@@ -12,8 +12,10 @@ import json
 
 from .database import get_db
 from .config import get_config, DEFAULT_CONFIG_PATH
-from .models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, DailySummary
+from .models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, DailySummary, ProjectState, OpenLoop
 from .manager import get_manager
+from .time_utils import get_local_now
+from .project_engine import get_active_projects_list, get_open_loops_list, refresh_project_states
 from synthesizer.aggregator import (
     generate_daily_summary_pipeline,
     generate_periodic_checkpoint,
@@ -23,7 +25,7 @@ from synthesizer.aggregator import (
 app = FastAPI(
     title="OmniContext Local Engine & Web Dashboard",
     description="個人全景上下文與活動記憶核心 API 與 Web 儀表板",
-    version="1.1.0"
+    version="1.2.0"
 )
 
 # 啟用 CORS 允許 Chrome Extension 和本機前端存取
@@ -45,7 +47,6 @@ app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 
 @app.get("/", response_class=HTMLResponse)
 def index_page():
-    """提供 Web 儀表板首頁"""
     index_file = WEB_DIR / "index.html"
     if index_file.exists():
         return FileResponse(str(index_file))
@@ -56,12 +57,13 @@ def index_page():
 # Pydantic 請求與回應結構模型
 # =====================================================================
 class AIPromptCreate(BaseModel):
-    platform: str = Field(..., description="gemini, chatgpt, claude, manus, etc.")
+    platform: str = Field(..., description="gemini, chatgpt, claude, manus, claude_code, codex, antigravity")
     url: Optional[str] = None
     conversation_id: Optional[str] = None
     prompt_text: str = Field(..., description="使用者輸入的 Prompt")
     response_text: Optional[str] = Field(None, description="AI 回應文本摘要")
     project_tag: Optional[str] = None
+    cwd: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
 
 
@@ -111,43 +113,65 @@ class GenerateCheckpointRequest(BaseModel):
 # =====================================================================
 @app.get("/api/v1/health")
 def health_check():
-    return {"status": "ok", "service": "OmniContext", "time": datetime.utcnow().isoformat()}
+    return {"status": "ok", "service": "OmniContext", "time": get_local_now().isoformat()}
 
 
 @app.get("/api/v1/control/status")
 def get_control_status():
-    """取得當前監控狀態、統計指標與目標配置"""
     manager = get_manager()
     return manager.get_status()
 
 
 @app.post("/api/v1/control/start")
 def start_monitoring():
-    """啟動全景監控服務"""
     manager = get_manager()
     return manager.start_all()
 
 
 @app.post("/api/v1/control/stop")
 def stop_monitoring():
-    """停止全景監控服務"""
     manager = get_manager()
     return manager.stop_all()
 
 
 # =====================================================================
-# 2. 配置動態讀寫 API (監控目標、資料夾、模型選擇)
+# 2. 進行中工作 (Active Projects) & Open Loops API (P1 核心)
+# =====================================================================
+@app.get("/api/v1/projects/active")
+def get_active_projects():
+    """取得當前所有進行中專案的狀態、閒置天數與最後動作"""
+    return get_active_projects_list()
+
+
+@app.get("/api/v1/open-loops")
+def get_open_loops(project: Optional[str] = None):
+    """取得未結事項清單"""
+    return get_open_loops_list(project_key=project)
+
+
+@app.post("/api/v1/open-loops/{loop_id}/resolve")
+def resolve_open_loop(loop_id: int):
+    """將未結事項標記為已解決"""
+    db = get_db()
+    with db.session_scope() as session:
+        loop = session.query(OpenLoop).filter_by(id=loop_id).first()
+        if not loop:
+            raise HTTPException(status_code=404, detail="Open loop not found")
+        loop.resolved_at = get_local_now()
+    return {"status": "success", "message": "Open loop marked as resolved"}
+
+
+# =====================================================================
+# 3. 配置動態讀寫 API
 # =====================================================================
 @app.get("/api/v1/config")
 def get_system_config():
-    """取得當前完整的系統設定檔內容"""
     cfg = get_config()
     return cfg.data
 
 
 @app.post("/api/v1/config")
 def update_system_config(new_config: Dict[str, Any] = Body(...)):
-    """更新系統設定檔並熱重載監控服務"""
     try:
         with open(DEFAULT_CONFIG_PATH, "w", encoding="utf-8") as f:
             yaml.safe_dump(new_config, f, allow_unicode=True, sort_keys=False)
@@ -160,24 +184,50 @@ def update_system_config(new_config: Dict[str, Any] = Body(...)):
 
 
 # =====================================================================
-# 3. 數據採集 Ingestion API
+# 4. 數據採集 Ingestion API (支援 Upsert 修復 D5)
 # =====================================================================
 @app.post("/api/v1/events/ai", status_code=201)
-def create_ai_event(payload: AIPromptCreate):
+def create_or_update_ai_event(payload: AIPromptCreate):
     db = get_db()
+    clean_prompt = payload.prompt_text.strip()
+
     with db.session_scope() as session:
+        # 尋找最近 10 分鐘內、相同平台與 Prompt 的記錄 (Upsert 邏輯)
+        recent_cutoff = get_local_now() - timedelta(minutes=10)
+        existing = (
+            session.query(AIPromptEvent)
+            .filter(
+                AIPromptEvent.platform == payload.platform,
+                AIPromptEvent.prompt_text == clean_prompt,
+                AIPromptEvent.timestamp >= recent_cutoff
+            )
+            .order_by(AIPromptEvent.timestamp.desc())
+            .first()
+        )
+
+        if existing:
+            # 若已有記錄且新 payload 帶有回應內容，則更新回應
+            if payload.response_text:
+                existing.response_text = payload.response_text
+                if payload.url: existing.url = payload.url
+                if payload.project_tag: existing.project_tag = payload.project_tag
+                if payload.cwd: existing.cwd = payload.cwd
+            return {"status": "updated", "message": "Existing AI event updated with response"}
+
+        # 否則新增記錄
         event = AIPromptEvent(
             platform=payload.platform,
             url=payload.url,
             conversation_id=payload.conversation_id,
-            prompt_text=payload.prompt_text,
+            prompt_text=clean_prompt,
             response_text=payload.response_text,
             project_tag=payload.project_tag,
+            cwd=payload.cwd,
             metadata_json=json.dumps(payload.metadata, ensure_ascii=False) if payload.metadata else None,
-            timestamp=datetime.utcnow()
+            timestamp=get_local_now()
         )
         session.add(event)
-    return {"status": "success", "message": "AI event logged"}
+    return {"status": "created", "message": "New AI event logged"}
 
 
 @app.post("/api/v1/events/file", status_code=201)
@@ -192,7 +242,7 @@ def create_file_event(payload: FileActivityCreate):
             size_bytes=payload.size_bytes,
             diff_summary=payload.diff_summary,
             project_name=payload.project_name,
-            timestamp=datetime.utcnow()
+            timestamp=get_local_now()
         )
         session.add(event)
     return {"status": "success", "message": "File event logged"}
@@ -216,7 +266,7 @@ def create_git_event(payload: GitActivityCreate):
             files_changed_count=payload.files_changed_count,
             insertions=payload.insertions,
             deletions=payload.deletions,
-            timestamp=datetime.utcnow()
+            timestamp=get_local_now()
         )
         session.add(event)
     return {"status": "success", "message": "Git event logged"}
@@ -227,8 +277,8 @@ def create_window_event(payload: WindowEventCreate):
     db = get_db()
     with db.session_scope() as session:
         event = WindowEvent(
-            start_time=payload.start_time or datetime.utcnow(),
-            end_time=payload.end_time or datetime.utcnow(),
+            start_time=payload.start_time or get_local_now(),
+            end_time=payload.end_time or get_local_now(),
             duration_seconds=payload.duration_seconds,
             app_name=payload.app_name,
             window_title=payload.window_title,
@@ -239,14 +289,13 @@ def create_window_event(payload: WindowEventCreate):
 
 
 # =====================================================================
-# 4. 即時活動時間軸動態查詢 (Live Feed API)
+# 5. 即時活動時間軸動態查詢 (Live Feed API)
 # =====================================================================
 @app.get("/api/v1/events/recent")
 def get_recent_events(
     limit: int = Query(50, ge=1, le=200),
     event_type: str = Query("all", regex="^(all|ai|file|git|window)$")
 ):
-    """查詢即時活動流（供 Web 儀表板 Live Feed 動態更新）"""
     db = get_db()
     events = []
 
@@ -307,29 +356,25 @@ def get_recent_events(
                     "project": w.app_name
                 })
 
-    # 按時間從新到舊排序
     events.sort(key=lambda x: x["timestamp"], reverse=True)
     return events[:limit]
 
 
 # =====================================================================
-# 5. 週期性日誌快照 (Checkpoint Logs) API
+# 6. 週期性快照日誌 API
 # =====================================================================
 @app.get("/api/v1/logs/checkpoints")
 def get_checkpoint_logs():
-    """列出所有週期性快照日誌"""
     return list_periodic_checkpoints()
 
 
 @app.post("/api/v1/logs/checkpoints/generate")
 def create_checkpoint_log(req: GenerateCheckpointRequest = Body(...)):
-    """手動產出最近 N 小時的活動日誌快照"""
     return generate_periodic_checkpoint(hours=req.hours)
 
 
 @app.get("/api/v1/logs/checkpoints/{filename}")
 def read_checkpoint_file(filename: str):
-    """讀取特定快照日誌的內容"""
     cfg = get_config()
     cp_dir = Path(cfg.get("exporters.checkpoints_dir", "logs/checkpoints"))
     if not cp_dir.is_absolute():
@@ -346,7 +391,7 @@ def read_checkpoint_file(filename: str):
 
 
 # =====================================================================
-# 6. AI 每日摘要與報告 API
+# 7. AI 每日摘要與報告 API
 # =====================================================================
 @app.get("/api/v1/summaries")
 def list_summaries(limit: int = Query(20, ge=1, le=100)):
@@ -390,7 +435,7 @@ def get_summary_by_date(date_str: str):
 
 @app.post("/api/v1/summaries/generate")
 def generate_summary(req: GenerateSummaryRequest):
-    target_date = req.target_date or date.today().isoformat()
+    target_date = req.target_date or get_local_now().strftime("%Y-%m-%d")
     result = generate_daily_summary_pipeline(
         target_date_str=target_date,
         provider_override=req.provider,

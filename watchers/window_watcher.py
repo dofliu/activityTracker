@@ -9,6 +9,7 @@ import os
 from core.config import get_config
 from core.database import get_db
 from core.models import WindowEvent
+from core.time_utils import get_local_now
 
 logger = logging.getLogger("OmniContext.WindowWatcher")
 
@@ -72,7 +73,7 @@ class WindowWatcherService:
         self._thread: threading.Thread | None = None
         self._current_app: str = ""
         self._current_title: str = ""
-        self._current_start_time: datetime = datetime.utcnow()
+        self._current_start_time: datetime = get_local_now()
 
     def start(self):
         enabled = self.cfg.get("watchers.window_watcher.enabled", True)
@@ -81,6 +82,7 @@ class WindowWatcherService:
             return
 
         self._running = True
+        self._current_start_time = get_local_now()
         self._thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self._thread.start()
         logger.info("WindowWatcher service started.")
@@ -97,7 +99,7 @@ class WindowWatcherService:
         if not self._current_app or not self._current_title:
             return
 
-        now = datetime.utcnow()
+        now = get_local_now()
         duration = (now - self._current_start_time).total_seconds()
         
         # 過短的時間（小於 3 秒）視為閃退或快速切換，忽略以節省空間
@@ -124,11 +126,10 @@ class WindowWatcherService:
                 app_name, title = get_active_window_info()
                 if title and title not in ignore_titles:
                     if app_name != self._current_app or title != self._current_title:
-                        # 視窗切換，結算前一個
                         self._flush_current_window()
                         self._current_app = app_name
                         self._current_title = title
-                        self._current_start_time = datetime.utcnow()
+                        self._current_start_time = get_local_now()
             except Exception as e:
                 logger.error(f"Error in window monitoring: {e}")
 

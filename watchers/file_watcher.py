@@ -1,8 +1,8 @@
 import os
 import time
+import fnmatch
 from pathlib import Path
-from typing import Set, Dict
-from datetime import datetime
+from typing import Set, Dict, List
 import logging
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
@@ -10,31 +10,77 @@ from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from core.config import get_config
 from core.database import get_db
 from core.models import FileActivityEvent
+from core.time_utils import get_local_now
 
 logger = logging.getLogger("OmniContext.FileWatcher")
 
+# 內建預設過濾黑名單
+DEFAULT_IGNORES = [
+    "*/site-packages/*",
+    "*/.venv/*",
+    "*/venv/*",
+    "*/__pycache__/*",
+    "*/.git/*",
+    "*/node_modules/*",
+    "*.dist-info/*",
+    "*/.codex/*",
+    "*/.gemini/*",
+    "*.tmp",
+    "~$*",
+    "*.crdownload",
+    "*.lock",
+    "*.pyc"
+]
+
 
 class ActivityFileHandler(FileSystemEventHandler):
-    def __init__(self, allowed_exts: Set[str]):
+    def __init__(self, allowed_exts: Set[str], ignore_patterns: List[str]):
         super().__init__()
         self.allowed_exts = allowed_exts
+        self.ignore_patterns = DEFAULT_IGNORES + [p for p in ignore_patterns if p]
         self.last_events: Dict[str, float] = {}  # 用於防手震 (Debounce)
-        self.debounce_seconds = 2.0
+        self.debounce_seconds = 300.0  # 同檔案 5 分鐘內只記錄一次修改，避免存檔刷屏
+
+    def _is_ignored(self, path_str: str) -> bool:
+        # 正規化路徑斜線為正斜線
+        norm_path = path_str.replace("\\", "/")
+        path_name = Path(path_str).name
+
+        for pattern in self.ignore_patterns:
+            norm_pattern = pattern.replace("\\", "/")
+            if fnmatch.fnmatch(norm_path, norm_pattern) or fnmatch.fnmatch(path_name, norm_pattern):
+                return True
+            # 也支援部分目錄匹配
+            clean_pat = norm_pattern.strip("*").strip("/")
+            if clean_pat and f"/{clean_pat}/" in f"/{norm_path}/":
+                return True
+        return False
 
     def _is_allowed(self, path_str: str) -> bool:
         path = Path(path_str)
         if path.is_dir():
             return False
-        # 檢查副檔名
-        return path.suffix.lower() in self.allowed_exts
+        
+        # 1. 檢查副檔名
+        if path.suffix.lower() not in self.allowed_exts:
+            return False
+
+        # 2. 檢查忽略模式
+        if self._is_ignored(path_str):
+            return False
+
+        return True
 
     def _process_event(self, action: str, path_str: str):
         if not self._is_allowed(path_str):
             return
 
         now = time.time()
-        if path_str in self.last_events and (now - self.last_events[path_str]) < self.debounce_seconds:
-            return
+        # 檢查 5 分鐘 debounce (針對 modified 事件)
+        if action == "modified" and path_str in self.last_events:
+            if (now - self.last_events[path_str]) < self.debounce_seconds:
+                return
+
         self.last_events[path_str] = now
 
         p = Path(path_str)
@@ -57,7 +103,7 @@ class ActivityFileHandler(FileSystemEventHandler):
             except Exception:
                 pass
 
-        # 寫入資料庫
+        # 寫入資料庫 (採用本地時間)
         db = get_db()
         with db.session_scope() as session:
             event = FileActivityEvent(
@@ -68,10 +114,10 @@ class ActivityFileHandler(FileSystemEventHandler):
                 size_bytes=size_bytes,
                 diff_summary=diff_summary,
                 project_name=p.parent.name,
-                timestamp=datetime.utcnow()
+                timestamp=get_local_now()
             )
             session.add(event)
-        logger.info(f"File activity: [{action}] {file_name} ({file_type})")
+        logger.info(f"File activity: [{action}] {file_name} ({file_type}) in {p.parent.name}")
 
     def on_created(self, event: FileSystemEvent):
         self._process_event("created", event.src_path)
@@ -98,9 +144,10 @@ class FileWatcherService:
             return
 
         directories = self.cfg.get("watchers.file_watcher.watch_directories", [])
-        exts = set(self.cfg.get("watchers.file_watcher.extensions", [".tex", ".docx", ".md", ".pdf", ".txt"]))
-        
-        handler = ActivityFileHandler(allowed_exts=exts)
+        exts = set(self.cfg.get("watchers.file_watcher.extensions", [".tex", ".docx", ".md", ".pdf", ".txt", ".py"]))
+        ignore_patterns = self.cfg.get("watchers.file_watcher.ignore_patterns", [])
+
+        handler = ActivityFileHandler(allowed_exts=exts, ignore_patterns=ignore_patterns)
         scheduled_count = 0
 
         for d_str in directories:

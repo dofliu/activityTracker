@@ -1,4 +1,3 @@
-from datetime import datetime
 from sqlalchemy import (
     Column,
     Integer,
@@ -6,9 +5,11 @@ from sqlalchemy import (
     Text,
     DateTime,
     Float,
-    Index
+    Index,
+    Boolean
 )
 from sqlalchemy.orm import declarative_base
+from .time_utils import get_local_now
 
 Base = declarative_base()
 
@@ -18,17 +19,19 @@ class AIPromptEvent(Base):
     __tablename__ = "ai_prompt_events"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
-    platform = Column(String(50), nullable=False, index=True)  # gemini, chatgpt, claude, manus, claude_code, etc.
+    timestamp = Column(DateTime, default=get_local_now, index=True)
+    platform = Column(String(50), nullable=False, index=True)  # gemini, chatgpt, claude, manus, claude_code, codex, antigravity
     url = Column(String(500), nullable=True)
     conversation_id = Column(String(100), nullable=True, index=True)
     prompt_text = Column(Text, nullable=False)
     response_text = Column(Text, nullable=True)
-    project_tag = Column(String(100), nullable=True, index=True)
+    project_tag = Column(String(255), nullable=True, index=True)
+    cwd = Column(String(1000), nullable=True)
     metadata_json = Column(Text, nullable=True)
 
     __table_args__ = (
         Index("ix_ai_platform_time", "platform", "timestamp"),
+        Index("ix_ai_project_time", "project_tag", "timestamp"),
     )
 
 
@@ -37,7 +40,7 @@ class FileActivityEvent(Base):
     __tablename__ = "file_activity_events"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    timestamp = Column(DateTime, default=get_local_now, index=True)
     file_path = Column(String(1000), nullable=False)
     file_name = Column(String(255), nullable=False)
     file_type = Column(String(50), nullable=False, index=True)  # .tex, .docx, .md, .pdf, .py
@@ -52,7 +55,7 @@ class GitActivityEvent(Base):
     __tablename__ = "git_activity_events"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    timestamp = Column(DateTime, default=get_local_now, index=True)
     repo_name = Column(String(100), nullable=False, index=True)
     repo_path = Column(String(1000), nullable=False)
     commit_hash = Column(String(50), unique=True, nullable=False)
@@ -69,8 +72,8 @@ class WindowEvent(Base):
     __tablename__ = "window_events"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    start_time = Column(DateTime, default=datetime.utcnow, index=True)
-    end_time = Column(DateTime, default=datetime.utcnow)
+    start_time = Column(DateTime, default=get_local_now, index=True)
+    end_time = Column(DateTime, default=get_local_now)
     duration_seconds = Column(Float, default=0.0)
     app_name = Column(String(100), nullable=False, index=True)
     window_title = Column(String(500), nullable=False)
@@ -83,9 +86,37 @@ class DailySummary(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     date_str = Column(String(10), unique=True, nullable=False, index=True)  # YYYY-MM-DD
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_local_now)
     llm_provider = Column(String(50), nullable=False)
     model_name = Column(String(100), nullable=False)
     raw_markdown = Column(Text, nullable=False)
     highlights_json = Column(Text, nullable=True)
     action_items_json = Column(Text, nullable=True)
+
+
+class ProjectState(Base):
+    """記錄各專案/論文的進行中狀態與最後進展 (P1 專案歸戶層)"""
+    __tablename__ = "project_states"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_key = Column(String(255), unique=True, nullable=False, index=True)  # 正規化路徑或標籤名稱
+    display_name = Column(String(100), nullable=False, index=True)
+    category = Column(String(50), default="Coding", index=True)  # Research, Coding, Paper, Personal
+    last_activity_at = Column(DateTime, default=get_local_now, index=True)
+    last_action_summary = Column(Text, nullable=True)
+    status = Column(String(50), default="active", index=True)  # active, idle, stale, completed
+    updated_at = Column(DateTime, default=get_local_now, onupdate=get_local_now)
+
+
+class OpenLoop(Base):
+    """記錄未結事項、卡點與待辦項目 (P1 Open Loops 層)"""
+    __tablename__ = "open_loops"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_key = Column(String(255), nullable=False, index=True)
+    title = Column(Text, nullable=False)
+    source_type = Column(String(50), default="ai_dialogue")  # ai_dialogue, commit, file_edit, manual
+    source_event_id = Column(Integer, nullable=True)
+    confidence = Column(Float, default=1.0)
+    created_at = Column(DateTime, default=get_local_now, index=True)
+    resolved_at = Column(DateTime, nullable=True, index=True)

@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OmniContext - 個人全景上下文與 AI 智慧記憶中樞</title>
   <link rel="stylesheet" href="/static/style.css">
-  <!-- Markdown Parser -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
@@ -15,7 +14,7 @@
       <div class="logo-icon">🌐</div>
       <div>
         <h1 class="app-title">OmniContext</h1>
-        <p class="app-subtitle">個人全景活動追蹤 & AI 智慧回顧中樞</p>
+        <p class="app-subtitle">個人全景活動追蹤 & 進行中專案中樞</p>
       </div>
     </div>
 
@@ -41,7 +40,8 @@
 
   <!-- 導航分頁列 -->
   <nav class="nav-tabs">
-    <button class="nav-tab active" data-tab="tab-dashboard">📊 即時儀表板</button>
+    <button class="nav-tab active" data-tab="tab-projects">🎯 進行中工作 (Projects)</button>
+    <button class="nav-tab" data-tab="tab-dashboard">📊 即時活動流 (Live Feed)</button>
     <button class="nav-tab" data-tab="tab-settings">⚙️ 監控項目與配置</button>
     <button class="nav-tab" data-tab="tab-summaries">📝 AI 每日摘要與報告</button>
     <button class="nav-tab" data-tab="tab-checkpoints">⏱️ 週期性活動快照</button>
@@ -51,16 +51,33 @@
   <main class="app-container">
 
     <!-- ============================================================ -->
-    <!-- 分頁 1: 即時儀表板 -->
+    <!-- 分頁 0: 🎯 進行中工作 (Active Projects) (P1 預設首頁) -->
     <!-- ============================================================ -->
-    <section id="tab-dashboard" class="tab-pane active">
+    <section id="tab-projects" class="tab-pane active">
+      <div class="card-header flex-between mb-3">
+        <div>
+          <h2>🎯 進行中專案與研究狀態 (Active Workstreams)</h2>
+          <p class="text-muted text-sm">自動從 Git commits、論文寫作、Claude Code、Codex 與 Antigravity 活動歸戶</p>
+        </div>
+        <button class="btn btn-outline btn-sm" id="btn-refresh-projects">🔄 重新整理專案狀態</button>
+      </div>
+
+      <div class="projects-grid" id="projects-grid">
+        <div class="loading-placeholder">載入進行中專案與研究狀態中...</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 分頁 1: 📊 即時活動流與指標 -->
+    <!-- ============================================================ -->
+    <section id="tab-dashboard" class="tab-pane">
       <!-- 統計指標卡片 -->
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-icon">🤖</div>
           <div class="stat-content">
             <div class="stat-value" id="stat-ai-prompts">0</div>
-            <div class="stat-label">AI 互動 (Prompts)</div>
+            <div class="stat-label">AI 互動 (Claude/Codex/Web)</div>
           </div>
         </div>
 
@@ -76,7 +93,7 @@
           <div class="stat-icon">💻</div>
           <div class="stat-content">
             <div class="stat-value" id="stat-git-commits">0</div>
-            <div class="stat-label">Git Commits</div>
+            <div class="stat-label">Git Commits (49+ Repos)</div>
           </div>
         </div>
 
@@ -89,10 +106,10 @@
         </div>
 
         <div class="stat-card">
-          <div class="stat-icon">📝</div>
+          <div class="stat-icon">🎯</div>
           <div class="stat-content">
-            <div class="stat-value" id="stat-daily-summaries">0</div>
-            <div class="stat-label">AI 每日回顧</div>
+            <div class="stat-value" id="stat-active-projects">0</div>
+            <div class="stat-label">進行中專案數</div>
           </div>
         </div>
       </div>
@@ -103,9 +120,7 @@
           <h3>🔍 採集器與排程器狀態</h3>
           <span class="text-muted text-sm" id="last-refresh-time">更新於: --:--:--</span>
         </div>
-        <div class="watchers-status-grid" id="watchers-grid">
-          <!-- JS 動態填入 -->
-        </div>
+        <div class="watchers-status-grid" id="watchers-grid"></div>
       </div>
 
       <!-- 即時活動流 -->
@@ -127,11 +142,11 @@
     </section>
 
     <!-- ============================================================ -->
-    <!-- 分頁 2: 監控項目與配置 -->
+    <!-- 分頁 2: ⚙️ 監控項目與配置 -->
     <!-- ============================================================ -->
     <section id="tab-settings" class="tab-pane">
       <div class="settings-layout">
-        <!-- 左側：監控目標選擇 -->
+        <!-- 檔案監控 -->
         <div class="card">
           <div class="card-header">
             <h3>📁 1. 論文與檔案監控資料夾</h3>
@@ -163,46 +178,54 @@
         <!-- 程式碼倉庫 -->
         <div class="card">
           <div class="card-header">
-            <h3>💻 2. Git 程式碼專案庫</h3>
+            <h3>💻 2. Git 程式碼專案根目錄 (自動遞迴掃描)</h3>
           </div>
           <div class="card-body">
             <div class="form-group">
-              <label>Git 倉庫目錄清單：</label>
+              <label>Git 倉庫/根目錄清單 (支援掃描底下所有子倉庫)：</label>
               <div id="repo-list" class="tag-list-box"></div>
               <div class="input-with-btn mt-2">
-                <input type="text" id="input-new-repo" placeholder="輸入本機 Git 專案目錄絕對路徑...">
-                <button class="btn btn-secondary" id="btn-add-repo">+ 新增倉庫</button>
+                <input type="text" id="input-new-repo" placeholder="輸入本機 Git 專案根目錄路徑...">
+                <button class="btn btn-secondary" id="btn-add-repo">+ 新增根目錄</button>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 瀏覽器與 AI 工具開關 -->
+        <!-- 瀏覽器與 AI 工具開關 (真正綁定後端) -->
         <div class="card">
           <div class="card-header">
-            <h3>🤖 3. AI 工具與瀏覽器監控開關</h3>
+            <h3>🤖 3. AI 工具與本機日誌採集開關</h3>
           </div>
           <div class="card-body">
             <div class="toggle-grid">
+              <label class="toggle-item">
+                <input type="checkbox" id="toggle-claude-code" checked>
+                <span>Claude Code CLI (`~/.claude`)</span>
+              </label>
+              <label class="toggle-item">
+                <input type="checkbox" id="toggle-codex" checked>
+                <span>Codex CLI (`~/.codex`)</span>
+              </label>
+              <label class="toggle-item">
+                <input type="checkbox" id="toggle-antigravity" checked>
+                <span>Antigravity Transcripts</span>
+              </label>
               <label class="toggle-item">
                 <input type="checkbox" id="toggle-gemini" checked>
                 <span>Gemini (gemini.google.com)</span>
               </label>
               <label class="toggle-item">
                 <input type="checkbox" id="toggle-chatgpt" checked>
-                <span>ChatGPT / Codex (chatgpt.com)</span>
+                <span>ChatGPT / OpenAI Web</span>
               </label>
               <label class="toggle-item">
-                <input type="checkbox" id="toggle-claude" checked>
-                <span>Claude (claude.ai)</span>
+                <input type="checkbox" id="toggle-claude-web" checked>
+                <span>Claude Web (claude.ai)</span>
               </label>
               <label class="toggle-item">
                 <input type="checkbox" id="toggle-manus" checked>
                 <span>Manus (manus.im)</span>
-              </label>
-              <label class="toggle-item">
-                <input type="checkbox" id="toggle-claude-code" checked>
-                <span>Claude Code / CLI 日誌</span>
               </label>
               <label class="toggle-item">
                 <input type="checkbox" id="toggle-window-focus" checked>
@@ -254,11 +277,10 @@
     </section>
 
     <!-- ============================================================ -->
-    <!-- 分頁 3: AI 每日摘要與報告 -->
+    <!-- 分頁 3: 📝 AI 每日摘要與報告 -->
     <!-- ============================================================ -->
     <section id="tab-summaries" class="tab-pane">
       <div class="summaries-layout">
-        <!-- 左側列表 -->
         <div class="summary-sidebar card">
           <div class="card-header">
             <h3>📅 歷史每日回顧</h3>
@@ -274,7 +296,6 @@
           </div>
         </div>
 
-        <!-- 右側 Markdown 報告展示 -->
         <div class="summary-content card">
           <div class="card-header flex-between">
             <h3 id="current-summary-title">📄 每日回顧報告內容</h3>
@@ -290,7 +311,7 @@
     </section>
 
     <!-- ============================================================ -->
-    <!-- 分頁 4: 週期性活動快照 (Checkpoints) -->
+    <!-- 分頁 4: ⏱️ 週期性活動快照 (Checkpoints) -->
     <!-- ============================================================ -->
     <section id="tab-checkpoints" class="tab-pane">
       <div class="summaries-layout">

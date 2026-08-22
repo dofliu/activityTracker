@@ -1,6 +1,6 @@
 // web/app.js - OmniContext Web Dashboard Controller
 
-const API_BASE = ""; // 相對路徑 (同 Origin)
+const API_BASE = "";
 
 let currentConfig = null;
 let activeFilter = "all";
@@ -8,9 +8,6 @@ let currentSummaryMarkdown = "";
 let currentCheckpointMarkdown = "";
 let isMonitoring = false;
 
-// =====================================================================
-// 初始化與事件監聽
-// =====================================================================
 document.addEventListener("DOMContentLoaded", () => {
   initTabs();
   initControlButtons();
@@ -18,7 +15,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initSummariesTab();
   initCheckpointsTab();
 
-  // 初始載入與定時輪詢 (每 4 秒刷新儀表板與狀態)
+  // 初始載入與定時輪詢
+  loadActiveProjects();
   refreshStatusAndMetrics();
   refreshLiveFeed();
   loadConfigIntoSettings();
@@ -44,15 +42,78 @@ function initTabs() {
       const targetId = tab.getAttribute("data-tab");
       document.getElementById(targetId).classList.add("active");
 
+      if (targetId === "tab-projects") loadActiveProjects();
       if (targetId === "tab-summaries") loadSummariesList();
       if (targetId === "tab-checkpoints") loadCheckpointsList();
       if (targetId === "tab-settings") loadConfigIntoSettings();
     });
   });
+
+  document.getElementById("btn-refresh-projects").addEventListener("click", loadActiveProjects);
 }
 
 // =====================================================================
-// 2. 系統狀態與控制按鈕 (Start/Stop, Quick Actions)
+// 2. 進行中專案 (Active Projects - P1 核心首頁)
+// =====================================================================
+async function loadActiveProjects() {
+  const container = document.getElementById("projects-grid");
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/projects/active`);
+    if (!res.ok) return;
+    const projects = await res.json();
+
+    if (projects.length === 0) {
+      container.innerHTML = '<div class="loading-placeholder">尚未識別到專案活動。進行程式開發、論文寫作或在 Claude/Codex 發問後將自動建立。</div>';
+      return;
+    }
+
+    container.innerHTML = projects.map(p => {
+      let statusClass = "proj-status-active";
+      let statusText = "🟢 活躍中";
+      if (p.status === "idle") {
+        statusClass = "proj-status-idle";
+        statusText = `🟡 閒置 ${p.idle_days} 天`;
+      } else if (p.status === "stale") {
+        statusClass = "proj-status-stale";
+        statusText = `⚪ 閒置 ${p.idle_days} 天`;
+      }
+
+      let catIcon = "💻";
+      if (p.category.includes("Research") || p.category.includes("Paper")) catIcon = "📄";
+      if (p.category.includes("AI")) catIcon = "🤖";
+
+      return `
+        <div class="project-card">
+          <div>
+            <div class="project-card-header">
+              <div>
+                <div class="project-title">${catIcon} ${escapeHtml(p.display_name)}</div>
+                <div class="project-category">${escapeHtml(p.category)}</div>
+              </div>
+              <span class="project-status-badge ${statusClass}">${statusText}</span>
+            </div>
+
+            <div class="project-action-box">
+              <strong>最新動態：</strong> ${escapeHtml(p.last_action_summary || '無紀錄')}
+            </div>
+          </div>
+
+          <div class="project-meta-row">
+            <span>⏱️ 最後活動: ${p.last_activity_at}</span>
+            <span>📌 未結事項: <strong>${p.open_loops_count}</strong></span>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    document.getElementById("stat-active-projects").innerText = projects.length;
+  } catch (err) {
+    console.error("Failed to load active projects:", err);
+  }
+}
+
+// =====================================================================
+// 3. 系統狀態與控制按鈕
 // =====================================================================
 function initControlButtons() {
   const btnToggle = document.getElementById("btn-toggle-monitor");
@@ -68,7 +129,6 @@ function initControlButtons() {
   document.getElementById("btn-quick-summary").addEventListener("click", () => triggerGenerateSummary());
   document.getElementById("btn-trigger-cp-now").addEventListener("click", triggerQuickCheckpoint);
 
-  // 篩選按鈕
   document.querySelectorAll(".filter-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
@@ -88,14 +148,11 @@ async function refreshStatusAndMetrics() {
     isMonitoring = data.is_running;
     updateStatusBadge(data.is_running);
 
-    // 更新指標卡片
     document.getElementById("stat-ai-prompts").innerText = data.metrics.ai_prompts_count;
     document.getElementById("stat-file-events").innerText = data.metrics.file_events_count;
     document.getElementById("stat-git-commits").innerText = data.metrics.git_commits_count;
     document.getElementById("stat-window-events").innerText = data.metrics.window_events_count;
-    document.getElementById("stat-daily-summaries").innerText = data.metrics.daily_summaries_count;
 
-    // 更新採集器狀態 Grid
     renderWatchersGrid(data.watchers);
     document.getElementById("last-refresh-time").innerText = `更新於: ${new Date().toLocaleTimeString()}`;
   } catch (err) {
@@ -168,7 +225,7 @@ async function stopMonitoring() {
 }
 
 // =====================================================================
-// 3. 即時活動時間軸 (Live Feed)
+// 4. 即時活動流 (Live Feed)
 // =====================================================================
 async function refreshLiveFeed() {
   try {
@@ -178,7 +235,7 @@ async function refreshLiveFeed() {
     const container = document.getElementById("feed-list");
 
     if (events.length === 0) {
-      container.innerHTML = '<div class="loading-placeholder">目前尚無活動紀錄。請在瀏覽器或本機進行操作。</div>';
+      container.innerHTML = '<div class="loading-placeholder">目前尚無活動紀錄。</div>';
       return;
     }
 
@@ -208,13 +265,12 @@ async function refreshLiveFeed() {
 }
 
 // =====================================================================
-// 4. 監控配置管理 (Settings Form)
+// 5. 監控配置管理 (Settings)
 // =====================================================================
 let configDirs = [];
 let configRepos = [];
 
 function initSettingsForm() {
-  // 新增目錄
   document.getElementById("btn-add-dir").addEventListener("click", () => {
     const input = document.getElementById("input-new-dir");
     const val = input.value.trim();
@@ -225,7 +281,6 @@ function initSettingsForm() {
     }
   });
 
-  // 新增倉庫
   document.getElementById("btn-add-repo").addEventListener("click", () => {
     const input = document.getElementById("input-new-repo");
     const val = input.value.trim();
@@ -236,7 +291,6 @@ function initSettingsForm() {
     }
   });
 
-  // 儲存設定
   document.getElementById("btn-save-settings").addEventListener("click", saveSettings);
 }
 
@@ -246,15 +300,12 @@ async function loadConfigIntoSettings() {
     if (!res.ok) return;
     currentConfig = await res.json();
 
-    // 填入目錄
     configDirs = currentConfig.watchers?.file_watcher?.watch_directories || [];
     renderDirList();
 
-    // 填入倉庫
     configRepos = currentConfig.watchers?.git_watcher?.repositories || [];
     renderRepoList();
 
-    // 填入排程與 LLM
     document.getElementById("input-schedule-time").value = currentConfig.synthesizer?.schedule?.time || "23:30";
     document.getElementById("input-checkpoint-interval").value = currentConfig.synthesizer?.periodic_checkpoint?.interval_hours || 2;
     
@@ -262,11 +313,20 @@ async function loadConfigIntoSettings() {
     document.getElementById("select-llm-provider").value = provider;
     document.getElementById("input-model-name").value = currentConfig.synthesizer?.[provider]?.model || "gemini-2.5-flash";
 
-    // 勾選副檔名
     const exts = currentConfig.watchers?.file_watcher?.extensions || [];
     document.querySelectorAll("#ext-checkboxes input").forEach(cb => {
       cb.checked = exts.includes(cb.value);
     });
+
+    // 載入各開關
+    document.getElementById("toggle-claude-code").checked = currentConfig.watchers?.agent_log_watcher?.claude_code !== false;
+    document.getElementById("toggle-codex").checked = currentConfig.watchers?.agent_log_watcher?.codex !== false;
+    document.getElementById("toggle-antigravity").checked = currentConfig.watchers?.agent_log_watcher?.antigravity !== false;
+    document.getElementById("toggle-gemini").checked = currentConfig.watchers?.browser?.gemini !== false;
+    document.getElementById("toggle-chatgpt").checked = currentConfig.watchers?.browser?.chatgpt !== false;
+    document.getElementById("toggle-claude-web").checked = currentConfig.watchers?.browser?.claude_web !== false;
+    document.getElementById("toggle-manus").checked = currentConfig.watchers?.browser?.manus !== false;
+    document.getElementById("toggle-window-focus").checked = currentConfig.watchers?.window_watcher?.enabled !== false;
   } catch (err) {
     console.error("Failed to load config:", err);
   }
@@ -289,7 +349,7 @@ function renderDirList() {
 function renderRepoList() {
   const container = document.getElementById("repo-list");
   if (configRepos.length === 0) {
-    container.innerHTML = '<div class="text-muted text-sm">尚未設定 Git 專案庫</div>';
+    container.innerHTML = '<div class="text-muted text-sm">尚未設定 Git 專案根目錄</div>';
     return;
   }
   container.innerHTML = configRepos.map((repo, idx) => `
@@ -317,7 +377,6 @@ async function saveSettings() {
   const provider = document.getElementById("select-llm-provider").value;
   const modelName = document.getElementById("input-model-name").value.trim();
 
-  // 更新配置物件
   if (!currentConfig.watchers) currentConfig.watchers = {};
   if (!currentConfig.watchers.file_watcher) currentConfig.watchers.file_watcher = { enabled: true };
   currentConfig.watchers.file_watcher.watch_directories = configDirs;
@@ -325,6 +384,20 @@ async function saveSettings() {
 
   if (!currentConfig.watchers.git_watcher) currentConfig.watchers.git_watcher = { enabled: true };
   currentConfig.watchers.git_watcher.repositories = configRepos;
+
+  if (!currentConfig.watchers.agent_log_watcher) currentConfig.watchers.agent_log_watcher = { enabled: true };
+  currentConfig.watchers.agent_log_watcher.claude_code = document.getElementById("toggle-claude-code").checked;
+  currentConfig.watchers.agent_log_watcher.codex = document.getElementById("toggle-codex").checked;
+  currentConfig.watchers.agent_log_watcher.antigravity = document.getElementById("toggle-antigravity").checked;
+
+  if (!currentConfig.watchers.browser) currentConfig.watchers.browser = {};
+  currentConfig.watchers.browser.gemini = document.getElementById("toggle-gemini").checked;
+  currentConfig.watchers.browser.chatgpt = document.getElementById("toggle-chatgpt").checked;
+  currentConfig.watchers.browser.claude_web = document.getElementById("toggle-claude-web").checked;
+  currentConfig.watchers.browser.manus = document.getElementById("toggle-manus").checked;
+
+  if (!currentConfig.watchers.window_watcher) currentConfig.watchers.window_watcher = { enabled: true };
+  currentConfig.watchers.window_watcher.enabled = document.getElementById("toggle-window-focus").checked;
 
   if (!currentConfig.synthesizer) currentConfig.synthesizer = {};
   if (!currentConfig.synthesizer.schedule) currentConfig.synthesizer.schedule = { enabled: true };
@@ -352,7 +425,7 @@ async function saveSettings() {
 }
 
 // =====================================================================
-// 5. AI 每日摘要 (Summaries Tab)
+// 6. AI 每日摘要 (Summaries Tab)
 // =====================================================================
 function initSummariesTab() {
   document.getElementById("input-summary-date").value = new Date().toISOString().split("T")[0];
@@ -388,7 +461,6 @@ async function loadSummariesList() {
       </div>
     `).join("");
 
-    // 預設載入第一筆
     if (list.length > 0) {
       renderMarkdownSummary(list[0].date_str, list[0].raw_markdown);
     }
@@ -452,7 +524,7 @@ async function triggerGenerateSummary(targetDate = null, force = true) {
 }
 
 // =====================================================================
-// 6. 週期性快照日誌 (Checkpoints Tab)
+// 7. 週期性快照日誌 (Checkpoints Tab)
 // =====================================================================
 function initCheckpointsTab() {
   document.getElementById("btn-copy-cp").addEventListener("click", () => {

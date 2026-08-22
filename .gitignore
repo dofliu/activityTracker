@@ -11,6 +11,8 @@ ENV/
 
 # Database files (Local privacy storage)
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 
@@ -19,6 +21,7 @@ reports/*.md
 !reports/.gitkeep
 logs/checkpoints/*.md
 !logs/checkpoints/.gitkeep
+scripts/.tz_migrated
 
 # Environment variables & API keys
 .env
