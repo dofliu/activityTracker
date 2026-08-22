@@ -292,6 +292,17 @@ function initSettingsForm() {
   });
 
   document.getElementById("btn-save-settings").addEventListener("click", saveSettings);
+
+  document.getElementById("select-llm-provider").addEventListener("change", (e) => {
+    const p = e.target.value;
+    const defaultModels = {
+      gemini: "gemini-2.5-flash",
+      anthropic: "claude-3-5-sonnet-20241022",
+      openai: "gpt-4o",
+      ollama: "llama3.1:8b"
+    };
+    document.getElementById("input-model-name").value = currentConfig?.synthesizer?.[p]?.model || defaultModels[p] || "";
+  });
 }
 
 async function loadConfigIntoSettings() {
