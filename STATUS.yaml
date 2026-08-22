@@ -1,0 +1,22 @@
+name: OmniContext Activity Tracker
+name_zh: OmniContext 個人全景活動追蹤系統
+category: personal_tools
+progress: 35
+status: active
+last_updated: "2026-08-22"
+next_milestone: "P0 修復時區混用與檔案噪音，讓 Checkpoint 與日報產出真實內容（非 seed-demo 假資料）"
+technologies:
+  - Python
+  - FastAPI
+  - SQLAlchemy
+  - SQLite
+  - APScheduler
+  - watchdog
+  - GitPython
+  - Chrome Extension (MV3)
+  - Gemini API
+outputs:
+  - tool
+description: "Local-first personal context tracker that captures cross-platform AI conversations, file edits, git commits and window focus, then synthesizes daily research/work reviews via LLM."
+description_zh: "本機優先的個人全景活動追蹤系統，自動捕捉跨平台 AI 對話、檔案異動、Git commits 與視窗焦點，並由 LLM 產出每日工作與研究回顧。"
+key_metrics: "資料採集骨架與 Web 儀表板已完成；6 項採集缺陷待修（見 ROADMAP.md）。實測 8/22 有效 AI 對話僅 10 筆、Git commits 0 筆、檔案事件訊噪比 1:3574。"
