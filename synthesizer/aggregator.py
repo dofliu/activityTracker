@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, date, time, timedelta
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Set
 import json
 import logging
 
@@ -98,29 +98,46 @@ def fetch_events_in_range(start_dt: datetime, end_dt: datetime) -> Dict[str, Any
 
 
 def fetch_day_data(target_date: date) -> Dict[str, Any]:
-    """從 SQLite 資料庫撈取指定日期的所有事件"""
+    """從 SQLite 資料庫嚴格撈取指定日期的所有事件 (00:00:00 ~ 23:59:59)"""
     start_dt = datetime.combine(target_date, time.min)
     end_dt = datetime.combine(target_date, time.max)
     return fetch_events_in_range(start_dt, end_dt)
 
 
 def format_context_for_prompt(day_data: Dict[str, Any], target_date_str: str) -> str:
-    """將資料庫事件轉換為適合 LLM 閱讀的專案中心格式"""
-    # 1. Active Projects
-    active_projects = get_active_projects_list()[:10]
+    """將資料庫事件轉換為適合 LLM 閱讀的專案中心格式 (嚴格限於當日真實推進專案)"""
+    
+    # 找出今日真正有活動的專案名稱集合
+    today_active_project_names: Set[str] = set()
+    for g in day_data["git_events"]:
+        if g.get("repo"): today_active_project_names.add(g["repo"])
+    for f in day_data["file_events"]:
+        if f.get("project"): today_active_project_names.add(f["project"])
+    for a in day_data["ai_events"]:
+        if a.get("tag"): today_active_project_names.add(a["tag"])
+
+    # 1. Active Projects (今日真正有活動的專案)
+    all_projects = get_active_projects_list()
+    today_projects = [p for p in all_projects if p["display_name"] in today_active_project_names or p["project_key"] in today_active_project_names]
+
     proj_lines = []
-    for p in active_projects:
-        proj_lines.append(f"- **{p['display_name']}** [{p['category']}] ({p['status']}, 閒置 {p['idle_days']} 天): {p['last_action_summary']}")
-    proj_text = "\n".join(proj_lines) if proj_lines else "（目前尚無專案歸戶紀錄）"
+    for p in today_projects:
+        proj_lines.append(f"- **{p['display_name']}** [{p['category']}]: 最新動態 `{p['last_action_summary']}`")
+    
+    if not proj_lines and today_active_project_names:
+        for name in sorted(today_active_project_names):
+            proj_lines.append(f"- **{name}**")
+
+    proj_text = "\n".join(proj_lines) if proj_lines else "（今日無專案更新）"
 
     # 2. Open Loops
-    open_loops = get_open_loops_list()[:10]
+    open_loops = get_open_loops_list()[:8]
     loop_lines = []
     for ol in open_loops:
         loop_lines.append(f"- [{ol['project_key']}] {ol['title']} (建立於 {ol['created_at']})")
-    loop_text = "\n".join(loop_lines) if loop_lines else "（目前無遺留未結事項）"
+    loop_text = "\n".join(loop_lines) if loop_lines else "（目前無待辦事項）"
 
-    # 3. AI Events
+    # 3. AI Events (今日)
     ai_lines = []
     for item in day_data["ai_events"]:
         tag_info = f" [{item['tag']}]" if item['tag'] else ""
@@ -128,20 +145,20 @@ def format_context_for_prompt(day_data: Dict[str, Any], target_date_str: str) ->
         ai_lines.append(f"- [{item['time'].split(' ')[1]}] [{item['platform'].upper()}]{tag_info} 問: {item['prompt']}{resp_snippet}")
     ai_text = "\n".join(ai_lines) if ai_lines else "（今日無 AI 互動紀錄）"
 
-    # 4. File Events
+    # 4. File Events (今日)
     file_lines = []
     for item in day_data["file_events"]:
         diff_str = f" ({item['diff']})" if item['diff'] else ""
         file_lines.append(f"- [{item['time'].split(' ')[1]}] [{item['action'].upper()}] {item['file_name']} [{item['file_type']}]{diff_str}")
     file_text = "\n".join(file_lines) if file_lines else "（今日無檔案異動紀錄）"
 
-    # 5. Git Events
+    # 5. Git Events (今日)
     git_lines = []
     for item in day_data["git_events"]:
         git_lines.append(f"- [{item['time'].split(' ')[1]}] [{item['repo']}@{item['branch']}] Commit: {item['message']} (+{item['insertions']}/-{item['deletions']})")
     git_text = "\n".join(git_lines) if git_lines else "（今日無代碼提交紀錄）"
 
-    # 6. Window Events
+    # 6. Window Events (今日)
     app_durations: Dict[str, float] = {}
     for item in day_data["window_events"]:
         app = item["app"]
@@ -162,7 +179,6 @@ def format_context_for_prompt(day_data: Dict[str, Any], target_date_str: str) ->
 
 
 def save_summary_to_file(date_str: str, markdown_content: str) -> Path:
-    """將生成的 Markdown 報告存檔於 reports/ 與 Obsidian"""
     cfg = get_config()
     reports_dir_str = cfg.get("exporters.reports_dir", "reports")
     reports_dir = Path(reports_dir_str)
@@ -187,7 +203,6 @@ def save_summary_to_file(date_str: str, markdown_content: str) -> Path:
 
 
 def generate_periodic_checkpoint(hours: int = 2) -> Dict[str, Any]:
-    """每隔固定時間自動產出一個整理 Checkpoint Log，記錄近 N 小時的所有活動"""
     cfg = get_config()
     checkpoints_dir_str = cfg.get("exporters.checkpoints_dir", "logs/checkpoints")
     cp_dir = Path(checkpoints_dir_str)
@@ -255,7 +270,6 @@ def generate_periodic_checkpoint(hours: int = 2) -> Dict[str, Any]:
 
 
 def list_periodic_checkpoints() -> List[Dict[str, Any]]:
-    """列出已產生的所有週期性快照日誌"""
     cfg = get_config()
     checkpoints_dir_str = cfg.get("exporters.checkpoints_dir", "logs/checkpoints")
     cp_dir = Path(checkpoints_dir_str)
@@ -285,7 +299,7 @@ def generate_daily_summary_pipeline(
     provider_override: Optional[str] = None,
     force_refresh: bool = False
 ) -> Dict[str, Any]:
-    """完整的每日總結生成管道 (以專案為主軸、跨日接續)"""
+    """嚴格以指定日期 (00:00:00 ~ 23:59:59) 真實活動為範疇的每日總結生成管道"""
     if not target_date_str:
         target_date = get_local_now().date()
         target_date_str = target_date.isoformat()
@@ -294,7 +308,6 @@ def generate_daily_summary_pipeline(
 
     db = get_db()
 
-    # 檢查是否已存在
     with db.session_scope() as session:
         existing = session.query(DailySummary).filter_by(date_str=target_date_str).first()
         if existing and not force_refresh:
@@ -305,11 +318,11 @@ def generate_daily_summary_pipeline(
                 "markdown": existing.raw_markdown
             }
 
-    # 1. 撈取數據與更新專案狀態
+    # 1. 撈取指定日期當天的數據
     refresh_project_states()
     day_data = fetch_day_data(target_date)
 
-    # 2. 構建 Prompt
+    # 2. 構建 Prompt (僅包含當日有活動的專案)
     user_prompt = format_context_for_prompt(day_data, target_date_str)
 
     # 3. 調用 LLM
