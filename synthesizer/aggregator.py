@@ -357,9 +357,20 @@ def generate_daily_summary_pipeline(
             summary_record.raw_markdown = markdown_result
             summary_record.created_at = get_local_now()
 
+    # 6. 自動從日報萃取未結事項 (Open Loops) 並存入資料庫
+    try:
+        from core.project_engine import extract_and_save_open_loops_from_summary
+        loop_ids = extract_and_save_open_loops_from_summary(markdown_result, target_date_str)
+        if loop_ids:
+            logger.info(f"Extracted and saved {len(loop_ids)} Open Loops from daily summary.")
+    except Exception as e:
+        logger.warning(f"Error extracting open loops from summary: {e}")
+
     return {
         "status": "generated",
         "date_str": target_date_str,
         "report_path": str(report_file),
         "markdown": markdown_result
     }
+
+

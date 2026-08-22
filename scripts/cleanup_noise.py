@@ -19,10 +19,12 @@ from core.models import FileActivityEvent, AIPromptEvent, GitActivityEvent, Wind
 def cleanup_noise_and_demo_data():
     db = get_db()
     with db.session_scope() as session:
-        # 1. 清理檔案噪音 (.codex, site-packages, node_modules, .venv, dist-info)
+        # 1. 清理檔案噪音 (.codex, site-packages, node_modules, .venv, dist-info, Documents/Codex 暫存)
         noise_query = session.query(FileActivityEvent).filter(
             (FileActivityEvent.file_path.like("%/.codex/%")) |
             (FileActivityEvent.file_path.like("%\\.codex\\%")) |
+            (FileActivityEvent.file_path.like("%/Documents/Codex/%")) |
+            (FileActivityEvent.file_path.like("%\\Documents\\Codex\\%")) |
             (FileActivityEvent.file_path.like("%/site-packages/%")) |
             (FileActivityEvent.file_path.like("%\\.venv\\%")) |
             (FileActivityEvent.file_path.like("%\\__pycache__\\%")) |

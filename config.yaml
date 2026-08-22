@@ -8,9 +8,8 @@ watchers:
   file_watcher:
     enabled: true
     watch_directories:
-    - C:/Users/user/Documents
-    - C:/Users/user/Desktop/Papers
     - D:/Dropbox/Project_Academic/Paper&Patent/01.國際期刊(發表年月)
+    - D:/Project_CodingSimulation
     extensions:
     - .tex
     - .docx
@@ -22,6 +21,9 @@ watchers:
     - '**/node_modules/**'
     - '**/.git/**'
     - '**/__pycache__/**'
+    - '**/site-packages/**'
+    - '**/.venv/**'
+    - '**/.codex/**'
     - '**/.*'
   git_watcher:
     enabled: true
@@ -40,6 +42,14 @@ watchers:
     enabled: true
     antigravity_logs_path: C:/Users/user/.gemini/antigravity/brain
     claude_code_logs_path: C:/Users/user/.claude
+    claude_code: true
+    codex: true
+    antigravity: true
+  browser:
+    gemini: true
+    chatgpt: true
+    claude_web: true
+    manus: true
 synthesizer:
   schedule:
     enabled: true
@@ -49,7 +59,7 @@ synthesizer:
     interval_hours: 2
   provider: gemini
   gemini:
-    model: gemini-2.5-flash
+    model: gemini-3.7-flash
     api_key_env: GEMINI_API_KEY
   anthropic:
     model: claude-3-5-sonnet-20241022
@@ -60,6 +70,15 @@ synthesizer:
   ollama:
     base_url: http://localhost:11434
     model: llama3.1:8b
+notifiers:
+  telegram:
+    enabled: false
+    bot_token_env: TELEGRAM_BOT_TOKEN
+    chat_id_env: TELEGRAM_CHAT_ID
+    bot_token: ""
+    chat_id: ""
+    morning_briefing_time: "09:00"
+    evening_summary_time: "23:30"
 exporters:
   reports_dir: reports
   checkpoints_dir: logs/checkpoints

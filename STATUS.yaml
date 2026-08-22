@@ -1,23 +1,24 @@
 name: OmniContext Activity Tracker
 name_zh: OmniContext 個人全景活動追蹤系統
 category: personal_tools
-progress: 80
+progress: 95
 status: active
 last_updated: "2026-08-23"
-next_milestone: "P2 整合開機自動背景啟動 (install_autostart.ps1) 與 Telegram 主動推播通道"
+next_milestone: "P2 實裝 Telegram Bot API Key 測試外網推播與瀏覽器擴充套件實機打包"
 technologies:
   - Python
   - FastAPI
   - SQLAlchemy
-  - SQLite (WAL Mode)
+  - SQLite (WAL Mode + Single Instance Lock)
   - watchdog
   - GitPython
   - Chrome Extension (MV3)
-  - Gemini API / Claude API
-  - Claude Code / Codex / Antigravity Log Parsers
+  - Gemini API (gemini-3.7-flash) / Claude API
+  - Claude Code / Codex Sessions / Antigravity Log & Assistant Parsers
+  - Telegram Bot API
 outputs:
   - tool
   - web_dashboard
 description: "Local-first personal context tracker that captures cross-platform AI conversations, file edits, git commits and window focus, then synthesizes daily research/work reviews via LLM."
 description_zh: "本機優先的個人全景活動追蹤系統，自動捕捉跨平台 AI 對話、檔案異動、Git commits 與視窗焦點，並由 LLM 產出每日工作與研究回顧。"
-key_metrics: "已完成 P0 與 P1 重構：修復時區混用、ignore_patterns 噪音過濾、Git 49+ 倉庫遞迴掃描、擴充套件去重與補答、全面接入本機三大 AI 日誌 (Claude Code, Codex, Antigravity 累積 1068 筆真實對話)、專案狀態與 Open Loops 歸戶層已於 Web UI 完整上線。"
+key_metrics: "已完成 P0 與 P1 重構及 P2 核心組件：修復時區混用、ignore_patterns 噪音過濾、Git 49+ 倉庫遞迴掃描、擴充套件去重與補答、D6 開關全面接通；全量接入本機三大 AI 日誌（Claude Code, Codex 2025/2026 全 Sessions, Antigravity 累積 2,270 筆對話，含 1,664 筆真實 Assistant 回應結論）；實作檔案狀態增量掃描斷點與專案狀態快取；Open Loops 萃取與寫入器已完全打通；加入單一實例鎖與 Telegram Notifier。"

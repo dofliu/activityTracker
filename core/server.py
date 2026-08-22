@@ -183,11 +183,35 @@ def update_system_config(new_config: Dict[str, Any] = Body(...)):
         raise HTTPException(status_code=500, detail=f"Failed to update config: {e}")
 
 
+class OpenLoopCreate(BaseModel):
+    project_key: str
+    title: str
+    source_type: Optional[str] = "manual"
+
+
+@app.post("/api/v1/open-loops", status_code=201)
+def add_open_loop(payload: OpenLoopCreate):
+    from .project_engine import create_open_loop
+    loop_id = create_open_loop(
+        project_key=payload.project_key,
+        title=payload.title,
+        source_type=payload.source_type or "manual"
+    )
+    return {"status": "success", "id": loop_id, "message": "Open loop created"}
+
+
 # =====================================================================
-# 4. 數據採集 Ingestion API (支援 Upsert 修復 D5)
+# 4. 數據採集 Ingestion API (支援 Upsert 修復 D5 與 D6 假開關過濾)
 # =====================================================================
 @app.post("/api/v1/events/ai", status_code=201)
 def create_or_update_ai_event(payload: AIPromptCreate):
+    cfg = get_config()
+
+    # D6 假開關修復：檢查該瀏覽器平台是否啟用
+    browser_enabled = cfg.get(f"watchers.browser.{payload.platform}", True)
+    if not browser_enabled:
+        return {"status": "skipped", "message": f"{payload.platform} monitoring is disabled in settings"}
+
     db = get_db()
     clean_prompt = payload.prompt_text.strip()
 
@@ -228,6 +252,7 @@ def create_or_update_ai_event(payload: AIPromptCreate):
         )
         session.add(event)
     return {"status": "created", "message": "New AI event logged"}
+
 
 
 @app.post("/api/v1/events/file", status_code=201)
