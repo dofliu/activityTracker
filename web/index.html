@@ -1,343 +1,254 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-TW" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OmniContext - 個人全景上下文與 AI 智慧記憶中樞</title>
+  <title>OmniContext — 個人全景活動追蹤與 AI 回顧中樞</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
-  <!-- 頂部導航欄 -->
-  <header class="app-header">
-    <div class="header-left">
-      <div class="logo-icon">🌐</div>
-      <div>
-        <h1 class="app-title">OmniContext</h1>
-        <p class="app-subtitle">個人全景活動追蹤 & 進行中專案中樞</p>
+
+  <div class="topbar">
+    <div class="topbar-accent"></div>
+    <div class="topbar-main">
+      <div class="brand">
+        <div class="headband">
+          <span class="headband-plate">木ノ葉</span>
+          <span class="headband-tag">INTEL BOARD</span>
+        </div>
+        <div class="brand-text">
+          <div class="brand-name">OmniContext</div>
+          <div class="brand-sub">個人全景活動追蹤 · 本機優先</div>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div id="status-pill" class="pill pill-off"><span class="pill-dot"></span><span id="status-text">未連線</span></div>
+        <button id="btn-toggle-monitor" class="btn btn-ghost">開始監控</button>
+        <button id="btn-theme" class="btn btn-ghost" title="切換深淺色">☀ 淺色</button>
+        <button id="btn-quick-checkpoint" class="btn btn-ghost" title="將最近時段活動打包為快照">⏱️ 快照</button>
+        <button id="btn-quick-summary" class="btn btn-primary">⚡ 生成今日摘要</button>
       </div>
     </div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="tab-projects">01 · 進行中工作</button>
+      <button class="tab" data-tab="tab-dashboard">02 · 即時情報流</button>
+      <button class="tab" data-tab="tab-settings">03 · 監控配置</button>
+      <button class="tab" data-tab="tab-summaries">04 · 每日摘要</button>
+      <button class="tab" data-tab="tab-checkpoints">05 · 活動快照</button>
+    </nav>
+  </div>
 
-    <div class="header-right">
-      <div id="system-status-badge" class="status-badge status-stopped">
-        <span class="status-dot"></span>
-        <span id="status-text">未連線</span>
-      </div>
+  <div class="shell">
+    <main class="main">
 
-      <button id="btn-toggle-monitor" class="btn btn-primary">
-        <span id="toggle-icon">▶</span> <span id="toggle-text">開始監控</span>
-      </button>
-
-      <button id="btn-quick-checkpoint" class="btn btn-outline" title="將最近時段活動打包為 Checkpoint Log">
-        ⏱️ 快照日誌
-      </button>
-
-      <button id="btn-quick-summary" class="btn btn-accent" title="立即呼叫 AI 產出今日全景摘要">
-        ⚡ 生成今日摘要
-      </button>
-    </div>
-  </header>
-
-  <!-- 導航分頁列 -->
-  <nav class="nav-tabs">
-    <button class="nav-tab active" data-tab="tab-projects">🎯 進行中工作 (Projects)</button>
-    <button class="nav-tab" data-tab="tab-dashboard">📊 即時活動流 (Live Feed)</button>
-    <button class="nav-tab" data-tab="tab-settings">⚙️ 監控項目與配置</button>
-    <button class="nav-tab" data-tab="tab-summaries">📝 AI 每日摘要與報告</button>
-    <button class="nav-tab" data-tab="tab-checkpoints">⏱️ 週期性活動快照</button>
-  </nav>
-
-  <!-- 主要內容區 -->
-  <main class="app-container">
-
-    <!-- ============================================================ -->
-    <!-- 分頁 0: 🎯 進行中工作 (Active Projects) (P1 預設首頁) -->
-    <!-- ============================================================ -->
-    <section id="tab-projects" class="tab-pane active">
-      <div class="card-header flex-between mb-3">
-        <div>
-          <h2>🎯 進行中專案與研究狀態 (Active Workstreams)</h2>
-          <p class="text-muted text-sm">自動從 Git commits、論文寫作、Claude Code、Codex 與 Antigravity 活動歸戶</p>
+      <!-- 01 進行中工作 -->
+      <section id="tab-projects" class="pane active">
+        <div id="resume-card" class="resume">
+          <div class="resume-head"><span class="mono-label">RESUME HERE</span><span class="resume-head-zh">上次做到哪</span></div>
+          <div class="resume-body"><div class="placeholder">載入進行中工作…</div></div>
         </div>
-        <button class="btn btn-outline btn-sm" id="btn-refresh-projects">🔄 重新整理專案狀態</button>
-      </div>
 
-      <div class="projects-grid" id="projects-grid">
-        <div class="loading-placeholder">載入進行中專案與研究狀態中...</div>
-      </div>
-    </section>
+        <div class="row-between mb-8">
+          <span id="projects-count" class="mono-label muted">ACTIVE WORKSTREAMS</span>
+          <button id="btn-refresh-projects" class="btn btn-ghost btn-sm">🔄 重新歸戶</button>
+        </div>
+        <div id="projects-list" class="panel"><div class="placeholder">載入進行中工作…</div></div>
+      </section>
 
-    <!-- ============================================================ -->
-    <!-- 分頁 1: 📊 即時活動流與指標 -->
-    <!-- ============================================================ -->
-    <section id="tab-dashboard" class="tab-pane">
-      <!-- 統計指標卡片 -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon">🤖</div>
-          <div class="stat-content">
-            <div class="stat-value" id="stat-ai-prompts">0</div>
-            <div class="stat-label">AI 互動 (Claude/Codex/Web)</div>
+      <!-- 02 即時情報流 -->
+      <section id="tab-dashboard" class="pane">
+        <div id="stats-strip" class="stats"></div>
+
+        <div class="panel mb-14">
+          <div class="panel-head">
+            <span class="mono-label">LIVE FEED</span>
+            <div class="filters">
+              <button class="chip active" data-filter="all">全部</button>
+              <button class="chip" data-filter="ai">AI</button>
+              <button class="chip" data-filter="file">檔案</button>
+              <button class="chip" data-filter="git">Git</button>
+              <button class="chip" data-filter="window">視窗</button>
+            </div>
           </div>
+          <div id="feed-list" class="feed"><div class="placeholder">載入即時活動…</div></div>
         </div>
 
-        <div class="stat-card">
-          <div class="stat-icon">📄</div>
-          <div class="stat-content">
-            <div class="stat-value" id="stat-file-events">0</div>
-            <div class="stat-label">論文與檔案異動</div>
+        <div class="panel">
+          <div class="panel-head">
+            <span class="mono-label">COLLECTORS</span>
+            <span id="last-refresh" class="mono-mini muted">updated --:--:--</span>
           </div>
+          <div id="watchers-grid" class="collectors"></div>
         </div>
+      </section>
 
-        <div class="stat-card">
-          <div class="stat-icon">💻</div>
-          <div class="stat-content">
-            <div class="stat-value" id="stat-git-commits">0</div>
-            <div class="stat-label">Git Commits (49+ Repos)</div>
-          </div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-icon">⏳</div>
-          <div class="stat-content">
-            <div class="stat-value" id="stat-window-events">0</div>
-            <div class="stat-label">視窗焦點切換</div>
-          </div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-icon">🎯</div>
-          <div class="stat-content">
-            <div class="stat-value" id="stat-active-projects">0</div>
-            <div class="stat-label">進行中專案數</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 監聽器運作狀態 -->
-      <div class="card mb-4">
-        <div class="card-header flex-between">
-          <h3>🔍 採集器與排程器狀態</h3>
-          <span class="text-muted text-sm" id="last-refresh-time">更新於: --:--:--</span>
-        </div>
-        <div class="watchers-status-grid" id="watchers-grid"></div>
-      </div>
-
-      <!-- 即時活動流 -->
-      <div class="card">
-        <div class="card-header flex-between">
-          <h3>⚡ 即時活動時間軸 (Live Activity Feed)</h3>
-          <div class="feed-filters">
-            <button class="filter-btn active" data-filter="all">全部</button>
-            <button class="filter-btn" data-filter="ai">🤖 AI 提問</button>
-            <button class="filter-btn" data-filter="file">📁 論文/檔案</button>
-            <button class="filter-btn" data-filter="git">💻 Git</button>
-            <button class="filter-btn" data-filter="window">⏳ 視窗焦點</button>
-          </div>
-        </div>
-        <div class="feed-container" id="feed-list">
-          <div class="loading-placeholder">載入即時活動中...</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============================================================ -->
-    <!-- 分頁 2: ⚙️ 監控項目與配置 -->
-    <!-- ============================================================ -->
-    <section id="tab-settings" class="tab-pane">
-      <div class="settings-layout">
-        <!-- 檔案監控 -->
-        <div class="card">
-          <div class="card-header">
-            <h3>📁 1. 論文與檔案監控資料夾</h3>
-          </div>
-          <div class="card-body">
-            <div class="form-group">
-              <label>監控路徑清單：</label>
-              <div id="dir-list" class="tag-list-box"></div>
-              <div class="input-with-btn mt-2">
-                <input type="text" id="input-new-dir" placeholder="輸入要監控的論文或文檔資料夾絕對路徑...">
-                <button class="btn btn-secondary" id="btn-add-dir">+ 新增資料夾</button>
+      <!-- 03 監控配置 -->
+      <section id="tab-settings" class="pane">
+        <div class="panel mb-14">
+          <div class="panel-head"><span class="mono-label accent">01</span><span class="panel-title">監控路徑</span></div>
+          <div class="split">
+            <div class="split-col">
+              <div class="mono-mini muted mb-8">FILE DIRS</div>
+              <div id="dir-list" class="taglist"></div>
+              <div class="input-row">
+                <input type="text" id="input-new-dir" placeholder="絕對路徑…">
+                <button class="btn btn-ghost" id="btn-browse-dir" title="瀏覽選取本機資料夾">📁 瀏覽…</button>
+                <button class="btn btn-ghost" id="btn-add-dir">新增</button>
+              </div>
+              <div id="ext-checkboxes" class="extchips">
+                <label><input type="checkbox" value=".tex" checked>.tex</label>
+                <label><input type="checkbox" value=".docx" checked>.docx</label>
+                <label><input type="checkbox" value=".md" checked>.md</label>
+                <label><input type="checkbox" value=".pdf" checked>.pdf</label>
+                <label><input type="checkbox" value=".py" checked>.py</label>
+                <label><input type="checkbox" value=".txt" checked>.txt</label>
               </div>
             </div>
-
-            <div class="form-group mt-3">
-              <label>追蹤的副檔名：</label>
-              <div class="checkbox-group" id="ext-checkboxes">
-                <label><input type="checkbox" value=".tex" checked> .tex (LaTeX 論文)</label>
-                <label><input type="checkbox" value=".docx" checked> .docx (Word 文檔)</label>
-                <label><input type="checkbox" value=".md" checked> .md (Markdown/Obsidian)</label>
-                <label><input type="checkbox" value=".pdf" checked> .pdf (文獻閱讀)</label>
-                <label><input type="checkbox" value=".py" checked> .py (Python 代碼)</label>
-                <label><input type="checkbox" value=".txt" checked> .txt</label>
+            <div class="split-col">
+              <div class="mono-mini muted mb-8">GIT ROOTS</div>
+              <div id="repo-list" class="taglist"></div>
+              <div class="input-row">
+                <input type="text" id="input-new-repo" placeholder="Git 專案根目錄…">
+                <button class="btn btn-ghost" id="btn-browse-repo" title="瀏覽選取 Git 倉庫目錄">📁 瀏覽…</button>
+                <button class="btn btn-ghost" id="btn-add-repo">新增</button>
               </div>
+              <div class="note">D3：已升級遞迴探索模式，根目錄下所有子倉庫均會自動納入掃描。</div>
             </div>
           </div>
         </div>
 
-        <!-- 程式碼倉庫 -->
-        <div class="card">
-          <div class="card-header">
-            <h3>💻 2. Git 程式碼專案根目錄 (自動遞迴掃描)</h3>
+        <div class="panel mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent">02</span><span class="panel-title">採集來源</span>
+            <span class="muted small">右欄標示目前可信度</span>
           </div>
-          <div class="card-body">
-            <div class="form-group">
-              <label>Git 倉庫/根目錄清單 (支援掃描底下所有子倉庫)：</label>
-              <div id="repo-list" class="tag-list-box"></div>
-              <div class="input-with-btn mt-2">
-                <input type="text" id="input-new-repo" placeholder="輸入本機 Git 專案根目錄路徑...">
-                <button class="btn btn-secondary" id="btn-add-repo">+ 新增根目錄</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 瀏覽器與 AI 工具開關 (真正綁定後端) -->
-        <div class="card">
-          <div class="card-header">
-            <h3>🤖 3. AI 工具與本機日誌採集開關</h3>
-          </div>
-          <div class="card-body">
-            <div class="toggle-grid">
-              <label class="toggle-item">
-                <input type="checkbox" id="toggle-claude-code" checked>
-                <span>Claude Code CLI (`~/.claude`)</span>
-              </label>
-              <label class="toggle-item">
-                <input type="checkbox" id="toggle-codex" checked>
-                <span>Codex CLI (`~/.codex`)</span>
-              </label>
-              <label class="toggle-item">
-                <input type="checkbox" id="toggle-antigravity" checked>
-                <span>Antigravity Transcripts</span>
-              </label>
-              <label class="toggle-item">
-                <input type="checkbox" id="toggle-gemini" checked>
-                <span>Gemini (gemini.google.com)</span>
-              </label>
-              <label class="toggle-item">
-                <input type="checkbox" id="toggle-chatgpt" checked>
-                <span>ChatGPT / OpenAI Web</span>
-              </label>
-              <label class="toggle-item">
-                <input type="checkbox" id="toggle-claude-web" checked>
-                <span>Claude Web (claude.ai)</span>
-              </label>
-              <label class="toggle-item">
-                <input type="checkbox" id="toggle-manus" checked>
-                <span>Manus (manus.im)</span>
-              </label>
-              <label class="toggle-item">
-                <input type="checkbox" id="toggle-window-focus" checked>
-                <span>前景視窗與時間分配追蹤</span>
-              </label>
-            </div>
+          <div class="sources">
+            <label class="source"><input type="checkbox" id="toggle-claude-code" checked><span class="mono">~/.claude</span><span class="trust ok">OK</span></label>
+            <label class="source"><input type="checkbox" id="toggle-codex" checked><span class="mono">~/.codex</span><span class="trust ok">OK</span></label>
+            <label class="source"><input type="checkbox" id="toggle-antigravity" checked><span class="mono">antigravity</span><span class="trust ok">OK</span></label>
+            <label class="source"><input type="checkbox" id="toggle-gemini" checked><span class="mono">gemini.google.com</span><span class="trust ok">OK</span></label>
+            <label class="source"><input type="checkbox" id="toggle-chatgpt" checked><span class="mono">chatgpt.com</span><span class="trust ok">OK</span></label>
+            <label class="source"><input type="checkbox" id="toggle-claude-web" checked><span class="mono">claude.ai</span><span class="trust ok">OK</span></label>
+            <label class="source"><input type="checkbox" id="toggle-manus" checked><span class="mono">manus.im</span><span class="trust ok">OK</span></label>
+            <label class="source"><input type="checkbox" id="toggle-window-focus" checked><span class="mono">window focus</span><span class="trust ok">OK</span></label>
           </div>
         </div>
 
-        <!-- 排程與 LLM 摘要配置 -->
-        <div class="card">
-          <div class="card-header">
-            <h3>🧠 4. AI 摘要與定時排程配置</h3>
+        <div class="panel">
+          <div class="panel-head"><span class="mono-label accent">03</span><span class="panel-title">摘要與排程</span></div>
+          <div class="fields">
+            <div><div class="mono-mini muted mb-6">DAILY AT</div><input type="text" id="input-schedule-time" value="23:30" class="mono"></div>
+            <div><div class="mono-mini muted mb-6">CHECKPOINT / H</div><input type="number" id="input-checkpoint-interval" value="2" min="1" max="12" class="mono"></div>
+            <div><div class="mono-mini muted mb-6">PROVIDER</div>
+              <select id="select-llm-provider">
+                <option value="gemini">Google Gemini</option>
+                <option value="anthropic">Anthropic Claude</option>
+                <option value="openai">OpenAI</option>
+                <option value="ollama">Ollama（本機）</option>
+              </select>
+            </div>
+            <div><div class="mono-mini muted mb-6">MODEL</div><input type="text" id="input-model-name" value="gemini-3.7-flash" class="mono"></div>
           </div>
-          <div class="card-body">
-            <div class="grid-2">
-              <div class="form-group">
-                <label>每日全景摘要定時 (HH:MM)：</label>
-                <input type="text" id="input-schedule-time" value="23:30">
-              </div>
-              <div class="form-group">
-                <label>週期性活動快照間隔 (小時)：</label>
-                <input type="number" id="input-checkpoint-interval" value="2" min="1" max="12">
-              </div>
-            </div>
-
-            <div class="grid-2 mt-3">
-              <div class="form-group">
-                <label>LLM 核心供應商：</label>
-                <select id="select-llm-provider">
-                  <option value="gemini">Google Gemini (推薦: gemini-2.5-flash)</option>
-                  <option value="anthropic">Anthropic Claude (claude-3-5-sonnet)</option>
-                  <option value="openai">OpenAI (gpt-4o)</option>
-                  <option value="ollama">Ollama (本地離線模型)</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>模型名稱：</label>
-                <input type="text" id="input-model-name" value="gemini-2.5-flash">
-              </div>
-            </div>
-
-            <div class="form-actions mt-4">
-              <button class="btn btn-primary" id="btn-save-settings">💾 儲存並立即套用配置</button>
-            </div>
+          <div class="panel-foot">
+            <button class="btn btn-primary" id="btn-save-settings">儲存並套用</button>
+            <span class="muted small">寫回 config.yaml 後即時熱更新</span>
           </div>
+        </div>
+      </section>
+
+      <!-- 04 每日摘要 -->
+      <section id="tab-summaries" class="pane">
+        <div class="two-col">
+          <div class="side">
+            <div class="panel" style="padding: 10px; margin-bottom: 6px;">
+              <div class="mono-mini muted mb-6">日期範圍 (RANGE)</div>
+              <div class="range-inputs" style="display: flex; flex-direction: column; gap: 6px;">
+                <div>
+                  <span class="mono-mini muted" style="font-size: 9.5px;">FROM</span>
+                  <input type="date" id="input-summary-start-date" style="width: 100%; font-size: 11px;">
+                </div>
+                <div>
+                  <span class="mono-mini muted" style="font-size: 9.5px;">TO</span>
+                  <input type="date" id="input-summary-end-date" style="width: 100%; font-size: 11px;">
+                </div>
+              </div>
+              <div class="quick-ranges" style="display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0;">
+                <button class="chip btn-sm" data-range="today">今日</button>
+                <button class="chip btn-sm" data-range="yesterday">昨日</button>
+                <button class="chip btn-sm" data-range="this_week">本週</button>
+                <button class="chip btn-sm" data-range="7d">近 7 天</button>
+                <button class="chip btn-sm" data-range="30d">近 30 天</button>
+              </div>
+              <button class="btn btn-primary btn-block" id="btn-generate-custom-summary">⚡ 生成區間回顧</button>
+            </div>
+            <div id="summary-history-list" class="sidelist"><div class="placeholder">載入歷史報告…</div></div>
+          </div>
+          <article class="panel">
+            <div class="panel-head">
+              <span id="summary-meta" class="mono-mini muted">—</span>
+              <div class="head-actions">
+                <div class="viewswitch">
+                  <button class="chip active" data-view="day">日</button>
+                  <button class="chip" data-view="week">週</button>
+                  <button class="chip" data-view="month">月</button>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="btn-copy-markdown">複製 Markdown</button>
+              </div>
+            </div>
+            <div id="summary-view-day" class="markdown"><p class="muted">請從左側點選報告日期，或點「生成」產出今日摘要。</p></div>
+            <div id="summary-view-week" class="rangeview" hidden></div>
+            <div id="summary-view-month" class="rangeview" hidden></div>
+          </article>
+        </div>
+      </section>
+
+      <!-- 05 活動快照 -->
+      <section id="tab-checkpoints" class="pane">
+        <div class="two-col">
+          <div class="side">
+            <button class="btn btn-primary btn-block" id="btn-trigger-cp-now">+ 產出快照</button>
+            <div id="checkpoint-history-list" class="sidelist"><div class="placeholder">載入快照日誌…</div></div>
+          </div>
+          <article class="panel">
+            <div class="panel-head">
+              <span id="cp-title" class="mono-mini muted">—</span>
+              <button class="btn btn-ghost btn-sm" id="btn-copy-cp">複製 Log</button>
+            </div>
+            <div id="checkpoint-markdown-viewer" class="markdown"><p class="muted">請從左側點選快照日誌以檢視期間活動細節。</p></div>
+          </article>
+        </div>
+      </section>
+
+    </main>
+
+    <aside class="rail">
+      <div class="panel">
+        <div class="rail-head"><span>OPEN LOOPS</span><span id="loop-tally">—</span></div>
+        <div id="open-loops-list"><div class="placeholder">載入未結事項…</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <span class="mono-label danger">DATA TRUST</span>
+          <span class="mono-mini danger">2 / 8</span>
+        </div>
+        <div class="trust-note">多數採集器尚未產出可信資料，報告請勿當成真實工作紀錄。</div>
+        <div class="defects">
+          <div class="defect"><span>週期性 Checkpoint 空白</span><span class="code danger">D1</span></div>
+          <div class="defect"><span>檔案噪音 1:3574</span><span class="code warn">D2</span></div>
+          <div class="defect"><span>Git commits 掃不到</span><span class="code danger">D3</span></div>
+          <div class="defect"><span>Claude Code 未實作</span><span class="code danger">D4</span></div>
+          <div class="defect"><span>只存問不存答</span><span class="code warn">D5</span></div>
+          <div class="defect"><span>AI 開關無作用</span><span class="code danger">D6</span></div>
         </div>
       </div>
-    </section>
-
-    <!-- ============================================================ -->
-    <!-- 分頁 3: 📝 AI 每日摘要與報告 -->
-    <!-- ============================================================ -->
-    <section id="tab-summaries" class="tab-pane">
-      <div class="summaries-layout">
-        <div class="summary-sidebar card">
-          <div class="card-header">
-            <h3>📅 歷史每日回顧</h3>
-          </div>
-          <div class="summary-action-box">
-            <input type="date" id="input-summary-date">
-            <button class="btn btn-primary btn-block mt-2" id="btn-generate-custom-summary">
-              ⚡ 立即生成指定日摘要
-            </button>
-          </div>
-          <div class="summary-date-list" id="summary-history-list">
-            <div class="loading-placeholder">載入歷史報告...</div>
-          </div>
-        </div>
-
-        <div class="summary-content card">
-          <div class="card-header flex-between">
-            <h3 id="current-summary-title">📄 每日回顧報告內容</h3>
-            <div class="action-buttons">
-              <button class="btn btn-outline btn-sm" id="btn-copy-markdown">📋 複製 Markdown</button>
-            </div>
-          </div>
-          <div class="markdown-body" id="summary-markdown-viewer">
-            <p class="text-muted">請從左側點選報告日期或點擊「立即生成摘要」。</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============================================================ -->
-    <!-- 分頁 4: ⏱️ 週期性活動快照 (Checkpoints) -->
-    <!-- ============================================================ -->
-    <section id="tab-checkpoints" class="tab-pane">
-      <div class="summaries-layout">
-        <div class="summary-sidebar card">
-          <div class="card-header flex-between">
-            <h3>⏱️ 快照日誌清單</h3>
-            <button class="btn btn-primary btn-sm" id="btn-trigger-cp-now">+ 產出快照</button>
-          </div>
-          <div class="summary-date-list" id="checkpoint-history-list">
-            <div class="loading-placeholder">載入快照日誌...</div>
-          </div>
-        </div>
-
-        <div class="summary-content card">
-          <div class="card-header flex-between">
-            <h3 id="current-cp-title">⏱️ 活動快照內容</h3>
-            <button class="btn btn-outline btn-sm" id="btn-copy-cp">📋 複製 Log</button>
-          </div>
-          <div class="markdown-body" id="checkpoint-markdown-viewer">
-            <p class="text-muted">請從左側點選快照日誌以檢視期間活動細節。</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-  </main>
+    </aside>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>

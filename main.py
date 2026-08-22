@@ -164,17 +164,21 @@ def cmd_now():
     print("="*70 + "\n")
 
 
-def cmd_summary(target_date: str | None, provider: str | None, force: bool):
-    """手動觸發生成特定日期的 AI 總結報告"""
-    date_str = target_date or get_local_now().strftime("%Y-%m-%d")
-    logger.info(f"Generating summary for {date_str} using provider '{provider or 'default'}'...")
-    res = generate_daily_summary_pipeline(
-        target_date_str=date_str,
+def cmd_summary(target_date: str | None, start_date: str | None, end_date: str | None, provider: str | None, force: bool):
+    """手動觸發生成特定日期或區間的 AI 總結報告"""
+    from synthesizer.aggregator import generate_summary_pipeline
+    start_d = start_date or target_date or get_local_now().strftime("%Y-%m-%d")
+    end_d = end_date or target_date or get_local_now().strftime("%Y-%m-%d")
+    
+    logger.info(f"Generating summary for {start_d} ~ {end_d} using provider '{provider or 'default'}'...")
+    res = generate_summary_pipeline(
+        start_date_str=start_d,
+        end_date_str=end_d,
         provider_override=provider,
         force_refresh=force
     )
     print("\n" + "="*70)
-    print(f"[每日回顧生成完成] 日期: {res.get('date_str')}")
+    print(f"[工作回顧生成完成] 區間/日期: {res.get('date_str')}")
     print("="*70)
     print(res.get("markdown"))
     if "report_path" in res:
@@ -258,8 +262,10 @@ def main():
     subparsers.add_parser("now", help="一秒查詢當前進行中工作與最近動作")
 
     # summary 指令
-    summary_parser = subparsers.add_parser("summary", help="生成每日以專案為主軸的 AI 總結報告")
-    summary_parser.add_argument("--date", help="指定日期 (YYYY-MM-DD)，預設為今天")
+    summary_parser = subparsers.add_parser("summary", help="生成每日或自訂區間以專案為主軸的 AI 總結報告")
+    summary_parser.add_argument("--date", help="指定單一日期 (YYYY-MM-DD)")
+    summary_parser.add_argument("--start", help="自訂區間起始日期 (YYYY-MM-DD)")
+    summary_parser.add_argument("--end", help="自訂區間結束日期 (YYYY-MM-DD)")
     summary_parser.add_argument("--provider", help="指定 LLM 供應商 (gemini, anthropic, openai, ollama)")
     summary_parser.add_argument("--force", action="store_true", help="強制重新生成已存在的摘要")
 
@@ -286,7 +292,8 @@ def main():
     elif args.command == "now":
         cmd_now()
     elif args.command == "summary":
-        cmd_summary(args.date, args.provider, args.force)
+        cmd_summary(args.date, getattr(args, "start", None), getattr(args, "end", None), args.provider, args.force)
+
     elif args.command == "checkpoint":
         cmd_checkpoint(args.hours)
     elif args.command == "notify":

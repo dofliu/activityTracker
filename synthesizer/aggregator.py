@@ -9,8 +9,8 @@ from core.database import get_db
 from core.models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, DailySummary, ProjectState, OpenLoop
 from core.config import get_config
 from core.time_utils import get_local_now
-from core.project_engine import get_active_projects_list, get_open_loops_list, refresh_project_states
-from .prompt_templates import DAILY_PROJECT_SYNTHESIS_SYSTEM, DAILY_PROJECT_SYNTHESIS_USER
+from core.project_engine import get_active_projects_list, get_open_loops_list, refresh_project_states, extract_and_save_open_loops_from_summary
+from .prompt_templates import RANGE_PROJECT_SYNTHESIS_SYSTEM, RANGE_PROJECT_SYNTHESIS_USER
 from .llm_client import LLMClient
 
 logger = logging.getLogger("OmniContext.Aggregator")
@@ -97,38 +97,31 @@ def fetch_events_in_range(start_dt: datetime, end_dt: datetime) -> Dict[str, Any
         }
 
 
-def fetch_day_data(target_date: date) -> Dict[str, Any]:
-    """從 SQLite 資料庫嚴格撈取指定日期的所有事件 (00:00:00 ~ 23:59:59)"""
-    start_dt = datetime.combine(target_date, time.min)
-    end_dt = datetime.combine(target_date, time.max)
-    return fetch_events_in_range(start_dt, end_dt)
-
-
-def format_context_for_prompt(day_data: Dict[str, Any], target_date_str: str) -> str:
-    """將資料庫事件轉換為適合 LLM 閱讀的專案中心格式 (嚴格限於當日真實推進專案)"""
+def format_context_for_prompt(day_data: Dict[str, Any], time_range_str: str) -> str:
+    """將資料庫事件轉換為適合 LLM 閱讀的專案中心格式 (嚴格限於該區間內真實推進的專案)"""
     
-    # 找出今日真正有活動的專案名稱集合
-    today_active_project_names: Set[str] = set()
+    # 找出區間內真正有活動的專案名稱集合
+    active_project_names: Set[str] = set()
     for g in day_data["git_events"]:
-        if g.get("repo"): today_active_project_names.add(g["repo"])
+        if g.get("repo"): active_project_names.add(g["repo"])
     for f in day_data["file_events"]:
-        if f.get("project"): today_active_project_names.add(f["project"])
+        if f.get("project"): active_project_names.add(f["project"])
     for a in day_data["ai_events"]:
-        if a.get("tag"): today_active_project_names.add(a["tag"])
+        if a.get("tag"): active_project_names.add(a["tag"])
 
-    # 1. Active Projects (今日真正有活動的專案)
+    # 1. Active Projects (區間內有活動的專案)
     all_projects = get_active_projects_list()
-    today_projects = [p for p in all_projects if p["display_name"] in today_active_project_names or p["project_key"] in today_active_project_names]
+    matched_projects = [p for p in all_projects if p["display_name"] in active_project_names or p["project_key"] in active_project_names]
 
     proj_lines = []
-    for p in today_projects:
+    for p in matched_projects:
         proj_lines.append(f"- **{p['display_name']}** [{p['category']}]: 最新動態 `{p['last_action_summary']}`")
     
-    if not proj_lines and today_active_project_names:
-        for name in sorted(today_active_project_names):
+    if not proj_lines and active_project_names:
+        for name in sorted(active_project_names):
             proj_lines.append(f"- **{name}**")
 
-    proj_text = "\n".join(proj_lines) if proj_lines else "（今日無專案更新）"
+    proj_text = "\n".join(proj_lines) if proj_lines else "（該時段無專案更新）"
 
     # 2. Open Loops
     open_loops = get_open_loops_list()[:8]
@@ -137,38 +130,38 @@ def format_context_for_prompt(day_data: Dict[str, Any], target_date_str: str) ->
         loop_lines.append(f"- [{ol['project_key']}] {ol['title']} (建立於 {ol['created_at']})")
     loop_text = "\n".join(loop_lines) if loop_lines else "（目前無待辦事項）"
 
-    # 3. AI Events (今日)
+    # 3. AI Events
     ai_lines = []
     for item in day_data["ai_events"]:
         tag_info = f" [{item['tag']}]" if item['tag'] else ""
         resp_snippet = f"\n  -> AI 回應摘要: {item['response'][:250]}..." if item['response'] and len(item['response']) > 10 else ""
-        ai_lines.append(f"- [{item['time'].split(' ')[1]}] [{item['platform'].upper()}]{tag_info} 問: {item['prompt']}{resp_snippet}")
-    ai_text = "\n".join(ai_lines) if ai_lines else "（今日無 AI 互動紀錄）"
+        ai_lines.append(f"- [{item['time']}] [{item['platform'].upper()}]{tag_info} 問: {item['prompt']}{resp_snippet}")
+    ai_text = "\n".join(ai_lines) if ai_lines else "（該時段無 AI 互動紀錄）"
 
-    # 4. File Events (今日)
+    # 4. File Events
     file_lines = []
     for item in day_data["file_events"]:
         diff_str = f" ({item['diff']})" if item['diff'] else ""
-        file_lines.append(f"- [{item['time'].split(' ')[1]}] [{item['action'].upper()}] {item['file_name']} [{item['file_type']}]{diff_str}")
-    file_text = "\n".join(file_lines) if file_lines else "（今日無檔案異動紀錄）"
+        file_lines.append(f"- [{item['time']}] [{item['action'].upper()}] {item['file_name']} [{item['file_type']}]{diff_str}")
+    file_text = "\n".join(file_lines) if file_lines else "（該時段無檔案異動紀錄）"
 
-    # 5. Git Events (今日)
+    # 5. Git Events
     git_lines = []
     for item in day_data["git_events"]:
-        git_lines.append(f"- [{item['time'].split(' ')[1]}] [{item['repo']}@{item['branch']}] Commit: {item['message']} (+{item['insertions']}/-{item['deletions']})")
-    git_text = "\n".join(git_lines) if git_lines else "（今日無代碼提交紀錄）"
+        git_lines.append(f"- [{item['time']}] [{item['repo']}@{item['branch']}] Commit: {item['message']} (+{item['insertions']}/-{item['deletions']})")
+    git_text = "\n".join(git_lines) if git_lines else "（該時段無代碼提交紀錄）"
 
-    # 6. Window Events (今日)
+    # 6. Window Events
     app_durations: Dict[str, float] = {}
     for item in day_data["window_events"]:
         app = item["app"]
         app_durations[app] = app_durations.get(app, 0.0) + item["duration_sec"]
 
     window_lines = [f"- {app}: 約 {int(sec // 60)} 分鐘" for app, sec in sorted(app_durations.items(), key=lambda x: x[1], reverse=True)[:8]]
-    window_text = "\n".join(window_lines) if window_lines else "（今日無視窗統計資料）"
+    window_text = "\n".join(window_lines) if window_lines else "（該時段無視窗統計資料）"
 
-    return DAILY_PROJECT_SYNTHESIS_USER.format(
-        target_date=target_date_str,
+    return RANGE_PROJECT_SYNTHESIS_USER.format(
+        time_range_str=time_range_str,
         active_projects_text=proj_text,
         open_loops_text=loop_text,
         ai_interactions_text=ai_text,
@@ -178,7 +171,8 @@ def format_context_for_prompt(day_data: Dict[str, Any], target_date_str: str) ->
     )
 
 
-def save_summary_to_file(date_str: str, markdown_content: str) -> Path:
+def save_summary_to_file(label_str: str, markdown_content: str) -> Path:
+    """將生成的 Markdown 報告存檔於 reports/ 與 Obsidian"""
     cfg = get_config()
     reports_dir_str = cfg.get("exporters.reports_dir", "reports")
     reports_dir = Path(reports_dir_str)
@@ -187,14 +181,16 @@ def save_summary_to_file(date_str: str, markdown_content: str) -> Path:
         reports_dir = root_dir / reports_dir
     reports_dir.mkdir(parents=True, exist_ok=True)
 
-    file_path = reports_dir / f"Daily_Summary_{date_str}.md"
+    # 檔名清理
+    clean_label = label_str.replace(" ", "").replace("~", "_to_")
+    file_path = reports_dir / f"Daily_Summary_{clean_label}.md"
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(markdown_content)
 
     if cfg.get("exporters.obsidian.enabled", False):
         obsidian_dir = Path(cfg.get("exporters.obsidian.vault_daily_notes_dir", ""))
         if obsidian_dir.exists():
-            obsidian_file = obsidian_dir / f"{date_str}.md"
+            obsidian_file = obsidian_dir / f"{clean_label}.md"
             with open(obsidian_file, "w", encoding="utf-8") as f:
                 f.write(markdown_content)
             logger.info(f"Synced report to Obsidian: {obsidian_file}")
@@ -294,46 +290,63 @@ def list_periodic_checkpoints() -> List[Dict[str, Any]]:
     return results
 
 
-def generate_daily_summary_pipeline(
-    target_date_str: Optional[str] = None,
+def generate_summary_pipeline(
+    start_date_str: Optional[str] = None,
+    end_date_str: Optional[str] = None,
     provider_override: Optional[str] = None,
     force_refresh: bool = False
 ) -> Dict[str, Any]:
-    """嚴格以指定日期 (00:00:00 ~ 23:59:59) 真實活動為範疇的每日總結生成管道"""
-    if not target_date_str:
-        target_date = get_local_now().date()
-        target_date_str = target_date.isoformat()
+    """支援單日或自訂任意日期區間 (start_date ~ end_date) 的全景總結生成管道"""
+    now = get_local_now()
+
+    if not start_date_str and not end_date_str:
+        start_date = now.date()
+        end_date = now.date()
+    elif start_date_str and not end_date_str:
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = start_date
+    elif end_date_str and not start_date_str:
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        start_date = end_date
     else:
-        target_date = datetime.strptime(target_date_str, "%Y-%m-%d").date()
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+
+    if start_date > end_date:
+        start_date, end_date = end_date, start_date
+
+    is_single_day = (start_date == end_date)
+    range_label = start_date.isoformat() if is_single_day else f"{start_date.isoformat()} ~ {end_date.isoformat()}"
 
     db = get_db()
 
     with db.session_scope() as session:
-        existing = session.query(DailySummary).filter_by(date_str=target_date_str).first()
+        existing = session.query(DailySummary).filter_by(date_str=range_label).first()
         if existing and not force_refresh:
-            logger.info(f"Summary for {target_date_str} already exists. Returning cached.")
+            logger.info(f"Summary for {range_label} already exists. Returning cached.")
             return {
                 "status": "cached",
-                "date_str": target_date_str,
+                "date_str": range_label,
                 "markdown": existing.raw_markdown
             }
 
-    # 1. 撈取指定日期當天的數據
-    refresh_project_states()
-    day_data = fetch_day_data(target_date)
+    # 1. 撈取區間資料
+    start_dt = datetime.combine(start_date, time.min)
+    end_dt = datetime.combine(end_date, time.max)
+    range_data = fetch_events_in_range(start_dt, end_dt)
 
-    # 2. 構建 Prompt (僅包含當日有活動的專案)
-    user_prompt = format_context_for_prompt(day_data, target_date_str)
+    # 2. 構建 Prompt
+    user_prompt = format_context_for_prompt(range_data, range_label)
 
     # 3. 調用 LLM
     client = LLMClient(provider=provider_override)
     markdown_result = client.generate(
-        system_prompt=DAILY_PROJECT_SYNTHESIS_SYSTEM,
+        system_prompt=RANGE_PROJECT_SYNTHESIS_SYSTEM,
         user_prompt=user_prompt
     )
 
-    # 4. 存檔至本機檔案
-    report_file = save_summary_to_file(target_date_str, markdown_result)
+    # 4. 存檔至檔案
+    report_file = save_summary_to_file(range_label, markdown_result)
 
     # 5. 存檔至資料庫
     cfg = get_config()
@@ -341,10 +354,10 @@ def generate_daily_summary_pipeline(
     model_name = cfg.get(f"synthesizer.{provider_name}.model", "default")
 
     with db.session_scope() as session:
-        summary_record = session.query(DailySummary).filter_by(date_str=target_date_str).first()
+        summary_record = session.query(DailySummary).filter_by(date_str=range_label).first()
         if not summary_record:
             summary_record = DailySummary(
-                date_str=target_date_str,
+                date_str=range_label,
                 llm_provider=provider_name,
                 model_name=str(model_name),
                 raw_markdown=markdown_result,
@@ -357,20 +370,31 @@ def generate_daily_summary_pipeline(
             summary_record.raw_markdown = markdown_result
             summary_record.created_at = get_local_now()
 
-    # 6. 自動從日報萃取未結事項 (Open Loops) 並存入資料庫
+    # 6. 自動從報告中萃取未結事項 (Open Loops)
     try:
-        from core.project_engine import extract_and_save_open_loops_from_summary
-        loop_ids = extract_and_save_open_loops_from_summary(markdown_result, target_date_str)
+        loop_ids = extract_and_save_open_loops_from_summary(markdown_result, range_label)
         if loop_ids:
-            logger.info(f"Extracted and saved {len(loop_ids)} Open Loops from daily summary.")
+            logger.info(f"Extracted and saved {len(loop_ids)} Open Loops from summary ({range_label}).")
     except Exception as e:
-        logger.warning(f"Error extracting open loops from summary: {e}")
+        logger.warning(f"Error extracting open loops: {e}")
 
     return {
         "status": "generated",
-        "date_str": target_date_str,
+        "date_str": range_label,
         "report_path": str(report_file),
         "markdown": markdown_result
     }
 
 
+def generate_daily_summary_pipeline(
+    target_date_str: Optional[str] = None,
+    provider_override: Optional[str] = None,
+    force_refresh: bool = False
+) -> Dict[str, Any]:
+    """向後相容單日摘要呼叫"""
+    return generate_summary_pipeline(
+        start_date_str=target_date_str,
+        end_date_str=target_date_str,
+        provider_override=provider_override,
+        force_refresh=force_refresh
+    )

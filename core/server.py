@@ -100,12 +100,19 @@ class WindowEventCreate(BaseModel):
 
 class GenerateSummaryRequest(BaseModel):
     target_date: Optional[str] = Field(None, description="格式 YYYY-MM-DD，若無則為今天")
+    start_date: Optional[str] = Field(None, description="自訂區間起始日期 YYYY-MM-DD")
+    end_date: Optional[str] = Field(None, description="自訂區間結束日期 YYYY-MM-DD")
     provider: Optional[str] = Field(None, description="指定 LLM 供應商 (gemini, anthropic, openai, ollama)")
     force_refresh: bool = Field(False, description="是否覆蓋已存在的摘要")
 
 
+class BrowseFolderRequest(BaseModel):
+    initial_dir: Optional[str] = None
+
+
 class GenerateCheckpointRequest(BaseModel):
     hours: int = Field(2, ge=1, le=24, description="回溯時數")
+
 
 
 # =====================================================================
@@ -460,10 +467,35 @@ def get_summary_by_date(date_str: str):
 
 @app.post("/api/v1/summaries/generate")
 def generate_summary(req: GenerateSummaryRequest):
-    target_date = req.target_date or get_local_now().strftime("%Y-%m-%d")
-    result = generate_daily_summary_pipeline(
-        target_date_str=target_date,
+    from synthesizer.aggregator import generate_summary_pipeline
+    start_d = req.start_date or req.target_date
+    end_d = req.end_date or req.target_date
+    result = generate_summary_pipeline(
+        start_date_str=start_d,
+        end_date_str=end_d,
         provider_override=req.provider,
         force_refresh=req.force_refresh
     )
     return result
+
+
+# =====================================================================
+# 8. 本機檔案瀏覽與路徑選擇 API (Folder Picker API)
+# =====================================================================
+@app.post("/api/v1/utils/browse-folder")
+def api_browse_folder(req: Optional[BrowseFolderRequest] = None):
+    """彈出本機原生資料夾選擇對話框"""
+    from .fs_utils import open_native_folder_picker
+    init_dir = req.initial_dir if req else None
+    chosen = open_native_folder_picker(initial_dir=init_dir)
+    if chosen:
+        return {"status": "success", "path": chosen}
+    return {"status": "cancelled", "path": None}
+
+
+@app.get("/api/v1/utils/browse-fs")
+def api_list_fs_directories(path: Optional[str] = Query(None)):
+    """列出本機檔案系統目錄 (供網頁端資料夾導航)"""
+    from .fs_utils import list_fs_directories
+    return list_fs_directories(current_path=path)
+
