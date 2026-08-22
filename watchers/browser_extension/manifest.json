@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "OmniContext AI Activity Capturer",
+  "version": "1.0.0",
+  "description": "自動擷取 ChatGPT, Gemini, Claude, Manus 的對話與問答記錄並同步至本地 OmniContext 引擎",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://gemini.google.com/*",
+    "https://claude.ai/*",
+    "https://manus.im/*",
+    "http://127.0.0.1:8765/*",
+    "http://localhost:8765/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "OmniContext Activity Monitor"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
+      "js": ["content_scripts/chatgpt.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "js": ["content_scripts/gemini.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["content_scripts/claude.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://manus.im/*"],
+      "js": ["content_scripts/manus.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

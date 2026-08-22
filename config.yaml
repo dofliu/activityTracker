@@ -1,0 +1,68 @@
+server:
+  host: 127.0.0.1
+  port: 8765
+  log_level: info
+database:
+  db_path: omni_context.db
+watchers:
+  file_watcher:
+    enabled: true
+    watch_directories:
+    - C:/Users/user/Documents
+    - C:/Users/user/Desktop/Papers
+    - D:/Dropbox/Project_Academic/Paper&Patent/01.國際期刊(發表年月)
+    extensions:
+    - .tex
+    - .docx
+    - .md
+    - .pdf
+    - .py
+    - .txt
+    ignore_patterns:
+    - '**/node_modules/**'
+    - '**/.git/**'
+    - '**/__pycache__/**'
+    - '**/.*'
+  git_watcher:
+    enabled: true
+    repositories:
+    - D:\Project_CodingSimulation
+    scan_interval_seconds: 300
+  window_watcher:
+    enabled: true
+    interval_seconds: 5
+    idle_threshold_seconds: 180
+    ignore_titles:
+    - Program Manager
+    - Task Switching
+    - Windows Shell Experience Host
+  agent_log_watcher:
+    enabled: true
+    antigravity_logs_path: C:/Users/user/.gemini/antigravity/brain
+    claude_code_logs_path: C:/Users/user/.claude
+synthesizer:
+  schedule:
+    enabled: true
+    time: '23:30'
+  periodic_checkpoint:
+    enabled: true
+    interval_hours: 2
+  provider: gemini
+  gemini:
+    model: gemini-2.5-flash
+    api_key_env: GEMINI_API_KEY
+  anthropic:
+    model: claude-3-5-sonnet-20241022
+    api_key_env: ANTHROPIC_API_KEY
+  openai:
+    model: gpt-4o
+    api_key_env: OPENAI_API_KEY
+  ollama:
+    base_url: http://localhost:11434
+    model: llama3.1:8b
+exporters:
+  reports_dir: reports
+  checkpoints_dir: logs/checkpoints
+  obsidian:
+    enabled: false
+    vault_daily_notes_dir: C:/Users/user/Documents/ObsidianVault/DailyNotes

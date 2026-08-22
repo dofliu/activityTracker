@@ -1,0 +1,32 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Database files (Local privacy storage)
+*.db
+*.sqlite
+*.sqlite3
+
+# Local Generated Reports & Checkpoints
+reports/*.md
+!reports/.gitkeep
+logs/checkpoints/*.md
+!logs/checkpoints/.gitkeep
+
+# Environment variables & API keys
+.env
+.env.local
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

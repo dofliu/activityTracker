@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>OmniContext Status</title>
+  <style>
+    body {
+      width: 280px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: #f8fafc;
+      color: #1e293b;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .header h3 {
+      margin: 0;
+      font-size: 16px;
+      color: #0f172a;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 500;
+      margin-bottom: 12px;
+    }
+    .status-online {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .status-offline {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .dot-green { background: #22c55e; }
+    .dot-red { background: #ef4444; }
+    .info {
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.5;
+      margin-bottom: 14px;
+    }
+    .platforms {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      font-size: 11px;
+    }
+    .platform-tag {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      padding: 4px 6px;
+      border-radius: 4px;
+      text-align: center;
+      color: #334155;
+    }
+    button {
+      width: 100%;
+      margin-top: 12px;
+      padding: 8px;
+      border: none;
+      background: #3b82f6;
+      color: white;
+      border-radius: 6px;
+      font-weight: 500;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h3>🌐 OmniContext Monitor</h3>
+  </div>
+
+  <div id="status-container" class="status-badge status-offline">
+    <span id="status-dot" class="dot dot-red"></span>
+    <span id="status-text">檢查本機連線中...</span>
+  </div>
+
+  <div class="info">
+    自動擷取當前頁面發送的 Prompt 與 AI 回應並即時傳送至本地 SQLite 庫。
+  </div>
+
+  <div class="platforms">
+    <div class="platform-tag">✓ Gemini</div>
+    <div class="platform-tag">✓ ChatGPT</div>
+    <div class="platform-tag">✓ Claude.ai</div>
+    <div class="platform-tag">✓ Manus.im</div>
+  </div>
+
+  <button id="btn-check">重新整理連線狀態</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>
