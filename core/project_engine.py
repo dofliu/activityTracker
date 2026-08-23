@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
 from core.database import get_db
-from core.models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, ProjectState, OpenLoop
+from core.models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, ProjectState, OpenLoop, GitHubRepoState, GitHubPREvent
 from core.time_utils import get_local_now
 
 # 快取機制：避免前端每 4 秒輪詢時重複全量查詢三張表
@@ -150,6 +150,47 @@ def get_active_projects_list(force_refresh: bool = False) -> List[Dict[str, Any]
                 OpenLoop.resolved_at.is_(None)
             ).count()
 
+            # 查詢對應的 GitHub 遠端倉庫與 PR 狀態
+            gh_repo = session.query(GitHubRepoState).filter(
+                (GitHubRepoState.repo_name == p.display_name) |
+                (GitHubRepoState.repo_name == p.project_key)
+            ).first()
+
+            github_info = None
+            if gh_repo:
+                recent_prs = (
+                    session.query(GitHubPREvent)
+                    .filter_by(repo_name=gh_repo.repo_name)
+                    .order_by(desc(GitHubPREvent.updated_at))
+                    .limit(5)
+                    .all()
+                )
+                github_info = {
+                    "full_name": gh_repo.full_name,
+                    "html_url": gh_repo.html_url,
+                    "is_private": gh_repo.is_private,
+                    "default_branch": gh_repo.default_branch,
+                    "open_prs_count": gh_repo.open_prs_count,
+                    "open_issues_count": gh_repo.open_issues_count,
+                    "stars_count": gh_repo.stars_count,
+                    "prs": [
+                        {
+                            "number": pr.pr_number,
+                            "title": pr.title,
+                            "state": pr.state,
+                            "is_draft": pr.is_draft,
+                            "author": pr.author,
+                            "html_url": pr.html_url,
+                            "branch": f"{pr.branch_head} -> {pr.branch_base}",
+                            "ci_status": pr.ci_status,
+                            "review_state": pr.review_state,
+                            "merged_at": pr.merged_at.strftime("%Y-%m-%d %H:%M") if pr.merged_at else None,
+                            "updated_at": pr.updated_at.strftime("%Y-%m-%d %H:%M") if pr.updated_at else None
+                        }
+                        for pr in recent_prs
+                    ]
+                }
+
             result.append({
                 "id": p.id,
                 "project_key": p.project_key,
@@ -159,7 +200,8 @@ def get_active_projects_list(force_refresh: bool = False) -> List[Dict[str, Any]
                 "last_action_summary": p.last_action_summary,
                 "status": p.status,
                 "idle_days": idle_days,
-                "open_loops_count": loops_count
+                "open_loops_count": loops_count,
+                "github": github_info
             })
 
         _PROJECT_CACHE = result

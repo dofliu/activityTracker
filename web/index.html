@@ -28,6 +28,7 @@
 
       <div class="topbar-actions">
         <div id="status-pill" class="pill pill-off"><span class="pill-dot"></span><span id="status-text">未連線</span></div>
+        <div id="github-pill" class="pill pill-off" style="cursor: pointer;" title="點擊查看 GitHub 狀態"><span class="pill-dot"></span><span id="github-status-text">🐙 GitHub</span></div>
         <button id="btn-toggle-monitor" class="btn btn-ghost">開始監控</button>
         <button id="btn-theme" class="btn btn-ghost" title="切換深淺色">☀ 淺色</button>
         <button id="btn-quick-checkpoint" class="btn btn-ghost" title="將最近時段活動打包為快照">⏱️ 快照</button>
@@ -157,6 +158,38 @@
           <div class="panel-foot">
             <button class="btn btn-primary" id="btn-save-settings">儲存並套用</button>
             <span class="muted small">寫回 config.yaml 後即時熱更新</span>
+          </div>
+        </div>
+
+        <div class="panel mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent">04</span><span class="panel-title">GitHub 雲端整合 (全專案與 PR 追蹤)</span>
+            <span id="gh-auth-badge" class="trust broken">未連線</span>
+          </div>
+          <div style="padding: 14px;">
+            <div id="gh-account-info" class="mb-14" style="font-size: 13px; color: var(--tx); line-height: 1.6;">
+              正在偵測 GitHub 憑證…
+            </div>
+            <div class="split" style="gap: 12px; margin-bottom: 14px;">
+              <div class="split-col">
+                <div class="mono-mini muted mb-6">快捷方式 1 (推薦)：本機 GITHUB CLI</div>
+                <button class="btn btn-primary" id="btn-gh-auto-connect" style="width: 100%;">🔑 一鍵從本機 gh CLI 同步認證</button>
+                <div class="muted small mt-2">免手動輸入 Token，自動讀取本機登入之 GitHub 帳號</div>
+              </div>
+              <div class="split-col">
+                <div class="mono-mini muted mb-6">快捷方式 2：PERSONAL ACCESS TOKEN (PAT)</div>
+                <div class="input-row">
+                  <input type="password" id="input-gh-token" placeholder="ghp_xxxxxxxxxxxx (需勾選 repo 權限)">
+                  <button class="btn btn-ghost" id="btn-gh-token-connect">連線</button>
+                </div>
+                <div class="muted small mt-2">支援 Fine-Grained 或 Classic PAT (讀取 Public & Private Repos/PRs)</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <button class="btn btn-ghost btn-sm" id="btn-gh-sync">🔄 立即同步 GitHub 專案與 PR 狀態</button>
+              <button class="btn btn-ghost btn-sm" id="btn-gh-disconnect" style="color: var(--danger);">解除連線</button>
+              <span id="gh-sync-result" class="mono-mini muted"></span>
+            </div>
           </div>
         </div>
       </section>

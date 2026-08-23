@@ -16,6 +16,7 @@ let currentCheckpointMarkdown = "";
 let summaryView = "day";
 let configDirs = [];
 let configRepos = [];
+let githubStatus = null;
 
 const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t == null ? "" : t)
@@ -42,6 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initTabs();
   initControls();
   initSettingsForm();
+  initGitHubSection();
   initSummariesTab();
   initCheckpointsTab();
 
@@ -50,6 +52,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadProjects();
   loadOpenLoops();
   loadConfig();
+  loadGitHubStatus();
   loadSummaries();
   loadCheckpoints();
 
@@ -239,12 +242,30 @@ function renderProjects() {
     const loopColor = p.open_loops_count >= 3 ? "var(--orange)"
       : (p.open_loops_count > 0 ? "var(--tx)" : "var(--mu)");
     const open = expandedProject === p.project_key;
+
+    let ghBadge = "";
+    if (p.github) {
+      const prs = p.github.prs || [];
+      if (prs.length) {
+        const latest = prs[0];
+        const isMerged = latest.state === "merged";
+        const bg = isMerged ? "rgba(168, 85, 247, 0.16)" : "rgba(242, 106, 15, 0.16)";
+        const color = isMerged ? "#c084fc" : "var(--orange)";
+        ghBadge = `<span class="trust" style="background:${bg}; color:${color}; font-size:9.5px; margin-left:6px;" title="${esc(latest.title)}">PR #${latest.number} ${latest.state.toUpperCase()}</span>`;
+      } else {
+        ghBadge = `<span class="trust ok" style="font-size:9.5px; margin-left:6px;">🐙 ${p.github.is_private ? "PRIVATE" : "PUBLIC"}</span>`;
+      }
+    }
+
     return `
       <div class="pitem" data-key="${esc(p.project_key)}">
         <div class="prow">
           <span class="pbar" style="background:${bar}"></span>
           <div style="min-width:0">
-            <div class="pname">${esc(p.display_name)}</div>
+            <div class="pname" style="display:flex; align-items:center;">
+              <span>${esc(p.display_name)}</span>
+              ${ghBadge}
+            </div>
             <div class="pmeta">${esc(p.category || "")} · ${statusLabel(p)}</div>
           </div>
           <div class="paction">${esc(p.last_action_summary || "無紀錄")}</div>
@@ -303,6 +324,39 @@ async function renderProjectDetail(key) {
     ? loops.map(l => `<div class="pl"><b>·</b><span>${esc(l.title)}</span></div>`).join("")
     : '<div class="placeholder" style="padding:0">無未結事項。</div>';
 
+  let ghSection = "";
+  if (proj && proj.github) {
+    const gh = proj.github;
+    const prsHtml = (gh.prs && gh.prs.length)
+      ? gh.prs.map(pr => {
+          const isMerged = pr.state === "merged";
+          const stateClass = isMerged ? "ok" : (pr.state === "open" ? "noisy" : "broken");
+          const ciBadge = pr.ci_status !== "neutral" ? ` · CI: ${esc(pr.ci_status.toUpperCase())}` : "";
+          return `
+            <div style="padding: 7px 9px; border: 1px solid var(--bd); margin-bottom: 6px; background: var(--s2); font-size: 11.5px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap: 8px;">
+                <a href="${esc(pr.html_url)}" target="_blank" style="color:var(--orange); font-weight:700; text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                  #${pr.number} ${esc(pr.title)} ↗
+                </a>
+                <span class="trust ${stateClass}" style="flex-shrink:0;">${esc(pr.state.toUpperCase())}</span>
+              </div>
+              <div class="mono-mini muted mt-2" style="font-size:10px;">
+                ${esc(pr.branch)} · ${esc(pr.author || "")}${ciBadge}
+              </div>
+            </div>`;
+        }).join("")
+      : '<div class="placeholder" style="padding:0">此倉庫目前無近期 PR 紀錄。</div>';
+
+    ghSection = `
+      <div style="grid-column: 1 / -1; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--bd);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span class="mono-label">GITHUB REPO & PULL REQUESTS</span>
+          <a href="${esc(gh.html_url)}" target="_blank" class="mono-mini" style="color:var(--orange); text-decoration:none;">${esc(gh.full_name)} (${gh.is_private ? "Private" : "Public"}) ↗</a>
+        </div>
+        <div>${prsHtml}</div>
+      </div>`;
+  }
+
   slot.innerHTML = `
     <div class="pdetail">
       <div>
@@ -316,10 +370,12 @@ async function renderProjectDetail(key) {
           <button class="btn btn-primary btn-sm" data-cp>產出此刻快照</button>
         </div>
       </div>
+      ${ghSection}
     </div>`;
   const cpBtn = slot.querySelector("[data-cp]");
   if (cpBtn) cpBtn.addEventListener("click", (ev) => { ev.stopPropagation(); triggerCheckpoint(); });
 }
+
 
 // ---------------------------------------------------------------- open loops rail
 async function loadOpenLoops() {
@@ -506,6 +562,121 @@ async function saveSettings() {
     setTimeout(() => { btn.disabled = false; btn.textContent = label; }, 1600);
   }
 }
+
+// ---------------------------------------------------------------- github
+function initGitHubSection() {
+  $("github-pill").addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".pane").forEach(p => p.classList.remove("active"));
+    const tabBtn = document.querySelector('.tab[data-tab="tab-settings"]');
+    if (tabBtn) tabBtn.classList.add("active");
+    $("tab-settings").classList.add("active");
+    loadConfig();
+    const el = $("btn-gh-auto-connect");
+    if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 160, behavior: "smooth" });
+  });
+
+  $("btn-gh-auto-connect").addEventListener("click", async () => {
+    const btn = $("btn-gh-auto-connect");
+    const label = btn.textContent;
+    btn.disabled = true; btn.textContent = "偵測認證中…";
+    try {
+      const res = await postJSON("/api/v1/github/connect", { method: "gh_cli" });
+      $("gh-sync-result").textContent = `✓ 已連線 @${res.auth.username}，已同步 ${res.sync.synced_repos_count} 個專案與 ${res.sync.synced_prs_count} 筆 PR！`;
+      loadGitHubStatus();
+      loadProjects(true);
+    } catch (e) {
+      $("gh-sync-result").textContent = `連線失敗：${e.message}`;
+    } finally {
+      setTimeout(() => { btn.disabled = false; btn.textContent = label; }, 1500);
+    }
+  });
+
+  $("btn-gh-token-connect").addEventListener("click", async () => {
+    const token = $("input-gh-token").value.trim();
+    if (!token) return;
+    const btn = $("btn-gh-token-connect");
+    const label = btn.textContent;
+    btn.disabled = true; btn.textContent = "驗證中…";
+    try {
+      const res = await postJSON("/api/v1/github/connect", { method: "token", token });
+      $("gh-sync-result").textContent = `✓ 已連線 @${res.auth.username}，已同步 ${res.sync.synced_repos_count} 個專案與 ${res.sync.synced_prs_count} 筆 PR！`;
+      $("input-gh-token").value = "";
+      loadGitHubStatus();
+      loadProjects(true);
+    } catch (e) {
+      $("gh-sync-result").textContent = `Token 驗證失敗：${e.message}`;
+    } finally {
+      setTimeout(() => { btn.disabled = false; btn.textContent = label; }, 1500);
+    }
+  });
+
+  $("btn-gh-sync").addEventListener("click", async () => {
+    const btn = $("btn-gh-sync");
+    const label = btn.textContent;
+    btn.disabled = true; btn.textContent = "⏳ 同步中…";
+    try {
+      const res = await postJSON("/api/v1/github/sync");
+      $("gh-sync-result").textContent = `✓ 同步完成！已更新 ${res.synced_repos_count} 個倉庫與 ${res.synced_prs_count} 筆 PR 狀態。`;
+      loadProjects(true);
+    } catch (e) {
+      $("gh-sync-result").textContent = `同步失敗：${e.message}`;
+    } finally {
+      setTimeout(() => { btn.disabled = false; btn.textContent = label; }, 1500);
+    }
+  });
+
+  $("btn-gh-disconnect").addEventListener("click", async () => {
+    try {
+      await postJSON("/api/v1/github/disconnect");
+      $("gh-sync-result").textContent = "已解除 GitHub 連線。";
+      loadGitHubStatus();
+      loadProjects(true);
+    } catch (e) { console.error(e); }
+  });
+}
+
+async function loadGitHubStatus() {
+  try {
+    const data = await getJSON("/api/v1/github/status");
+    githubStatus = data;
+    const pill = $("github-pill");
+    const pillText = $("github-status-text");
+    const badge = $("gh-auth-badge");
+    const info = $("gh-account-info");
+
+    if (data.connected) {
+      pill.className = "pill pill-on";
+      pillText.textContent = `🐙 @${data.username} (${data.public_repos + data.total_private_repos} Repos)`;
+      badge.className = "trust ok";
+      badge.textContent = "CONNECTED";
+
+      const scopesStr = (data.scopes || []).join(", ") || "基本讀取";
+      const limitStr = data.rate_limit ? `API 額度: ${data.rate_limit.remaining}/${data.rate_limit.limit}` : "";
+
+      info.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+          <img src="${esc(data.avatar_url)}" style="width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--bd);">
+          <div>
+            <strong><a href="${esc(data.html_url)}" target="_blank" style="color: var(--orange); text-decoration: none;">@${esc(data.username)}</a></strong>
+            <span style="color: var(--mu); font-size: 11.5px;">(${esc(data.name || "")}) · 擁有 ${data.public_repos} 公開 / ${data.total_private_repos} 私有倉庫</span>
+          </div>
+        </div>
+        <div class="mono-mini muted" style="font-size: 10.5px;">
+          權限範圍: <code>${esc(scopesStr)}</code> · ${esc(limitStr)}
+        </div>`;
+    } else {
+      pill.className = "pill pill-off";
+      pillText.textContent = "🐙 GitHub: 未連線";
+      badge.className = "trust broken";
+      badge.textContent = "未連線";
+      info.textContent = data.message || "尚未啟用 GitHub 認證。連線後可自動讀取所有 Public / Private 倉庫、PR 進度與 CI 狀態。";
+    }
+  } catch (e) {
+    $("github-status-text").textContent = "🐙 GitHub: 離線";
+  }
+}
+
 
 // ---------------------------------------------------------------- summaries
 function initSummariesTab() {

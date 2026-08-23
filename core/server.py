@@ -12,7 +12,7 @@ import json
 
 from .database import get_db
 from .config import get_config, DEFAULT_CONFIG_PATH
-from .models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, DailySummary, ProjectState, OpenLoop
+from .models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, DailySummary, ProjectState, OpenLoop, GitHubRepoState, GitHubPREvent
 from .manager import get_manager
 from .time_utils import get_local_now
 from .project_engine import get_active_projects_list, get_open_loops_list, refresh_project_states
@@ -493,9 +493,141 @@ def api_browse_folder(req: Optional[BrowseFolderRequest] = None):
     return {"status": "cancelled", "path": None}
 
 
-@app.get("/api/v1/utils/browse-fs")
-def api_list_fs_directories(path: Optional[str] = Query(None)):
-    """列出本機檔案系統目錄 (供網頁端資料夾導航)"""
-    from .fs_utils import list_fs_directories
-    return list_fs_directories(current_path=path)
+class GitHubConnectRequest(BaseModel):
+    method: str = Field("gh_cli", description="gh_cli 或 token")
+    token: Optional[str] = None
+
+
+# =====================================================================
+# 9. GitHub 雲端專案與 PR 智慧追蹤 API (GitHub Cloud Integration)
+# =====================================================================
+@app.get("/api/v1/github/status")
+def get_github_status():
+    """取得 GitHub 連線與認證狀態"""
+    from integrations.github_client import get_github_client
+    client = get_github_client()
+    return client.test_connection()
+
+
+@app.post("/api/v1/github/connect")
+def connect_github(req: GitHubConnectRequest):
+    """啟用 GitHub 認證連線 (支援本機 gh CLI 自動偵測或自訂 PAT)"""
+    from integrations.github_client import get_github_client
+    client = get_github_client()
+
+    token_to_use = None
+    if req.method == "token" and req.token:
+        token_to_use = req.token.strip()
+    elif req.method == "gh_cli":
+        token_to_use = client.get_token()
+
+    if not token_to_use:
+        raise HTTPException(status_code=400, detail="未提供有效之 GitHub Token 且未偵測到 gh CLI 登入憑證")
+
+    # 驗證 Token
+    test_res = client.test_connection(token_override=token_to_use)
+    if not test_res.get("connected"):
+        raise HTTPException(status_code=401, detail=test_res.get("message", "Token 驗證失敗"))
+
+    # 儲存至 config.yaml
+    cfg = get_config()
+    cfg.data["integrations"] = cfg.data.get("integrations", {})
+    cfg.data["integrations"]["github"] = cfg.data["integrations"].get("github", {})
+    cfg.data["integrations"]["github"]["enabled"] = True
+    if req.method == "token":
+        cfg.data["integrations"]["github"]["token"] = token_to_use
+    else:
+        cfg.data["integrations"]["github"]["token"] = ""  # 使用 gh CLI 動態讀取
+
+    with open(DEFAULT_CONFIG_PATH, "w", encoding="utf-8") as f:
+        yaml.safe_dump(cfg.data, f, allow_unicode=True, sort_keys=False)
+
+    # 立即執行一次同步
+    sync_res = client.sync_all(max_repos=40)
+    return {
+        "status": "success",
+        "message": f"GitHub 帳號 @{test_res.get('username')} 連線成功！",
+        "auth": test_res,
+        "sync": sync_res
+    }
+
+
+@app.post("/api/v1/github/disconnect")
+def disconnect_github():
+    """解除 GitHub 連線"""
+    cfg = get_config()
+    if "integrations" in cfg.data and "github" in cfg.data["integrations"]:
+        cfg.data["integrations"]["github"]["enabled"] = False
+        cfg.data["integrations"]["github"]["token"] = ""
+        with open(DEFAULT_CONFIG_PATH, "w", encoding="utf-8") as f:
+            yaml.safe_dump(cfg.data, f, allow_unicode=True, sort_keys=False)
+    return {"status": "success", "message": "已解除 GitHub 整合連線"}
+
+
+@app.post("/api/v1/github/sync")
+def trigger_github_sync():
+    """手動觸發即時同步所有 Public/Private 專案與 PR 狀態"""
+    from integrations.github_client import get_github_client
+    client = get_github_client()
+    res = client.sync_all(max_repos=50)
+    # 強制重整專案快取
+    refresh_project_states(force=True)
+    return res
+
+
+@app.get("/api/v1/github/repos")
+def list_github_repos():
+    """取得所有已同步的 GitHub 遠端倉庫清單"""
+    db = get_db()
+    with db.session_scope() as session:
+        repos = session.query(GitHubRepoState).order_by(GitHubRepoState.pushed_at.desc()).all()
+        return [
+            {
+                "id": r.id,
+                "name": r.repo_name,
+                "full_name": r.full_name,
+                "is_private": r.is_private,
+                "html_url": r.html_url,
+                "description": r.description,
+                "default_branch": r.default_branch,
+                "open_prs_count": r.open_prs_count,
+                "open_issues_count": r.open_issues_count,
+                "stars": r.stars_count,
+                "pushed_at": r.pushed_at.strftime("%Y-%m-%d %H:%M") if r.pushed_at else None,
+                "prs_summary": json.loads(r.metadata_json) if r.metadata_json else []
+            }
+            for r in repos
+        ]
+
+
+@app.get("/api/v1/github/prs")
+def list_github_prs(state: Optional[str] = None):
+    """取得所有活躍 PRs (包含 Open, Merged, CI 狀態)"""
+    db = get_db()
+    with db.session_scope() as session:
+        query = session.query(GitHubPREvent)
+        if state:
+            query = query.filter_by(state=state)
+        prs = query.order_by(GitHubPREvent.updated_at.desc()).limit(40).all()
+        return [
+            {
+                "id": pr.id,
+                "repo": pr.repo_name,
+                "number": pr.pr_number,
+                "title": pr.title,
+                "state": pr.state,
+                "is_draft": pr.is_draft,
+                "author": pr.author,
+                "html_url": pr.html_url,
+                "branch_head": pr.branch_head,
+                "branch_base": pr.branch_base,
+                "ci_status": pr.ci_status,
+                "review_state": pr.review_state,
+                "created_at": pr.created_at.strftime("%Y-%m-%d %H:%M") if pr.created_at else None,
+                "updated_at": pr.updated_at.strftime("%Y-%m-%d %H:%M") if pr.updated_at else None,
+                "merged_at": pr.merged_at.strftime("%Y-%m-%d %H:%M") if pr.merged_at else None
+            }
+            for pr in prs
+        ]
+
 

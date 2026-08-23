@@ -85,7 +85,7 @@ class DailySummary(Base):
     __tablename__ = "daily_summaries"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    date_str = Column(String(10), unique=True, nullable=False, index=True)  # YYYY-MM-DD
+    date_str = Column(String(50), unique=True, nullable=False, index=True)  # YYYY-MM-DD 或 YYYY-MM-DD ~ YYYY-MM-DD
     created_at = Column(DateTime, default=get_local_now)
     llm_provider = Column(String(50), nullable=False)
     model_name = Column(String(100), nullable=False)
@@ -120,3 +120,51 @@ class OpenLoop(Base):
     confidence = Column(Float, default=1.0)
     created_at = Column(DateTime, default=get_local_now, index=True)
     resolved_at = Column(DateTime, nullable=True, index=True)
+
+
+class GitHubRepoState(Base):
+    """記錄 GitHub 遠端專案 (Public / Private) 狀態與指標"""
+    __tablename__ = "github_repo_states"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    repo_name = Column(String(100), unique=True, nullable=False, index=True)  # 如 activityTracker
+    full_name = Column(String(200), nullable=False, index=True)  # 如 dofliu/activityTracker
+    is_private = Column(Boolean, default=False)
+    html_url = Column(String(500), nullable=False)
+    description = Column(Text, nullable=True)
+    default_branch = Column(String(100), default="main")
+    open_prs_count = Column(Integer, default=0)
+    open_issues_count = Column(Integer, default=0)
+    stars_count = Column(Integer, default=0)
+    forks_count = Column(Integer, default=0)
+    pushed_at = Column(DateTime, nullable=True, index=True)
+    updated_at = Column(DateTime, default=get_local_now, onupdate=get_local_now)
+    metadata_json = Column(Text, nullable=True)  # 儲存 CI 狀態、最新 PR 摘要等
+
+
+class GitHubPREvent(Base):
+    """記錄 GitHub Pull Request 狀態、審查意見與 CI 檢查結果"""
+    __tablename__ = "github_pr_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    repo_name = Column(String(100), nullable=False, index=True)
+    pr_number = Column(Integer, nullable=False, index=True)
+    title = Column(Text, nullable=False)
+    state = Column(String(50), nullable=False, index=True)  # open, closed, merged
+    is_draft = Column(Boolean, default=False)
+    author = Column(String(100), nullable=True)
+    html_url = Column(String(500), nullable=False)
+    branch_head = Column(String(100), nullable=True)
+    branch_base = Column(String(100), nullable=True)
+    additions = Column(Integer, default=0)
+    deletions = Column(Integer, default=0)
+    changed_files = Column(Integer, default=0)
+    ci_status = Column(String(50), default="pending")  # success, failure, pending, neutral
+    review_state = Column(String(50), default="PENDING")  # APPROVED, CHANGES_REQUESTED, COMMENTED, PENDING
+    created_at = Column(DateTime, nullable=True, index=True)
+    updated_at = Column(DateTime, nullable=True, index=True)
+    merged_at = Column(DateTime, nullable=True, index=True)
+
+    __table_args__ = (
+        Index("ix_gh_repo_pr", "repo_name", "pr_number", unique=True),
+    )

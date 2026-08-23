@@ -6,7 +6,7 @@ import json
 import logging
 
 from core.database import get_db
-from core.models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, DailySummary, ProjectState, OpenLoop
+from core.models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, DailySummary, ProjectState, OpenLoop, GitHubPREvent
 from core.config import get_config
 from core.time_utils import get_local_now
 from core.project_engine import get_active_projects_list, get_open_loops_list, refresh_project_states, extract_and_save_open_loops_from_summary
@@ -42,6 +42,15 @@ def fetch_events_in_range(start_dt: datetime, end_dt: datetime) -> Dict[str, Any
             session.query(WindowEvent)
             .filter(WindowEvent.start_time >= start_dt, WindowEvent.start_time <= end_dt)
             .order_by(WindowEvent.start_time.asc())
+            .all()
+        )
+        pr_events = (
+            session.query(GitHubPREvent)
+            .filter(
+                ((GitHubPREvent.merged_at >= start_dt) & (GitHubPREvent.merged_at <= end_dt)) |
+                ((GitHubPREvent.updated_at >= start_dt) & (GitHubPREvent.updated_at <= end_dt))
+            )
+            .order_by(GitHubPREvent.updated_at.asc())
             .all()
         )
 
@@ -83,6 +92,21 @@ def fetch_events_in_range(start_dt: datetime, end_dt: datetime) -> Dict[str, Any
                 }
                 for e in git_events
             ],
+            "pr_events": [
+                {
+                    "id": p.id,
+                    "repo": p.repo_name,
+                    "number": p.pr_number,
+                    "title": p.title,
+                    "state": p.state,
+                    "branch": f"{p.branch_head} -> {p.branch_base}",
+                    "ci_status": p.ci_status,
+                    "review_state": p.review_state,
+                    "merged_at": p.merged_at.strftime("%Y-%m-%d %H:%M") if p.merged_at else None,
+                    "updated_at": p.updated_at.strftime("%Y-%m-%d %H:%M") if p.updated_at else None
+                }
+                for p in pr_events
+            ],
             "window_events": [
                 {
                     "id": e.id,
@@ -104,6 +128,8 @@ def format_context_for_prompt(day_data: Dict[str, Any], time_range_str: str) -> 
     active_project_names: Set[str] = set()
     for g in day_data["git_events"]:
         if g.get("repo"): active_project_names.add(g["repo"])
+    for p in day_data.get("pr_events", []):
+        if p.get("repo"): active_project_names.add(p["repo"])
     for f in day_data["file_events"]:
         if f.get("project"): active_project_names.add(f["project"])
     for a in day_data["ai_events"]:
@@ -145,11 +171,16 @@ def format_context_for_prompt(day_data: Dict[str, Any], time_range_str: str) -> 
         file_lines.append(f"- [{item['time']}] [{item['action'].upper()}] {item['file_name']} [{item['file_type']}]{diff_str}")
     file_text = "\n".join(file_lines) if file_lines else "（該時段無檔案異動紀錄）"
 
-    # 5. Git Events
+    # 5. Git Events & PRs
     git_lines = []
     for item in day_data["git_events"]:
         git_lines.append(f"- [{item['time']}] [{item['repo']}@{item['branch']}] Commit: {item['message']} (+{item['insertions']}/-{item['deletions']})")
-    git_text = "\n".join(git_lines) if git_lines else "（該時段無代碼提交紀錄）"
+    for pr in day_data.get("pr_events", []):
+        state_str = "已合併 (Merged)" if pr["state"] == "merged" else ("開啟中 (Open)" if pr["state"] == "open" else pr["state"])
+        ci_str = f" [CI: {pr['ci_status']}]" if pr.get("ci_status") != "neutral" else ""
+        git_lines.append(f"- [GitHub PR] [{pr['repo']}] PR #{pr['number']}: {pr['title']} ({state_str}){ci_str} 分支: {pr['branch']}")
+    git_text = "\n".join(git_lines) if git_lines else "（該時段無代碼提交或 PR 紀錄）"
+
 
     # 6. Window Events
     app_durations: Dict[str, float] = {}

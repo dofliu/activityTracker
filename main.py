@@ -247,6 +247,32 @@ def cmd_notify_telegram(action: str, date_str: Optional[str] = None):
         print("✅ 發送成功" if success else "❌ 發送失敗")
 
 
+def cmd_github(action: str):
+    """GitHub 雲端整合狀態與手動同步"""
+    from integrations.github_client import get_github_client
+    client = get_github_client()
+    if action in ["status", None]:
+        status = client.test_connection()
+        print("\n" + "="*50)
+        print("🐙 GitHub 雲端認證狀態")
+        print("="*50)
+        if status.get("connected"):
+            print(f"• 連線狀態 : 🟢 已認證 (@{status.get('username')})")
+            print(f"• 姓名     : {status.get('name')}")
+            print(f"• 公開倉庫 : {status.get('public_repos')} 個")
+            print(f"• 私有倉庫 : {status.get('total_private_repos')} 個")
+            print(f"• Token 權限: {', '.join(status.get('scopes', []))}")
+            if status.get("rate_limit"):
+                print(f"• API 額度 : {status['rate_limit']['remaining']} / {status['rate_limit']['limit']}")
+        else:
+            print(f"• 連線狀態 : 🔴 未連線 ({status.get('message')})")
+        print("="*50 + "\n")
+    elif action == "sync":
+        print("正在同步 GitHub 所有 Public / Private 倉庫與 PRs...")
+        res = client.sync_all(max_repos=50)
+        print(f"✅ 同步完成！已同步 {res.get('synced_repos_count')} 個專案與 {res.get('synced_prs_count')} 筆 PR 狀態。")
+
+
 def main():
     parser = argparse.ArgumentParser(description="OmniContext - 個人全景上下文與進行中專案智慧中樞")
     subparsers = parser.add_subparsers(dest="command", help="子指令")
@@ -273,6 +299,10 @@ def main():
     cp_parser = subparsers.add_parser("checkpoint", help="手動生成近時段的活動快照 Log")
     cp_parser.add_argument("--hours", type=int, default=2, help="回溯時數 (預設 2 小時)")
 
+    # github 指令
+    gh_parser = subparsers.add_parser("github", help="GitHub 雲端專案與 PR 同步管理")
+    gh_parser.add_argument("action", choices=["status", "sync"], default="status", nargs="?", help="動作 (status, sync)")
+
     # notify 指令
     notify_parser = subparsers.add_parser("notify", help="手動觸發 Telegram 推播")
     notify_parser.add_argument("type", choices=["summary", "briefing", "stagnation"], help="通知類型")
@@ -293,7 +323,8 @@ def main():
         cmd_now()
     elif args.command == "summary":
         cmd_summary(args.date, getattr(args, "start", None), getattr(args, "end", None), args.provider, args.force)
-
+    elif args.command == "github":
+        cmd_github(args.action)
     elif args.command == "checkpoint":
         cmd_checkpoint(args.hours)
     elif args.command == "notify":
@@ -304,6 +335,7 @@ def main():
         cmd_status()
     else:
         parser.print_help()
+
 
 
 if __name__ == "__main__":
