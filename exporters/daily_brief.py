@@ -15,15 +15,12 @@ from typing import Any, Dict, List, Optional
 
 from core.config import get_config
 from core.time_utils import get_local_now
-from core.project_engine import get_active_projects_list, get_open_loops_list
+from core.project_engine import get_active_projects_list, get_open_loops_list, is_bucket_project
 
 logger = logging.getLogger("OmniContext.DailyBrief")
 
 MARKER_START = "<!-- OMNICONTEXT:START -->"
 MARKER_END = "<!-- OMNICONTEXT:END -->"
-
-# 未歸戶的收容桶不是真的工作項目
-_BUCKET_KEYS = {"general", "general / notes", "general/notes", "unassigned", "general / unassigned"}
 
 _STATUS_LABEL = {
     "active": ("進行中", "#16a34a"),
@@ -34,10 +31,7 @@ _STATUS_LABEL = {
 
 def _collect() -> Dict[str, Any]:
     """彙整簡報所需資料"""
-    projects = [
-        p for p in get_active_projects_list()
-        if p.get("project_key", "").strip().lower() not in _BUCKET_KEYS
-    ]
+    projects = [p for p in get_active_projects_list() if not is_bucket_project(p.get("project_key"))]
     active = [p for p in projects if p["status"] == "active"]
     stagnant = [p for p in projects if p["status"] in ("idle", "stale")]
 

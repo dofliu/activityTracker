@@ -14,17 +14,13 @@ from typing import List, Optional
 
 from core.config import get_config
 from core.time_utils import get_local_now
-from core.project_engine import get_active_projects_list, get_open_loops_list
+from core.project_engine import get_active_projects_list, get_open_loops_list, is_bucket_project
 
 logger = logging.getLogger("OmniContext.DesktopNotifier")
 
-# 未歸戶的收容專案，不該出現在提醒裡（它不是一個真的工作項目）
-_BUCKET_KEYS = {"general", "general / notes", "general/notes", "unassigned", "general / unassigned"}
-
-
 def _real_projects(projects: List[dict]) -> List[dict]:
-    """濾掉未歸戶的收容桶，只留真正的工作項目"""
-    return [p for p in projects if p.get("project_key", "").strip().lower() not in _BUCKET_KEYS]
+    """濾掉未歸戶的收容桶（判定邏輯集中在 project_engine，避免多份名單各自漂移）"""
+    return [p for p in projects if not is_bucket_project(p.get("project_key"))]
 
 # 使用 PowerShell 已註冊的 AppUserModelID，免去自行註冊捷徑的麻煩
 _APP_ID = r"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe"

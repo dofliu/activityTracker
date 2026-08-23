@@ -10,6 +10,21 @@ from core.database import get_db
 from core.models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, ProjectState, OpenLoop, GitHubRepoState, GitHubPREvent
 from core.time_utils import get_local_now
 
+# 未歸戶的收容桶：不是真的工作項目，不應出現在進行中工作、提醒與簡報裡
+BUCKET_PROJECT_KEYS = {
+    "general",
+    "general / notes",
+    "general/notes",
+    "general / unassigned",
+    "unassigned",
+}
+
+
+def is_bucket_project(project_key: str | None) -> bool:
+    """判斷是否為未歸戶的收容桶"""
+    return (project_key or "").strip().lower() in BUCKET_PROJECT_KEYS
+
+
 # 卡片上「上次做到哪」只需要一句話，過長的 commit 內文或提問全文會把版面撐爆
 ACTION_SUMMARY_MAX_LEN = 70
 
@@ -310,6 +325,10 @@ def get_active_projects_list(force_refresh: bool = False) -> List[Dict[str, Any]
         projects = session.query(ProjectState).order_by(desc(ProjectState.last_activity_at)).all()
         result = []
         for p in projects:
+            # 收容桶不是工作項目，不列入進行中清單
+            if is_bucket_project(p.project_key):
+                continue
+
             idle_days = (now - p.last_activity_at).days
             
             loops_count = session.query(OpenLoop).filter(
