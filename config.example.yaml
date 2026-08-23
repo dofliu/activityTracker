@@ -11,9 +11,11 @@ watchers:
     - D:/Dropbox/Project_Academic/Paper&Patent/01.國際期刊(發表年月)
     - D:/Project_CodingSimulation
     extensions:
+    - .tex
     - .docx
     - .md
     - .pdf
+    - .py
     - .txt
     ignore_patterns:
     - '**/node_modules/**'
@@ -26,7 +28,7 @@ watchers:
   git_watcher:
     enabled: true
     repositories:
-    - D:\Project_CodingSimulation
+    - D:/Project_CodingSimulation
     scan_interval_seconds: 300
   window_watcher:
     enabled: true
@@ -83,3 +85,8 @@ exporters:
   obsidian:
     enabled: false
     vault_daily_notes_dir: C:/Users/user/Documents/ObsidianVault/DailyNotes
+integrations:
+  github:
+    enabled: true
+    token: ''
+    token_env: GITHUB_TOKEN

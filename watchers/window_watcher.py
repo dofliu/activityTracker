@@ -14,18 +14,21 @@ from core.time_utils import get_local_now
 logger = logging.getLogger("OmniContext.WindowWatcher")
 
 
-def get_active_window_info() -> Tuple[str, str]:
-    """取得當前 Windows 前景作用中視窗的 (應用程式名稱, 視窗標題)"""
+def get_active_window_info() -> Tuple[Optional[str], Optional[str]]:
+    """取得當前 Windows 前景作用中視窗的 (應用程式名稱, 視窗標題)，若無有效視窗回傳 (None, None)"""
     try:
         import win32gui
         import win32process
         import psutil
 
         hwnd = win32gui.GetForegroundWindow()
-        if not hwnd:
-            return "Idle", "Idle"
+        if not hwnd or hwnd == 0:
+            return None, None
 
         title = win32gui.GetWindowText(hwnd)
+        if not title or not title.strip():
+            return None, None
+
         _, pid = win32process.GetWindowThreadProcessId(hwnd)
         try:
             process = psutil.Process(pid)
@@ -33,18 +36,28 @@ def get_active_window_info() -> Tuple[str, str]:
         except Exception:
             app_name = "Unknown"
 
-        return app_name, title
+        if app_name.lower() in ("idle", "unknown") and title.lower() in ("idle", ""):
+            return None, None
+
+        return app_name, title.strip()
     except ImportError:
         # Fallback via ctypes
         try:
             user32 = ctypes.windll.user32
             hwnd = user32.GetForegroundWindow()
+            if not hwnd or hwnd == 0:
+                return None, None
             length = user32.GetWindowTextLengthW(hwnd)
+            if length == 0:
+                return None, None
             buff = ctypes.create_unicode_buffer(length + 1)
             user32.GetWindowTextW(hwnd, buff, length + 1)
-            return "WindowsApp", buff.value or "Idle"
+            val = buff.value.strip() if buff.value else ""
+            if not val or val.lower() == "idle":
+                return None, None
+            return "WindowsApp", val
         except Exception:
-            return "System", "Desktop"
+            return None, None
 
 
 def categorize_window(app_name: str, title: str) -> str:
@@ -95,8 +108,13 @@ class WindowWatcherService:
             logger.info("WindowWatcher service stopped.")
 
     def _flush_current_window(self):
-        """將上一個視窗的停留時間結算寫入資料庫"""
+        """將上一個視窗的停留時間結算寫入資料庫 (過濾假 Idle 與過短事件)"""
         if not self._current_app or not self._current_title:
+            return
+
+        if self._current_app.lower() in ("idle", "unknown") and self._current_title.lower() in ("idle", ""):
+            self._current_app = ""
+            self._current_title = ""
             return
 
         now = get_local_now()
@@ -117,6 +135,9 @@ class WindowWatcherService:
                 )
                 session.add(event)
 
+        self._current_app = ""
+        self._current_title = ""
+
     def _monitor_loop(self):
         interval = self.cfg.get("watchers.window_watcher.interval_seconds", 5)
         ignore_titles = set(self.cfg.get("watchers.window_watcher.ignore_titles", []))
@@ -124,12 +145,25 @@ class WindowWatcherService:
         while self._running:
             try:
                 app_name, title = get_active_window_info()
-                if title and title not in ignore_titles:
-                    if app_name != self._current_app or title != self._current_title:
+                if not app_name or not title:
+                    # 拿不到前景視窗（如背景服務執行或鎖定螢幕）：結算當前視窗，不寫入偽造 Idle
+                    if self._current_app:
                         self._flush_current_window()
-                        self._current_app = app_name
-                        self._current_title = title
-                        self._current_start_time = get_local_now()
+                else:
+                    if title not in ignore_titles:
+                        if app_name != self._current_app or title != self._current_title:
+                            self._flush_current_window()
+                            self._current_app = app_name
+                            self._current_title = title
+                            self._current_start_time = get_local_now()
+                        else:
+                            # 防呆：單一視窗超過 1800 秒（30分鐘）強制階段性結算
+                            now = get_local_now()
+                            if (now - self._current_start_time).total_seconds() > 1800:
+                                self._flush_current_window()
+                                self._current_app = app_name
+                                self._current_title = title
+                                self._current_start_time = now
             except Exception as e:
                 logger.error(f"Error in window monitoring: {e}")
 

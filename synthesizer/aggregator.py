@@ -182,14 +182,15 @@ def format_context_for_prompt(day_data: Dict[str, Any], time_range_str: str) -> 
     git_text = "\n".join(git_lines) if git_lines else "（該時段無代碼提交或 PR 紀錄）"
 
 
-    # 6. Window Events
+    # 6. Window Events (過濾無效/Idle 紀錄)
     app_durations: Dict[str, float] = {}
     for item in day_data["window_events"]:
         app = item["app"]
-        app_durations[app] = app_durations.get(app, 0.0) + item["duration_sec"]
+        if app and app.lower() not in ("idle", "unknown", "none"):
+            app_durations[app] = app_durations.get(app, 0.0) + item["duration_sec"]
 
-    window_lines = [f"- {app}: 約 {int(sec // 60)} 分鐘" for app, sec in sorted(app_durations.items(), key=lambda x: x[1], reverse=True)[:8]]
-    window_text = "\n".join(window_lines) if window_lines else "（該時段無視窗統計資料）"
+    window_lines = [f"- {app}: 約 {int(sec // 60)} 分鐘" for app, sec in sorted(app_durations.items(), key=lambda x: x[1], reverse=True)[:8] if sec >= 60]
+    window_text = "\n".join(window_lines) if window_lines else "（該時段無有效視窗焦點紀錄 / 服務於背景執行中）"
 
     return RANGE_PROJECT_SYNTHESIS_USER.format(
         time_range_str=time_range_str,

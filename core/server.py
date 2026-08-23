@@ -214,8 +214,19 @@ def add_open_loop(payload: OpenLoopCreate):
 def create_or_update_ai_event(payload: AIPromptCreate):
     cfg = get_config()
 
-    # D6 假開關修復：檢查該瀏覽器平台是否啟用
-    browser_enabled = cfg.get(f"watchers.browser.{payload.platform}", True)
+    # D6 假開關修復：檢查該瀏覽器平台是否啟用 (支援別名比對)
+    plat = (payload.platform or "").lower().strip()
+    if plat in ("claude", "claude_web"):
+        browser_enabled = cfg.get("watchers.browser.claude_web", cfg.get("watchers.browser.claude", True))
+    elif plat in ("chatgpt", "chatgpt_web"):
+        browser_enabled = cfg.get("watchers.browser.chatgpt", True)
+    elif plat in ("gemini", "gemini_web"):
+        browser_enabled = cfg.get("watchers.browser.gemini", True)
+    elif plat in ("manus", "manus_web"):
+        browser_enabled = cfg.get("watchers.browser.manus", True)
+    else:
+        browser_enabled = cfg.get(f"watchers.browser.{plat}", True)
+
     if not browser_enabled:
         return {"status": "skipped", "message": f"{payload.platform} monitoring is disabled in settings"}
 

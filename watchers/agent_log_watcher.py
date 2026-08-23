@@ -56,7 +56,53 @@ def extract_text_from_content(content: Any) -> str:
         return "\n".join(parts).strip()
     if isinstance(content, dict):
         return str(content.get("text") or content.get("content") or "").strip()
-    return str(content).strip()
+def extract_claude_user_text(content: Any) -> str:
+    """提取 Claude Code 的 User Prompt 文字，並過濾純 tool_result 雜訊"""
+    if not content:
+        return ""
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        texts = []
+        for item in content:
+            if isinstance(item, dict):
+                if item.get("type") == "tool_result":
+                    continue
+                txt = item.get("text") or item.get("input_text") or ""
+                if txt:
+                    texts.append(txt.strip())
+            elif isinstance(item, str):
+                texts.append(item.strip())
+        return "\n".join(texts).strip()
+    if isinstance(content, dict):
+        if content.get("type") == "tool_result":
+            return ""
+        return str(content.get("text") or "").strip()
+    return ""
+
+
+def extract_claude_assistant_text(content: Any) -> str:
+    """提取 Claude Code 的 Assistant 文字回覆 (包含 block type == 'text')"""
+    if not content:
+        return ""
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        texts = []
+        for item in content:
+            if isinstance(item, dict):
+                if item.get("type") == "text":
+                    txt = item.get("text") or ""
+                    if txt:
+                        texts.append(txt.strip())
+            elif isinstance(item, str):
+                texts.append(item.strip())
+        return "\n".join(texts).strip()
+    if isinstance(content, dict):
+        if content.get("type") == "text":
+            return str(content.get("text") or "").strip()
+        return str(content.get("text") or "").strip()
+    return ""
 
 
 class AgentLogWatcherService:
@@ -201,6 +247,7 @@ class AgentLogWatcherService:
                     current_user_time = None
                     current_cwd = None
                     current_session_id = None
+                    accumulated_responses: List[str] = []
 
                     with open(proj_jsonl, "r", encoding="utf-8", errors="ignore") as f:
                         for line in f:
@@ -213,42 +260,40 @@ class AgentLogWatcherService:
                                 ts = parse_timestamp_safe(item.get("timestamp") or item.get("createdAt"))
 
                                 if msg_type == "user":
-                                    # 如果前面已有積累的 user prompt 尚未寫入，先寫入
-                                    if current_user_prompt and current_user_time:
-                                        self._upsert_ai_event(
-                                            db, platform="claude_code", conv_id=current_session_id,
-                                            prompt=current_user_prompt, response=None,
-                                            cwd=current_cwd, timestamp=current_user_time
-                                        )
-
                                     msg = item.get("message", {})
-                                    content = extract_text_from_content(msg.get("content") if isinstance(msg, dict) else msg)
-                                    if content and len(content) >= 2:
-                                        current_user_prompt = content
+                                    content = msg.get("content") if isinstance(msg, dict) else item.get("content")
+                                    user_text = extract_claude_user_text(content)
+
+                                    if user_text and len(user_text) >= 2:
+                                        # 如果前面已有積累的 user prompt，成對寫入
+                                        if current_user_prompt and current_user_time:
+                                            full_resp = "\n\n".join(accumulated_responses).strip() if accumulated_responses else None
+                                            self._upsert_ai_event(
+                                                db, platform="claude_code", conv_id=current_session_id,
+                                                prompt=current_user_prompt, response=full_resp,
+                                                cwd=current_cwd, timestamp=current_user_time
+                                            )
+                                        current_user_prompt = user_text
                                         current_user_time = ts or get_local_now()
-                                        current_cwd = item.get("cwd")
+                                        current_cwd = item.get("cwd") or (str(proj_jsonl.parent) if proj_jsonl.parent else None)
                                         current_session_id = item.get("sessionId")
+                                        accumulated_responses = []
 
                                 elif msg_type == "assistant":
                                     msg = item.get("message", {})
-                                    assistant_text = extract_text_from_content(msg.get("content") if isinstance(msg, dict) else msg)
-
-                                    if current_user_prompt and current_user_time:
-                                        self._upsert_ai_event(
-                                            db, platform="claude_code", conv_id=current_session_id,
-                                            prompt=current_user_prompt, response=assistant_text if assistant_text else None,
-                                            cwd=current_cwd, timestamp=current_user_time
-                                        )
-                                        current_user_prompt = ""
-                                        current_user_time = None
+                                    content = msg.get("content") if isinstance(msg, dict) else item.get("content")
+                                    assistant_text = extract_claude_assistant_text(content)
+                                    if assistant_text:
+                                        accumulated_responses.append(assistant_text)
                             except Exception:
                                 continue
 
                         # 處理最後一筆
                         if current_user_prompt and current_user_time:
+                            full_resp = "\n\n".join(accumulated_responses).strip() if accumulated_responses else None
                             self._upsert_ai_event(
                                 db, platform="claude_code", conv_id=current_session_id,
-                                prompt=current_user_prompt, response=None,
+                                prompt=current_user_prompt, response=full_resp,
                                 cwd=current_cwd, timestamp=current_user_time
                             )
                 except Exception as e:
