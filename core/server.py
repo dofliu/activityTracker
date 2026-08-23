@@ -177,16 +177,18 @@ def open_system_path(payload: OpenPathRequest):
         else: # explorer
             if sys.platform == "win32":
                 norm_path = os.path.normpath(target_path)
-                if os.path.isdir(norm_path):
-                    subprocess.Popen(f'explorer.exe "{norm_path}"', shell=True)
-                else:
-                    subprocess.Popen(f'explorer.exe /select,"{norm_path}"', shell=True)
+                import ctypes
+                # 使用 ShellExecuteW 直接向 Windows Desktop Shell 發送開啟視窗指令
+                ret = ctypes.windll.shell32.ShellExecuteW(None, "open", norm_path, None, None, 1)
+                if ret <= 32:
+                    # 備援：使用 cmd /c start 開啟前台視窗
+                    subprocess.Popen(f'cmd.exe /c start "" "{norm_path}"', shell=True)
             elif sys.platform == "darwin":
                 subprocess.Popen(["open", target_path])
             else:
                 subprocess.Popen(["xdg-open", target_path])
 
-            return {"status": "success", "message": f"已開啟資料夾: {target_path}"}
+            return {"status": "success", "message": f"已在檔案總管開啟: {target_path}"}
     except Exception as e:
         logger.error(f"Error opening path {payload.path}: {e}")
         return {"status": "error", "message": str(e)}
