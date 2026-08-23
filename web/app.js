@@ -303,22 +303,47 @@ async function renderProjectDetail(key) {
   slot.innerHTML = '<div class="pdetail"><div class="placeholder">載入專案活動…</div></div>';
 
   const proj = projectsCache.find(p => p.project_key === key);
-  const events = recentEvents
-    .filter(e => (e.project || "") === key || (proj && (e.project || "") === proj.display_name))
-    .slice(0, 12);
+  let events = [];
+  try {
+    events = await getJSON(`/api/v1/events/recent?limit=30&project=${encodeURIComponent(key)}`);
+  } catch (e) {
+    events = recentEvents.filter(e => (e.project || "") === key || (proj && (e.project || "") === proj.display_name));
+  }
 
   let loops = [];
   try { loops = await getJSON(`/api/v1/open-loops?project=${encodeURIComponent(key)}`); } catch (e) {}
 
+  // 提取該專案近期異動的檔案清單
+  const fileEvents = events.filter(e => e.type === "file");
+  const distinctFiles = [];
+  const seenPaths = new Set();
+  for (const f of fileEvents) {
+    if (!seenPaths.has(f.detail || f.title)) {
+      seenPaths.add(f.detail || f.title);
+      distinctFiles.push(f);
+    }
+  }
+
   const dotOf = { ai: "var(--orange)", git: "var(--warn)", window: "var(--mu)", file: "var(--bd)" };
   const tl = events.length
-    ? events.map(e => `
+    ? events.slice(0, 10).map(e => `
         <div class="tl">
           <span class="tl-time">${esc((e.timestamp || "").split(" ")[1] || "")}</span>
           <span class="tl-dot" style="background:${dotOf[e.type] || "var(--bd)"}"></span>
-          <span class="tl-text">${esc(e.title)}</span>
+          <span class="tl-text">${esc(e.title)} <small class="muted">(${esc(e.response || "")})</small></span>
         </div>`).join("")
-    : '<div class="placeholder" style="padding:0">最近 200 筆事件中沒有這個專案的紀錄。</div>';
+    : '<div class="placeholder" style="padding:0">近期尚無詳細活動紀錄。</div>';
+
+  const fileListHtml = distinctFiles.length
+    ? distinctFiles.map(f => `
+        <div style="padding: 5px 8px; border: 1px solid var(--bd); margin-bottom: 4px; background: var(--s2); font-size: 11px; display: flex; justify-content: space-between; align-items: center;">
+          <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80%;">
+            <strong style="color: var(--tx);">${esc(f.title.replace(/^\[[^\]]+\]\s*/, ''))}</strong>
+            <span class="muted mono-mini" style="margin-left: 6px; font-size: 9.5px;">${esc(f.detail || '')}</span>
+          </div>
+          <span class="mono-mini accent" style="font-size: 9.5px; flex-shrink: 0;">${esc(f.response || '')}</span>
+        </div>`).join("")
+    : '<div class="placeholder" style="padding:0">無檔案異動紀錄。</div>';
 
   const ll = loops.length
     ? loops.map(l => `<div class="pl"><b>·</b><span>${esc(l.title)}</span></div>`).join("")
@@ -359,6 +384,10 @@ async function renderProjectDetail(key) {
 
   slot.innerHTML = `
     <div class="pdetail">
+      <div>
+        <span class="mono-label">RECENT MODIFIED FILES (本次工作異動檔案)</span>
+        ${fileListHtml}
+      </div>
       <div>
         <span class="mono-label">ACTIVITY TIMELINE</span>
         ${tl}

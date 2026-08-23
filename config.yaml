@@ -11,11 +11,9 @@ watchers:
     - D:/Dropbox/Project_Academic/Paper&Patent/01.國際期刊(發表年月)
     - D:/Project_CodingSimulation
     extensions:
-    - .tex
     - .docx
     - .md
     - .pdf
-    - .py
     - .txt
     ignore_patterns:
     - '**/node_modules/**'
@@ -75,10 +73,10 @@ notifiers:
     enabled: false
     bot_token_env: TELEGRAM_BOT_TOKEN
     chat_id_env: TELEGRAM_CHAT_ID
-    bot_token: ""
-    chat_id: ""
-    morning_briefing_time: "09:00"
-    evening_summary_time: "23:30"
+    bot_token: ''
+    chat_id: ''
+    morning_briefing_time: 09:00
+    evening_summary_time: '23:30'
 exporters:
   reports_dir: reports
   checkpoints_dir: logs/checkpoints

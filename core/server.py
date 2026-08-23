@@ -326,14 +326,21 @@ def create_window_event(payload: WindowEventCreate):
 @app.get("/api/v1/events/recent")
 def get_recent_events(
     limit: int = Query(50, ge=1, le=200),
-    event_type: str = Query("all", regex="^(all|ai|file|git|window)$")
+    event_type: str = Query("all", regex="^(all|ai|file|git|window)$"),
+    project: Optional[str] = Query(None)
 ):
     db = get_db()
     events = []
 
     with db.session_scope() as session:
         if event_type in ["all", "ai"]:
-            ai_list = session.query(AIPromptEvent).order_by(AIPromptEvent.timestamp.desc()).limit(limit).all()
+            q_ai = session.query(AIPromptEvent)
+            if project:
+                q_ai = q_ai.filter(
+                    (AIPromptEvent.project_tag == project) |
+                    (AIPromptEvent.cwd.contains(project))
+                )
+            ai_list = q_ai.order_by(AIPromptEvent.timestamp.desc()).limit(limit).all()
             for a in ai_list:
                 events.append({
                     "id": f"ai_{a.id}",
@@ -347,7 +354,13 @@ def get_recent_events(
                 })
 
         if event_type in ["all", "file"]:
-            file_list = session.query(FileActivityEvent).order_by(FileActivityEvent.timestamp.desc()).limit(limit).all()
+            q_file = session.query(FileActivityEvent)
+            if project:
+                q_file = q_file.filter(
+                    (FileActivityEvent.project_name == project) |
+                    (FileActivityEvent.file_path.contains(project))
+                )
+            file_list = q_file.order_by(FileActivityEvent.timestamp.desc()).limit(limit).all()
             for f in file_list:
                 events.append({
                     "id": f"file_{f.id}",
@@ -361,7 +374,10 @@ def get_recent_events(
                 })
 
         if event_type in ["all", "git"]:
-            git_list = session.query(GitActivityEvent).order_by(GitActivityEvent.timestamp.desc()).limit(limit).all()
+            q_git = session.query(GitActivityEvent)
+            if project:
+                q_git = q_git.filter(GitActivityEvent.repo_name == project)
+            git_list = q_git.order_by(GitActivityEvent.timestamp.desc()).limit(limit).all()
             for g in git_list:
                 events.append({
                     "id": f"git_{g.id}",
@@ -375,7 +391,13 @@ def get_recent_events(
                 })
 
         if event_type in ["all", "window"]:
-            win_list = session.query(WindowEvent).order_by(WindowEvent.start_time.desc()).limit(limit).all()
+            q_win = session.query(WindowEvent)
+            if project:
+                q_win = q_win.filter(
+                    (WindowEvent.app_name == project) |
+                    (WindowEvent.window_title.contains(project))
+                )
+            win_list = q_win.order_by(WindowEvent.start_time.desc()).limit(limit).all()
             for w in win_list:
                 events.append({
                     "id": f"win_{w.id}",

@@ -103,7 +103,10 @@ class ActivityFileHandler(FileSystemEventHandler):
             except Exception:
                 pass
 
-        # 寫入資料庫 (採用本地時間)
+        # 寫入資料庫 (採用本地時間與統一專案根目錄解析)
+        from core.project_engine import resolve_project_from_path
+        proj_root = resolve_project_from_path(path_str)
+
         db = get_db()
         with db.session_scope() as session:
             event = FileActivityEvent(
@@ -113,11 +116,11 @@ class ActivityFileHandler(FileSystemEventHandler):
                 action=action,
                 size_bytes=size_bytes,
                 diff_summary=diff_summary,
-                project_name=p.parent.name,
+                project_name=proj_root,
                 timestamp=get_local_now()
             )
             session.add(event)
-        logger.info(f"File activity: [{action}] {file_name} ({file_type}) in {p.parent.name}")
+        logger.info(f"File activity: [{action}] {file_name} ({file_type}) in {proj_root}")
 
     def on_created(self, event: FileSystemEvent):
         self._process_event("created", event.src_path)
