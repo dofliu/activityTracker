@@ -156,11 +156,13 @@ def format_context_for_prompt(day_data: Dict[str, Any], time_range_str: str) -> 
         loop_lines.append(f"- [{ol['project_key']}] {ol['title']} (建立於 {ol['created_at']})")
     loop_text = "\n".join(loop_lines) if loop_lines else "（目前無待辦事項）"
 
-    # 3. AI Events
+    # 3. AI Events (嚴格排除佔位字串，僅注入真實結論)
     ai_lines = []
     for item in day_data["ai_events"]:
         tag_info = f" [{item['tag']}]" if item['tag'] else ""
-        resp_snippet = f"\n  -> AI 回應摘要: {item['response'][:250]}..." if item['response'] and len(item['response']) > 10 else ""
+        resp = (item.get('response') or "").strip()
+        is_placeholder = resp.startswith("[Executed") or resp.startswith("[Codex CLI") or resp.startswith("<")
+        resp_snippet = f"\n  -> AI 回應結論: {resp[:250]}..." if resp and len(resp) > 10 and not is_placeholder else ""
         ai_lines.append(f"- [{item['time']}] [{item['platform'].upper()}]{tag_info} 問: {item['prompt']}{resp_snippet}")
     ai_text = "\n".join(ai_lines) if ai_lines else "（該時段無 AI 互動紀錄）"
 

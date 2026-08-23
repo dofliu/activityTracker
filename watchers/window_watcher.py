@@ -87,6 +87,7 @@ class WindowWatcherService:
         self._current_app: str = ""
         self._current_title: str = ""
         self._current_start_time: datetime = get_local_now()
+        self.last_written_at: Optional[datetime] = None
 
     def start(self):
         enabled = self.cfg.get("watchers.window_watcher.enabled", True)
@@ -109,34 +110,42 @@ class WindowWatcherService:
 
     def _flush_current_window(self):
         """將上一個視窗的停留時間結算寫入資料庫 (過濾假 Idle 與過短事件)"""
-        if not self._current_app or not self._current_title:
+        app = self._current_app
+        title = self._current_title
+        start_t = self._current_start_time
+
+        # 先重設狀態，確保即使寫入失敗也不會造成死循環阻塞
+        self._current_app = ""
+        self._current_title = ""
+
+        if not app or not title:
             return
 
-        if self._current_app.lower() in ("idle", "unknown") and self._current_title.lower() in ("idle", ""):
-            self._current_app = ""
-            self._current_title = ""
+        if app.lower() in ("idle", "unknown") and title.lower() in ("idle", ""):
             return
 
         now = get_local_now()
-        duration = (now - self._current_start_time).total_seconds()
+        duration = (now - start_t).total_seconds()
         
         # 過短的時間（小於 3 秒）視為閃退或快速切換，忽略以節省空間
         if duration >= 3.0:
-            db = get_db()
-            category = categorize_window(self._current_app, self._current_title)
-            with db.session_scope() as session:
-                event = WindowEvent(
-                    start_time=self._current_start_time,
-                    end_time=now,
-                    duration_seconds=duration,
-                    app_name=self._current_app,
-                    window_title=self._current_title,
-                    category=category
-                )
-                session.add(event)
-
-        self._current_app = ""
-        self._current_title = ""
+            try:
+                db = get_db()
+                category = categorize_window(app, title)
+                with db.session_scope() as session:
+                    event = WindowEvent(
+                        start_time=start_t,
+                        end_time=now,
+                        duration_seconds=duration,
+                        app_name=app,
+                        window_title=title,
+                        category=category
+                    )
+                    session.add(event)
+                self.last_written_at = now
+                logger.info(f"Recorded window focus: [{app}] {title[:50]} ({duration:.1f}s)")
+            except Exception as e:
+                logger.error(f"Failed to save window event [{app}] {title}: {e}", exc_info=True)
 
     def _monitor_loop(self):
         interval = self.cfg.get("watchers.window_watcher.interval_seconds", 5)
@@ -165,6 +174,6 @@ class WindowWatcherService:
                                 self._current_title = title
                                 self._current_start_time = now
             except Exception as e:
-                logger.error(f"Error in window monitoring: {e}")
+                logger.error(f"Error in window monitor loop: {e}", exc_info=True)
 
             time.sleep(interval)

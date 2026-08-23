@@ -390,7 +390,7 @@ async function refreshStatus() {
     $("btn-toggle-monitor").textContent = isMonitoring ? t("btn_pause_monitor") : t("btn_start_monitor");
 
     renderStats(data.metrics);
-    renderCollectors(data.watchers);
+    renderCollectors(data.watchers, data.last_events || {});
     $("last-refresh").textContent = "updated " + new Date().toLocaleTimeString();
   } catch (e) {
     $("status-text").textContent = t("status_disconnected");
@@ -418,21 +418,31 @@ function renderStats(m) {
     </div>`).join("");
 }
 
-function renderCollectors(w) {
+function renderCollectors(w, lastEvents = {}) {
   const items = [
-    { name: t("collector_file"), on: w.file_watcher },
-    { name: t("collector_git"), on: w.git_watcher },
-    { name: t("collector_window"), on: w.window_watcher },
-    { name: t("collector_agent"), on: w.agent_log_watcher },
-    { name: t("collector_scheduler"), on: w.scheduler }
+    { name: t("collector_file"), on: w.file_watcher, last: lastEvents.file_watcher },
+    { name: t("collector_git"), on: w.git_watcher, last: lastEvents.git_watcher },
+    { name: t("collector_window"), on: w.window_watcher, last: lastEvents.window_watcher },
+    { name: t("collector_agent"), on: w.agent_log_watcher, last: lastEvents.agent_log_watcher },
+    { name: t("collector_scheduler"), on: w.scheduler, last: null }
   ];
-  $("watchers-grid").innerHTML = items.map(it => `
+  $("watchers-grid").innerHTML = items.map(it => {
+    let lastTimeStr = "";
+    if (it.last) {
+      const timePart = it.last.includes(" ") ? it.last.split(" ")[1] : it.last;
+      lastTimeStr = `<span class="mono-mini" style="font-size:10px; opacity:0.85; display:block; margin-top:2px; color:var(--text-dim);">${currentLang === "zh-TW" ? "寫入" : "Synced"}: ${timePart}</span>`;
+    } else if (it.on && it.name !== t("collector_scheduler")) {
+      lastTimeStr = `<span class="mono-mini" style="font-size:10px; opacity:0.6; display:block; margin-top:2px; color:var(--warn);">${currentLang === "zh-TW" ? "尚無紀錄" : "No writes yet"}</span>`;
+    }
+    return `
     <div class="collector">
       <div class="collector-name">${it.name}</div>
       <div class="collector-state" style="color:${it.on ? "var(--orange)" : "var(--mu)"}">
         ${it.on ? t("collector_enabled") : t("collector_disabled")}
+        ${lastTimeStr}
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 // ---------------------------------------------------------------- live feed

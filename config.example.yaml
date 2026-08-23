@@ -16,7 +16,6 @@ watchers:
     - .md
     - .pdf
     - .py
-    - .txt
     ignore_patterns:
     - '**/node_modules/**'
     - '**/.git/**'
@@ -24,6 +23,15 @@ watchers:
     - '**/site-packages/**'
     - '**/.venv/**'
     - '**/.codex/**'
+    - '**/BladeDamage/**'
+    - '**/outputs/**'
+    - '**/results/**'
+    - '**/logs/**'
+    - '**/CASE-*'
+    - '*.log'
+    - '*.out'
+    - '*.csv'
+    - '*.tsv'
     - '**/.*'
   git_watcher:
     enabled: true

@@ -27,6 +27,8 @@ SUBFOLDER_BLACKLIST = {
     'draft_paper', 'daily_report', 'papers', 'research_ideas', 'core', 'synthesizer',
     'watchers', 'integrations', 'notifiers', 'scripts', 'web', 'logs', 'checkpoints',
     'tests', 'docs', 'static', 'code', 'experiments', 'knowledgebase', 'prompts',
+    'submitted', 'draft', 'drafts', 'archive', 'archives', 'outputs', 'results',
+    'bladedamage', 'blade_damage', 'general / notes', 'general / unassigned',
     'pytest-cache-files-skngqfx2'
 }
 
@@ -368,17 +370,22 @@ def create_open_loop(
     source_event_id: Optional[int] = None,
     confidence: float = 1.0
 ) -> int:
-    """新增或更新未結事項 (Open Loop)，具備正規化與模糊去重機制"""
+    """新增或更新未結事項 (Open Loop)，自動去除前綴標籤並具備特徵碼模糊去重機制"""
     db = get_db()
-    clean_title = title.strip()
+    raw_title = title.strip()
+    
+    # 徹底去除 **優先級 1 (`activityTracker`)**：或 **Priority 1 (`...`)**: 等 Markdown 雜訊前綴
+    clean_title = re.sub(r"^\s*(\*\*)?(優先級|Priority)\s*\d+.*?\1[：:\s]*", "", raw_title).strip()
+    clean_title = re.sub(r"^[：:\s\-*]+", "", clean_title).strip()
+    if not clean_title:
+        clean_title = raw_title
+
     norm_key = normalize_project_name(project_key) if project_key else "General"
     if norm_key in ["General / Unassigned", ""]:
         norm_key = "General"
 
-    # 生成用於比對去重的精簡特徵字串 (去除優先級標籤、標點與 Markdown 符號)
-    stripped_text = re.sub(r"\*\*優先級\s*\d+.*?\*\*[：:]?", "", clean_title)
-    stripped_text = re.sub(r"\*\*Priority\s*\d+.*?\*\*[：:]?", "", stripped_text)
-    feature_text = re.sub(r"[\s\*\`\(\)\[\]【】\.,:;!？。，：；_\\/\-]", "", stripped_text).lower()
+    # 生成用於比對去重的精簡特徵字串
+    feature_text = re.sub(r"[\s\*\`\(\)\[\]【】\.,:;!？。，：；_\\/\-]", "", clean_title).lower()
 
     with db.session_scope() as session:
         # 查詢同專案中尚未解決的事項
@@ -392,10 +399,8 @@ def create_open_loop(
             if el.title.strip() == clean_title:
                 return el.id
 
-            # 2. 模糊特徵比對 (前 25 字元相同或特徵重合度高)
-            el_stripped = re.sub(r"\*\*優先級\s*\d+.*?\*\*[：:]?", "", el.title)
-            el_stripped = re.sub(r"\*\*Priority\s*\d+.*?\*\*[：:]?", "", el_stripped)
-            el_feature = re.sub(r"[\s\*\`\(\)\[\]【】\.,:;!？。，：；_\\/\-]", "", el_stripped).lower()
+            # 2. 模糊特徵比對 (前 20 字元相同或特徵重合度高)
+            el_feature = re.sub(r"[\s\*\`\(\)\[\]【】\.,:;!？。，：；_\\/\-]", "", el.title).lower()
 
             if feature_text and el_feature:
                 if feature_text == el_feature:
@@ -454,13 +459,15 @@ def extract_and_save_open_loops_from_summary(summary_markdown: str, date_str: st
                 item_text = match.group(1).strip()
                 detected_project = "General"
 
-                # 1. 優先從括號中抽出專案標籤，如 (`activityTracker`) 或 (claudDataProduction) 或 【wavePowerSimuPLC】
-                bracket_match = re.search(r"[`(（【\[]\s*([a-zA-Z0-9_\-\.\u4e00-\u9fa5]+)\s*[`)）】\]]", item_text)
-                if bracket_match:
-                    cand = bracket_match.group(1).strip()
-                    if cand and not any(k in cand for k in ["優先級", "Priority", "待辦", "今日", "明日", "高", "中", "低"]):
-                        cand_clean = cand.strip("`'\" ")
-                        detected_project = normalize_project_name(cand_clean)
+                # 1. 優先從括號或反引號中抽出專案標籤，如 (`activityTracker`) 或 (`113-01 離岸風電實務`) 或 【wavePowerSimuPLC】
+                all_brackets = re.findall(r"[`(（【\[]([^`()（）【\]]+?)[`)）】\]]", item_text)
+                for cand in all_brackets:
+                    cand_clean = cand.strip("`'\" ").strip()
+                    if cand_clean and not any(k in cand_clean for k in ["優先級", "Priority", "待辦", "今日", "明日", "高", "中", "低"]):
+                        norm_cand = normalize_project_name(cand_clean)
+                        if norm_cand not in ["General / Unassigned", "General", "General / Notes"]:
+                            detected_project = norm_cand
+                            break
 
                 # 2. 若括號內未抽出，比對已知專案名稱
                 if detected_project == "General":

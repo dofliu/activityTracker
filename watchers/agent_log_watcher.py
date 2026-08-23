@@ -468,6 +468,7 @@ class AgentLogWatcherService:
             conv_id = transcript_path.parent.parent.name
             current_prompt = ""
             current_time = None
+            latest_real_response = ""
 
             try:
                 with open(transcript_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -481,46 +482,41 @@ class AgentLogWatcherService:
                             ts = parse_timestamp_safe(item.get("created_at") or item.get("timestamp"))
 
                             if step_type == "USER_INPUT":
-                                # 若前面有積累的 prompt 先寫入
-                                if current_prompt and current_time:
-                                    self._upsert_ai_event(
-                                        db, platform="antigravity", conv_id=conv_id,
-                                        prompt=current_prompt, response=None,
-                                        url=str_path, timestamp=current_time
-                                    )
-
-                                prompt_text = item.get("content", "")
-                                clean_prompt = prompt_text.strip()
+                                raw_prompt = item.get("content", "")
+                                clean_prompt = raw_prompt.strip()
                                 if clean_prompt.startswith("<USER_REQUEST>"):
                                     clean_prompt = clean_prompt.replace("<USER_REQUEST>", "").replace("</USER_REQUEST>", "").strip()
 
+                                # 過濾系統內部注入訊息與 Checkpoint Summary
+                                if "<SYSTEM_MESSAGE>" in clean_prompt or "<CONTEXT_SUMMARY>" in clean_prompt:
+                                    continue
+
                                 if len(clean_prompt) >= 2:
+                                    # 遇到新提問：先寫入上一輪提問與其最終真實回答
+                                    if current_prompt and current_time:
+                                        self._upsert_ai_event(
+                                            db, platform="antigravity", conv_id=conv_id,
+                                            prompt=current_prompt, response=latest_real_response if latest_real_response else None,
+                                            url=str_path, timestamp=current_time
+                                        )
                                     current_prompt = clean_prompt
                                     current_time = ts or datetime.fromtimestamp(transcript_path.stat().st_mtime)
+                                    latest_real_response = ""
 
-                            elif step_type == "PLANNER_RESPONSE" and current_prompt:
-                                model_content = item.get("content", "")
-                                tool_calls = item.get("tool_calls", [])
-                                resp_summary = model_content.strip()
-                                if tool_calls:
-                                    tool_names = [tc.get("toolName") or tc.get("name") or "tool" for tc in tool_calls if isinstance(tc, dict)]
-                                    tool_str = f" [Executed tools: {', '.join(tool_names[:4])}]"
-                                    resp_summary = (resp_summary + tool_str).strip()
+                            elif step_type == "PLANNER_RESPONSE":
+                                model_content = (item.get("content") or "").strip()
+                                # 排除純空字串或過短的工具調用過渡，只保留實質結論
+                                if model_content and len(model_content) >= 5 and not model_content.startswith("<"):
+                                    latest_real_response = model_content
 
-                                self._upsert_ai_event(
-                                    db, platform="antigravity", conv_id=conv_id,
-                                    prompt=current_prompt, response=resp_summary if resp_summary else None,
-                                    url=str_path, timestamp=current_time or ts or get_local_now()
-                                )
-                                current_prompt = ""
-                                current_time = None
                         except Exception:
                             continue
 
+                    # 寫入最後一輪
                     if current_prompt and current_time:
                         self._upsert_ai_event(
                             db, platform="antigravity", conv_id=conv_id,
-                            prompt=current_prompt, response=None,
+                            prompt=current_prompt, response=latest_real_response if latest_real_response else None,
                             url=str_path, timestamp=current_time
                         )
             except Exception as e:

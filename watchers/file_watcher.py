@@ -25,6 +25,15 @@ DEFAULT_IGNORES = [
     "*.dist-info/*",
     "*/.codex/*",
     "*/.gemini/*",
+    "*/BladeDamage/*",
+    "*/outputs/*",
+    "*/results/*",
+    "*/logs/*",
+    "*CASE-*",
+    "*.log",
+    "*.out",
+    "*.csv",
+    "*.tsv",
     "*.tmp",
     "~$*",
     "*.crdownload",
@@ -36,10 +45,14 @@ DEFAULT_IGNORES = [
 class ActivityFileHandler(FileSystemEventHandler):
     def __init__(self, allowed_exts: Set[str], ignore_patterns: List[str]):
         super().__init__()
-        self.allowed_exts = allowed_exts
+        # 預設嚴格允許寫作與程式碼副檔名 (.tex, .docx, .md, .pdf, .py)，過濾 .txt 批次模擬檔
+        clean_exts = {e.lower() for e in allowed_exts if e.lower() != ".txt"}
+        self.allowed_exts = clean_exts if clean_exts else {".tex", ".docx", ".md", ".pdf", ".py"}
         self.ignore_patterns = DEFAULT_IGNORES + [p for p in ignore_patterns if p]
         self.last_events: Dict[str, float] = {}  # 用於防手震 (Debounce)
+        self.daily_counts: Dict[str, int] = {}  # 單日單檔上限防抖 (key: YYYY-MM-DD:path)
         self.debounce_seconds = 300.0  # 同檔案 5 分鐘內只記錄一次修改，避免存檔刷屏
+        self.max_events_per_day_per_file = 5  # 單一檔案每日最多紀錄 5 次
 
     def _is_ignored(self, path_str: str) -> bool:
         # 正規化路徑斜線為正斜線
@@ -81,7 +94,14 @@ class ActivityFileHandler(FileSystemEventHandler):
             if (now - self.last_events[path_str]) < self.debounce_seconds:
                 return
 
+        # 檢查單日單檔上限防呆 (防止長時間批次腳本灌爆資料庫)
+        today_key = f"{get_local_now().strftime('%Y-%m-%d')}:{path_str}"
+        cnt = self.daily_counts.get(today_key, 0)
+        if cnt >= self.max_events_per_day_per_file:
+            return
+
         self.last_events[path_str] = now
+        self.daily_counts[today_key] = cnt + 1
 
         p = Path(path_str)
         file_name = p.name

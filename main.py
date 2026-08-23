@@ -229,9 +229,33 @@ def cmd_status():
     print("="*50 + "\n")
 
 
-def cmd_notify_telegram(action: str, date_str: Optional[str] = None):
-    """測試或手動發送 Telegram 通知"""
+def cmd_notify_telegram(action: str, date_str: Optional[str] = None, dry_run: bool = False):
+    """測試或手動發送 Telegram 通知 (支援 --dry-run 預覽)"""
     notifier = TelegramNotifier()
+    if dry_run:
+        now = get_local_now()
+        projects = get_active_projects_list()
+        open_loops = get_open_loops_list()
+        print("\n" + "="*50)
+        print("📱 Telegram 推播預覽 (Dry-run Mode)")
+        print("="*50)
+        if action == "briefing":
+            active_projs = [p for p in projects if p["status"] == "active"][:5]
+            print(f"<b>🌅 OmniContext 晨間簡報 ({now.strftime('%Y-%m-%d')})</b>\n")
+            print("<b>🔥 今日重點活躍專案：</b>")
+            for p in active_projs:
+                print(f"• <b>[{p['category']}] {p['display_name']}</b>\n  └─ {p['last_action_summary']}")
+            print(f"\n<b>📌 待跟進未結事項 ({len(open_loops)} 項)：</b>")
+            for ol in open_loops[:6]:
+                print(f"• [ ] <b>[{ol['project_key']}]</b> {ol['title']}")
+        elif action == "stagnation":
+            stagnant = [p for p in projects if p["status"] in ["idle", "stale"] and p["idle_days"] >= 3][:4]
+            print("<b>⚠️ OmniContext 專案停滯提醒</b>\n")
+            for p in stagnant:
+                print(f"• <b>{p['display_name']}</b> (已閒置 {p['idle_days']} 天)\n  └─ 上次動態: {p['last_action_summary']}")
+        print("="*50 + "\n")
+        return
+
     if action == "summary":
         d = date_str or get_local_now().strftime("%Y-%m-%d")
         print(f"正在發送 {d} 的每日日報至 Telegram...")
@@ -307,6 +331,7 @@ def main():
     notify_parser = subparsers.add_parser("notify", help="手動觸發 Telegram 推播")
     notify_parser.add_argument("type", choices=["summary", "briefing", "stagnation"], help="通知類型")
     notify_parser.add_argument("--date", help="指定日期 (YYYY-MM-DD)")
+    notify_parser.add_argument("--dry-run", action="store_true", help="不實際發送，僅在終端機預覽推播格式")
 
     # clear-demo 指令
     subparsers.add_parser("clear-demo", help="清除示範假資料與歷史噪音")
@@ -328,7 +353,7 @@ def main():
     elif args.command == "checkpoint":
         cmd_checkpoint(args.hours)
     elif args.command == "notify":
-        cmd_notify_telegram(args.type, getattr(args, "date", None))
+        cmd_notify_telegram(args.type, getattr(args, "date", None), getattr(args, "dry_run", False))
     elif args.command == "clear-demo":
         cleanup_noise_and_demo_data()
     elif args.command == "status":

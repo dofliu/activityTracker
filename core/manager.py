@@ -82,12 +82,18 @@ class WatcherManager:
         cfg = get_config()
         db = get_db()
 
+        from sqlalchemy import func
         with db.session_scope() as session:
             ai_count = session.query(AIPromptEvent).count()
             file_count = session.query(FileActivityEvent).count()
             git_count = session.query(GitActivityEvent).count()
             win_count = session.query(WindowEvent).count()
             summary_count = session.query(DailySummary).count()
+
+            last_ai = session.query(func.max(AIPromptEvent.timestamp)).scalar()
+            last_file = session.query(func.max(FileActivityEvent.timestamp)).scalar()
+            last_git = session.query(func.max(GitActivityEvent.timestamp)).scalar()
+            last_win = session.query(func.max(WindowEvent.end_time)).scalar()
 
         return {
             "is_running": self._is_running,
@@ -97,6 +103,12 @@ class WatcherManager:
                 "window_watcher": cfg.get("watchers.window_watcher.enabled", True),
                 "agent_log_watcher": cfg.get("watchers.agent_log_watcher.enabled", True),
                 "scheduler": cfg.get("synthesizer.schedule.enabled", True),
+            },
+            "last_events": {
+                "file_watcher": last_file.strftime("%Y-%m-%d %H:%M:%S") if last_file else None,
+                "git_watcher": last_git.strftime("%Y-%m-%d %H:%M:%S") if last_git else None,
+                "window_watcher": last_win.strftime("%Y-%m-%d %H:%M:%S") if last_win else None,
+                "agent_log_watcher": last_ai.strftime("%Y-%m-%d %H:%M:%S") if last_ai else None,
             },
             "metrics": {
                 "ai_prompts_count": ai_count,
