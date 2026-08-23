@@ -10,6 +10,42 @@ from core.database import get_db
 from core.models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, ProjectState, OpenLoop, GitHubRepoState, GitHubPREvent
 from core.time_utils import get_local_now
 
+# 卡片上「上次做到哪」只需要一句話，過長的 commit 內文或提問全文會把版面撐爆
+ACTION_SUMMARY_MAX_LEN = 70
+
+
+def summarize_action(text: str, max_len: int = ACTION_SUMMARY_MAX_LEN) -> str:
+    """把任意長度的活動描述壓成單行摘要
+
+    只取第一段有意義的內容（commit 的標題行、提問的第一句），
+    去掉換行與多餘空白，超長則截斷。
+    """
+    if not text:
+        return ""
+
+    # 只取第一個非空行：git commit 的 body、AI 提問的後續段落都不需要
+    first_line = ""
+    for line in str(text).splitlines():
+        if line.strip():
+            first_line = line.strip()
+            break
+
+    collapsed = re.sub(r"\s+", " ", first_line)
+    if len(collapsed) <= max_len:
+        return collapsed
+    return collapsed[:max_len].rstrip() + "…"
+
+def shorten_filename(name: str, max_len: int = 26) -> str:
+    """縮短過長檔名但保留副檔名，讓多檔摘要不會把「等共 N 個檔案」擠掉"""
+    if not name or len(name) <= max_len:
+        return name
+    stem, dot, ext = name.rpartition(".")
+    if dot and len(ext) <= 5:
+        keep = max(max_len - len(ext) - 2, 6)
+        return f"{stem[:keep]}….{ext}"
+    return name[:max_len] + "…"
+
+
 # 快取機制：避免前端每 4 秒輪詢時重複全量查詢三張表
 _PROJECT_CACHE: List[Dict[str, Any]] = []
 _LAST_PROJECT_REFRESH_TIME: float = 0.0
@@ -150,7 +186,7 @@ def refresh_project_states(force: bool = False):
             project_stats[repo_norm]["git_cnt"] += 1
             if g.timestamp > project_stats[repo_norm]["last_time"]:
                 project_stats[repo_norm]["last_time"] = g.timestamp
-                project_stats[repo_norm]["last_action"] = f"Git Commit: {g.message} (+{g.insertions}/-{g.deletions})"
+                project_stats[repo_norm]["last_action"] = f"Git: {summarize_action(g.message)} (+{g.insertions}/-{g.deletions})"
 
         # 2. 收集 Files (論文與文檔)
         file_events = session.query(FileActivityEvent).order_by(desc(FileActivityEvent.timestamp)).all()
@@ -187,11 +223,13 @@ def refresh_project_states(force: bool = False):
                 recent_files = [ev.file_name for ev in f_list if ev.timestamp >= recent_cutoff]
                 distinct_recent = list(dict.fromkeys(recent_files))
                 if len(distinct_recent) > 1:
-                    files_preview = ", ".join(distinct_recent[:2])
-                    more = f" 等共 {len(distinct_recent)} 個檔案" if len(distinct_recent) > 2 else f" 共 2 個檔案"
+                    files_preview = ", ".join(shorten_filename(n) for n in distinct_recent[:2])
+                    more = f" 等共 {len(distinct_recent)} 個檔案" if len(distinct_recent) > 2 else " 共 2 個檔案"
                     project_stats[p_name]["last_action"] = f"異動 {files_preview}{more}"
                 else:
-                    project_stats[p_name]["last_action"] = f"[{latest_f.action.upper()}] {latest_f.file_name} ({latest_f.diff_summary or latest_f.file_type})"
+                    detail = latest_f.diff_summary or ""
+                    suffix = f" ({detail})" if detail else ""
+                    project_stats[p_name]["last_action"] = f"[{latest_f.action.upper()}] {shorten_filename(latest_f.file_name, 34)}{suffix}"
 
         # 3. 收集 AI Prompts
         ai_events = session.query(AIPromptEvent).order_by(desc(AIPromptEvent.timestamp)).all()
@@ -204,7 +242,7 @@ def refresh_project_states(force: bool = False):
             project_stats[norm_tag]["ai_cnt"] += 1
             if a.timestamp > project_stats[norm_tag]["last_time"]:
                 project_stats[norm_tag]["last_time"] = a.timestamp
-                project_stats[norm_tag]["last_action"] = f"[{a.platform.upper()}] {a.prompt_text[:60]}..."
+                project_stats[norm_tag]["last_action"] = f"[{a.platform.upper()}] {summarize_action(a.prompt_text)}"
 
         # 4. 查詢 GitHub Repos 與本機 Git 狀態作為決定性判準
         gh_repo_names = {r.repo_name.lower() for r in session.query(GitHubRepoState).all()}
