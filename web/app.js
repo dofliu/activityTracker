@@ -541,7 +541,6 @@ function renderActionGroup(p) {
   if (!p) return "";
   const ghUrl = p.github_url || (p.github && p.github.html_url);
   const path = p.local_path;
-  const ai = p.ai_info;
 
   const folderBtn = path
     ? `<button class="action-btn" data-act="folder" data-path="${esc(path)}" title="${currentLang === 'zh-TW' ? '開啟本機資料夾 (' + esc(path) + ')' : 'Open Folder (' + esc(path) + ')'}">📁</button>`
@@ -555,22 +554,11 @@ function renderActionGroup(p) {
     ? `<a class="action-btn" href="${esc(ghUrl)}" target="_blank" rel="noopener noreferrer" title="${currentLang === 'zh-TW' ? '前往 GitHub 專案頁面' : 'Open on GitHub'}">🐙</a>`
     : `<button class="action-btn disabled" title="${currentLang === 'zh-TW' ? '未綁定 GitHub 倉庫' : 'No GitHub repo'}">🐙</button>`;
 
-  let aiBtn = `<button class="action-btn disabled" title="${currentLang === 'zh-TW' ? '尚無關聯 AI 對話' : 'No AI session'}">💬</button>`;
-  if (ai) {
-    if (ai.url) {
-      aiBtn = `<a class="action-btn" href="${esc(ai.url)}" target="_blank" rel="noopener noreferrer" title="${currentLang === 'zh-TW' ? '開啟網頁端 AI 對話 (' + esc(ai.platform) + ')' : 'Open Web AI Session'}">💬</a>`;
-    } else {
-      const platLabel = (ai.platform || "AI").toUpperCase();
-      aiBtn = `<button class="action-btn" data-act="ai" data-prompt="${esc(ai.prompt || '')}" data-cwd="${esc(ai.cwd || path || '')}" data-plat="${esc(ai.platform || '')}" title="${currentLang === 'zh-TW' ? '接續 [' + platLabel + '] 對話 (點擊複製脈絡並開啟終端)' : 'Resume [' + platLabel + '] (Copy Context & Open Terminal)'}">💬</button>`;
-    }
-  }
-
   return `
     <div class="action-group" onclick="event.stopPropagation()">
       ${folderBtn}
       ${vsCodeBtn}
       ${ghBtn}
-      ${aiBtn}
     </div>`;
 }
 
@@ -584,19 +572,6 @@ function attachActionGroupListeners(parentEl) {
         await runOpenAction(btn.dataset.path, "explorer");
       } else if (act === "vscode") {
         await runOpenAction(btn.dataset.path, "vscode");
-      } else if (act === "ai") {
-        const prompt = btn.dataset.prompt;
-        const cwd = btn.dataset.cwd;
-        const plat = (btn.dataset.plat || "AI").toUpperCase();
-        if (prompt) {
-          try {
-            await navigator.clipboard.writeText(prompt);
-          } catch (_) {}
-        }
-        if (cwd) {
-          await runOpenAction(cwd, "terminal");
-        }
-        showToast(currentLang === "zh-TW" ? `⚡ 已複製 [${plat}] 最近脈絡並開啟終端！` : `⚡ Copied [${plat}] context & opened terminal!`);
       }
     });
   });

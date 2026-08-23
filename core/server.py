@@ -176,10 +176,11 @@ def open_system_path(payload: OpenPathRequest):
 
         else: # explorer
             if sys.platform == "win32":
-                if os.path.isdir(target_path):
-                    os.startfile(target_path)
+                norm_path = os.path.normpath(target_path)
+                if os.path.isdir(norm_path):
+                    subprocess.Popen(f'explorer.exe "{norm_path}"', shell=True)
                 else:
-                    subprocess.Popen(f'explorer.exe /select,"{target_path}"', shell=True)
+                    subprocess.Popen(f'explorer.exe /select,"{norm_path}"', shell=True)
             elif sys.platform == "darwin":
                 subprocess.Popen(["open", target_path])
             else:
