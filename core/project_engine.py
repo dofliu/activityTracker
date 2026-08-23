@@ -17,8 +17,10 @@ _PROJECT_CACHE_TTL: float = 30.0  # 30 秒快取
 
 
 CATEGORY_FOLDERS = {
-    'planning_writing', 'published', 'drafts', 'archive', '2026', '2025', '2024',
-    'papers', 'projects', 'paper&patent', '01.國際期刊(發表年月)'
+    'planning_writing', 'published', 'submitted', 'drafts', 'archive', 'archives',
+    '2026', '2025', '2024', 'papers', 'projects', 'paper&patent', '01.國際期刊(發表年月)',
+    '01_最新論文', 'dropbox', 'project_academic', 'project_codingsimulation',
+    'personalhelper', 'users', 'user', 'documents', 'desktop', 'downloads'
 }
 
 SUBFOLDER_BLACKLIST = {
@@ -29,61 +31,53 @@ SUBFOLDER_BLACKLIST = {
     'tests', 'docs', 'static', 'code', 'experiments', 'knowledgebase', 'prompts',
     'submitted', 'draft', 'drafts', 'archive', 'archives', 'outputs', 'results',
     'bladedamage', 'blade_damage', 'general / notes', 'general / unassigned',
-    'pytest-cache-files-skngqfx2'
+    'pytest-cache-files-skngqfx2', 'source', 'manuscripts', 'render_manuscript',
+    'render_manuscript_final', 'response', 'response_final', 'response_final2',
+    'response_final3', 'closure_qa', 'word_pdf_v7', 'word_pdf', 'clean', 'diff',
+    'figures', 'tables', 'data', 'temp', 'tmp'
 }
 
 
 def resolve_project_from_path(file_path_str: str | None) -> str:
-    """從檔案路徑階層嚴謹解析出真實所屬的專案/論文根目錄名稱"""
+    """從檔案路徑階層嚴謹解析出真實所屬的專案/論文根目錄名稱 (Top-Down Canonical Resolver)"""
     if not file_path_str:
         return "General / Unassigned"
 
     p = Path(file_path_str).resolve()
 
     # 1. 優先檢查 Git 根目錄 (若在 Git repo 內，以 Git repo 根目錄為專案)
-    curr = p.parent
+    curr = p.parent if p.is_file() or '.' in p.name else p
     while curr != curr.parent:
         if (curr / '.git').exists():
             return curr.name
         curr = curr.parent
 
-    # 2. 檢查是否在監控目錄 (watch_directories) 下
-    try:
-        from core.config import get_config
-        cfg = get_config()
-        watch_dirs = [Path(d).resolve() for d in cfg.get('watchers.file_watcher.watch_directories', [])]
-        for wd in watch_dirs:
-            try:
-                rel = p.relative_to(wd)
-                parts = rel.parts
-                if len(parts) >= 1:
-                    first = parts[0]
-                    # 若為單一根目錄孤立檔案 (如 researchProgress.md)
-                    if len(parts) == 1 and ('.' in first or p.is_file()):
-                        return "General / Notes"
+    # 2. 依序 Top-Down 尋找最上層有意義的專案/論文根目錄
+    parts = p.parts
+    dir_parts = parts[:-1] if ('.' in parts[-1] or p.is_file()) else parts
 
-                    # 若第一層為通用目錄分類 (如 Planning_Writing) 且有下一層
-                    if first.lower() in CATEGORY_FOLDERS and len(parts) > 1:
-                        second = parts[1]
-                        if len(parts) == 2 and '.' in second:
-                            return "General / Notes"
-                        if second.lower() not in SUBFOLDER_BLACKLIST:
-                            return second
-                    elif first.lower() not in SUBFOLDER_BLACKLIST and first.lower() not in CATEGORY_FOLDERS:
-                        if len(parts) > 1 or (not '.' in first):
-                            return first
-            except ValueError:
-                continue
-    except Exception:
-        pass
+    for idx, part in enumerate(dir_parts):
+        clean = part.lower().replace('\\', '').replace('/', '').strip()
+        # 跳過磁碟機代號與分類路徑 (如 Dropbox, Planning_Writing, Submitted)
+        if clean in CATEGORY_FOLDERS or clean in ['d:', 'c:', '']:
+            continue
 
-    # 3. 倒序找有意義的目錄
-    for part in reversed(p.parts[:-1]):
-        clean = part.lower().strip()
-        if clean not in SUBFOLDER_BLACKLIST and clean not in CATEGORY_FOLDERS and len(clean) > 2:
-            return part
+        # 跳過通用過渡或版本子目錄 (如 _cowork_v11, 00_final_submission, response_final)
+        if (clean in SUBFOLDER_BLACKLIST or 
+            clean.startswith('_cowork') or 
+            clean.startswith('00_final') or 
+            clean.startswith('01_') or 
+            clean.startswith('02_') or
+            clean.startswith('1st') or
+            clean.startswith('2nd') or
+            clean.startswith('response') or
+            clean.startswith('closure')):
+            continue
 
-    return p.parent.name if p.parent else "General / Unassigned"
+        # 命中第一層實質專案根目錄！
+        return part
+
+    return "General / Notes"
 
 
 def normalize_project_name(path_or_tag: str | None) -> str:

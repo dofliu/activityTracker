@@ -1,10 +1,10 @@
 name: OmniContext Activity Tracker
 name_zh: OmniContext 個人全景活動追蹤系統
 category: personal_tools
-progress: 82
+progress: 88
 status: active
 last_updated: "2026-08-23"
-next_milestone: "Telegram Bot 外網金鑰設定與 Chrome MV3 擴充套件實機載入驗證"
+next_milestone: "Telegram Bot 外網金鑰填入實測與 Chrome MV3 擴充套件實機載入"
 technologies:
   - Python
   - FastAPI
@@ -21,4 +21,4 @@ outputs:
   - web_dashboard
 description: "Local-first personal context tracker that captures cross-platform AI conversations, file edits, git commits and window focus, then synthesizes daily research/work reviews via LLM."
 description_zh: "本機優先的個人全景活動追蹤系統，自動捕捉跨平台 AI 對話、檔案異動、Git commits 與視窗焦點，並由 LLM 產出每日工作與研究回顧。"
-key_metrics: "全系統已完成實測驗證：1. 安全清理 Git PAT 明文與鎖檔；2. 視窗採集器強化異常日誌與最後寫入時間追蹤；3. 徹底根除 3,800+ 筆 .txt 實驗數據噪音，建立單日 5 次單檔上限與過濾黑名單；4. 深入解析 Antigravity 累積對話，真實 AI 結論配對率達 85.0% (1,946/2,289 筆，嚴格排除佔位符)；5. 實作專案多數決分類與 Open Loops 標題清洗（100% 正確歸戶至所屬專案）；6. Telegram Notifier 支援晨報、晚報與 --dry-run 預覽。"
+key_metrics: "全系統已完成實測驗證：1. 徹底刪除 TestApp 測試列，Web UI 與後端實作動態紅黃綠燈（逾時 3 小時標紅、30 分鐘內標綠），杜絕假健康；2. 徹底清除所有佔位字串與 orphan 紀錄，真實 AI 結論配對率達 95.6% (1,944/2,034 筆，Codex 97.9%、Antigravity 94.8%、Claude Code 88.0%)；3. 實作論文 Top-Down Canonical Resolver，將 81 個碎片化子目錄收斂為清晰論文主專案；4. 排除 activityTracker 自身日誌干擾，恢復程式碼與論文雙軌即時監控；5. Telegram 預設啟用並支援晨報 dry-run 完整格式。"

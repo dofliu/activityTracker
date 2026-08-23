@@ -1,6 +1,8 @@
 import logging
 import threading
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from datetime import datetime
+from core.time_utils import get_local_now
 from core.config import get_config
 from core.database import get_db
 from core.models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, DailySummary
@@ -83,6 +85,7 @@ class WatcherManager:
         db = get_db()
 
         from sqlalchemy import func
+        now = get_local_now()
         with db.session_scope() as session:
             ai_count = session.query(AIPromptEvent).count()
             file_count = session.query(FileActivityEvent).count()
@@ -95,15 +98,39 @@ class WatcherManager:
             last_git = session.query(func.max(GitActivityEvent.timestamp)).scalar()
             last_win = session.query(func.max(WindowEvent.end_time)).scalar()
 
+        def _calc_health(enabled: bool, last_dt: Optional[datetime]) -> str:
+            if not enabled:
+                return "disabled"
+            if not last_dt:
+                return "stale"
+            diff_sec = (now - last_dt).total_seconds()
+            if diff_sec < 1800: # < 30 分鐘
+                return "healthy"
+            elif diff_sec < 10800: # < 3 小時
+                return "idle"
+            else:
+                return "stale"
+
+        watchers_cfg = {
+            "file_watcher": cfg.get("watchers.file_watcher.enabled", True),
+            "git_watcher": cfg.get("watchers.git_watcher.enabled", True),
+            "window_watcher": cfg.get("watchers.window_watcher.enabled", True),
+            "agent_log_watcher": cfg.get("watchers.agent_log_watcher.enabled", True),
+            "scheduler": cfg.get("synthesizer.schedule.enabled", True),
+        }
+
+        collector_health = {
+            "file_watcher": _calc_health(watchers_cfg["file_watcher"], last_file),
+            "git_watcher": _calc_health(watchers_cfg["git_watcher"], last_git),
+            "window_watcher": _calc_health(watchers_cfg["window_watcher"], last_win),
+            "agent_log_watcher": _calc_health(watchers_cfg["agent_log_watcher"], last_ai),
+            "scheduler": "healthy" if watchers_cfg["scheduler"] else "disabled",
+        }
+
         return {
             "is_running": self._is_running,
-            "watchers": {
-                "file_watcher": cfg.get("watchers.file_watcher.enabled", True),
-                "git_watcher": cfg.get("watchers.git_watcher.enabled", True),
-                "window_watcher": cfg.get("watchers.window_watcher.enabled", True),
-                "agent_log_watcher": cfg.get("watchers.agent_log_watcher.enabled", True),
-                "scheduler": cfg.get("synthesizer.schedule.enabled", True),
-            },
+            "watchers": watchers_cfg,
+            "collector_health": collector_health,
             "last_events": {
                 "file_watcher": last_file.strftime("%Y-%m-%d %H:%M:%S") if last_file else None,
                 "git_watcher": last_git.strftime("%Y-%m-%d %H:%M:%S") if last_git else None,

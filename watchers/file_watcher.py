@@ -29,6 +29,10 @@ DEFAULT_IGNORES = [
     "*/outputs/*",
     "*/results/*",
     "*/logs/*",
+    "*/reports/*",
+    "*/checkpoints/*",
+    "*activityTracker/logs/*",
+    "*activityTracker/reports/*",
     "*CASE-*",
     "*.log",
     "*.out",
@@ -38,6 +42,10 @@ DEFAULT_IGNORES = [
     "~$*",
     "*.crdownload",
     "*.lock",
+    "*.db",
+    "*.db-journal",
+    "*.db-wal",
+    "*.db-shm",
     "*.pyc"
 ]
 

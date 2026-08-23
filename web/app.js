@@ -390,7 +390,7 @@ async function refreshStatus() {
     $("btn-toggle-monitor").textContent = isMonitoring ? t("btn_pause_monitor") : t("btn_start_monitor");
 
     renderStats(data.metrics);
-    renderCollectors(data.watchers, data.last_events || {});
+    renderCollectors(data.watchers, data.last_events || {}, data.collector_health || {});
     $("last-refresh").textContent = "updated " + new Date().toLocaleTimeString();
   } catch (e) {
     $("status-text").textContent = t("status_disconnected");
@@ -418,27 +418,48 @@ function renderStats(m) {
     </div>`).join("");
 }
 
-function renderCollectors(w, lastEvents = {}) {
+function renderCollectors(w, lastEvents = {}, health = {}) {
   const items = [
-    { name: t("collector_file"), on: w.file_watcher, last: lastEvents.file_watcher },
-    { name: t("collector_git"), on: w.git_watcher, last: lastEvents.git_watcher },
-    { name: t("collector_window"), on: w.window_watcher, last: lastEvents.window_watcher },
-    { name: t("collector_agent"), on: w.agent_log_watcher, last: lastEvents.agent_log_watcher },
-    { name: t("collector_scheduler"), on: w.scheduler, last: null }
+    { key: "file_watcher", name: t("collector_file"), on: w.file_watcher, last: lastEvents.file_watcher, h: health.file_watcher || "stale" },
+    { key: "git_watcher", name: t("collector_git"), on: w.git_watcher, last: lastEvents.git_watcher, h: health.git_watcher || "stale" },
+    { key: "window_watcher", name: t("collector_window"), on: w.window_watcher, last: lastEvents.window_watcher, h: health.window_watcher || "stale" },
+    { key: "agent_log_watcher", name: t("collector_agent"), on: w.agent_log_watcher, last: lastEvents.agent_log_watcher, h: health.agent_log_watcher || "stale" },
+    { key: "scheduler", name: t("collector_scheduler"), on: w.scheduler, last: null, h: health.scheduler || "healthy" }
   ];
+
+  const colorMap = {
+    healthy: "var(--success, #22c55e)",
+    idle: "var(--warn, #eab308)",
+    stale: "var(--danger, #ef4444)",
+    disabled: "var(--mu, #888)"
+  };
+
+  const labelMap = {
+    healthy: currentLang === "zh-TW" ? "運作中" : "Active",
+    idle: currentLang === "zh-TW" ? "待命中" : "Idle",
+    stale: currentLang === "zh-TW" ? "無有效資料" : "Stale",
+    disabled: currentLang === "zh-TW" ? "已停用" : "Disabled"
+  };
+
   $("watchers-grid").innerHTML = items.map(it => {
     let lastTimeStr = "";
     if (it.last) {
       const timePart = it.last.includes(" ") ? it.last.split(" ")[1] : it.last;
-      lastTimeStr = `<span class="mono-mini" style="font-size:10px; opacity:0.85; display:block; margin-top:2px; color:var(--text-dim);">${currentLang === "zh-TW" ? "寫入" : "Synced"}: ${timePart}</span>`;
-    } else if (it.on && it.name !== t("collector_scheduler")) {
-      lastTimeStr = `<span class="mono-mini" style="font-size:10px; opacity:0.6; display:block; margin-top:2px; color:var(--warn);">${currentLang === "zh-TW" ? "尚無紀錄" : "No writes yet"}</span>`;
+      lastTimeStr = `<span class="mono-mini" style="font-size:10px; opacity:0.85; display:block; margin-top:2px; color:var(--text-dim);">${currentLang === "zh-TW" ? "最後寫入" : "Last"}: ${timePart}</span>`;
+    } else if (it.on && it.key !== "scheduler") {
+      lastTimeStr = `<span class="mono-mini" style="font-size:10px; opacity:0.85; display:block; margin-top:2px; color:var(--danger, #ef4444); font-weight:600;">${currentLang === "zh-TW" ? "尚無紀錄 (待排查)" : "No data (Pending)"}</span>`;
     }
+    const dotColor = colorMap[it.h] || "var(--mu)";
+    const statusText = labelMap[it.h] || (it.on ? t("collector_enabled") : t("collector_disabled"));
+
     return `
     <div class="collector">
-      <div class="collector-name">${it.name}</div>
-      <div class="collector-state" style="color:${it.on ? "var(--orange)" : "var(--mu)"}">
-        ${it.on ? t("collector_enabled") : t("collector_disabled")}
+      <div class="collector-name" style="display:flex; align-items:center; gap:6px;">
+        <span style="width:7px; height:7px; border-radius:50%; background:${dotColor}; display:inline-block;"></span>
+        ${it.name}
+      </div>
+      <div class="collector-state" style="color:${dotColor}">
+        ${statusText}
         ${lastTimeStr}
       </div>
     </div>`;

@@ -178,7 +178,7 @@ class AgentLogWatcherService:
             logger.debug("Antigravity watcher is disabled in config.")
 
     # =========================================================================
-    # 1. Claude Code 日誌解析 (含 User 與 Assistant 完整問答)
+    # 1. Claude Code 日誌解析 (以 projects/**/*.jsonl 為核心成對提取 User 與 Assistant 回應)
     # =========================================================================
     def scan_claude_code_logs(self, full_history: bool = False):
         user_home = Path.home()
@@ -187,56 +187,10 @@ class AgentLogWatcherService:
             return
 
         db = get_db()
-
-        # 1. 讀取 history.jsonl
-        history_file = claude_dir / "history.jsonl"
-        if history_file.exists() and self._should_scan_file(history_file, full_history):
-            try:
-                with open(history_file, "r", encoding="utf-8", errors="ignore") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            item = json.loads(line)
-                            prompt_text = item.get("display") or item.get("text") or item.get("prompt")
-                            if not prompt_text or len(prompt_text.strip()) < 2:
-                                continue
-
-                            event_time = parse_timestamp_safe(item.get("timestamp"))
-                            if not event_time:
-                                continue
-
-                            project_path = item.get("project") or item.get("cwd")
-                            clean_prompt = prompt_text.strip()
-
-                            hash_key = f"claude_code_hist:{clean_prompt[:50]}:{event_time.strftime('%Y%m%d%H%M')}"
-                            if hash_key in self._processed_hashes:
-                                continue
-
-                            with db.session_scope() as session:
-                                existing = session.query(AIPromptEvent).filter_by(
-                                    platform="claude_code",
-                                    prompt_text=clean_prompt
-                                ).first()
-                                if not existing:
-                                    tag = Path(project_path).name if project_path else "Claude Code"
-                                    session.add(AIPromptEvent(
-                                        platform="claude_code",
-                                        prompt_text=clean_prompt,
-                                        response_text=None,
-                                        project_tag=tag,
-                                        cwd=str(project_path) if project_path else None,
-                                        timestamp=event_time
-                                    ))
-                            self._processed_hashes.add(hash_key)
-                        except Exception:
-                            continue
-            except Exception as e:
-                logger.debug(f"Error reading Claude history.jsonl: {e}")
-
-        # 2. 讀取 projects/**/*.jsonl (成對解析 User 與 Assistant 回應)
         projects_dir = claude_dir / "projects"
+        has_scanned_projects = False
+
+        # 1. 優先讀取 projects/**/*.jsonl (成對解析 User 與 Assistant 完整回答)
         if projects_dir.exists():
             for proj_jsonl in projects_dir.glob("**/*.jsonl"):
                 if not self._should_scan_file(proj_jsonl, full_history):
@@ -265,7 +219,6 @@ class AgentLogWatcherService:
                                     user_text = extract_claude_user_text(content)
 
                                     if user_text and len(user_text) >= 2:
-                                        # 如果前面已有積累的 user prompt，成對寫入
                                         if current_user_prompt and current_user_time:
                                             full_resp = "\n\n".join(accumulated_responses).strip() if accumulated_responses else None
                                             self._upsert_ai_event(
@@ -283,7 +236,7 @@ class AgentLogWatcherService:
                                     msg = item.get("message", {})
                                     content = msg.get("content") if isinstance(msg, dict) else item.get("content")
                                     assistant_text = extract_claude_assistant_text(content)
-                                    if assistant_text:
+                                    if assistant_text and not assistant_text.startswith("["):
                                         accumulated_responses.append(assistant_text)
                             except Exception:
                                 continue
@@ -296,8 +249,47 @@ class AgentLogWatcherService:
                                 prompt=current_user_prompt, response=full_resp,
                                 cwd=current_cwd, timestamp=current_user_time
                             )
+                    has_scanned_projects = True
                 except Exception as e:
                     logger.debug(f"Error reading Claude project log {proj_jsonl}: {e}")
+
+        # 2. 僅在無 projects 目錄時才以 history.jsonl 作為備援回退
+        history_file = claude_dir / "history.jsonl"
+        if not has_scanned_projects and history_file.exists() and self._should_scan_file(history_file, full_history):
+            try:
+                with open(history_file, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            item = json.loads(line)
+                            prompt_text = item.get("display") or item.get("text") or item.get("prompt")
+                            if not prompt_text or len(prompt_text.strip()) < 2:
+                                continue
+
+                            event_time = parse_timestamp_safe(item.get("timestamp"))
+                            if not event_time:
+                                continue
+
+                            project_path = item.get("project") or item.get("cwd")
+                            clean_prompt = prompt_text.strip()
+
+                            hash_key = f"claude_code_hist:{clean_prompt[:50]}:{event_time.strftime('%Y%m%d%H%M')}"
+                            if hash_key in self._processed_hashes:
+                                continue
+
+                            self._upsert_ai_event(
+                                db, platform="claude_code", conv_id=None,
+                                prompt=clean_prompt, response=None,
+                                cwd=str(project_path) if project_path else None,
+                                timestamp=event_time
+                            )
+                            self._processed_hashes.add(hash_key)
+                        except Exception:
+                            continue
+            except Exception as e:
+                logger.debug(f"Error reading Claude history.jsonl: {e}")
 
     # =========================================================================
     # 2. Codex 日誌與 Sessions 全量解析 (支援 2025/2026 所有 Session 與 Assistant 回應)
@@ -417,22 +409,25 @@ class AgentLogWatcherService:
                             current_time = ts or get_local_now()
 
                         elif role == "assistant" and current_prompt:
-                            self._upsert_ai_event(
-                                db, platform="codex", conv_id=session_id,
-                                prompt=current_prompt, response=content if content else None,
-                                cwd=session_cwd, timestamp=current_time or ts or get_local_now()
-                            )
-                            current_prompt = ""
-                            current_time = None
+                            clean_cnt = (content or "").strip()
+                            if not clean_cnt.startswith("[") and not clean_cnt.startswith("<") and len(clean_cnt) >= 3:
+                                self._upsert_ai_event(
+                                    db, platform="codex", conv_id=session_id,
+                                    prompt=current_prompt, response=clean_cnt,
+                                    cwd=session_cwd, timestamp=current_time or ts or get_local_now()
+                                )
+                                current_prompt = ""
+                                current_time = None
 
                     elif t == "event_msg" and isinstance(payload, dict):
                         p_type = payload.get("type")
                         if p_type == "agent_message" and current_prompt:
                             msg_text = extract_text_from_content(payload.get("message") or payload.get("text"))
-                            if msg_text:
+                            clean_msg = (msg_text or "").strip()
+                            if clean_msg and not clean_msg.startswith("[") and not clean_msg.startswith("<") and len(clean_msg) >= 3:
                                 self._upsert_ai_event(
                                     db, platform="codex", conv_id=session_id,
-                                    prompt=current_prompt, response=msg_text,
+                                    prompt=current_prompt, response=clean_msg,
                                     cwd=session_cwd, timestamp=current_time or ts or get_local_now()
                                 )
                                 current_prompt = ""
@@ -505,8 +500,8 @@ class AgentLogWatcherService:
 
                             elif step_type == "PLANNER_RESPONSE":
                                 model_content = (item.get("content") or "").strip()
-                                # 排除純空字串或過短的工具調用過渡，只保留實質結論
-                                if model_content and len(model_content) >= 5 and not model_content.startswith("<"):
+                                # 排除純空字串或工具調用字串，只保留實質結論
+                                if model_content and len(model_content) >= 5 and not model_content.startswith("<") and not model_content.startswith("["):
                                     latest_real_response = model_content
 
                         except Exception:
@@ -534,6 +529,13 @@ class AgentLogWatcherService:
         clean_prompt = prompt.strip()
         if len(clean_prompt) < 2:
             return
+
+        # 清洗 response：嚴格過濾以 [ 開頭之工具調用字串與佔位符
+        clean_resp = (response or "").strip()
+        if clean_resp.startswith("[") or clean_resp.startswith("<") or clean_resp in ["[Executed in Antigravity Agent Session]", "[Codex CLI Session]"]:
+            clean_resp = None
+        if clean_resp and len(clean_resp) < 3:
+            clean_resp = None
 
         # 針對 Documents/Codex 等一次性暫存目錄做正規化標籤
         tag = None
@@ -564,15 +566,17 @@ class AgentLogWatcherService:
                     url=url,
                     conversation_id=conv_id,
                     prompt_text=clean_prompt,
-                    response_text=response,
+                    response_text=clean_resp,
                     project_tag=tag,
                     cwd=cwd,
                     timestamp=event_time
                 ))
             else:
-                # 若已有紀錄但先前沒有 response_text，或現在有了更詳細的回應，進行補全
-                if response and (not existing.response_text or existing.response_text.startswith("[")):
-                    existing.response_text = response
+                # 若已有紀錄但先前沒有 response_text，或現在有了真實回應，進行補全
+                if clean_resp and (not existing.response_text or existing.response_text.startswith("[")):
+                    existing.response_text = clean_resp
+                elif not clean_resp and existing.response_text and existing.response_text.startswith("["):
+                    existing.response_text = None
                 if cwd and not existing.cwd:
                     existing.cwd = cwd
                 if tag and not existing.project_tag:
