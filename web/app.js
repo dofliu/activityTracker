@@ -542,9 +542,10 @@ function renderActionGroup(p) {
   const ghUrl = p.github_url || (p.github && p.github.html_url);
   const path = p.local_path;
   const vsCodeUri = path ? "vscode://file/" + encodeURI(path.replace(/\\/g, "/")) : "";
+  const folderUri = path ? "openfolder:///" + encodeURI(path.replace(/\\/g, "/")) : "";
 
   const folderBtn = path
-    ? `<button class="action-btn" data-act="folder" data-path="${esc(path)}" title="${currentLang === 'zh-TW' ? '開啟本機資料夾 (' + esc(path) + ')' : 'Open Folder (' + esc(path) + ')'}">📁</button>`
+    ? `<a class="action-btn" href="${esc(folderUri)}" data-act="folder" data-path="${esc(path)}" title="${currentLang === 'zh-TW' ? '開啟本機資料夾 (' + esc(path) + ')' : 'Open Folder (' + esc(path) + ')'}">📁</a>`
     : `<button class="action-btn disabled" title="${currentLang === 'zh-TW' ? '尚未定位到本機路徑' : 'No local path'}">📁</button>`;
 
   const vsCodeBtn = path
@@ -567,7 +568,6 @@ function attachActionGroupListeners(parentEl) {
   parentEl.querySelectorAll("[data-act]").forEach(btn => {
     btn.addEventListener("click", async (ev) => {
       ev.stopPropagation();
-      ev.preventDefault();
       const act = btn.dataset.act;
       if (act === "folder") {
         const pth = btn.dataset.path;
@@ -576,7 +576,7 @@ function attachActionGroupListeners(parentEl) {
             await navigator.clipboard.writeText(pth);
           } catch (_) {}
         }
-        await runOpenAction(pth, "explorer");
+        runOpenAction(pth, "explorer");
       }
     });
   });

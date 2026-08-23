@@ -115,6 +115,28 @@ class GenerateCheckpointRequest(BaseModel):
 
 
 
+def ensure_openfolder_protocol():
+    """註冊 openfolder:// 瀏覽器直通協議 (僅寫入 HKCU，不需管理員權限)"""
+    import sys
+    if sys.platform != "win32":
+        return
+    try:
+        import winreg
+        key_path = r"Software\Classes\openfolder"
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+            winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "URL:Open Folder Protocol")
+            winreg.SetValueEx(key, "URL Protocol", 0, winreg.REG_SZ, "")
+        
+        cmd_path = key_path + r"\shell\open\command"
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_path) as cmd_key:
+            cmd = 'powershell.exe -WindowStyle Hidden -NoProfile -Command "$raw = \'%1\'; $p = [System.Uri]::UnescapeDataString(($raw -replace \'^openfolder:/*\', \'\')); if (Test-Path $p) { explorer.exe $p } else { explorer.exe (Split-Path $p) }"'
+            winreg.SetValueEx(cmd_key, "", 0, winreg.REG_SZ, cmd)
+    except Exception as e:
+        logger.warning(f"Could not register openfolder protocol: {e}")
+
+ensure_openfolder_protocol()
+
+
 # =====================================================================
 # 1. 監控生命週期與控制 API
 # =====================================================================
