@@ -1,136 +1,266 @@
-# 🌐 OmniContext — 個人全景活動追蹤與 AI 回顧中樞
+# 🌐 OmniContext — 個人全景活動追蹤與進行中工作智慧中樞
 
-> 一個本機優先、注重隱私的個人上下文記憶系統。目標是自動捕捉跨平台 AI 對話、論文寫作、程式開發、檔案異動與時間分配，讓你隨時知道「我正在進行哪些工作、上次做到哪、有什麼還沒收尾」。
+[![Language](https://img.shields.io/badge/Language-English%20%7C%20%E7%B9%81%E9%AB%94%E4%B8%AD%E6%96%87-orange)](#-language--%E8%AA%9E%E8%A8%80)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-green)](https://fastapi.tiangolo.com/)
 
-**目前狀態：開發中（progress 35%）。骨架完整，資料採集正確性修復中。**
-完整開發規劃見 [ROADMAP.md](ROADMAP.md)，專案狀態見 [STATUS.yaml](STATUS.yaml)。
+> **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
----
+**OmniContext** 是一個**本機優先（Local-First）、注重絕對隱私**的個人上下文記憶中樞與工作進度追蹤系統。它能全自動捕獲您在電腦上的跨平台 AI 對話（Claude Code、Codex、Antigravity、ChatGPT、Gemini 等）、程式碼提交、檔案與論文寫作異動、視窗時間分配，並深度整合 GitHub 雲端倉庫與 Pull Request (PR) 狀態。
 
-## ⚠️ 使用前必讀：目前的真實能力
-
-這個專案的架構已經完成，但**多數採集器尚未產出可信資料**。在 P0 修復完成前，請不要把產出的報告當成真實工作紀錄。
-
-| 功能 | 狀態 | 說明 |
-| :--- | :--- | :--- |
-| Web 儀表板（即時流／設定／報告） | ✅ 可用 | `http://127.0.0.1:8765` |
-| 視窗焦點與時間統計 | ✅ 可用 | 唯一穩定運作的採集器 |
-| LLM 每日摘要生成 | ✅ 可用 | 但輸入資料品質受下列問題影響 |
-| 週期性 Checkpoint 快照 | ❌ 產出空白 | 時區混用造成查不到事件（缺陷 D1） |
-| 檔案／論文異動 | ⚠️ 噪音嚴重 | `ignore_patterns` 未實作，訊噪比約 1:3574（D2） |
-| Git commits | ❌ 掃不到 | 路徑需自身為 repo 且不遞迴（D3） |
-| Claude Code 紀錄 | ❌ 未實作 | 目前僅有一行預留註解（D4） |
-| 瀏覽器 AI 對話（ChatGPT/Gemini/Claude/Manus） | ⚠️ 只存問不存答 | 去重邏輯丟棄回應（D5） |
-| 設定頁的 AI 工具開關 | ❌ 無作用 | 前端未寫入設定（D6） |
-| 主動提醒／開機自動啟動 | ❌ 未實作 | 規劃於 P2 |
-
-缺陷代號 D1~D6 的詳細位置與修法見 [ROADMAP.md](ROADMAP.md) 第 0.2 節。
+隨時幫助您回答三個核心問題：
+1. **「我現在正在進行哪些專案？」**
+2. **「我上次做到哪裡、動了哪些檔案？」**
+3. **「有哪些尚未收尾的未結事項（Open Loops）？」**
 
 ---
 
-## 🚀 快速上手
+## 🌟 核心特色功能
 
-### 1. 安裝與啟動
-
-```bash
-cd D:\Project_CodingSimulation\PersonalHelper\activityTracker
-pip install -r requirements.txt
-python main.py
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                        OmniContext 核心系統架構                          │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  [ 跨平台 AI 採集 ]      [ 本機檔案 / Git ]      [ GitHub 雲端整合 ]     │
+│  • Claude Code 日誌       • Watchdog 檔案異動     • 48+ Public/Private   │
+│  • Codex Sessions         • 遞迴 Git Scanner      • PR 狀態 / 分支流向   │
+│  • Antigravity 對話       • 論文多檔案智能歸戶    • Actions CI 測試結果  │
+│  • Chrome 擴充套件                                                       │
+│          │                       │                       │               │
+│          └───────────────────────┼───────────────────────┘               │
+│                                  ▼                                       │
+│                    [ 本機 SQLite 資料庫儲存 ]                            │
+│                    (omni_context.db · 零外洩)                            │
+│                                  │                                       │
+│          ┌───────────────────────┴───────────────────────┐               │
+│          ▼                                               ▼               │
+│  [ Web 視覺化儀表板 ]                        [ AI 摘要與排程回顧 ]       │
+│  • 01 · 進行中工作 (Workstreams)             • 多日自訂區間日報回顧      │
+│  • 02 · 即時情報流 (Live Feed)               • 週期性 Checkpoint 快照    │
+│  • 03 · 監控配置 (Settings)                  • Telegram 晨間簡報與停滯警示 │
+│  • 04 · 每日摘要 (Summaries)                 • 多供應商 (Gemini 3.7 /    │
+│  • 05 · 活動快照 (Checkpoints)                 Claude / OpenAI / Ollama) │
+│  • 🌐 中英文 i18n 動態切換 / 深淺色主題                                  │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
-啟動後開啟 **`http://127.0.0.1:8765`** 進入儀表板。目前需手動啟動，關閉終端即停止（自動啟動規劃於 P2）。
+### 1. 🎯 專案根目錄智能歸戶（Hierarchy Project Resolver）
+* **消除子目錄碎片化**：自動將巢狀目錄（如 `core/`、`synthesizer/`、`Draft_Paper/`、`Daily_Report/`）整合歸戶至對應的真實專案或論文根名稱（如 `activityTracker`、`AI_PapersResearch`）。
+* **工作階段多檔案聚合**：同一工作階段內動到的多個檔案，在專案卡片上整合成單一條目（如「`異動 A.md, B.py 等共 6 個檔案`」），點開手風琴即可展開所有檔案的字數變更與路徑清單。
+
+### 2. 🐙 GitHub 雲端全專案與 PR 智慧追蹤（GitHub Cloud Intel）
+* **雙軌認證**：
+  * **一鍵免密連線**：自動探測本機登入之 `gh` CLI 憑證（具備 `repo`, `read:org`, `workflow`, `gist` 完整 scope），無需手動建立 PAT。
+  * **Token 支援**：支援 Fine-Grained 與 Classic Personal Access Token。
+* **全量倉庫與 PR 狀態撈取**：
+  * 自動同步所有 Public / Private 倉庫。
+  * 提取各 PR 的標題、狀態（Open / Merged / Draft）、分支流向（`head -> base`）、CI 測試結果（`SUCCESS` / `PENDING` / `FAILURE`）與審查狀態。
+  * Web 儀表板提供直接點擊跳轉至 GitHub PR 的超連結。
+
+### 3. 🤖 跨平台 AI 對話全景記錄（問答完整解析）
+* **本機 CLI / IDE Agent**：
+  * **Claude Code**（`~/.claude/projects/`）：完整記錄命令、提問與對話細節。
+  * **Codex**（`~/.codex/sessions/**`）：解析 Rollout JSONL 與 Assistant 訊息回覆。
+  * **Antigravity**（`.gemini/brain/**`）：即時擷取對話與執行工具。
+* **瀏覽器擴充套件（Chrome Extension MV3）**：
+  * 支援 **ChatGPT**、**Gemini**、**Claude.ai**、**Manus**。
+  * 具備 10 分鐘滑動窗口 Upsert 去重，同時保存**使用者提問**與 **AI 完整回答內容**。
+
+### 4. ⚡ 自訂日期區間 AI 工作回顧（LLM Synthesis Engine）
+* **任意日期範圍報告**：支援從 Web UI 選擇起訖日期（`FROM ~ TO`）或使用 `今日`、`昨日`、`本週`、`近 7 天`、`近 30 天` 快捷標籤，一鍵產出多日全景回顧。
+* **多模型支援**：預設採用 Google Gemini (`gemini-3.7-flash`)，亦支援 Anthropic Claude、OpenAI GPT-4o 及本機 Ollama。
+* **未結事項萃取**：AI 生成摘要時自動提煉「待收尾與未結事項 (Open Loops)」，並同步至首頁右側清單供勾選結案。
+
+### 5. 🌐 完整中英文多語言介面（Bilingual i18n & Theme）
+* Web 儀表板頂部提供 `🌐 English` / `🌐 繁體中文` 一鍵即時切換。
+* 支援淺色（Light）與深色（Dark）主題，所有使用者偏好自動儲存於 `localStorage`。
+
+### 6. 🔔 Telegram 遠端推播與背景自動啟動
+* 支援定時發送「每日工作摘要」、「晨間工作簡報」與「停滯專案警示」。
+* 提供 Windows 開機自動背景啟動安裝腳本（`scripts/install_autostart.ps1`）。
+
+---
+
+## 🚀 快速開始
+
+### 1. 安裝環境與依賴
+
+需求環境：**Python 3.10+**
+
+```bash
+# 複製專案
+git clone https://github.com/dofliu/activityTracker.git
+cd activityTracker
+
+# 安裝 Python 依賴套件
+pip install -r requirements.txt
+```
 
 ### 2. 設定 LLM API 金鑰
 
-依 `config.yaml` 的 `synthesizer.provider` 選擇供應商，並設定對應環境變數：
+系統預設使用 `Google Gemini`，請設定環境變數或於 `config.yaml` 中配置：
 
-| Provider | 環境變數 | 預設模型 |
+```bash
+# Windows PowerShell
+$env:GEMINI_API_KEY="your-gemini-api-key"
+
+# 或若使用 Anthropic / OpenAI
+$env:ANTHROPIC_API_KEY="your-anthropic-api-key"
+$env:OPENAI_API_KEY="your-openai-api-key"
+```
+
+### 3. 啟動 Web 儀表板與後台監控
+
+```bash
+python main.py
+```
+
+啟動後於瀏覽器開啟：**[http://127.0.0.1:8765](http://127.0.0.1:8765)**
+
+---
+
+## 💻 CLI 指令完全指南
+
+OmniContext 支援完整的終端命令列操作：
+
+| 指令 | 說明 | 範例 |
 | :--- | :--- | :--- |
-| `gemini`（預設） | `GEMINI_API_KEY` | gemini-2.5-flash |
-| `anthropic` | `ANTHROPIC_API_KEY` | claude-3-5-sonnet |
-| `openai` | `OPENAI_API_KEY` | gpt-4o |
-| `ollama` | 無（本機 `localhost:11434`） | llama3.1:8b |
-
-### 3. 安裝瀏覽器擴充套件（選用）
-
-1. Chrome／Edge 開啟 `chrome://extensions/`，啟用「開發人員模式」。
-2. 點「載入未封裝項目」，選擇 `watchers/browser_extension/`。
-3. 注意：目前僅能擷取提問，AI 回應會被去重邏輯丟棄（D5 修復中）。
+| `python main.py` | 啟動 Web 儀表板與背景採集服務 | `python main.py` |
+| `python main.py now` | 一秒查詢當前進行中專案、最近 5 筆活動與未結事項 | `python main.py now` |
+| `python main.py summary` | 生成 AI 摘要日報（支援自訂區間與強制更新） | `python main.py summary --start 2026-08-20 --end 2026-08-23` |
+| `python main.py github status` | 查看當前 GitHub 連線帳號、倉庫數與 API 額度 | `python main.py github status` |
+| `python main.py github sync` | 手動觸發同步 GitHub 所有 Public/Private 倉庫與 PRs | `python main.py github sync` |
+| `python main.py checkpoint` | 手動打包最近時段活動為 Markdown 快照 Log | `python main.py checkpoint --hours 2` |
+| `python main.py notify` | 手動觸發發送 Telegram 報告或簡報 | `python main.py notify summary` |
+| `python main.py status` | 查看資料庫累積數據指標與採集器運行狀態 | `python main.py status` |
 
 ---
 
-## 💻 CLI 指令
+## ⚙️ 設定檔說明 (`config.yaml`)
 
-| 指令 | 說明 |
-| :--- | :--- |
-| `python main.py` | 啟動 Web 儀表板與後台監控 |
-| `python main.py summary --force` | 手動生成今日 AI 摘要報告 |
-| `python main.py checkpoint --hours 2` | 產出最近 2 小時活動快照 |
-| `python main.py status` | 查看資料庫累積統計與監控狀態 |
-| `python main.py seed-demo` | 寫入示範假資料（**注意：會污染真實統計**） |
+系統設定檔支援 Web 介面即時儲存與熱更新：
 
-> `seed-demo` 寫入的是虛構的論文與 commit 紀錄。若曾執行過，`reports/` 內的報告即包含假資料，請勿據此判斷實際工作進度。
+```yaml
+app:
+  port: 8765
+  host: "127.0.0.1"
 
----
+watchers:
+  file_watcher:
+    enabled: true
+    watch_directories:
+      - "D:/Project_CodingSimulation"
+      - "D:/Dropbox/Project_Academic/Paper_and_Patent/01.JournalPapers"
+    extensions: [".tex", ".docx", ".md", ".pdf", ".py", ".txt"]
+  
+  git_watcher:
+    enabled: true
+    repositories:
+      - "D:/Project_CodingSimulation"
+  
+  agent_log_watcher:
+    enabled: true
+    claude_code: true
+    codex: true
+    antigravity: true
 
-## 📂 專案結構
+  browser:
+    gemini: true
+    chatgpt: true
+    claude_web: true
+    manus: true
 
-```text
-activityTracker/
-├── STATUS.yaml                     # 專案狀態（研究儀表板掃描用）
-├── ROADMAP.md                      # P0~P2 開發規劃與缺陷清單
-├── config.yaml                     # 系統設定（支援 Web UI 熱更新）
-├── main.py                         # 主入口與 CLI
-│
-├── core/                           # 核心服務
-│   ├── manager.py                  # Watcher 生命週期管理
-│   ├── server.py                   # FastAPI REST API 與靜態伺服器
-│   ├── config.py                   # 設定載入器（singleton）
-│   ├── database.py                 # SQLite Session 管理
-│   └── models.py                   # 事件資料模型
-│
-├── web/                            # Web 儀表板前端（原生 JS）
-│   ├── index.html / app.js / style.css
-│
-├── watchers/                       # 數據採集器
-│   ├── browser_extension/          # Chrome MV3 擴充（4 個 AI 平台）
-│   ├── file_watcher.py             # 檔案異動（watchdog）
-│   ├── git_watcher.py              # Git commits 掃描
-│   ├── window_watcher.py           # 視窗焦點與時間統計
-│   └── agent_log_watcher.py        # 本機 Agent 日誌（Antigravity 已實作）
-│
-├── synthesizer/                    # 摘要與排程引擎
-│   ├── aggregator.py               # 事件聚合、Checkpoint、Prompt 組裝
-│   ├── prompt_templates.py         # 每日回顧 Prompt
-│   ├── llm_client.py               # 多供應商 LLM 客戶端
-│   └── scheduler.py                # 每日定時 + 週期性快照排程
-│
-├── logs/checkpoints/               # 週期性活動快照
-└── reports/                        # 每日 Markdown 報告
+synthesizer:
+  provider: "gemini"
+  gemini:
+    model: "gemini-3.7-flash"
+  schedule:
+    enabled: true
+    time: "23:30"
+  periodic_checkpoint:
+    enabled: true
+    interval_hours: 2
+
+integrations:
+  github:
+    enabled: true
+    token: ""  # 空白時自動使用本機 gh auth token
 ```
 
 ---
 
-## 🗺️ 開發路線
+## 🧩 安裝 Chrome 瀏覽器擴充套件
 
-| 階段 | 目標 | 預估 |
-| :--- | :--- | :--- |
-| **P0** | 修復 D1~D6，讓現有功能產出真實乾淨的資料 | 0.5~1 天 |
-| **P1** | 接上 Claude Code／Codex 日誌，新增專案狀態與未結事項追蹤 | 2~3 天 |
-| **P2** | 開機自動啟動、Telegram 主動提醒、`/now` 隨時查詢 | 1~2 天 |
-
-詳細任務與驗收標準見 [ROADMAP.md](ROADMAP.md)。
+1. 開啟 Chrome 或 Edge 瀏覽器，進入 `chrome://extensions/`。
+2. 開啟右上角 **「開發人員模式」 (Developer mode)**。
+3. 點選 **「載入未封裝項目」 (Load unpacked)**。
+4. 選擇本專案中的 `watchers/browser_extension/` 資料夾。
+5. 安裝完成後，當您造訪 ChatGPT、Gemini、Claude.ai 或 Manus 時，提問與 AI 回覆將自動同步至本地 OmniContext！
 
 ---
 
-## 🔒 隱私
+## 📂 專案檔案架構
 
-所有資料留在本機 `omni_context.db`（SQLite），不上傳任何雲端。資料庫、報告與 `.env` 已列入 `.gitignore`。
-
-**資料庫內含完整 AI 對話內容與檔案路徑，任何情況下都不要提交至 GitHub。**
+```text
+activityTracker/
+├── config.yaml                     # 系統設定檔（支援 Web UI 熱更新）
+├── main.py                         # 主入口與 CLI 命令列分發
+├── requirements.txt                # 專案相依套件清單
+├── README.md                       # 繁體中文說明文件
+├── README_en.md                    # English Documentation
+│
+├── core/                           # 核心服務模組
+│   ├── database.py                 # SQLite 連線與 Session 管理
+│   ├── models.py                   # SQLAlchemy 資料庫模型 (Events, Projects, PRs)
+│   ├── server.py                   # FastAPI REST API 與靜態伺服器
+│   ├── project_engine.py           # 專案智能歸戶、多檔案聚合與未結事項引擎
+│   ├── fs_utils.py                 # 本機原生檔案總管/瀏覽對話框工具
+│   └── time_utils.py               # 統一本地時區解析工具
+│
+├── integrations/                   # 外部雲端整合
+│   └── github_client.py            # GitHub API Client (Public/Private Repos, PRs, CI)
+│
+├── watchers/                       # 多源活動數據採集器
+│   ├── file_watcher.py             # Watchdog 檔案異動監控與字數統計
+│   ├── git_watcher.py              # Git 遞迴多倉庫掃描與 Commit 追蹤
+│   ├── window_watcher.py           # 視窗焦點切換與時間分配統計
+│   ├── agent_log_watcher.py        # Claude Code / Codex / Antigravity 日誌解析
+│   └── browser_extension/          # Chrome MV3 擴充套件 (ChatGPT/Gemini/Claude/Manus)
+│
+├── synthesizer/                    # AI 摘要與排程回顧引擎
+│   ├── aggregator.py               # 多日區間資料聚合與報告管線
+│   ├── prompt_templates.py         # 結構化 Prompt 樣板
+│   ├── llm_client.py               # 多供應商 LLM 客戶端 (Gemini/Claude/OpenAI/Ollama)
+│   └── scheduler.py                # 每日定時總結與週期快照定時器
+│
+├── notifiers/                      # 通知推播模組
+│   └── telegram_notifier.py        # Telegram Bot 每日摘要與停滯專案警示
+│
+├── web/                            # Web 儀表板前端
+│   ├── index.html                  # 儀表板主結構 (支援 i18n 標籤)
+│   ├── app.js                      # 前端控制器 (i18n 多語言引擎、GitHub 狀態、手風琴視圖)
+│   └── style.css                   # 暗橘風格主題與雙欄版型
+│
+├── scripts/                        # 自動化與維護腳本
+│   ├── install_autostart.ps1       # Windows 開機自動啟動註冊腳本
+│   └── uninstall_autostart.ps1     # 移除開機自動啟動腳本
+│
+├── logs/checkpoints/               # 週期性活動快照儲存目錄
+└── reports/                        # 每日/區間 Markdown 報告儲存目錄
+```
 
 ---
 
-## 📄 授權
+## 🔒 隱私與安全聲明
 
-MIT License — 見 [LICENSE](LICENSE)。
+* **100% 本機儲存**：所有活動事件均保存在本機 SQLite 資料庫中（`omni_context.db`）。
+* **零雲端遙測**：系統不包含任何外部追蹤代碼或第三方分析工具。
+* **Git 提交防護**：資料庫檔案、API 金鑰與個人 Markdown 報告均已預設加入 `.gitignore`，確保私密對話與工作日誌絕不上傳公開倉庫。
+
+---
+
+## 📄 授權條款
+
+本專案採用 [MIT License](LICENSE) 授權。

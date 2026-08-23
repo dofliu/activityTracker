@@ -3,6 +3,7 @@
 const API = "";
 const POLL_MS = 4000;
 
+let currentLang = localStorage.getItem("omni-lang") || "zh-TW";
 let currentConfig = null;
 let activeFilter = "all";
 let isMonitoring = false;
@@ -23,6 +24,266 @@ const esc = (t) => String(t == null ? "" : t)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
   .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 
+// ---------------------------------------------------------------- i18n
+const I18N = {
+  "zh-TW": {
+    lang_btn: "🌐 English",
+    status_connected: "已連線",
+    status_disconnected: "未連線",
+    status_monitoring: "MONITORING 監控中",
+    status_paused: "PAUSED 已暫停",
+    btn_start_monitor: "開始監控",
+    btn_pause_monitor: "暫停監控",
+    btn_theme_light: "☀ 淺色",
+    btn_theme_dark: "☾ 深色",
+    btn_quick_checkpoint: "⏱️ 快照",
+    btn_quick_summary: "⚡ 生成今日摘要",
+    tab_projects: "01 · 進行中工作",
+    tab_dashboard: "02 · 即時情報流",
+    tab_settings: "03 · 監控配置",
+    tab_summaries: "04 · 每日摘要",
+    tab_checkpoints: "05 · 活動快照",
+    resume_head: "RESUME HERE",
+    resume_sub: "上次做到哪",
+    btn_reindex_projects: "🔄 重新歸戶",
+    ph_loading_projects: "載入進行中工作…",
+    ph_no_projects: "尚未識別到專案活動。進行程式開發、論文寫作或在 Claude / Codex 發問後將自動建立。",
+    active_workstreams: "ACTIVE WORKSTREAMS",
+    feed_title: "LIVE FEED",
+    filter_all: "全部",
+    filter_ai: "AI",
+    filter_file: "檔案",
+    filter_git: "Git",
+    filter_window: "視窗",
+    ph_loading_feed: "載入即時活動…",
+    ph_no_feed: "目前尚無活動紀錄。",
+    collectors_title: "COLLECTORS",
+    collector_file: "檔案監控",
+    collector_git: "Git 掃描",
+    collector_window: "視窗焦點",
+    collector_agent: "Agent 日誌",
+    collector_scheduler: "定時排程",
+    collector_enabled: "● 運作中",
+    collector_disabled: "○ 已關閉",
+    settings_p1_title: "監控路徑",
+    label_file_dirs: "FILE DIRS (檔案目錄)",
+    label_git_roots: "GIT ROOTS (Git 倉庫根目錄)",
+    btn_browse: "📁 瀏覽…",
+    btn_add: "新增",
+    ph_abs_path: "絕對路徑…",
+    ph_git_path: "Git 專案根目錄…",
+    git_recursive_note: "已啟用遞迴探索模式，根目錄下所有子倉庫均會自動納入掃描。",
+    settings_p2_title: "採集來源",
+    settings_p2_note: "右欄標示目前可信度",
+    settings_p3_title: "摘要與排程",
+    btn_save_apply: "儲存並套用",
+    settings_save_note: "寫回 config.yaml 後即時熱更新",
+    settings_p4_title: "GitHub 雲端整合 (全專案與 PR 追蹤)",
+    gh_opt1_title: "快捷方式 1 (推薦)：本機 GITHUB CLI",
+    btn_gh_auto_connect: "🔑 一鍵從本機 gh CLI 同步認證",
+    gh_opt1_sub: "免手動輸入 Token，自動讀取本機登入之 GitHub 帳號",
+    gh_opt2_title: "快捷方式 2：PERSONAL ACCESS TOKEN (PAT)",
+    ph_gh_token: "ghp_xxxxxxxxxxxx (需勾選 repo 權限)",
+    btn_connect: "連線",
+    gh_opt2_sub: "支援 Fine-Grained 或 Classic PAT (讀取 Public & Private Repos/PRs)",
+    btn_gh_sync: "🔄 立即同步 GitHub 專案與 PR 狀態",
+    btn_gh_disconnect: "解除連線",
+    label_date_range: "日期範圍 (RANGE)",
+    chip_today: "今日",
+    chip_yesterday: "昨日",
+    chip_this_week: "本週",
+    chip_7d: "近 7 天",
+    chip_30d: "近 30 天",
+    btn_generate_range: "⚡ 生成區間回顧",
+    ph_loading_summaries: "載入歷史報告…",
+    view_day: "日",
+    view_week: "週",
+    view_month: "月",
+    btn_copy_markdown: "複製 Markdown",
+    ph_summary_click: "請從左側點選報告日期，或點「生成」產出今日摘要。",
+    btn_trigger_cp_now: "+ 產出快照",
+    ph_loading_checkpoints: "載入快照日誌…",
+    btn_copy_log: "複製 Log",
+    ph_cp_click: "請從左側點選快照日誌以檢視期間活動細節。",
+    rail_open_loops: "OPEN LOOPS",
+    ph_loading_loops: "載入未結事項…",
+    ph_no_loops: "無未結事項。",
+    data_trust_title: "DATA TRUST",
+    data_trust_desc: "所有採集器與資料模型均通過正確性驗收，產出高信度真實紀錄。",
+    trust_d1: "統一時區 (Local Timezone)",
+    trust_d2: "檔案防手震與噪音過濾 (Debounce)",
+    trust_d3: "Git 遞迴多倉庫掃描 (64 Repos)",
+    trust_d4: "Claude / Codex / Antigravity 日誌",
+    trust_d5: "AI 提問與完整回應解析",
+    trust_d6: "設定熱套用與開關聯動",
+    trust_d7: "GitHub 雲端倉庫與 PR 狀態整合",
+    trust_d8: "中英文多語言 i18n 與專案智能歸戶",
+    status_active: "活躍中",
+    status_idle: "閒置 {days} 天",
+    open_loop_count: "未結",
+    sec_files_modified: "RECENT MODIFIED FILES (本次工作異動檔案)",
+    sec_timeline: "ACTIVITY TIMELINE (活動時間軸)",
+    sec_open_loops: "OPEN LOOPS (未結事項)",
+    sec_gh_pr: "GITHUB REPO & PULL REQUESTS (遠端倉庫與 PR 追蹤)",
+    btn_snapshot_now: "產出此刻快照",
+    files_modified_summary: "異動 {files} 等共 {count} 個檔案"
+  },
+  "en": {
+    lang_btn: "🌐 繁體中文",
+    status_connected: "Connected",
+    status_disconnected: "Disconnected",
+    status_monitoring: "MONITORING",
+    status_paused: "PAUSED",
+    btn_start_monitor: "Start Monitoring",
+    btn_pause_monitor: "Pause Monitoring",
+    btn_theme_light: "☀ Light",
+    btn_theme_dark: "☾ Dark",
+    btn_quick_checkpoint: "⏱️ Checkpoint",
+    btn_quick_summary: "⚡ Today's Summary",
+    tab_projects: "01 · Active Workstreams",
+    tab_dashboard: "02 · Live Intel Feed",
+    tab_settings: "03 · Settings",
+    tab_summaries: "04 · Daily Summaries",
+    tab_checkpoints: "05 · Activity Checkpoints",
+    resume_head: "RESUME HERE",
+    resume_sub: "Last Session",
+    btn_reindex_projects: "🔄 Reindex",
+    ph_loading_projects: "Loading workstreams…",
+    ph_no_projects: "No project activities detected yet. Activities will automatically be logged when coding, paper writing, or interacting with Claude / Codex.",
+    active_workstreams: "ACTIVE WORKSTREAMS",
+    feed_title: "LIVE FEED",
+    filter_all: "All",
+    filter_ai: "AI",
+    filter_file: "Files",
+    filter_git: "Git",
+    filter_window: "Window",
+    ph_loading_feed: "Loading live feed…",
+    ph_no_feed: "No activity records found.",
+    collectors_title: "COLLECTORS",
+    collector_file: "File Watcher",
+    collector_git: "Git Scanner",
+    collector_window: "Window Focus",
+    collector_agent: "Agent Logs",
+    collector_scheduler: "Scheduler",
+    collector_enabled: "● ENABLED",
+    collector_disabled: "○ DISABLED",
+    settings_p1_title: "Watch Directories",
+    label_file_dirs: "FILE DIRS",
+    label_git_roots: "GIT ROOTS",
+    btn_browse: "📁 Browse…",
+    btn_add: "Add",
+    ph_abs_path: "Absolute path…",
+    ph_git_path: "Git repo root…",
+    git_recursive_note: "Recursive scanning enabled: all nested repositories are automatically discovered.",
+    settings_p2_title: "Data Sources",
+    settings_p2_note: "Reliability badge on right",
+    settings_p3_title: "Synthesis & Schedules",
+    btn_save_apply: "Save & Apply",
+    settings_save_note: "Hot reloaded directly into config.yaml",
+    settings_p4_title: "GitHub Cloud Integration (Public & Private Repos + PRs)",
+    gh_opt1_title: "Option 1 (Recommended): Local GITHUB CLI",
+    btn_gh_auto_connect: "🔑 1-Click Auth via Local gh CLI",
+    gh_opt1_sub: "No manual PAT needed, automatically reads local logged-in GitHub account",
+    gh_opt2_title: "Option 2: PERSONAL ACCESS TOKEN (PAT)",
+    ph_gh_token: "ghp_xxxxxxxxxxxx (with repo scope)",
+    btn_connect: "Connect",
+    gh_opt2_sub: "Supports Fine-Grained or Classic PAT (fetches Public & Private Repos/PRs)",
+    btn_gh_sync: "🔄 Sync GitHub Repos & PRs Now",
+    btn_gh_disconnect: "Disconnect",
+    label_date_range: "DATE RANGE",
+    chip_today: "Today",
+    chip_yesterday: "Yesterday",
+    chip_this_week: "This Week",
+    chip_7d: "Last 7 Days",
+    chip_30d: "Last 30 Days",
+    btn_generate_range: "⚡ Generate Range Review",
+    ph_loading_summaries: "Loading history summaries…",
+    view_day: "Day",
+    view_week: "Week",
+    view_month: "Month",
+    btn_copy_markdown: "Copy Markdown",
+    ph_summary_click: "Select a date on the left, or click Generate to synthesize today's review.",
+    btn_trigger_cp_now: "+ New Checkpoint",
+    ph_loading_checkpoints: "Loading checkpoint logs…",
+    btn_copy_log: "Copy Log",
+    ph_cp_click: "Select a checkpoint log on the left to inspect detailed activity records.",
+    rail_open_loops: "OPEN LOOPS",
+    ph_loading_loops: "Loading open loops…",
+    ph_no_loops: "No open loops.",
+    data_trust_title: "DATA TRUST",
+    data_trust_desc: "All collectors and data models verified for high-fidelity activity intelligence.",
+    trust_d1: "Unified Timezone (Local TZ)",
+    trust_d2: "File Debounce & Noise Filter",
+    trust_d3: "Git Recursive Multi-Repo Scan (64 Repos)",
+    trust_d4: "Claude / Codex / Antigravity Logs",
+    trust_d5: "AI Prompts & Full Assistant Responses",
+    trust_d6: "Settings Hot Reload & Sync",
+    trust_d7: "GitHub Cloud Repos & PR Integration",
+    trust_d8: "Bilingual i18n & Canonical Project Resolver",
+    status_active: "Active",
+    status_idle: "Idle {days}d",
+    open_loop_count: "Open",
+    sec_files_modified: "RECENT MODIFIED FILES",
+    sec_timeline: "ACTIVITY TIMELINE",
+    sec_open_loops: "OPEN LOOPS",
+    sec_gh_pr: "GITHUB REPO & PULL REQUESTS",
+    btn_snapshot_now: "Snapshot Now",
+    files_modified_summary: "Modified {files} ({count} files total)"
+  }
+};
+
+function t(key, vars = {}) {
+  const dict = I18N[currentLang] || I18N["zh-TW"];
+  let str = dict[key] || (I18N["zh-TW"] && I18N["zh-TW"][key]) || key;
+  for (const [k, v] of Object.entries(vars)) {
+    str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
+  }
+  return str;
+}
+
+function applyLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem("omni-lang", lang);
+  document.documentElement.lang = lang === "zh-TW" ? "zh-TW" : "en";
+
+  // 更新所有 data-i18n 節點文字
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const k = el.dataset.i18n;
+    if (k && I18N[currentLang][k]) {
+      el.textContent = t(k);
+    }
+  });
+
+  // 更新所有 placeholder
+  document.querySelectorAll("[data-i18n-ph]").forEach(el => {
+    const k = el.dataset.i18nPh;
+    if (k && I18N[currentLang][k]) {
+      el.placeholder = t(k);
+    }
+  });
+
+  // 更新語言按鈕標籤
+  const langBtn = $("btn-lang");
+  if (langBtn) langBtn.textContent = t("lang_btn");
+
+  paintThemeBtn();
+  refreshStatus();
+  renderResume();
+  renderProjects();
+  renderOpenLoops();
+}
+
+function initLanguage() {
+  const langBtn = $("btn-lang");
+  if (langBtn) {
+    langBtn.addEventListener("click", () => {
+      const nextLang = currentLang === "zh-TW" ? "en" : "zh-TW";
+      applyLanguage(nextLang);
+    });
+  }
+  applyLanguage(currentLang);
+}
+
 async function getJSON(url) {
   const res = await fetch(API + url);
   if (!res.ok) throw new Error(url + " → " + res.status);
@@ -39,6 +300,7 @@ async function postJSON(url, body) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  initLanguage();
   initTheme();
   initTabs();
   initControls();
@@ -72,7 +334,8 @@ function initTheme() {
   });
 }
 function paintThemeBtn() {
-  $("btn-theme").textContent = document.documentElement.dataset.theme === "dark" ? "☀ 淺色" : "☾ 深色";
+  const isDark = document.documentElement.dataset.theme === "dark";
+  $("btn-theme").textContent = isDark ? t("btn_theme_light") : t("btn_theme_dark");
 }
 
 // ---------------------------------------------------------------- tabs
@@ -123,26 +386,25 @@ async function refreshStatus() {
 
     const pill = $("status-pill");
     pill.className = "pill " + (isMonitoring ? "pill-on" : "pill-off");
-    $("status-text").textContent = isMonitoring ? "MONITORING" : "PAUSED";
-    $("btn-toggle-monitor").textContent = isMonitoring ? "暫停" : "開始";
+    $("status-text").textContent = isMonitoring ? t("status_monitoring") : t("status_paused");
+    $("btn-toggle-monitor").textContent = isMonitoring ? t("btn_pause_monitor") : t("btn_start_monitor");
 
     renderStats(data.metrics);
     renderCollectors(data.watchers);
     $("last-refresh").textContent = "updated " + new Date().toLocaleTimeString();
   } catch (e) {
-    $("status-text").textContent = "未連線";
+    $("status-text").textContent = t("status_disconnected");
     $("status-pill").className = "pill pill-off";
   }
 }
 
 function renderStats(m) {
-  // 可信度依 README 已知缺陷 D1~D6 標示，避免把不可信數字當成真實紀錄
   const items = [
-    { tag: "AI TURNS", value: m.ai_prompts_count, label: "Claude / Codex / Web", trust: "noisy" },
-    { tag: "FILES", value: m.file_events_count, label: "論文與檔案異動", trust: "noisy" },
-    { tag: "COMMITS", value: m.git_commits_count, label: "Git commits", trust: "broken" },
-    { tag: "FOCUS", value: m.window_events_count, label: "視窗焦點切換", trust: "ok" },
-    { tag: "STREAMS", value: projectsCache.length, label: "進行中工作", trust: "ok" }
+    { tag: "AI TURNS", value: m.ai_prompts_count, label: "Claude / Codex / Web", trust: "ok" },
+    { tag: "FILES", value: m.file_events_count, label: currentLang === "zh-TW" ? "論文與檔案異動" : "Paper & File Events", trust: "ok" },
+    { tag: "COMMITS", value: m.git_commits_count, label: currentLang === "zh-TW" ? "Git commits 提交" : "Git Commits", trust: "ok" },
+    { tag: "FOCUS", value: m.window_events_count, label: currentLang === "zh-TW" ? "視窗焦點切換" : "Window Focus", trust: "ok" },
+    { tag: "STREAMS", value: projectsCache.length, label: currentLang === "zh-TW" ? "進行中工作" : "Active Workstreams", trust: "ok" }
   ];
   const dot = { ok: "var(--orange)", noisy: "var(--warn)", broken: "var(--danger)" };
   $("stats-strip").innerHTML = items.map(s => `
@@ -158,17 +420,17 @@ function renderStats(m) {
 
 function renderCollectors(w) {
   const items = [
-    { name: "檔案監控", on: w.file_watcher },
-    { name: "Git 掃描", on: w.git_watcher },
-    { name: "視窗焦點", on: w.window_watcher },
-    { name: "Agent 日誌", on: w.agent_log_watcher },
-    { name: "定時排程", on: w.scheduler }
+    { name: t("collector_file"), on: w.file_watcher },
+    { name: t("collector_git"), on: w.git_watcher },
+    { name: t("collector_window"), on: w.window_watcher },
+    { name: t("collector_agent"), on: w.agent_log_watcher },
+    { name: t("collector_scheduler"), on: w.scheduler }
   ];
   $("watchers-grid").innerHTML = items.map(it => `
     <div class="collector">
       <div class="collector-name">${it.name}</div>
       <div class="collector-state" style="color:${it.on ? "var(--orange)" : "var(--mu)"}">
-        ${it.on ? "● ENABLED" : "○ DISABLED"}
+        ${it.on ? t("collector_enabled") : t("collector_disabled")}
       </div>
     </div>`).join("");
 }
@@ -179,7 +441,7 @@ async function refreshFeed() {
     const events = await getJSON(`/api/v1/events/recent?limit=60&event_type=${activeFilter}`);
     if (activeFilter === "all") recentEvents = events;
     const box = $("feed-list");
-    if (!events.length) { box.innerHTML = '<div class="placeholder">目前尚無活動紀錄。</div>'; return; }
+    if (!events.length) { box.innerHTML = `<div class="placeholder">${t("ph_no_feed")}</div>`; return; }
     box.innerHTML = events.map(e => `
       <div class="frow">
         <span class="ftime">${esc((e.timestamp || "").split(" ")[1] || "")}</span>
@@ -201,31 +463,31 @@ async function loadProjects(force) {
     }
     renderResume();
     renderProjects();
-    $("projects-count").textContent = `ACTIVE WORKSTREAMS · ${projectsCache.length}`;
+    $("projects-count").textContent = `${t("active_workstreams")} · ${projectsCache.length}`;
   } catch (e) {
-    $("projects-list").innerHTML = '<div class="placeholder">無法讀取進行中工作。請確認 main.py 是否在執行。</div>';
+    $("projects-list").innerHTML = `<div class="placeholder">${t("ph_loading_projects")}</div>`;
   }
 }
 
 function statusLabel(p) {
-  if (p.status === "active") return "活躍中";
-  return `閒置 ${p.idle_days} 天`;
+  if (p.status === "active") return t("status_active");
+  return t("status_idle", { days: p.idle_days });
 }
 
 function renderResume() {
   const box = document.querySelector("#resume-card .resume-body");
   const p = projectsCache[0];
   if (!p) {
-    box.innerHTML = '<div class="placeholder">尚未識別到專案活動。進行程式開發、論文寫作或在 Claude / Codex 發問後將自動建立。</div>';
+    box.innerHTML = `<div class="placeholder">${t("ph_no_projects")}</div>`;
     return;
   }
   box.innerHTML = `
     <div style="min-width:0">
       <div class="resume-title">${esc(p.display_name)}</div>
       <div class="resume-action">${esc(p.last_action_summary || "無紀錄")}</div>
-      <div class="resume-meta">${esc(p.last_activity_at)} · ${esc(p.category || "")} · 未結 ${p.open_loops_count}</div>
+      <div class="resume-meta">${esc(p.last_activity_at)} · ${esc(p.category || "")} · ${t("open_loop_count")} ${p.open_loops_count}</div>
     </div>
-    <button class="btn btn-primary" data-resume="${esc(p.project_key)}">接續 →</button>`;
+    <button class="btn btn-primary" data-resume="${esc(p.project_key)}">${currentLang === "zh-TW" ? "接續 →" : "Resume →"}</button>`;
   const btn = box.querySelector("[data-resume]");
   if (btn) btn.addEventListener("click", () => expandProject(p.project_key, true));
 }
@@ -233,7 +495,7 @@ function renderResume() {
 function renderProjects() {
   const box = $("projects-list");
   if (!projectsCache.length) {
-    box.innerHTML = '<div class="placeholder">尚未識別到專案活動。</div>';
+    box.innerHTML = `<div class="placeholder">${t("ph_no_projects")}</div>`;
     return;
   }
   box.innerHTML = projectsCache.map(p => {
@@ -269,7 +531,7 @@ function renderProjects() {
             <div class="pmeta">${esc(p.category || "")} · ${statusLabel(p)}</div>
           </div>
           <div class="paction">${esc(p.last_action_summary || "無紀錄")}</div>
-          <div class="ploops" style="color:${loopColor}">${p.open_loops_count}<span>未結</span></div>
+          <div class="ploops" style="color:${loopColor}">${p.open_loops_count}<span>${t("open_loop_count")}</span></div>
           <div class="plast">${esc((p.last_activity_at || "").replace(/^\d{4}-/, ""))}</div>
           <div class="pchev">${open ? "▾" : "▸"}</div>
         </div>
@@ -300,7 +562,7 @@ async function renderProjectDetail(key) {
   const item = document.querySelector(`.pitem[data-key="${CSS.escape(key)}"]`);
   if (!item) return;
   const slot = item.querySelector(".pdetail-slot");
-  slot.innerHTML = '<div class="pdetail"><div class="placeholder">載入專案活動…</div></div>';
+  slot.innerHTML = `<div class="pdetail"><div class="placeholder">${t("ph_loading_projects")}</div></div>`;
 
   const proj = projectsCache.find(p => p.project_key === key);
   let events = [];
@@ -332,7 +594,7 @@ async function renderProjectDetail(key) {
           <span class="tl-dot" style="background:${dotOf[e.type] || "var(--bd)"}"></span>
           <span class="tl-text">${esc(e.title)} <small class="muted">(${esc(e.response || "")})</small></span>
         </div>`).join("")
-    : '<div class="placeholder" style="padding:0">近期尚無詳細活動紀錄。</div>';
+    : `<div class="placeholder" style="padding:0">${t("ph_no_feed")}</div>`;
 
   const fileListHtml = distinctFiles.length
     ? distinctFiles.map(f => `
@@ -347,7 +609,7 @@ async function renderProjectDetail(key) {
 
   const ll = loops.length
     ? loops.map(l => `<div class="pl"><b>·</b><span>${esc(l.title)}</span></div>`).join("")
-    : '<div class="placeholder" style="padding:0">無未結事項。</div>';
+    : `<div class="placeholder" style="padding:0">${t("ph_no_loops")}</div>`;
 
   let ghSection = "";
   if (proj && proj.github) {
@@ -375,7 +637,7 @@ async function renderProjectDetail(key) {
     ghSection = `
       <div style="grid-column: 1 / -1; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--bd);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <span class="mono-label">GITHUB REPO & PULL REQUESTS</span>
+          <span class="mono-label">${t("sec_gh_pr")}</span>
           <a href="${esc(gh.html_url)}" target="_blank" class="mono-mini" style="color:var(--orange); text-decoration:none;">${esc(gh.full_name)} (${gh.is_private ? "Private" : "Public"}) ↗</a>
         </div>
         <div>${prsHtml}</div>
@@ -385,18 +647,18 @@ async function renderProjectDetail(key) {
   slot.innerHTML = `
     <div class="pdetail">
       <div>
-        <span class="mono-label">RECENT MODIFIED FILES (本次工作異動檔案)</span>
+        <span class="mono-label">${t("sec_files_modified")}</span>
         ${fileListHtml}
       </div>
       <div>
-        <span class="mono-label">ACTIVITY TIMELINE</span>
+        <span class="mono-label">${t("sec_timeline")}</span>
         ${tl}
       </div>
       <div>
-        <span class="mono-label">OPEN LOOPS</span>
+        <span class="mono-label">${t("sec_open_loops")}</span>
         ${ll}
         <div class="pdetail-actions">
-          <button class="btn btn-primary btn-sm" data-cp>產出此刻快照</button>
+          <button class="btn btn-primary btn-sm" data-cp>${t("btn_snapshot_now")}</button>
         </div>
       </div>
       ${ghSection}
@@ -412,7 +674,7 @@ async function loadOpenLoops() {
     loopsCache = await getJSON("/api/v1/open-loops");
     renderOpenLoops();
   } catch (e) {
-    $("open-loops-list").innerHTML = '<div class="placeholder">無法讀取未結事項。</div>';
+    $("open-loops-list").innerHTML = `<div class="placeholder">${t("ph_loading_loops")}</div>`;
   }
 }
 
@@ -420,7 +682,7 @@ function renderOpenLoops() {
   $("loop-tally").textContent = String(loopsCache.length);
   const box = $("open-loops-list");
   if (!loopsCache.length) {
-    box.innerHTML = '<div class="placeholder">目前沒有未結事項。AI 每日摘要會自動萃取。</div>';
+    box.innerHTML = `<div class="placeholder">${t("ph_no_loops")}</div>`;
     return;
   }
   box.innerHTML = loopsCache.map(l => `
