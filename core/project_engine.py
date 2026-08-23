@@ -1,4 +1,5 @@
 import re
+import os
 import time
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Set
@@ -343,7 +344,9 @@ def get_active_projects_list(force_refresh: bool = False) -> List[Dict[str, Any]
             ).first()
 
             github_info = None
+            github_url = None
             if gh_repo:
+                github_url = gh_repo.html_url
                 recent_prs = (
                     session.query(GitHubPREvent)
                     .filter_by(repo_name=gh_repo.repo_name)
@@ -377,6 +380,65 @@ def get_active_projects_list(force_refresh: bool = False) -> List[Dict[str, Any]
                     ]
                 }
 
+            # 4. 解析本機真實目錄 (Local Path)
+            local_path = None
+            # 優先從近期檔案異動回溯真實專案目錄
+            latest_f = session.query(FileActivityEvent).filter(
+                (FileActivityEvent.project_name == p.project_key) |
+                (FileActivityEvent.project_name == p.display_name)
+            ).order_by(desc(FileActivityEvent.timestamp)).first()
+            if latest_f and latest_f.file_path:
+                fp = Path(latest_f.file_path).resolve()
+                curr = fp.parent if fp.is_file() else fp
+                while curr != curr.parent:
+                    if curr.name.lower() == p.project_key.lower():
+                        local_path = str(curr)
+                        break
+                    curr = curr.parent
+                if not local_path and fp.parent.exists():
+                    local_path = str(fp.parent)
+
+            # 次之從 AI 活動的 cwd 判定
+            latest_ai = session.query(AIPromptEvent).filter(
+                (AIPromptEvent.project_tag == p.project_key) |
+                (AIPromptEvent.project_tag == p.display_name) |
+                (AIPromptEvent.cwd.like(f"%{p.project_key}%"))
+            ).order_by(desc(AIPromptEvent.timestamp)).first()
+
+            if not local_path and latest_ai and latest_ai.cwd:
+                if os.path.exists(latest_ai.cwd):
+                    local_path = str(Path(latest_ai.cwd).resolve())
+
+            # 備援從常用根目錄探測
+            if not local_path:
+                candidates = [
+                    Path("D:/Project_CodingSimulation") / p.project_key,
+                    Path("D:/Project_CodingSimulation/PersonalHelper") / p.project_key,
+                    Path("D:/Project_CodingSimulation/researchTopic") / p.project_key,
+                    Path("D:/Project_CodingSimulation/courseRelated") / p.project_key,
+                    Path("D:/Dropbox/Project_Academic/Paper&Patent/01.國際期刊(發表年月)/Planning_Writing") / p.project_key,
+                    Path("D:/Dropbox/Project_Academic/Paper&Patent/01.國際期刊(發表年月)/Submitted") / p.project_key,
+                ]
+                for cand in candidates:
+                    if cand.exists():
+                        local_path = str(cand.resolve())
+                        break
+
+            if not local_path and p.project_key == "Agent Development":
+                local_path = str(Path("D:/Project_CodingSimulation/PersonalHelper/activityTracker").resolve())
+
+            # 5. 提取最新 AI 對話資訊
+            ai_info = None
+            if latest_ai:
+                ai_info = {
+                    "platform": latest_ai.platform,
+                    "url": latest_ai.url,
+                    "prompt": latest_ai.prompt_text[:120] if latest_ai.prompt_text else None,
+                    "response": latest_ai.response_text[:160] if latest_ai.response_text else None,
+                    "conv_id": latest_ai.conversation_id,
+                    "cwd": latest_ai.cwd
+                }
+
             result.append({
                 "id": p.id,
                 "project_key": p.project_key,
@@ -387,7 +449,10 @@ def get_active_projects_list(force_refresh: bool = False) -> List[Dict[str, Any]
                 "status": p.status,
                 "idle_days": idle_days,
                 "open_loops_count": loops_count,
-                "github": github_info
+                "local_path": local_path,
+                "github_url": github_url,
+                "github": github_info,
+                "ai_info": ai_info
             })
 
         _PROJECT_CACHE = result

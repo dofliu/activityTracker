@@ -141,6 +141,56 @@ def stop_monitoring():
     return manager.stop_all()
 
 
+class OpenPathRequest(BaseModel):
+    path: Optional[str] = None
+    action: Optional[str] = "explorer"  # "explorer" | "vscode" | "terminal" | "browser"
+    url: Optional[str] = None
+
+
+@app.post("/api/v1/control/open_path")
+def open_system_path(payload: OpenPathRequest):
+    """在宿主機直接開啟本機資料夾、VS Code、終端機或指定網頁"""
+    import subprocess
+    import os
+    import sys
+    import webbrowser
+
+    try:
+        if payload.url:
+            webbrowser.open(payload.url)
+            return {"status": "success", "message": f"已在瀏覽器開啟: {payload.url}"}
+
+        target_path = os.path.abspath(payload.path) if payload.path else None
+        if not target_path or not os.path.exists(target_path):
+            return {"status": "error", "message": f"本機路徑不存在: {payload.path}"}
+
+        if payload.action == "vscode":
+            subprocess.Popen(f'code "{target_path}"', shell=True)
+            return {"status": "success", "message": f"已在 VS Code 開啟: {target_path}"}
+
+        elif payload.action == "terminal":
+            if sys.platform == "win32":
+                folder = target_path if os.path.isdir(target_path) else os.path.dirname(target_path)
+                subprocess.Popen(f'start powershell.exe -NoExit -Command "Set-Location \'{folder}\'"', shell=True)
+            return {"status": "success", "message": f"已在終端機開啟: {target_path}"}
+
+        else: # explorer
+            if sys.platform == "win32":
+                if os.path.isdir(target_path):
+                    os.startfile(target_path)
+                else:
+                    subprocess.Popen(f'explorer.exe /select,"{target_path}"', shell=True)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", target_path])
+            else:
+                subprocess.Popen(["xdg-open", target_path])
+
+            return {"status": "success", "message": f"已開啟資料夾: {target_path}"}
+    except Exception as e:
+        logger.error(f"Error opening path {payload.path}: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 # =====================================================================
 # 2. 進行中工作 (Active Projects) & Open Loops API (P1 核心)
 # =====================================================================

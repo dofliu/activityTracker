@@ -505,6 +505,103 @@ function statusLabel(p) {
   return t("status_idle", { days: p.idle_days });
 }
 
+// ---------------------------------------------------------------- Quick Actions & Toast
+function showToast(msg, duration = 3200) {
+  let box = $("toast-container");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "toast-container";
+    document.body.appendChild(box);
+  }
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.textContent = msg;
+  box.appendChild(el);
+  setTimeout(() => {
+    el.style.opacity = "0";
+    el.style.transition = "opacity 0.3s ease";
+    setTimeout(() => el.remove(), 300);
+  }, duration);
+}
+
+async function runOpenAction(path, action = "explorer", url = null) {
+  try {
+    const res = await postJSON("/api/v1/control/open_path", { path, action, url });
+    if (res && res.status === "success") {
+      showToast("⚡ " + res.message);
+    } else {
+      showToast("⚠️ " + (res.message || "無法開啟目標"));
+    }
+  } catch (e) {
+    showToast("⚠️ 操作失敗: " + e.message);
+  }
+}
+
+function renderActionGroup(p) {
+  if (!p) return "";
+  const ghUrl = p.github_url || (p.github && p.github.html_url);
+  const path = p.local_path;
+  const ai = p.ai_info;
+
+  const folderBtn = path
+    ? `<button class="action-btn" data-act="folder" data-path="${esc(path)}" title="${currentLang === 'zh-TW' ? '開啟本機資料夾 (' + esc(path) + ')' : 'Open Folder (' + esc(path) + ')'}">📁</button>`
+    : `<button class="action-btn disabled" title="${currentLang === 'zh-TW' ? '尚未定位到本機路徑' : 'No local path'}">📁</button>`;
+
+  const vsCodeBtn = path
+    ? `<button class="action-btn" data-act="vscode" data-path="${esc(path)}" title="${currentLang === 'zh-TW' ? '在 VS Code 中開啟專案' : 'Open in VS Code'}">💻</button>`
+    : `<button class="action-btn disabled" title="${currentLang === 'zh-TW' ? '尚未定位到本機路徑' : 'No local path'}">💻</button>`;
+
+  const ghBtn = ghUrl
+    ? `<a class="action-btn" href="${esc(ghUrl)}" target="_blank" rel="noopener noreferrer" title="${currentLang === 'zh-TW' ? '前往 GitHub 專案頁面' : 'Open on GitHub'}">🐙</a>`
+    : `<button class="action-btn disabled" title="${currentLang === 'zh-TW' ? '未綁定 GitHub 倉庫' : 'No GitHub repo'}">🐙</button>`;
+
+  let aiBtn = `<button class="action-btn disabled" title="${currentLang === 'zh-TW' ? '尚無關聯 AI 對話' : 'No AI session'}">💬</button>`;
+  if (ai) {
+    if (ai.url) {
+      aiBtn = `<a class="action-btn" href="${esc(ai.url)}" target="_blank" rel="noopener noreferrer" title="${currentLang === 'zh-TW' ? '開啟網頁端 AI 對話 (' + esc(ai.platform) + ')' : 'Open Web AI Session'}">💬</a>`;
+    } else {
+      const platLabel = (ai.platform || "AI").toUpperCase();
+      aiBtn = `<button class="action-btn" data-act="ai" data-prompt="${esc(ai.prompt || '')}" data-cwd="${esc(ai.cwd || path || '')}" data-plat="${esc(ai.platform || '')}" title="${currentLang === 'zh-TW' ? '接續 [' + platLabel + '] 對話 (點擊複製脈絡並開啟終端)' : 'Resume [' + platLabel + '] (Copy Context & Open Terminal)'}">💬</button>`;
+    }
+  }
+
+  return `
+    <div class="action-group" onclick="event.stopPropagation()">
+      ${folderBtn}
+      ${vsCodeBtn}
+      ${ghBtn}
+      ${aiBtn}
+    </div>`;
+}
+
+function attachActionGroupListeners(parentEl) {
+  parentEl.querySelectorAll("[data-act]").forEach(btn => {
+    btn.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      const act = btn.dataset.act;
+      if (act === "folder") {
+        await runOpenAction(btn.dataset.path, "explorer");
+      } else if (act === "vscode") {
+        await runOpenAction(btn.dataset.path, "vscode");
+      } else if (act === "ai") {
+        const prompt = btn.dataset.prompt;
+        const cwd = btn.dataset.cwd;
+        const plat = (btn.dataset.plat || "AI").toUpperCase();
+        if (prompt) {
+          try {
+            await navigator.clipboard.writeText(prompt);
+          } catch (_) {}
+        }
+        if (cwd) {
+          await runOpenAction(cwd, "terminal");
+        }
+        showToast(currentLang === "zh-TW" ? `⚡ 已複製 [${plat}] 最近脈絡並開啟終端！` : `⚡ Copied [${plat}] context & opened terminal!`);
+      }
+    });
+  });
+}
+
 function renderResume() {
   const box = document.querySelector("#resume-card .resume-body");
   const p = projectsCache[0];
@@ -518,7 +615,11 @@ function renderResume() {
       <div class="resume-action">${esc(p.last_action_summary || "無紀錄")}</div>
       <div class="resume-meta">${esc(p.last_activity_at)} · ${esc(p.category || "")} · ${t("open_loop_count")} ${p.open_loops_count}</div>
     </div>
-    <button class="btn btn-primary" data-resume="${esc(p.project_key)}">${currentLang === "zh-TW" ? "接續 →" : "Resume →"}</button>`;
+    <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+      ${renderActionGroup(p)}
+      <button class="btn btn-primary" data-resume="${esc(p.project_key)}">${currentLang === "zh-TW" ? "接續 →" : "Resume →"}</button>
+    </div>`;
+  attachActionGroupListeners(box);
   const btn = box.querySelector("[data-resume]");
   if (btn) btn.addEventListener("click", () => expandProject(p.project_key, true));
 }
@@ -562,6 +663,7 @@ function renderProjects() {
             <div class="pmeta">${esc(p.category || "")} · ${statusLabel(p)}</div>
           </div>
           <div class="paction">${esc(p.last_action_summary || "無紀錄")}</div>
+          ${renderActionGroup(p)}
           <div class="ploops" style="color:${loopColor}">${p.open_loops_count}<span>${t("open_loop_count")}</span></div>
           <div class="plast">${esc((p.last_activity_at || "").replace(/^\d{4}-/, ""))}</div>
           <div class="pchev">${open ? "▾" : "▸"}</div>
@@ -569,6 +671,8 @@ function renderProjects() {
         <div class="pdetail-slot"></div>
       </div>`;
   }).join("");
+
+  attachActionGroupListeners(box);
 
   box.querySelectorAll(".pitem").forEach(item => {
     item.querySelector(".prow").addEventListener("click", () => {
@@ -675,8 +779,24 @@ async function renderProjectDetail(key) {
       </div>`;
   }
 
+  // 快捷本機操作路徑條
+  let quickBar = "";
+  if (proj) {
+    quickBar = `
+      <div style="grid-column: 1 / -1; margin-bottom: 14px; padding: 10px 14px; background: var(--s1); border: 1px solid var(--bd); display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <div style="min-width:0; display:flex; align-items:center; gap:8px;">
+          <span class="mono-mini accent" style="font-weight:700; flex-shrink:0;">LOCAL PATH:</span>
+          <code style="font-size:11.5px; background:transparent; color:var(--tx); word-break:break-all;">${esc(proj.local_path || '尚未定位到本機路徑')}</code>
+        </div>
+        <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
+          ${renderActionGroup(proj)}
+        </div>
+      </div>`;
+  }
+
   slot.innerHTML = `
     <div class="pdetail">
+      ${quickBar}
       <div>
         <span class="mono-label">${t("sec_files_modified")}</span>
         ${fileListHtml}
@@ -694,6 +814,8 @@ async function renderProjectDetail(key) {
       </div>
       ${ghSection}
     </div>`;
+
+  attachActionGroupListeners(slot);
   const cpBtn = slot.querySelector("[data-cp]");
   if (cpBtn) cpBtn.addEventListener("click", (ev) => { ev.stopPropagation(); triggerCheckpoint(); });
 }
