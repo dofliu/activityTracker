@@ -40,6 +40,7 @@ watchers:
     scan_interval_seconds: 300
   window_watcher:
     enabled: true
+    heartbeat_minutes: 5
     interval_seconds: 5
     idle_threshold_seconds: 180
     ignore_titles:
@@ -79,6 +80,12 @@ synthesizer:
     base_url: http://localhost:11434
     model: llama3.1:8b
 notifiers:
+  desktop:
+    enabled: true
+    morning_briefing_time: '08:30'
+    evening_summary_time: '22:00'
+    stagnation_days: 5
+    launch_url: http://127.0.0.1:8765
   telegram:
     enabled: false
     bot_token_env: TELEGRAM_BOT_TOKEN
@@ -88,6 +95,10 @@ notifiers:
     morning_briefing_time: 09:00
     evening_summary_time: '23:30'
 exporters:
+  daily_brief:
+    enabled: true
+    output_dir: D:/Project_CodingSimulation
+    inject_into: ''
   reports_dir: reports
   checkpoints_dir: logs/checkpoints
   obsidian:

@@ -77,9 +77,16 @@
 * Web 儀表板頂部提供 `🌐 English` / `🌐 繁體中文` 一鍵即時切換。
 * 支援淺色（Light）與深色（Dark）主題，所有使用者偏好自動儲存於 `localStorage`。
 
-### 6. 🔔 Telegram 遠端推播與背景自動啟動
-* 支援定時發送「每日工作摘要」、「晨間工作簡報」與「停滯專案警示」。
+### 6. 🔔 零設定主動提醒（桌面通知 + 每日入口檔案）
+* **Windows 原生桌面通知**：直接呼叫 WinRT Toast，**不需安裝任何套件、不需申請帳號**。
+  * 晨間簡報（08:30）：進行中專案 + 最優先的未收尾事項。
+  * 今日回顧（22:00）：今天推進了哪些專案。
+  * 停滯提醒：專案閒置超過 5 天自動示警。
+  * 點擊通知直接開啟儀表板；`--dry-run` 可先預覽內容。
+* **每日入口簡報**：自動產出 `OMNICONTEXT_TODAY.md` / `.html` 到你每天會打開的目錄，
+  HTML 版每 5 分鐘自動刷新，可直接設為瀏覽器首頁或書籤。
 * 提供 Windows 開機自動背景啟動安裝腳本（`scripts/install_autostart.ps1`）。
+* Telegram 通道保留為選用（預設關閉）。
 
 ---
 
@@ -133,7 +140,8 @@ OmniContext 支援完整的終端命令列操作：
 | `python main.py github status` | 查看當前 GitHub 連線帳號、倉庫數與 API 額度 | `python main.py github status` |
 | `python main.py github sync` | 手動觸發同步 GitHub 所有 Public/Private 倉庫與 PRs | `python main.py github sync` |
 | `python main.py checkpoint` | 手動打包最近時段活動為 Markdown 快照 Log | `python main.py checkpoint --hours 2` |
-| `python main.py notify` | 手動觸發發送 Telegram 報告或簡報 | `python main.py notify summary` |
+| `python main.py brief` | 產出每日簡報檔案至每日入口目錄 | `python main.py brief --notify` |
+| `python main.py notify` | 手動觸發提醒（預設桌面通知） | `python main.py notify briefing --dry-run` |
 | `python main.py status` | 查看資料庫累積數據指標與採集器運行狀態 | `python main.py status` |
 
 ---

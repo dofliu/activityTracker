@@ -28,6 +28,8 @@ from core.project_engine import get_active_projects_list, get_open_loops_list, c
 from synthesizer.aggregator import generate_daily_summary_pipeline, generate_periodic_checkpoint
 from scripts.cleanup_noise import cleanup_noise_and_demo_data
 from notifiers.telegram_notifier import TelegramNotifier
+from notifiers.desktop_notifier import DesktopNotifier
+from exporters.daily_brief import export_daily_brief
 
 logging.basicConfig(
     level=logging.INFO,
@@ -271,6 +273,41 @@ def cmd_notify_telegram(action: str, date_str: Optional[str] = None, dry_run: bo
         print("✅ 發送成功" if success else "❌ 發送失敗")
 
 
+def cmd_notify_desktop(action: str, dry_run: bool = False):
+    """發送 Windows 桌面通知"""
+    notifier = DesktopNotifier()
+    if action in ("briefing", "summary"):
+        ok = notifier.send_morning_briefing(dry_run=dry_run)
+    elif action == "evening":
+        ok = notifier.send_evening_summary(dry_run=dry_run)
+    elif action == "stagnation":
+        ok = notifier.send_stagnation_alert(dry_run=dry_run)
+    else:
+        print(f"未知的通知類型: {action}")
+        return
+
+    if not dry_run:
+        print("✅ 桌面通知已送出" if ok else "❌ 桌面通知發送失敗，請查看日誌")
+
+
+def cmd_brief(output_dir: Optional[str] = None, notify: bool = False):
+    """產出每日簡報檔案，並可選擇同時發送桌面通知"""
+    res = export_daily_brief(output_dir)
+    print("\n" + "=" * 60)
+    print(f"📌 每日簡報已更新 ({res['generated_at']})")
+    print("=" * 60)
+    print(f"• 進行中專案 : {res['active_count']} 個")
+    print(f"• 尚未收尾   : {res['open_loops_count']} 項")
+    print(f"• 停滯專案   : {res['stagnant_count']} 個")
+    print("-" * 60)
+    for f in res["files"]:
+        print(f"  → {f}")
+    print("=" * 60 + "\n")
+
+    if notify:
+        DesktopNotifier().send_morning_briefing()
+
+
 def cmd_github(action: str):
     """GitHub 雲端整合狀態與手動同步"""
     from integrations.github_client import get_github_client
@@ -328,10 +365,16 @@ def main():
     gh_parser.add_argument("action", choices=["status", "sync"], default="status", nargs="?", help="動作 (status, sync)")
 
     # notify 指令
-    notify_parser = subparsers.add_parser("notify", help="手動觸發 Telegram 推播")
-    notify_parser.add_argument("type", choices=["summary", "briefing", "stagnation"], help="通知類型")
+    notify_parser = subparsers.add_parser("notify", help="手動觸發提醒推播 (預設桌面通知)")
+    notify_parser.add_argument("type", choices=["summary", "briefing", "evening", "stagnation"], help="通知類型")
+    notify_parser.add_argument("--channel", choices=["desktop", "telegram"], default="desktop", help="推播通道 (預設 desktop)")
     notify_parser.add_argument("--date", help="指定日期 (YYYY-MM-DD)")
     notify_parser.add_argument("--dry-run", action="store_true", help="不實際發送，僅在終端機預覽推播格式")
+
+    # brief 指令
+    brief_parser = subparsers.add_parser("brief", help="產出每日簡報檔案 (寫入每日入口目錄)")
+    brief_parser.add_argument("--dir", help="覆寫輸出目錄")
+    brief_parser.add_argument("--notify", action="store_true", help="產出後同時發送桌面通知")
 
     # clear-demo 指令
     subparsers.add_parser("clear-demo", help="清除示範假資料與歷史噪音")
@@ -353,7 +396,12 @@ def main():
     elif args.command == "checkpoint":
         cmd_checkpoint(args.hours)
     elif args.command == "notify":
-        cmd_notify_telegram(args.type, getattr(args, "date", None), getattr(args, "dry_run", False))
+        if getattr(args, "channel", "desktop") == "telegram":
+            cmd_notify_telegram(args.type, getattr(args, "date", None), getattr(args, "dry_run", False))
+        else:
+            cmd_notify_desktop(args.type, getattr(args, "dry_run", False))
+    elif args.command == "brief":
+        cmd_brief(getattr(args, "dir", None), getattr(args, "notify", False))
     elif args.command == "clear-demo":
         cleanup_noise_and_demo_data()
     elif args.command == "status":

@@ -5,6 +5,8 @@ from datetime import datetime
 from core.config import get_config
 from .aggregator import generate_daily_summary_pipeline, generate_periodic_checkpoint
 from notifiers.telegram_notifier import TelegramNotifier
+from notifiers.desktop_notifier import DesktopNotifier
+from exporters.daily_brief import export_daily_brief
 
 logger = logging.getLogger("OmniContext.Scheduler")
 
@@ -16,13 +18,15 @@ class SynthesisScheduler:
         self._thread: threading.Thread | None = None
         self._apscheduler = None
         self._notifier = TelegramNotifier()
+        self._desktop = DesktopNotifier()
 
     def start(self):
         daily_enabled = self.cfg.get("synthesizer.schedule.enabled", True)
         checkpoint_enabled = self.cfg.get("synthesizer.periodic_checkpoint.enabled", True)
         telegram_enabled = self.cfg.get("notifiers.telegram.enabled", False)
+        desktop_enabled = self.cfg.get("notifiers.desktop.enabled", True)
 
-        if not daily_enabled and not checkpoint_enabled and not telegram_enabled:
+        if not daily_enabled and not checkpoint_enabled and not telegram_enabled and not desktop_enabled:
             logger.info("Schedulers are disabled in config.")
             return
 
@@ -75,6 +79,23 @@ class SynthesisScheduler:
                 )
                 logger.info(f"Morning briefing scheduled for {m_h:02d}:{m_m:02d} daily.")
 
+            # 桌面通知：早報與晚報（不需任何帳號或金鑰）
+            if self.cfg.get("notifiers.desktop.enabled", True):
+                for job_id, time_key, default_time, func in (
+                    ("desktop_morning_job", "notifiers.desktop.morning_briefing_time", "08:30", self._run_desktop_morning_job),
+                    ("desktop_evening_job", "notifiers.desktop.evening_summary_time", "22:00", self._run_desktop_evening_job),
+                ):
+                    try:
+                        d_h, d_m = [int(x) for x in str(self.cfg.get(time_key, default_time)).split(":")]
+                    except Exception:
+                        d_h, d_m = [int(x) for x in default_time.split(":")]
+
+                    self._apscheduler.add_job(
+                        func=func, trigger="cron", hour=d_h, minute=d_m,
+                        id=job_id, replace_existing=True
+                    )
+                    logger.info(f"Desktop notification '{job_id}' scheduled for {d_h:02d}:{d_m:02d} daily.")
+
             self._apscheduler.start()
         except ImportError:
             # 原生執行緒排程備援機制
@@ -113,6 +134,9 @@ class SynthesisScheduler:
             res = generate_daily_summary_pipeline()
             logger.info(f"Daily synthesis finished: {res.get('status')}")
 
+            # 日報產生後未結事項會更新，順道刷新每日入口的簡報檔
+            self._refresh_daily_brief()
+
             # 若啟用 Telegram，自動推播晚報
             if self._notifier.is_enabled() and "date_str" in res:
                 self._notifier.send_daily_summary(res["date_str"])
@@ -129,6 +153,33 @@ class SynthesisScheduler:
             logger.info(f"Periodic checkpoint generated: {res.get('file_name')}")
         except Exception as e:
             logger.error(f"Error generating checkpoint log: {e}", exc_info=True)
+
+    def _refresh_daily_brief(self):
+        """更新每日入口的簡報檔案（早晚報前都先刷新一次，確保通知與檔案一致）"""
+        if not self.cfg.get("exporters.daily_brief.enabled", True):
+            return
+        try:
+            res = export_daily_brief()
+            logger.info(f"Daily brief exported: {res.get('active_count')} active projects, {res.get('open_loops_count')} open loops.")
+        except Exception as e:
+            logger.error(f"Error exporting daily brief: {e}", exc_info=True)
+
+    def _run_desktop_morning_job(self):
+        logger.info("Triggering desktop morning briefing...")
+        self._refresh_daily_brief()
+        try:
+            self._desktop.send_morning_briefing()
+            self._desktop.send_stagnation_alert()
+        except Exception as e:
+            logger.error(f"Error sending desktop morning briefing: {e}", exc_info=True)
+
+    def _run_desktop_evening_job(self):
+        logger.info("Triggering desktop evening summary...")
+        self._refresh_daily_brief()
+        try:
+            self._desktop.send_evening_summary()
+        except Exception as e:
+            logger.error(f"Error sending desktop evening summary: {e}", exc_info=True)
 
     def _run_morning_briefing_job(self):
         logger.info("Triggering scheduled morning briefing...")

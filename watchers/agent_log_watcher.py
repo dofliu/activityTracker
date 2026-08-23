@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import threading
@@ -103,6 +104,69 @@ def extract_claude_assistant_text(content: Any) -> str:
             return str(content.get("text") or "").strip()
         return str(content.get("text") or "").strip()
     return ""
+
+
+# CLI 內部訊息的包裹標籤：這些是 Agent 工具自己產生的系統訊息，不是使用者的提問。
+# 若不在採集端過濾，它們會出現在活動流，並被當成「今日提問」餵進 LLM 日報。
+CLI_ARTIFACT_PREFIXES = (
+    "<command-name>",
+    "<command-message>",
+    "<command-args>",
+    "<local-command-stdout>",
+    "<local-command-stderr>",
+    "<local-command-caveat>",
+    "<task-notification>",
+    "<system-reminder>",
+    "<bash-input>",
+    "<bash-stdout>",
+    "<bash-stderr>",
+    "<user-memory-input>",
+    "caveat: the messages below were generated",
+    "[request interrupted by user",
+    # Codex CLI 內部訊息
+    "<codex_internal",
+    "<scheduled-task",
+    "<environment_context>",
+    "<heartbeat>",
+    "<turn_aborted>",
+    "<create-pr-command>",
+    "<image>",
+    "<skill>",
+    "<in-app-browser-context",
+)
+
+# Antigravity 會把真正的提問包在標籤裡，這些內容要保留，只是需要脫殼
+_UNWRAP_PATTERNS = (
+    re.compile(r"</?USER_REQUEST>", re.IGNORECASE),
+    re.compile(r"<ADDITIONAL_METADATA>.*?</ADDITIONAL_METADATA>", re.IGNORECASE | re.DOTALL),
+    re.compile(r"<ATTACHED_FILES>.*?</ATTACHED_FILES>", re.IGNORECASE | re.DOTALL),
+)
+
+
+def clean_prompt_text(text: str) -> str:
+    """脫去 Agent 加在使用者提問外層的包裹標籤，保留真正的內容"""
+    if not text:
+        return ""
+    cleaned = text
+    for pattern in _UNWRAP_PATTERNS:
+        cleaned = pattern.sub("", cleaned)
+    return cleaned.strip()
+
+# 無參數的斜線指令（/login、/compact、/model…）只代表操作，不帶工作內容
+BARE_SLASH_COMMAND = re.compile(r"^/[a-zA-Z][\w-]*\s*$")
+
+
+def is_cli_artifact(text: str) -> bool:
+    """判斷一段文字是否為 Agent CLI 的內部訊息而非真實使用者提問"""
+    if not text:
+        return True
+
+    lowered = text.strip().lower()
+    if lowered.startswith(CLI_ARTIFACT_PREFIXES):
+        return True
+    if BARE_SLASH_COMMAND.match(text.strip()):
+        return True
+    return False
 
 
 class AgentLogWatcherService:
@@ -526,8 +590,13 @@ class AgentLogWatcherService:
         cwd: Optional[str] = None, url: Optional[str] = None,
         timestamp: Optional[datetime] = None
     ):
-        clean_prompt = prompt.strip()
+        # 先脫殼再判斷：避免把包在標籤裡的真實提問誤判為雜訊
+        clean_prompt = clean_prompt_text(prompt)
         if len(clean_prompt) < 2:
+            return
+
+        # 在寫入前就擋掉 CLI 內部訊息，避免污染活動流與 LLM 日報的輸入
+        if is_cli_artifact(clean_prompt):
             return
 
         # 清洗 response：嚴格過濾以 [ 開頭之工具調用字串與佔位符

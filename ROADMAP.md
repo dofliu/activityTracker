@@ -66,10 +66,41 @@
 
 ---
 
+## 1.5 提醒通道與資料清洗（2026-08-23 新增）
+
+Telegram 通道經評估後**不採用**（使用者未使用該工具），改為兩條零設定的本機通道。
+`notifiers/telegram_notifier.py` 保留為通用 notifier 的參考實作，預設關閉。
+
+### 桌面通知 `notifiers/desktop_notifier.py`
+- 直接以 PowerShell 呼叫 Windows WinRT `ToastNotificationManager`，**不依賴 winotify / plyer**，無需安裝套件或申請帳號；WinRT 不可用時自動降級為 `MessageBox`。
+- 三種情境：晨間簡報（08:30）、今日回顧（22:00）、專案停滯提醒（預設閒置 5 天）。
+- 點擊通知直接開啟儀表板；`--dry-run` 可在終端機預覽。
+- 自動濾除 `General / Notes` 這類未歸戶收容桶，不讓它佔用提醒版面。
+
+### 每日入口簡報 `exporters/daily_brief.py`
+- 產出 `OMNICONTEXT_TODAY.md` 與 `OMNICONTEXT_TODAY.html` 至 `exporters.daily_brief.output_dir`（預設 `D:/Project_CodingSimulation`）。
+- HTML 版每 5 分鐘自動刷新，可設為瀏覽器書籤或首頁；Markdown 版可被其他工具或 AI 直接讀取。
+- 設定 `inject_into` 指向既有 HTML 儀表板時，改為在 `<!-- OMNICONTEXT:START/END -->` 標記間注入。
+- **注意**：`MCP/LabPagesCowork/` 底下的儀表板會被 `deploy_dashboard.py` 推送到公開 GitHub Pages，因此預設不注入該檔案，避免個人工作紀錄外流。
+
+### 資料清洗 `scripts/purge_legacy_data.py`
+- 冪等腳本，清除兩類歷史污染：seed-demo 殘留的假視窗事件（`aaai2026_draft.tex`、`TestApp`）、Agent CLI 內部訊息被誤存為使用者提問。
+- 採集端 `_upsert_ai_event()` 已加上同一組過濾（`is_cli_artifact()`），並先以 `clean_prompt_text()` 脫去 `<USER_REQUEST>`、`<ADDITIONAL_METADATA>` 等包裹標籤再判斷，避免誤刪真實提問。
+- 實測清除 179 筆 CLI 雜訊與 2 筆假視窗事件，真實配對率由 84.9% 提升至 **85.9%**（Codex 98%、Antigravity 94%、Claude Code 53%）。
+
+> Claude Code 的 53% 是資料來源限制，非缺陷：`~/.claude/history.jsonl` 本身只存提問不存回應，
+> 這批紀錄永遠無法配對；`projects/**/*.jsonl` 來源的配對率則正常。
+
+### 視窗採集器心跳 `watchers/window_watcher.py`
+- 每 5 分鐘（`heartbeat_minutes`）記錄一次實際讀到的前景視窗，讀不到時以 WARNING 標示。
+- 目的是讓下次靜默失效能直接從日誌判斷是「讀不到」還是「寫不進」。
+
+---
+
 ## 2. 下一步驗收與維運清單 (Remaining Milestones to 100%)
 
-1. **Telegram 實機推播驗證**：
-   - 填入 `TELEGRAM_BOT_TOKEN` 與 `TELEGRAM_CHAT_ID`，執行 `python main.py notify briefing` 測試外網推播。
+1. **視窗採集器靜默失效定位**：
+   - 服務連續運行 1 小時後檢視心跳日誌與 `collector_health`，確認是讀取端或寫入端問題。
 2. **Chrome MV3 擴充套件實機載入**：
    - 於 Chrome Developer Mode 載入 `watchers/browser_extension`，測試 claude.ai / chatgpt 網頁端對話捕捉。
 3. **自動開機排程佈署 (`scripts/install_autostart.ps1`)**：

@@ -150,10 +150,21 @@ class WindowWatcherService:
     def _monitor_loop(self):
         interval = self.cfg.get("watchers.window_watcher.interval_seconds", 5)
         ignore_titles = set(self.cfg.get("watchers.window_watcher.ignore_titles", []))
+        # 心跳週期：定期把「實際讀到什麼」寫進日誌，讓靜默失效可以直接定位是讀不到還是寫不進
+        heartbeat_seconds = self.cfg.get("watchers.window_watcher.heartbeat_minutes", 5) * 60
+        last_heartbeat = 0.0
 
         while self._running:
             try:
                 app_name, title = get_active_window_info()
+
+                if time.time() - last_heartbeat >= heartbeat_seconds:
+                    last_heartbeat = time.time()
+                    if app_name and title:
+                        logger.info(f"WindowWatcher heartbeat: 前景視窗 = {app_name} | {title[:60]}")
+                    else:
+                        logger.warning("WindowWatcher heartbeat: 讀不到前景視窗 (GetForegroundWindow 回傳空值)")
+
                 if not app_name or not title:
                     # 拿不到前景視窗（如背景服務執行或鎖定螢幕）：結算當前視窗，不寫入偽造 Idle
                     if self._current_app:
