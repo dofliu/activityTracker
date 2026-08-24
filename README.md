@@ -289,9 +289,9 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 
 | 階段 | 內容 | 說明 |
 | :--- | :--- | :--- |
-| **P3** | 記憶層 | 專案接續 Context Handoff、本機語意檢索、`omni ask` 問自己的歷史、重複工作偵測、Session 敘事層 |
+| **P3** | 記憶層 (95%) | ✅ P3-1 專案接續 Context Handoff（`main.py resume` + Web 一鍵複製）、P3-2 本機語意檢索、P3-3 `omni ask` 問自己的歷史、重複工作偵測、Session 敘事層 |
 | **P4** | 收集層補完 | 瀏覽器閱讀內容、行事曆與會議、終端機指令歷史、未 commit 的工作狀態 |
-| **P5** | 效率工具層 | `STATUS.yaml` 自動維護、停滯 PR 提醒、週報月報 rollup、知識圖譜 |
+| **P5** | 主動秘書 AI 與自主執行 | 主動情境推論與前瞻提案、三級安全守門員（L0/L1/L2）、Agent Dispatcher 調度自主執行、Telegram/Web 一鍵批准、晨間前瞻與晚間交接、`STATUS.yaml` 自動維護 |
 | **P6** | 開源整備 | 抽離硬編碼路徑、`main.py init` 引導、pyproject 與測試、跨平台抽象 |
 
 > 收集越多不等於越有用：檔案事件曾從 3,575 筆噪音 → 4,327 筆 → 收斂至 789 筆。

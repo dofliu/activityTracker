@@ -1,6 +1,6 @@
 # OmniContext 開發規劃與成果紀錄 — P0 ~ P6
 
-> 最新更新日期：2026-08-24　｜　當前進度：92% (全系統採集器穩定運作、AI 結論配對達 95.6%、論文目錄收斂完備)
+> 最新更新日期：2026-08-24　｜　當前進度：95% (P3-1 Context Handoff 實作完成，UI/OpenLoops 互動全面優化，P5 主動秘書 AI 架構確立)
 > 本文件記錄 OmniContext 從 0 到 1 的缺陷修復歷程、已完成之架構改造與未來的維運與延伸規劃。
 
 ---
@@ -160,17 +160,24 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 ---
 
-## 4. P3：記憶層（最高優先）
+## 4. P3：記憶層（進行中：95%）
 
 > 目標：讓 236 萬字元從「存著」變成「用得到」。**不需要任何新的採集器。**
 
-### P3-1 專案接續 Context Handoff（建議首先實作）
+### ✅ P3-1 專案接續 Context Handoff（已完成）
 
-- 新增 `python main.py resume <專案>`，產出可直接貼進任何 AI session 的接續 prompt：
-  這個專案在做什麼、上次做到哪、未結事項、近期關鍵決策。
-- **不需 embedding**，用現有 `project_states` + `open_loops` + 最近 N 筆對話即可組出。
-- 解決每天在不同 AI 之間重複交代背景的成本，半天內可驗證方向。
-- 驗收：對任一活躍專案執行後，產出的 prompt 貼進新 session 即可無縫接續，無需人工補充。
+- **多維度自動提煉引擎 (`core/handoff_engine.py`)**：
+  - 自動彙整專案基本資訊、閒置天數、本機絕對路徑、GitHub 倉庫與 PR 清單。
+  - 提取最後活躍時間、動作摘要、未結事項（Open Loops）、最近 5 筆 Git Commits (`+insertions/-deletions`) 與關鍵檔案。
+  - 智能過濾 CLI 雜訊，提取最近 3~5 輪真實問答結論與歷史決策脈絡，組裝成各主流 AI 即開即用的結構化 Prompt。
+- **CLI 終端指令指南 (`python main.py resume`)**：
+  - `python main.py resume`（預設最活躍專案）或 `python main.py resume <專案名稱>`。
+  - 支援 `-c` / `--copy`（自動寫入 Windows 剪貼簿）、`--turns N`（指定歷史輪數）與 `--json`。
+- **Web UI 一鍵無縫接續**：
+  - 頂部 `RESUME HERE` 與各專案展開卡片加入 `📋 複製接續 Prompt` 按鈕，點擊彈出 Toast 提示並寫入剪貼簿。
+  - 專案清單支援「60 天活躍過濾與展開更多（Show More）」、右側欄「DATA TRUST 可收摺置頂」、「Open Loops 點擊跳轉對焦專案與獨立打勾結案」。
+
+---
 
 ### P3-2 本機語意檢索索引
 
@@ -210,24 +217,69 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 ---
 
-## 6. P5：效率工具層
+## 6. P5：主動秘書 AI 與自主執行架構 (Proactive AI Secretary & Autonomous Worker)
 
-1. **`STATUS.yaml` 自動維護**：全域規則要求每個專案都需具備，49 個 repo 手動維護不可行。
-   系統已知各專案最後活動與進度線索，可自動起草、使用者確認。
-2. **停滯 PR 與分支提醒**：GitHub 資料已在庫中（57 repos / 266 PRs），只差把
-   「此 PR 已開啟 12 天無進展」推送到眼前。
-3. **週報與月報 rollup**：日報是原料，週報才是可交付成果（研究進度、投稿追蹤）。
-4. **實體抽取與知識圖譜**：從對話抽出人名、論文、概念、決策並連成圖。
-   此為 MSG-IRAG 研究方法的真實應用場景，可同時產出論文素材。
+> 核心目標：從「被動記錄與定時摘要」躍升為「主動感知狀態 ➔ 預判前瞻需求 ➔ 提出行動提案 ➔ 一鍵授權背景自主作業」。
+
+```
+[ OmniContext 全景事件流 (Git / 檔案 / 跨平台 AI / 視窗) ]
+                        ↓
+         [ 主動情境與意圖推論引擎 (Evaluator) ]
+         (工作段落停頓、專案切換、未結事項逾時、早晚時段觸發)
+                        ↓
+            [ 主動秘書提案 (Action Proposals) ]
+          ↗                                   ↖
+[ Web 儀表板 秘書建議卡片 ]               [ Telegram 即時按鈕通知 ]
+          ↘                                   ↗
+              [ 使用者點擊「✅ 批准執行」]
+                        ↓
+      [ 安全防護閘門 (3-Tier Safety Gate: L0/L1/L2) ]
+                        ↓
+         [ 背景任務調度器 (Agent Dispatcher) ]
+         ├── 調度 Claude Code CLI / Codex / Antigravity
+         ├── 執行本機 Python / Git 腳本
+         └── 呼叫學術檢索 API (arXiv / Semantic Scholar)
+                        ↓
+               [ 任務完成回報與結案存檔 ]
+```
+
+### P5-1 主動情境與意圖推論引擎 (`core/proactive_secretary.py`)
+- 監聽 SQLite WAL 事件流，在關鍵時機（工作停頓 15 分鐘、專案切換、未結事項逾時、早晨 08:30 / 晚間 22:00）觸發輕量 LLM 分析。
+- 自動生成具體的 `ActionProposal` 結構體（目標專案、情境依據、建議行動、預估風險、所需工具與執行命令）。
+- **具體場景範例**：
+  - *論文情境*：「偵測到 `AI_Papers_Auto_Claude` 新增了 3 篇文獻引用但缺少 BibTeX，是否自動檢索 DOI 並補齊文獻庫？」
+  - *代碼情境*：「偵測到 `wavePowerSimuPLC` 有 1 項未結事項已停滯 48 小時，是否為您整理現有差異並產出測試診斷腳本？」
+  - *協作情境*：「偵測到 GitHub 遠端 PR #30 已被合併，是否一鍵執行本地 fast-forward 同步？」
+
+### P5-2 三級安全防護與授權閘門 (Human-in-the-Loop Safety Gate)
+- **Level 0 (唯讀 / 分析)**：免確認自動執行（如文獻檢索、代碼靜態分析、產生 Context Handoff、快照存檔）。
+- **Level 1 (輔助操作)**：單鍵確認執行（如 Git pull 同步、整理 Markdown 筆記、格式化檔案、更新未結事項狀態）。
+- **Level 2 (高權限修改)**：需明確審閱（如修改原始碼、Git push、建立 PR、呼叫付費外部 API）。
+
+### P5-3 背景任務調度器與 Worker 執行沙盒 (`core/agent_dispatcher.py`)
+- 將 `core/handoff_engine.py` 提煉之精確 Context 作為初始 Prompt。
+- 調度本機已授權的 Agent 工具（`claude code`、`codex`、`antigravity sidecar` 或本機 Python 工具）在指定沙盒目錄執行。
+- 執行完成後自動抓取輸出結果、寫入活動日誌並回報完成狀態。
+
+### P5-4 雙向互動與遠端授權介面
+- **Web UI 秘書建議卡片**：於儀表板首頁動態呈現「🤖 秘書待辦提案」，提供 `[✅ 批准執行]`、`[✏️ 修改後執行]`、`[❌ 略過]` 操作。
+- **Telegram Bot 雙向互動**：推播提案時附帶 Inline Keyboard 互動按鈕，在外亦可一鍵批准本機秘書開始作業。
+
+### P5-5 智能秘書版晨間簡報與晚間交接
+- **晨間前瞻（08:30）**：不只總結昨日，更主動提出「今日建議焦點」、「待決策事項」與「已預備好之 Context Handoff」。
+- **晚間歸檔（22:00）**：盤點今日所有已推/未推 commits、自動歸檔未結事項、更新各專案狀態。
+
+### P5-6 `STATUS.yaml` 自動維護與週/月報 Rollup
+- 系統已知各專案最後活動與進度線索，自動起草並同步更新各 repo 之 `STATUS.yaml`。
+- 將每日摘要自動 Rollup 為週報與月報，供研究進度追蹤與投稿管理。
 
 ---
 
-## 7. P6：開源整備（在 P3 完成後再進行）
+## 7. P6：開源整備（在 P3 & P5 核心完成後進行）
 
 1. 將 `project_engine.py` 的硬編碼路徑抽成設定項。
 2. 新增 `python main.py init` 互動式引導，自動偵測本機 Agent 日誌路徑與 Git 根目錄。
-3. 建立 `pyproject.toml` 與基本測試（優先覆蓋 `is_cli_artifact`、`resolve_project_from_path`、
-   `summarize_action` 這類純函式）。
+3. 建立 `pyproject.toml` 與基本測試（優先覆蓋 `is_cli_artifact`、`resolve_project_from_path`、`summarize_action` 這類純函式）。
 4. 無 LLM 金鑰時預設走 Ollama，確保零金鑰也能完整體驗。
 5. 跨平台：視窗採集與桌面通知抽象出平台介面，Windows 以外先降級為停用而非報錯。
 
@@ -236,16 +288,19 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 ## 8. 建議執行順序
 
 ```
-P3-1 resume（半天，無需 embedding）
-  → P3-2 語意索引（半天）
-  → P3-3 omni ask（半天）
-  → P3-5 session 敘事層（一天）
-  → P5-1 STATUS.yaml 自動維護
-  → P4 收集層擇一補完
+✅ P3-1 resume（專案接續 Context Handoff 與 Web 一鍵複製 — 已完成）
+  → P3-2 語意索引（Ollama / 本機向量化）
+  → P3-3 omni ask（問自己的歷史庫）
+  → P5-1 主動情境推論與前瞻提案引擎（Proactive Proposals）
+  → P5-2 & P5-3 安全授權閘門與 Agent Dispatcher 自主執行
+  → P5-4 Telegram / Web 雙向授權按鈕
+  → P3-5 Session 敘事層
+  → P4 收集層補完
   → P6 開源整備
 ```
 
-理由：P3-1 至 P3-3 不需要任何新採集器，資料已經在庫裡卻從未被使用；
-它們同時解決原始需求（跨 AI 切換、大量專案、記不住），
-而「對自己的 AI 對話做檢索與接續」也正是本專案對外最具辨識度的能力。
+理由：
+1. **P3-1** 已證明現有 Context 能夠高質量提煉並餵給任何 AI。
+2. **P3-2 + P3-3** 賦予秘書「檢索歷史」的能力。
+3. **P5 主動秘書** 則讓系統真正從「被動工具」轉化為「主動助理」，發揮全景感知與背景調度的最大乘數效應。
 
