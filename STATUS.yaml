@@ -3,8 +3,8 @@ name_zh: OmniContext 個人全景活動追蹤系統
 category: personal_tools
 progress: 92
 status: active
-last_updated: "2026-08-23"
-next_milestone: "視窗採集器心跳日誌觀察定位靜默失效，與 Chrome MV3 擴充套件實機載入"
+last_updated: "2026-08-24"
+next_milestone: "P3 記憶層：專案接續 Context Handoff (main.py resume) 與本機語意檢索"
 technologies:
   - Python
   - FastAPI
