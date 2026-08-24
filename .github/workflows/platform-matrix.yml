@@ -1,0 +1,71 @@
+name: Platform Matrix
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-build-install:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        python: ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install test and build dependencies
+        run: python -m pip install --upgrade pip build ".[dev]"
+
+      - name: Run contract and integration tests
+        run: python -m pytest -q
+
+      - name: Compile Python sources
+        run: python -m compileall -q core exporters integrations notifiers scripts synthesizer watchers web main.py
+
+      - name: Validate Browser Extension JavaScript syntax
+        shell: pwsh
+        run: |
+          Get-ChildItem watchers/browser_extension -Recurse -Filter *.js |
+            ForEach-Object { node --check $_.FullName }
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: Verify release artifact contents
+        run: python scripts/verify_release_artifacts.py dist --receipt matrix-artifact-receipt.json
+
+      - name: Install wheel and verify writable-home runtime
+        shell: pwsh
+        run: |
+          $wheel = (Get-ChildItem dist -Filter *.whl -File | Select-Object -First 1).FullName
+          python -m pip install --force-reinstall --no-deps $wheel
+          $smokeHome = Join-Path $env:RUNNER_TEMP "omnicontext-installed-smoke"
+          $receipt = Join-Path $env:RUNNER_TEMP "omnicontext-installed-smoke.json"
+          Push-Location $env:RUNNER_TEMP
+          try {
+            python "$env:GITHUB_WORKSPACE/scripts/verify_installed_package.py" --expect-home $smokeHome --receipt $receipt
+          } finally {
+            Pop-Location
+          }
+          Copy-Item $receipt matrix-installed-receipt.json
+
+      - name: Upload matrix receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: receipts-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            matrix-artifact-receipt.json
+            matrix-installed-receipt.json

@@ -21,11 +21,35 @@ def test_mv3_background_uses_alarm_heartbeat_and_never_logs_prompt_preview():
 
 
 def test_each_content_script_reports_ready_without_logging_prompt_content():
-    for script_path in sorted((EXTENSION_DIR / "content_scripts").glob("*.js")):
+    site_scripts = [
+        EXTENSION_DIR / "content_scripts" / name
+        for name in ("chatgpt.js", "gemini.js", "claude.js", "manus.js")
+    ]
+    for script_path in site_scripts:
         source = script_path.read_text(encoding="utf-8")
-        assert "OMNICONTEXT_CONTENT_READY" in source
-        assert "OMNICONTEXT_CAPTURE_DIAGNOSTIC" in source
+        assert "platform:" in source
         assert "substring(0, 50)" not in source
+
+
+def test_shared_capture_core_scopes_submit_and_rejects_previous_response_pairing():
+    source = (EXTENSION_DIR / "content_scripts" / "capture_core.js").read_text(
+        encoding="utf-8"
+    )
+    assert "OMNICONTEXT_CONTENT_READY" in source
+    assert "OMNICONTEXT_CAPTURE_DIAGNOSTIC" in source
+    assert 'document.addEventListener("submit"' in source
+    assert "targetIsComposer(event.target)" in source
+    assert "current.count > baseline.count" in source
+    assert "current.text !== baseline.text" in source
+
+
+def test_manifest_loads_shared_core_before_each_refactored_site_script():
+    manifest = json.loads((EXTENSION_DIR / "manifest.json").read_text(encoding="utf-8"))
+    scripts_by_match = {
+        entry["matches"][0]: entry["js"] for entry in manifest["content_scripts"]
+    }
+    for host in ("https://chatgpt.com/*", "https://claude.ai/*", "https://manus.im/*"):
+        assert scripts_by_match[host][0] == "content_scripts/capture_core.js"
 
 
 def test_popup_exposes_heartbeat_and_capture_diagnostics_without_token_echo():

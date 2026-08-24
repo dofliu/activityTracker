@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import argparse
+import json
 import logging
 import secrets
 import shutil
@@ -450,6 +451,58 @@ def cmd_extension_path():
     print(extension_dir)
 
 
+def cmd_semantic_index(
+    project: Optional[str] = None,
+    rebuild: bool = False,
+    limit: Optional[int] = None,
+    as_json: bool = False,
+):
+    """P3-2：建立或增量更新本機 semantic index。"""
+    from core.semantic_index import build_semantic_index
+
+    result = build_semantic_index(project=project, rebuild=rebuild, limit=limit)
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    print(f"status: {result.get('status')}")
+    if result.get("status") == "indexed":
+        print(f"embedding_model: {result['embedding_model']}")
+        print(f"source_documents: {result['source_documents']}")
+        print(f"indexed: {result['indexed']}")
+        print(f"unchanged: {result['unchanged']}")
+        print(f"dimensions: {result['dimensions']}")
+        print(f"boundary: {result['claim_boundary']}")
+
+
+def cmd_ask(
+    question: str,
+    project: Optional[str] = None,
+    top_k: Optional[int] = None,
+    no_synthesis: bool = False,
+    as_json: bool = False,
+):
+    """P3-3：從本機 semantic evidence 回答並列出可追溯來源。"""
+    from core.semantic_index import ask_local_context
+
+    result = ask_local_context(
+        question,
+        project=project,
+        top_k=top_k,
+        synthesize=not no_synthesis,
+    )
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    print(result.get("answer") or "已完成 semantic retrieval；未啟用答案生成。")
+    print("\n來源：")
+    for item in result.get("sources", []):
+        print(
+            f"[{item['citation']}] {item['source_ref']} · "
+            f"score={item['score']:.4f} · trust={item['trust_status']}"
+        )
+    print(f"\nBoundary: {result['claim_boundary']}")
+
+
 def cmd_notify_telegram(action: str, date_str: Optional[str] = None, dry_run: bool = False):
     """測試或手動發送 Telegram 通知 (支援 --dry-run 預覽)"""
     notifier = TelegramNotifier()
@@ -653,6 +706,19 @@ def main():
     # status 指令
     subparsers.add_parser("status", help="查看當前數據庫統計與監控狀態")
 
+    index_parser = subparsers.add_parser("index", help="建立/更新本機 semantic index (P3-2)")
+    index_parser.add_argument("--project", help="只索引指定專案")
+    index_parser.add_argument("--rebuild", action="store_true", help="重建指定範圍的索引")
+    index_parser.add_argument("--limit", type=int, help="限制本次來源筆數（smoke/test 用）")
+    index_parser.add_argument("--json", action="store_true", help="輸出 JSON receipt")
+
+    ask_parser = subparsers.add_parser("ask", help="查詢本機 semantic context (P3-3)")
+    ask_parser.add_argument("question", help="要詢問的問題")
+    ask_parser.add_argument("--project", help="限制指定專案")
+    ask_parser.add_argument("--top-k", type=int, help="引用來源數量")
+    ask_parser.add_argument("--no-synthesis", action="store_true", help="只回傳 retrieval，不呼叫生成模型")
+    ask_parser.add_argument("--json", action="store_true", help="輸出 JSON")
+
     loop_parser = subparsers.add_parser("open-loop", help="複核 Open Loop lifecycle")
     loop_parser.add_argument("id", type=int, help="Open Loop ID")
     loop_parser.add_argument("status", choices=["open", "stale", "resolved", "superseded"])
@@ -717,6 +783,21 @@ def main():
         cleanup_noise_and_demo_data()
     elif args.command == "status":
         cmd_status()
+    elif args.command == "index":
+        cmd_semantic_index(
+            getattr(args, "project", None),
+            getattr(args, "rebuild", False),
+            getattr(args, "limit", None),
+            getattr(args, "json", False),
+        )
+    elif args.command == "ask":
+        cmd_ask(
+            args.question,
+            getattr(args, "project", None),
+            getattr(args, "top_k", None),
+            getattr(args, "no_synthesis", False),
+            getattr(args, "json", False),
+        )
     elif args.command == "open-loop":
         cmd_open_loop(args.id, args.status, getattr(args, "note", None))
     elif args.command == "open-loop-reconcile":

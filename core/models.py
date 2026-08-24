@@ -6,7 +6,8 @@ from sqlalchemy import (
     DateTime,
     Float,
     Index,
-    Boolean
+    Boolean,
+    LargeBinary,
 )
 from sqlalchemy.orm import declarative_base
 from .time_utils import get_local_now
@@ -185,6 +186,37 @@ class MilestoneNotificationReceipt(Base):
             "channel",
             unique=True,
         ),
+    )
+
+
+class SemanticDocument(Base):
+    """P3-2 本機 semantic index；每筆向量可追溯到原始 SQLite row。"""
+    __tablename__ = "semantic_documents"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source_type = Column(String(40), nullable=False)
+    source_id = Column(String(120), nullable=False)
+    source_ref = Column(String(1500), nullable=False)
+    source_updated_at = Column(DateTime, nullable=True, index=True)
+    project_key = Column(String(255), nullable=True, index=True)
+    title = Column(Text, nullable=False)
+    content = Column(Text, nullable=False)
+    trust_status = Column(String(50), nullable=False, default="observed")
+    content_hash = Column(String(64), nullable=False)
+    embedding_model = Column(String(120), nullable=False)
+    embedding_input_mode = Column(String(50), nullable=False, default="normalized_full")
+    embedding_dimensions = Column(Integer, nullable=False)
+    embedding = Column(LargeBinary, nullable=False)
+    indexed_at = Column(DateTime, default=get_local_now, nullable=False)
+
+    __table_args__ = (
+        Index(
+            "ux_semantic_documents_source",
+            "source_type",
+            "source_id",
+            unique=True,
+        ),
+        Index("ix_semantic_documents_model", "embedding_model"),
     )
 
 

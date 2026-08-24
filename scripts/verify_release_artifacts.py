@@ -13,6 +13,7 @@ from pathlib import Path
 
 WHEEL_REQUIRED_SUFFIXES = (
     "core/runtime_paths.py",
+    "core/semantic_index.py",
     "scripts/verify_installed_package.py",
     "web/index.html",
     "web/extension-monitor.html",
@@ -22,6 +23,7 @@ WHEEL_REQUIRED_SUFFIXES = (
     "watchers/browser_extension/popup.html",
     "watchers/browser_extension/popup.js",
     "watchers/browser_extension/content_scripts/chatgpt.js",
+    "watchers/browser_extension/content_scripts/capture_core.js",
     ".data/data/share/omnicontext/config.example.yaml",
     ".dist-info/entry_points.txt",
 )
@@ -30,6 +32,7 @@ SDIST_REQUIRED_SUFFIXES = (
     "/MANIFEST.in",
     "/config.example.yaml",
     "/core/runtime_paths.py",
+    "/core/semantic_index.py",
     "/scripts/verify_installed_package.py",
     "/web/index.html",
     "/web/extension-monitor.html",

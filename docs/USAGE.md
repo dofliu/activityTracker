@@ -1,6 +1,6 @@
 # OmniContext 使用說明
 
-> 適用版本：`1.3.0a2` Personal Alpha / P2.5 + P2.6 + verified Extension heartbeat + P6 packaging hardening
+> 適用版本：`1.3.0a3` Personal Alpha / P2.6 + P3 semantic memory + P6 cross-platform gate
 >
 > 主要驗證平台：Windows 11、Python 3.12、Chrome/Edge MV3
 
@@ -30,7 +30,7 @@ python -m pip install -r requirements.txt
 本機建置出的 Alpha wheel 可安裝為：
 
 ```powershell
-python -m pip install .\dist\omnicontext-1.3.0a2-py3-none-any.whl
+python -m pip install .\dist\omnicontext-1.3.0a3-py3-none-any.whl
 omnicontext assets-status
 ```
 
@@ -96,7 +96,7 @@ python main.py init --show-token
 ```
 
 6. 將 token 貼入 Extension popup 並儲存。
-7. 在 `chrome://extensions/`／`edge://extensions/` 按一次 Reload，讓 Extension `1.2.0` background 與 content scripts 生效。
+7. 在 `chrome://extensions/`／`edge://extensions/` 按一次 Reload，讓 Extension `1.3.0` background、shared capture core 與 content scripts 生效。
 8. popup 顯示 pairing 成功與近期 Heartbeat 後，開啟支援網站並完成一輪對話，再到 Extension Monitor 查看 `OBSERVED` 狀態。
 
 目前支援 ChatGPT、Claude.ai、Gemini 與 Manus。Monitor 顯示 ONLINE 只證明 localhost service 正常；RECENT HEARTBEAT 代表 Extension 曾以正確 token 抵達 server；CONTENT READY 代表支援網站載入過 content script；只有 OBSERVED 才代表資料庫已有真實 Browser event。任何單一狀態都不代表完整 coverage。請勿把 token 放入截圖、issue、commit 或公開日誌。
@@ -163,6 +163,23 @@ python main.py now
 python main.py resume activityTracker --copy
 ```
 
+### 建立本機 Semantic Index 並詢問歷史
+
+先確認 Ollama 已啟動且已有 `bge-m3:latest`（或在 `semantic_index.embedding_model` 指定的 model）：
+
+```powershell
+# 首次全量／日後增量；未變來源會依 content hash 跳過
+omni index --json
+
+# 只看 retrieval evidence，不執行答案生成
+omni ask "上次如何處理 SQLite rollback?" --project activityTracker --no-synthesis
+
+# 使用本機 Ollama 生成附 [S1] 引用的回答
+omni ask "activityTracker 最近有哪些可靠性改善？" --project activityTracker
+```
+
+`semantic_index.allow_remote` 預設為 `false`，embedding 與 ask generation 只接受 loopback URL。Similarity 只做 evidence ranking；CLI 的 `source_ref`、trust status 與 `embedding_input_mode` 才是回查線索，不代表來源內容已被外部驗證。
+
 ### 建立工作快照與摘要
 
 ```powershell
@@ -197,7 +214,7 @@ python main.py open-loop-reconcile
 python main.py migration-status
 ```
 
-正常結果應為 `state: up_to_date`、`schema_version: 5/5`、`pending_versions: []`。這個指令不會建立或修改 database。
+正常結果應為 `state: up_to_date`、`schema_version: 7/7`、`pending_versions: []`。這個指令不會建立或修改 database。
 
 OmniContext 啟動時會執行 append-only migration registry。既有有資料 DB 只要存在 pending version，便先依 `data_lifecycle.auto_backup_before_migration` 建立 verified online backup；migration 成功後才寫入 `schema_migrations` receipt。若偵測 checksum mismatch、history gap 或未知較新版本，服務會拒絕繼續啟動。
 
@@ -229,13 +246,13 @@ python main.py restore-drill `
 
 備份預設位於 `~/OmniContext/backups`。`restore-drill` 會以 read-only 方式開啟來源備份、還原到 OS 暫存目錄，比對 integrity、table list、schema fingerprint 與 row counts，最後刪除暫存 DB，只保存不含 row content 的 JSON receipt。它不提供 live database destination，因此不會覆蓋正式資料。
 
-Windows isolated wheel fresh/upgrade/assets smoke 已通過。自動 retention pruning、macOS/Linux matrix 與正式 production rollback rehearsal 仍屬 release gate；不要直接用檔案複製覆蓋正在執行的 SQLite database。
+Windows isolated wheel fresh/upgrade/assets smoke 與 formal package+DB rollback rehearsal 已通過。Rollback 必須同時回復相容 wheel 與 pre-migration online backup，且在服務停止後處理 `.db-wal/.db-shm`；只覆蓋 `.db` 可能讓新 WAL 重新套回。自動 retention pruning 與 macOS/Linux 真實 CI receipt 仍屬 release gate。
 
 ## 7. 平台能力
 
 | 功能 | Windows | macOS / Linux |
 |---|---|---|
-| FastAPI、SQLite、CLI log ingestion | source + wheel isolated smoke 已實測 | source-level baseline，待 CI／實機 |
+| FastAPI、SQLite、CLI log ingestion | source + wheel isolated smoke 已實測 | 3-OS workflow 已建立，待 push 後真實 CI receipt |
 | Browser Extension | Chrome/Edge Alpha | Chromium 理論可用，待實機 |
 | Window foreground collector | 支援 | 明確降級，不宣稱可用 |
 | Desktop notification | WinRT Toast／MessageBox fallback | 明確降級，待平台實作 |

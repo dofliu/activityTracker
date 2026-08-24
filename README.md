@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **目前狀態：Personal Alpha。** Windows Dashboard/API、Extension token boundary、verified heartbeat contract、P2.6 usage milestone、SQLite schema migration 5/5、wheel/sdist fresh/upgrade/assets smoke、isolated restore drill 與 52 個 contract tests 已驗證；Gemini Browser ingestion 已觀察 3 筆事件（2 筆含回應），但新版 Extension heartbeat 實機 receipt、其他網站、真實達標 Toast、正式 rollback 與 macOS/Linux matrix 尚未完成，因此不是 release-ready。
+> **目前狀態：Personal Alpha。** Windows milestone WinRT Toast E2E、schema 7/7、formal package+DB rollback、P3-2 全量本機 semantic index（4,102/4,102）與 P3-3 `omni ask` 已通過；ChatGPT 真實 DOM selectors 已修復。Claude/Manus authenticated capture 與推送後的 macOS/Linux CI matrix 仍待真實 receipt，因此尚非 release-ready。
 
 **文件入口：**[完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
 
@@ -102,6 +102,11 @@
 * 數值只代表已觀察到的前景時間，不等於生產力或實際工時；coverage ledger 尚未完成前一律標示 `partial`。
 * `http://127.0.0.1:8765/extension-monitor` 可觀察 Browser Extension 的 enabled／observed 狀態，但 token pairing 仍只能在 Extension popup 完成。
 
+### 8. 🧠 本機 Semantic Index 與 `omni ask`（P3-2 / P3-3 Alpha）
+* 以 loopback Ollama `bge-m3` 將 AI turns、Git commits、file activity metadata、Open Loops 與 Project State 建立 1024 維本機索引，資料不送至 cloud provider。
+* `content_hash + embedding_model` 增量更新；每筆保留原始 SQLite `source_ref`、project、timestamp、trust status 與 embedding input 降級模式。
+* `omni ask` 可先 retrieval-only，也可由本機 Ollama 生成含 `[S1]` 引用的答案；similarity 不是來源真實性或 coverage 證明。
+
 ---
 
 ## 🚀 快速開始
@@ -125,7 +130,7 @@ python main.py init --watch "/your/project/root"
 若使用已建置的 Alpha wheel：
 
 ```console
-python -m pip install omnicontext-1.3.0a2-py3-none-any.whl
+python -m pip install omnicontext-1.3.0a3-py3-none-any.whl
 omnicontext init --watch "/your/project/root"
 omnicontext assets-status
 ```
@@ -180,8 +185,10 @@ OmniContext 支援完整的終端命令列操作：
 | `python main.py migration-status` | 唯讀查看目前／最新 schema version、pending 與相容性 | `python main.py migration-status` |
 | `python main.py assets-status` | 檢查 packaged config/Web/Extension assets | `python main.py assets-status` |
 | `python main.py extension-path` | 顯示 Chrome/Edge Load unpacked 目錄 | `python main.py extension-path` |
+| `python main.py index` | 建立／增量更新本機 semantic index | `python main.py index --json` |
+| `python main.py ask` | 查詢自己的跨 AI／Repository 歷史並列出來源 | `python main.py ask "上次如何處理 rollback?" --project activityTracker` |
 
-Installed wheel 可將表中的 `python main.py` 改為 `omnicontext`。
+Installed wheel 可將表中的 `python main.py` 改為 `omnicontext` 或較短的 `omni`。
 
 ---
 
@@ -287,6 +294,7 @@ activityTracker/
 │   ├── platform_services.py        # Windows/macOS/Linux argv 型 OS 整合
 │   ├── data_lifecycle.py           # SQLite online backup 與 integrity receipt
 │   ├── project_engine.py           # 專案智能歸戶、多檔案聚合與未結事項引擎
+│   ├── semantic_index.py           # 本機 embeddings、provenance retrieval 與 omni ask
 │   ├── fs_utils.py                 # 本機原生檔案總管/瀏覽對話框工具
 │   └── time_utils.py               # 統一本地時區解析工具
 │
@@ -357,7 +365,7 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 | **P3** | 記憶層 | ✅ P3-1 Context Handoff；P3-2 本機語意檢索、P3-3 `omni ask`、重複工作偵測與 Session 敘事層待 P2.5 gate |
 | **P4** | 收集層補完 | 瀏覽器閱讀內容、行事曆與會議、終端機指令歷史、未 commit 的工作狀態 |
 | **P5** | 主動秘書 AI 與自主執行 | 主動情境推論與前瞻提案、三級安全守門員（L0/L1/L2）、Agent Dispatcher 調度自主執行、Telegram/Web 一鍵批准、晨間前瞻與晚間交接、`STATUS.yaml` 自動維護 |
-| **P6** | 開源整備 | `1.3.0a2` wheel/sdist contents、fresh install、`1.2.0 → 1.3.0a2` upgrade、assets 與 writable application home 已在 Windows 隔離環境通過；macOS/Linux matrix 與公開 release gate 待完成 |
+| **P6** | 開源整備 | `1.3.0a2` packaging baseline 與 formal rollback 已在 Windows 隔離環境通過；`1.3.0a3` candidate 與 3-OS GitHub Actions matrix 待完成 |
 
 > 收集越多不等於越有用：檔案事件曾從 3,575 筆噪音 → 4,327 筆 → 收斂至 789 筆。
 > 新增採集來源必須先通過「能否改變決策」的檢驗。
@@ -370,7 +378,7 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 
 * 部分歸戶邏輯仍硬編碼專案根路徑（`core/project_engine.py`）。
 * 視窗採集、桌面通知與開機排程僅支援 **Windows**。
-* `pyproject.toml`、schema migration 5/5 與 Windows wheel/sdist install/upgrade/assets 驗收已完成；macOS/Linux CI／實機尚未完成。
+* `pyproject.toml`、schema migration 7/7、Windows wheel/sdist install/upgrade/assets 與 formal rollback 已完成；macOS/Linux CI receipt 尚未完成。
 * `main.py init --watch <path>` 已取代手動複製設定；複雜來源仍需於 `config.yaml` 調整。
 
 剩餘項目將於 **P6 開源整備** 階段持續處理。

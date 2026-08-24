@@ -1,13 +1,13 @@
 name: OmniContext Activity Tracker
 name_zh: OmniContext 個人全景活動追蹤系統
 category: personal_tools
-progress: 75
+progress: 86
 progress_basis: "依 P0-P6 加權里程碑估計；不是 release readiness 百分比"
 status: active_hardening
 release_ready: false
 last_updated: "2026-08-25"
-current_phase: "P2.5 hardening + P2.6 Usage/Milestone + Verified Extension Bridge + P6 Packaging Alpha"
-next_milestone: "取得 Extension 1.2.0 live heartbeat、補 ChatGPT/Claude/Manus、Toast evidence、formal rollback 與跨平台 matrix"
+current_phase: "P2.6 Usage/Milestone + P3 Semantic Memory Alpha + P6 Cross-platform Gate"
+next_milestone: "取得 Extension 1.3.0 live heartbeat 與 Claude/Manus authenticated capture，完成 GitHub Actions 3-OS matrix receipts"
 planned_features:
   - id: FEATURE-001
     name: "每日主要介面使用時間與里程碑教練"
@@ -18,10 +18,10 @@ planned_features:
     specification: "docs/FEATURE-001-daily-interface-usage-milestone-coach.md"
   - id: FEATURE-002
     name: "跨 AI、應用與 Repository 的個人工作脈絡層"
-    stage: implemented_foundation
+    stage: implemented_alpha
     priority: must_have
     scope: "將多 AI sessions、browser events、local files、Git/GitHub、foreground activity 與 Open Loops 歸入 canonical project timeline，產生 provider-neutral Context Handoff"
-    trust_boundary: "不得宣稱完整匯入所有 provider history；每個來源保留 provenance、response status 與 coverage；semantic index 尚未完成"
+    trust_boundary: "不得宣稱完整匯入所有 provider history；每個來源保留 provenance、response status、embedding input mode 與 coverage；similarity 不代表真實性"
     specification: "docs/PRODUCT_POSITIONING.md"
 technologies:
   - Python
@@ -45,10 +45,10 @@ documentation:
 description: "Local-first, provider-neutral personal work-context layer spanning AI sessions, applications, repositories, files, Git/GitHub, window focus and open loops."
 description_zh: "本機優先、provider-neutral 的個人工作脈絡層；跨 AI、應用與 Repository 統整事件，使用 cloud LLM 摘要時才將選定脈絡傳送至該 provider。"
 evidence_snapshot:
-  captured_at: "2026-08-25 00:21 Asia/Taipei"
-  ai_events_total: 2436
-  ai_responses_nonempty: 2070
-  ai_response_final_candidates: 1908
+  captured_at: "2026-08-25 01:21 Asia/Taipei"
+  ai_events_total: 2437
+  ai_responses_nonempty: 2071
+  ai_response_final_candidates: 1909
   ai_response_partial: 65
   ai_response_missing: 126
   ai_rows_with_legacy_status: 337
@@ -58,33 +58,33 @@ evidence_snapshot:
   browser_ai_events_with_response: 2
   browser_platforms_observed: [gemini]
   file_events: 1442
-  git_events: 141
-  window_events: 781
+  git_events: 142
+  window_events: 854
   github_repos: 57
   github_prs: 266
   ingestion_checkpoints: 602
   ingestion_checkpoint_errors: 0
   latest_verified_backup:
-    path: "~/OmniContext/backups/omni_context-20260825-002030-592282.db"
+    path: "~/OmniContext/backups/omni_context-20260825-012059-101380.db"
     integrity: ok
-    tables: 13
-    size_bytes: 10612736
-    sha256: "bab7a05143af569af1f2d106c9e93c14dce45f3f3e3489a8ab5a74a60ced4812"
+    tables: 14
+    size_bytes: 35880960
+    sha256: "a78c922bf79515a20c665c756cd6854aa485b869b4dd1d36ccfe22af804616c9"
   latest_restore_drill:
-    captured_at: "2026-08-25 00:20 Asia/Taipei"
-    source_backup: "~/OmniContext/backups/omni_context-20260825-002030-592282.db"
-    receipt: "~/OmniContext/backups/restore_drills/restore-drill-20260825-002036-184268.json"
+    captured_at: "2026-08-25 01:21 Asia/Taipei"
+    source_backup: "~/OmniContext/backups/omni_context-20260825-012059-101380.db"
+    receipt: "~/OmniContext/backups/restore_drills/restore-drill-20260825-012101-385828.json"
     status: passed
     integrity: ok
     schema_match: true
     row_counts_match: true
     temporary_copy_retained: false
   schema_migration:
-    captured_at: "2026-08-25 00:19 Asia/Taipei"
+    captured_at: "2026-08-25 01:15 Asia/Taipei"
     state: up_to_date
-    schema_version: 5
-    latest_version: 5
-    applied_versions: [1, 2, 3, 4, 5]
+    schema_version: 7
+    latest_version: 7
+    applied_versions: [1, 2, 3, 4, 5, 6, 7]
     pending_versions: []
     isolated_backup_copy_upgrade: passed
     isolated_copy_user_table_row_counts_match: true
@@ -108,8 +108,9 @@ evidence_snapshot:
   runtime_findings:
     - "重啟後 file/git/window/agent_log collectors 均回報 healthy"
     - "runtime file watcher 已同時納入 Project_CodingSimulation 與學術目錄"
-    - "Gemini Browser extension 已觀察 3 筆 event，其中 2 筆具非空 response；ChatGPT/Claude/Manus 尚未逐站驗證"
-    - "Extension 1.2.0 heartbeat contract 已通過，但 live heartbeat table 仍為 0；需重新載入 unpacked Extension，不能以舊 event 代表目前在線"
+    - "Gemini Browser extension 已觀察 3 筆 event／2 筆 response；ChatGPT 已完成 live DOM selector probe，但該測試瀏覽器未載入 OmniContext Extension，不能等同 DB capture receipt"
+    - "ChatGPT 真實繁中 DOM prompt/response selector 已驗證並修復 send click；Claude/Manus 測試瀏覽器停在登入頁，不能宣稱 authenticated capture"
+    - "Extension 1.3.0 heartbeat contract 已通過，但 live heartbeat table 仍為 0；需重新載入 unpacked Extension，不能以舊 event 代表目前在線"
   p2_6_evidence:
     localhost_monitor: passed_dashboard_and_extension_monitor_smoke
     usage_date: "2026-08-25"
@@ -135,18 +136,49 @@ evidence_snapshot:
     milestone_receipts: 0
     milestone_dry_run: not_reached
     visual_qa: passed_no_horizontal_overflow_and_no_console_errors
+    windows_milestone_toast_e2e:
+      status: passed
+      transport: winrt_toast
+      os_return_code: 0
+      evaluator: notified
+      database_receipt: sent
+      duplicate_evaluation: already_notified
+      isolated_from_live_database: true
+  semantic_memory_evidence:
+    schema_version: 7_of_7
+    embedding_provider: ollama_loopback
+    embedding_model: bge-m3:latest
+    dimensions: 1024
+    source_documents: 4102
+    indexed_documents: 4102
+    failures: 0
+    embedding_input_modes:
+      legacy_raw_full: 3901
+      legacy_raw_truncated: 198
+      ascii_fallback: 3
+    incremental_rerun: indexed_0_unchanged_4102
+    retrieval_only_smoke: passed_with_source_refs
+    local_answer_smoke: passed_llama3_1_8b_with_citations
+    claim_boundary: "Similarity ranks local evidence; it does not validate source truth, semantic correctness or coverage."
+  formal_rollback_evidence:
+    status: passed
+    path: "1.3.0a1/schema4 -> 1.3.0a2/schema5 -> 1.3.0a1/schema4"
+    package_and_database_rollback: true
+    database_sha_match: true
+    sentinel_row_preserved: true
+    wal_shm_cleanup_required: true
   packaging_evidence:
     captured_at: "2026-08-25 00:27 Asia/Taipei"
-    candidate_version: 1.3.0a2
+    candidate_version: 1.3.0a3
     baseline_1_2_0_wheel_runtime_assets: missing
     pep517_wheel_sdist_build: passed
     artifact_content_receipt: passed
     artifact_hashes: retained_in_external_os_temp_receipt
     artifact_privacy_exclusions: passed_no_config_database_or_local_secrets
-    fresh_wheel_install: passed_isolated_windows_venv
+    fresh_wheel_install: passed_1.3.0a3_isolated_windows_venv
     upgrade_path: passed_1_2_0_to_1_3_0a2_with_pip_local_version_receipt
     installed_application_home_outside_package: true
-    installed_schema_migration: up_to_date_5_of_5
+    installed_schema_migration: up_to_date_7_of_7
     installed_http_endpoints:
       health: 200
       dashboard: 200
@@ -158,20 +190,20 @@ quality_gates:
   ingestion_provenance: passed_local_rescan_601_sources
   response_finalization: passed_as_final_candidate_contract_not_semantic_correctness
   open_loop_lifecycle: passed_local_db_reconciliation
-  automated_tests: passed_52_contract_tests
+  automated_tests: passed_59_contract_tests
   usage_milestone_alpha: passed_contract_and_windows_dashboard_api_smoke
   documentation_current: passed_readme_usage_roadmap_status_sync
   backup_lifecycle: passed_online_backup_and_isolated_restore_drill
   versioned_migration: passed_fresh_legacy_backup_copy_and_live_upgrade_5_of_5
   packaging_windows_alpha: passed_artifacts_fresh_upgrade_assets_and_writable_home
   portability_baseline: implemented_source_level_release_matrix_pending
-  semantic_memory: pending
+  semantic_memory: passed_local_alpha_4102_of_4102
   autonomous_execution: blocked_by_p2_5
 known_blockers:
-  - "Gemini Browser ingestion 已觀察 3 筆 event／2 筆 response，但 Extension 1.2.0 live heartbeat 與 ChatGPT/Claude/Manus 尚未驗證"
-  - "P2.6 尚無 continuous coverage ledger，coverage 維持 partial；真實達標 Windows Toast 尚未觸發"
+  - "Gemini Browser ingestion 已觀察 3 筆 event／2 筆 response，ChatGPT live selectors 已驗證；Extension 1.3.0 live heartbeat 與 Claude/Manus authenticated capture 尚未完成"
+  - "P2.6 尚無 continuous coverage ledger，coverage 維持 partial；Windows milestone Toast E2E 已通過但不代表全天 coverage"
   - "337 筆 legacy AI rows 無 response_status，僅保留為歷史資料，不進入 canonical synthesis/handoff 結論"
-  - "Windows wheel/sdist install/upgrade/assets 已驗證，但 formal production rollback rehearsal 與 public publish/tag 尚未執行"
-  - "macOS/Linux 尚未執行實機或 CI matrix；Windows-only window/notification 功能目前採明確降級"
+  - "Windows wheel/sdist install/upgrade/assets 與 formal rollback 已驗證；1.3.0a3 candidate packaging、public publish/tag 尚未執行"
+  - "Windows/macOS/Linux workflow 已建立但尚未推送取得真實 CI receipt；Windows-only window/notification 功能目前採明確降級"
   - "project_engine 仍含個人根路徑 fallback，尚未完全 config-driven"
-key_metrics: "P0-P2 可日常運行，P3-1 已以 canonical turn contract 強化；P2.5 security/data/lifecycle、SQLite migration 5/5、P2.6 usage/milestone、verified Extension heartbeat contract 與 Windows P6 packaging alpha 已落地並通過 52 tests。Gemini Browser ingestion 已有 3 筆 event／2 筆 response；wheel/sdist contents、fresh/1.2.0 upgrade、writable home、pre/post-migration backups 與 restore drills 均通過。Live heartbeat、其餘網站、真實達標 Toast、formal rollback 與 macOS/Linux matrix 未完成；整體仍非 release-ready，P5 autonomous executor 維持 blocked。"
+key_metrics: "P0-P2 可日常運行；P3-1 handoff、P3-2 semantic index 4,102/4,102、P3-3 omni ask、SQLite schema 7/7、Windows Toast E2E 與 formal package+DB rollback 已通過。Gemini Browser 有 3 筆 event／2 筆 response，ChatGPT live selectors 已修復。Extension 1.3.0 heartbeat、Claude/Manus authenticated capture、1.3.0a3 packaging 與 3-OS CI receipts 尚未完成；整體仍非 release-ready，P5 autonomous executor 維持 blocked。"

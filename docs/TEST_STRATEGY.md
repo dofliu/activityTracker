@@ -69,7 +69,7 @@ python main.py extension-path
 
 ### Installed package
 
-- Fresh wheel install 必須在 package 外建立 writable application home、config 與 schema `5/5` database。
+- Fresh wheel install 必須在 package 外建立 writable application home、config 與 schema `7/7` database。
 - 上一版 wheel upgrade 必須確實替換 distribution version，保留 package 外的 data boundary。
 - Health、Dashboard、Extension Monitor 與 `/static/app.js` 必須回傳 HTTP 200。
 - `assets-status` 與 `extension-path` 必須在 source checkout／installed wheel 都可用。
@@ -100,3 +100,16 @@ python main.py extension-path
 - popup 分開顯示 service health 與 token pairing status。
 - MV3 background 必須使用 `chrome.alarms`，每個 content script 回報 ready，console 不得輸出 Prompt preview。
 - Windows live API 與 dashboard render smoke；macOS/Linux 驗證 `unavailable` graceful degradation。
+
+## P3 Semantic Index / `omni ask` Matrix
+
+- Fresh/legacy DB 必須到 schema 7/7；`semantic_documents` source identity 唯一且 embedding input mode 可追溯。
+- AI response 只有 `final_candidate` 可進入 response evidence；partial/legacy response 不得升格。
+- Incremental rerun 必須以 content hash/model 跳過未變來源；成功 batch 原子提交，中斷後可續跑。
+- Ollama URL 預設 loopback-only；remote URL 在 `allow_remote=false` 時 fail-closed。
+- Retrieval 每筆保留 SQLite `source_ref`、project、timestamp、trust、score；similarity 不作 truth/coverage claim。
+- 真實 Windows Alpha receipt：`bge-m3` 1024 維、4,102/4,102、3 筆可見 `ascii_fallback`、第二次 `0 changed / 4102 unchanged`；`llama3.1:8b` 回答含 `[S1]` citations。
+
+## Platform CI Matrix
+
+`.github/workflows/platform-matrix.yml` 在 Windows、Ubuntu、macOS 的 Python 3.10/3.12 執行 pytest、compileall、Extension JS syntax、build、artifact privacy/content 與 installed writable-home/API/assets smoke。Workflow YAML 存在不等於通過；必須保存 GitHub Actions run/job 結果。

@@ -144,6 +144,18 @@ synthesizer:
   ollama:
     base_url: http://localhost:11434
     model: llama3.1:8b
+
+semantic_index:
+  enabled: true
+  provider: ollama
+  base_url: http://127.0.0.1:11434
+  embedding_model: bge-m3:latest
+  batch_size: 8
+  max_document_chars: 6000
+  embedding_input_chars: 3000
+  default_top_k: 6
+  allow_remote: false
+
 notifiers:
   desktop:
     enabled: true

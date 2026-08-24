@@ -169,6 +169,62 @@ def _migration_005_browser_extension_heartbeat(connection: Connection) -> None:
     ))
 
 
+def _migration_006_local_semantic_index(connection: Connection) -> None:
+    connection.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS semantic_documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_type VARCHAR(40) NOT NULL,
+            source_id VARCHAR(120) NOT NULL,
+            source_ref VARCHAR(1500) NOT NULL,
+            source_updated_at DATETIME,
+            project_key VARCHAR(255),
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            trust_status VARCHAR(50) NOT NULL DEFAULT 'observed',
+            content_hash VARCHAR(64) NOT NULL,
+            embedding_model VARCHAR(120) NOT NULL,
+            embedding_dimensions INTEGER NOT NULL,
+            embedding BLOB NOT NULL,
+            indexed_at DATETIME NOT NULL
+        );
+        """
+    ))
+    connection.execute(text(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_semantic_documents_source "
+        "ON semantic_documents(source_type, source_id);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_semantic_documents_source_updated_at "
+        "ON semantic_documents(source_updated_at);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_semantic_documents_project_key "
+        "ON semantic_documents(project_key);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_semantic_documents_model "
+        "ON semantic_documents(embedding_model);"
+    ))
+
+
+def _migration_007_embedding_input_provenance(connection: Connection) -> None:
+    _add_columns_if_missing(
+        connection,
+        "semantic_documents",
+        {
+            "embedding_input_mode": "VARCHAR(50) NOT NULL DEFAULT 'legacy_unrecorded'",
+        },
+    )
+    if _table_exists(connection, "semantic_documents"):
+        connection.execute(text(
+            "UPDATE semantic_documents SET embedding_input_mode = "
+            "CASE WHEN LENGTH(content) <= 3000 THEN 'legacy_raw_full' "
+            "ELSE 'legacy_raw_truncated' END "
+            "WHERE embedding_input_mode = 'legacy_unrecorded'"
+        ))
+
+
 MIGRATIONS: tuple[MigrationDefinition, ...] = (
     MigrationDefinition(
         1,
@@ -202,6 +258,20 @@ MIGRATIONS: tuple[MigrationDefinition, ...] = (
         "browser_extension_heartbeats:create;"
         "indexes:unique_instance,last_seen;privacy:no_url_no_prompt_no_token",
         _migration_005_browser_extension_heartbeat,
+    ),
+    MigrationDefinition(
+        6,
+        "local_semantic_index",
+        "semantic_documents:create;indexes:unique_source,updated,project,model;"
+        "embedding:local_float32_blob;provenance:source_ref_trust_status",
+        _migration_006_local_semantic_index,
+    ),
+    MigrationDefinition(
+        7,
+        "embedding_input_provenance",
+        "semantic_documents:add:embedding_input_mode;"
+        "values:normalized_full,normalized_truncated,ascii_fallback,metadata_only,legacy_raw",
+        _migration_007_embedding_input_provenance,
     ),
 )
 

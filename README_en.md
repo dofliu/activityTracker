@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **Current status: Personal Alpha.** Windows Dashboard/API, the Extension token boundary, the verified-heartbeat contract, P2.6 usage milestones, SQLite schema migration 5/5, wheel/sdist fresh/upgrade/assets smoke, an isolated restore drill, and 52 contract tests are verified. Gemini browser ingestion has produced 3 events (2 with responses), while a live receipt from the new Extension heartbeat, the other supported sites, a real milestone Toast, a formal rollback rehearsal, and the macOS/Linux matrix remain incomplete; this is not release-ready.
+> **Current status: Personal Alpha.** A real Windows milestone WinRT Toast E2E, schema 7/7, formal package+database rollback, a full local semantic index (4,102/4,102), and P3-3 `omni ask` have passed. ChatGPT's live DOM selectors were repaired; authenticated Claude/Manus captures and the post-push macOS/Linux CI receipts remain outstanding, so this is not release-ready.
 
 **Documentation:** [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
 
@@ -95,6 +95,11 @@ It is purpose-built to answer three fundamental questions at any moment:
 * Foreground time is not productivity or actual work time. Coverage remains `partial` until a continuous coverage ledger exists.
 * `http://127.0.0.1:8765/extension-monitor` exposes enabled/observed ingestion state, while token pairing remains inside the Extension popup.
 
+### 8. 🧠 Local Semantic Index and `omni ask` (P3-2 / P3-3 Alpha)
+* Loopback Ollama `bge-m3` indexes AI turns, Git commits, file-activity metadata, Open Loops, and Project State without sending the index to a cloud provider.
+* Incremental updates use content hashes and retain SQLite source references, project, time, trust status, and embedding-input degradation provenance.
+* `omni ask` supports retrieval-only mode or a local Ollama answer with `[S1]` citations. Similarity is not source validation or proof of coverage.
+
 ---
 
 ## 🚀 Getting Started
@@ -118,7 +123,7 @@ python main.py init --watch "/your/project/root"
 For a locally built Alpha wheel:
 
 ```bash
-python -m pip install omnicontext-1.3.0a2-py3-none-any.whl
+python -m pip install omnicontext-1.3.0a3-py3-none-any.whl
 omnicontext init --watch "/your/project/root"
 omnicontext assets-status
 ```
@@ -168,8 +173,10 @@ For Extension pairing, milestone configuration, backups, and troubleshooting, se
 | `python main.py migration-status` | Read current/latest schema versions, pending steps, and compatibility | `python main.py migration-status` |
 | `python main.py assets-status` | Verify packaged config/Web/Extension assets | `python main.py assets-status` |
 | `python main.py extension-path` | Print the Chrome/Edge Load unpacked directory | `python main.py extension-path` |
+| `python main.py index` | Build or incrementally update the local semantic index | `python main.py index --json` |
+| `python main.py ask` | Ask cross-AI/repository history with traceable sources | `python main.py ask "How did rollback work?" --project activityTracker` |
 
-With an installed wheel, replace `python main.py` with `omnicontext`.
+With an installed wheel, replace `python main.py` with `omnicontext` or `omni`.
 
 ---
 
@@ -270,6 +277,7 @@ activityTracker/
 │   ├── platform_services.py        # Cross-platform argv-based OS integration
 │   ├── data_lifecycle.py           # SQLite online backup and integrity receipt
 │   ├── project_engine.py           # Canonical project resolver & open loop engine
+│   ├── semantic_index.py           # Local embeddings, provenance retrieval, and omni ask
 │   ├── fs_utils.py                 # Native Windows folder picker utilities
 │   └── time_utils.py               # Unified timezone helpers
 │

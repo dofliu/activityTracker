@@ -1,6 +1,6 @@
 # OmniContext 開發規劃與成果紀錄 — P0 ~ P6
 
-> 最新更新日期：2026-08-25　｜　目前狀態：**personal alpha / P2.5 hardening + P2.6 usage milestone alpha**。P3-1 已完成；P2.5 local contracts、P2.6 alpha、verified Extension heartbeat 與 P6 source baseline 已落地，但 release matrix 尚未通過，整體不具 release-ready 或 autonomous-ready 資格。
+> 最新更新日期：2026-08-25　｜　目前狀態：**personal alpha / P2.6 + P3 semantic memory alpha**。P3-1、P3-2、P3-3、Windows Toast E2E 與 formal rollback 已完成；ChatGPT live selectors 已修復。Claude/Manus authenticated capture 與 Windows/macOS/Linux CI 真實 receipts 尚未完成，整體不具 release-ready 或 autonomous-ready 資格。
 > 本文件記錄 OmniContext 從 0 到 1 的缺陷修復歷程、已完成之架構改造與未來的維運與延伸規劃。
 
 ---
@@ -107,8 +107,8 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 ## 2. 維運清單 (Remaining Maintenance)
 
 1. **Chrome MV3 擴充套件實機載入**：
-   - 於 Chrome Developer Mode 載入 `watchers/browser_extension`，測試 claude.ai / chatgpt 網頁端對話捕捉。
-   - 目前資料庫中 `platform` 尚無 gemini / chatgpt / claude / manus 任何一筆，此路徑未經實機驗證。
+   - Gemini 已有 3 筆 Browser events／2 筆 response；ChatGPT 已完成 2026-08-25 真實 DOM prompt/response selector probe 並修復繁中 send click。
+   - Claude.ai／Manus authenticated capture 與 Extension 1.3.0 live heartbeat 仍待瀏覽器登入、Reload 與逐站 receipt。
 2. **自動開機排程佈署 (`scripts/install_autostart.ps1`)**：
    - 註冊 Windows Task Scheduler 工作排程，支援背景靜默啟動（`pythonw.exe`）。
 3. **視窗採集器持續觀察**：
@@ -120,7 +120,7 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 
 > Architecture decision：在語意記憶與自主執行之前，先讓「來源、turn、回應、待辦、權限與執行平台」都有明確契約。P5 在本節所有 release blockers 關閉前維持 blocked。
 
-**2026-08-25 實作結果：**52 個 contract tests 通過；append-only SQLite migration registry 已完成 fresh/legacy/idempotent/checksum/newer-version/failure/create-all-bypass gates。Live DB 已由 4/5 升級至 5/5，pre/post backups 及 restore drills 通過。Extension `1.2.0` 新增 token-authenticated heartbeat receipt、MV3 `chrome.alarms`、content-ready 與非敏感 error code；Prompt preview 已從 console 移除。Live DB 已觀察到 3 筆 Gemini Browser events，其中 2 筆具非空 response，證明至少一條真實 browser ingestion path 可運作；新版 heartbeat receipt 仍須由瀏覽器重新載入 Extension 後取得，其他網站 coverage、真實 Toast、formal rollback rehearsal 與 macOS/Linux matrix尚未通過。
+**2026-08-25 實作結果：**append-only SQLite registry 已擴充至 7/7；Windows WinRT milestone Toast E2E 與 `1.3.0a1/schema4 → 1.3.0a2/schema5 → rollback` rehearsal 通過。Extension `1.3.0` 採 shared capture core，加入 localized click、form submit 與 response baseline；ChatGPT live DOM probe 通過，Claude/Manus authenticated receipt 仍待完成。P3-2/P3-3 已進入 Alpha；跨平台 workflow 已建立，尚待推送後真實 CI。
 
 ### P2.5-S1 本機 API 安全邊界
 
@@ -157,19 +157,19 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 - `config.example.yaml` 不含個人絕對路徑；路徑支援 `~` 與環境變數展開。
 - 建立 `pyproject.toml`、pytest 基線與 CI-ready test commands；測試從 P6 提前到 P2.5。
 - `main.py init --watch <path>` 已可產生本機 `config.yaml`、必要目錄與 extension token；Agent/Git 自動偵測與 notification capability probe 尚待完成。
-- Versioned migration 已採 1→4 append-only registry；checksum mismatch、history gap 或未知較新版本會 fail-closed，既有有資料 DB 升級前自動 online backup。
+- Versioned migration 已採 1→7 append-only registry；checksum mismatch、history gap 或未知較新版本會 fail-closed，既有有資料 DB 升級前自動 online backup。
 
 ### P2.5 Release Gate
 
 - [x] Security contract tests 與 Windows live Origin/token probe 通過。
 - [x] Transcript pairing / stable turn key / malformed JSONL / checkpoint fail-closed tests 通過。
 - [x] Open Loop lifecycle contract tests 通過，現有過時與重複事項完成一次人工複核。
-- [ ] Windows 實機 smoke test 通過；macOS/Linux 至少完成 import、config、CLI 降級測試。
+- [ ] Windows 實機 smoke 已通過；macOS/Linux matrix workflow 已建立，待 push 後取得真實 receipt。
 - [x] README 隱私聲明明確區分 local storage、cloud LLM processing 與 optional integrations。
 - [x] SQLite online backup 產生 integrity 與 SHA-256 evidence；isolated restore drill 通過 schema／row-count parity 並保存 JSON receipt。
-- [x] Versioned migration fresh/legacy/live upgrade 到 5/5；pre/post backups 與 restore drill 均通過。
+- [x] Versioned migration fresh/legacy/live upgrade到 7/7；pre/post backups、restore drill 與 formal package+DB rollback 均通過。
 - [x] Windows wheel/sdist contents、fresh install、1.2.0 upgrade、assets、writable-home 與 privacy exclusions 通過。
-- [ ] 無 High/Critical blocker 後，才可開始 P3-2；P5 executor 另需獨立安全 gate。
+- [x] P3-2/P3-3 local-only Alpha 已完成；P5 executor 仍需獨立安全 gate。
 
 ---
 
@@ -177,7 +177,7 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 
 > 需求來源：2026-08-24 使用者臨時需求。完整規格見 [`docs/FEATURE-001-daily-interface-usage-milestone-coach.md`](docs/FEATURE-001-daily-interface-usage-milestone-coach.md)。本項為 **MoSCoW: Should Have**，不得取代 P2.5 的資料可靠性與 release blockers。
 
-**2026-08-24 實作證據：**localhost 主頁與 `/extension-monitor` 已完成 live smoke；usage API 回傳 11 個當日介面、coverage `partial`，Extension token pairing probe 通過且未洩漏 token。內建 scheduler 已實機回報 usage milestone、每日 synthesis、checkpoint、Telegram opt-in 與早晚 desktop jobs。34 個 tests 通過，包含 interval overlap/dedup、跨午夜、unsupported platform、milestone receipt、quiet hours、cooldown、scheduler fallback 與 Extension security。Browser 實機 event 仍為 0，Windows Toast 也尚未以真實達標事件觸發，因此維持 alpha。
+**2026-08-25 實作證據：**localhost 主頁與 `/extension-monitor` 已完成 live smoke；usage API coverage 維持 `partial`。Windows 隔離 milestone E2E 已走過真實 WinRT Toast submission、SQLite sent receipt 與 duplicate suppression；正式資料庫未寫入測試 event。coverage ledger 尚未完成，因此維持 Alpha。
 
 ### 產品目的
 
@@ -284,17 +284,17 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 ---
 
-### P3-2 本機語意檢索索引
+### ✅ P3-2 本機語意檢索索引（2026-08-25 完成 Alpha）
 
-- 以本機 embedding（Ollama / RTX 4080）只對具 provenance 的 canonical final candidates 建索引，**資料不出本機**；索引前重新量測數量，不把本次 1,890 筆快照硬編碼為永久母數。
-- 新增 `ai_embeddings` 資料表與增量索引流程，沿用既有的 `(mtime, size)` 增量掃描模式。
-- 驗收：對歷史問題的語意查詢能回傳正確的原始對話，冷啟動建索引時間可接受。
+- 新增 schema 6/7 `semantic_documents`，使用 loopback Ollama `bge-m3:latest` 建立 1024 維索引，涵蓋 AI turns、Git commits、file activity metadata、Open Loops 與 Project State；不額外讀取檔案正文。
+- 每筆保存 `source_ref`、project、timestamp、trust status、content hash、model、float32 BLOB 與 `embedding_input_mode`。partial/legacy response 不會升格為可信結論。
+- 每個成功 batch 原子提交並可依 content hash 續跑。真實全量驗收：4,102/4,102、failure=0；3 筆 Ollama Unicode NaN 來源以可追溯 `ascii_fallback` 降級；第二次執行 `indexed=0 / unchanged=4102`。
 
-### P3-3 `omni ask`：問自己的歷史
+### ✅ P3-3 `omni ask`：問自己的歷史（2026-08-25 完成 Alpha）
 
-- `python main.py ask "我上次怎麼解決 SQLite database locked?"`
-- 建立在 P3-2 之上，回傳原始對話出處（時間、平台、專案）與結論摘要。
-- 直接解決「跨 AI 切換、記不住」的原始需求。
+- `omni ask "我上次怎麼解決 SQLite database locked?" --project activityTracker`
+- retrieval-only 與本機 `llama3.1:8b` synthesis 均已實測；回傳 `[S1]` 引用、SQLite source row、時間、專案、trust 與 similarity score。
+- loopback-only 預設 fail-closed；similarity 不作來源真實性、完整 coverage 或語意正確證明。
 
 ### P3-4 重複工作偵測
 
@@ -384,7 +384,7 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 1. 將 `project_engine.py` 的硬編碼路徑抽成設定項。
 2. 擴充已建立的 `python main.py init`，加入本機 Agent 日誌、Git 根目錄與 notification capability 自動偵測。
-3. 維護 P2.5 已建立的 `pyproject.toml`、52 個 tests、versioned migration、verified backup 與 Windows wheel/sdist release receipts；下一步完成 live heartbeat、macOS/Linux CI matrix 與 formal rollback rehearsal。
+3. 維護 `pyproject.toml`、contract tests、schema 7/7、verified backup、Windows packaging 與 formal rollback receipts；下一步取得 live heartbeat、Claude/Manus capture 與 3-OS CI receipts。
 4. 無 LLM 金鑰時預設走 Ollama，確保零金鑰也能完整體驗。
 5. 跨平台：視窗採集與桌面通知抽象出平台介面，Windows 以外先降級為停用而非報錯。
 
@@ -398,8 +398,8 @@ P2.5-S1 API 安全邊界
   → P2.5-L1 Open Loop lifecycle
   → P2.5-P1 pytest / platform abstraction / generic config
   → ✅ P3-1 resume（已完成，並以新資料契約重新驗收）
-  → P3-2 語意索引（Ollama / 本機向量化）
-  → P3-3 omni ask（問自己的歷史庫）
+  → ✅ P3-2 語意索引（4,102/4,102）
+  → ✅ P3-3 omni ask（retrieval + local synthesis）
   → P3-5 Session 敘事層
   → P5-1 Proposal-only 主動建議（不執行修改）
   → P5 executor 獨立安全驗收

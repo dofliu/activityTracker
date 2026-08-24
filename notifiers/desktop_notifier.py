@@ -8,6 +8,7 @@ import logging
 import subprocess
 import sys
 import tempfile
+from datetime import datetime
 from html import escape
 from pathlib import Path
 from typing import List, Optional
@@ -41,6 +42,7 @@ $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
 class DesktopNotifier:
     def __init__(self):
         self.cfg = get_config()
+        self.last_delivery_receipt: dict | None = None
 
     def is_enabled(self) -> bool:
         return bool(self.cfg.get("notifiers.desktop.enabled", True)) and sys.platform == "win32"
@@ -48,10 +50,22 @@ class DesktopNotifier:
     # ------------------------------------------------------------------
     # 底層送出
     # ------------------------------------------------------------------
-    def send(self, title: str, lines: List[str], launch_url: Optional[str] = None) -> bool:
+    def send(
+        self,
+        title: str,
+        lines: List[str],
+        launch_url: Optional[str] = None,
+        *,
+        allow_fallback: bool = True,
+    ) -> bool:
         """送出一則桌面通知。lines 最多顯示 2~3 行，點擊可開啟 launch_url。"""
         if sys.platform != "win32":
             logger.warning("Desktop notification is only supported on Windows.")
+            self.last_delivery_receipt = {
+                "status": "unsupported",
+                "transport": None,
+                "platform": sys.platform,
+            }
             return False
 
         body = "\n".join(lines)[:600]
@@ -82,22 +96,59 @@ class DesktopNotifier:
 
             if result.returncode != 0:
                 logger.warning(f"Toast failed ({result.returncode}), falling back to MessageBox: {result.stderr[:200]}")
-                return self._fallback_messagebox(title, body)
+                self.last_delivery_receipt = {
+                    "status": "failed",
+                    "transport": "winrt_toast",
+                    "platform": sys.platform,
+                    "return_code": result.returncode,
+                    "stderr": result.stderr[:500],
+                    "attempted_at": datetime.now().astimezone().isoformat(),
+                }
+                return self._fallback_messagebox(title, body) if allow_fallback else False
 
             logger.info(f"Desktop notification sent: {title}")
+            self.last_delivery_receipt = {
+                "status": "submitted",
+                "transport": "winrt_toast",
+                "platform": sys.platform,
+                "return_code": result.returncode,
+                "attempted_at": datetime.now().astimezone().isoformat(),
+            }
             return True
         except Exception as e:
             logger.error(f"Error sending desktop notification: {e}")
-            return self._fallback_messagebox(title, body)
+            self.last_delivery_receipt = {
+                "status": "failed",
+                "transport": "winrt_toast",
+                "platform": sys.platform,
+                "error_type": type(e).__name__,
+                "error": str(e)[:500],
+                "attempted_at": datetime.now().astimezone().isoformat(),
+            }
+            return self._fallback_messagebox(title, body) if allow_fallback else False
 
     def _fallback_messagebox(self, title: str, body: str) -> bool:
         """WinRT 不可用時的降級方案"""
         try:
             import ctypes
             ctypes.windll.user32.MessageBoxW(0, body, title, 0x40 | 0x40000)  # MB_ICONINFORMATION | MB_TOPMOST
+            self.last_delivery_receipt = {
+                "status": "displayed",
+                "transport": "message_box",
+                "platform": sys.platform,
+                "attempted_at": datetime.now().astimezone().isoformat(),
+            }
             return True
         except Exception as e:
             logger.error(f"Fallback MessageBox also failed: {e}")
+            self.last_delivery_receipt = {
+                "status": "failed",
+                "transport": "message_box",
+                "platform": sys.platform,
+                "error_type": type(e).__name__,
+                "error": str(e)[:500],
+                "attempted_at": datetime.now().astimezone().isoformat(),
+            }
             return False
 
     # ------------------------------------------------------------------
