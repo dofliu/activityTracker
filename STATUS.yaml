@@ -1,10 +1,21 @@
 name: OmniContext Activity Tracker
 name_zh: OmniContext 個人全景活動追蹤系統
 category: personal_tools
-progress: 95
-status: active
+progress: 70
+progress_basis: "依 P0-P6 加權里程碑估計；不是 release readiness 百分比"
+status: active_hardening
+release_ready: false
 last_updated: "2026-08-24"
-next_milestone: "P3 記憶層：本機語意檢索索引 (P3-2 Ollama / 本機 Embedding) 與 omni ask (P3-3)"
+current_phase: "P2.5 hardening + P2.6 Usage/Milestone Alpha"
+next_milestone: "完成 versioned migration、restore drill、real-browser ingestion／Toast evidence 與 Windows/macOS/Linux release matrix"
+planned_features:
+  - id: FEATURE-001
+    name: "每日主要介面使用時間與里程碑教練"
+    stage: implemented_alpha
+    priority: should_have
+    scope: "統計主要介面的 foreground active time，提供可配置每日里程碑、鼓勵與休息提醒"
+    trust_boundary: "不得將前景時間宣稱為生產力；coverage 不完整時顯示 partial/unavailable；預設不送 cloud LLM"
+    specification: "docs/FEATURE-001-daily-interface-usage-milestone-coach.md"
 technologies:
   - Python
   - FastAPI
@@ -13,12 +24,94 @@ technologies:
   - watchdog
   - GitPython
   - Chrome Extension (MV3)
-  - Gemini API (gemini-3.7-flash) / Claude API
-  - Claude Code / Codex Sessions / Antigravity Log & Assistant Parsers
-  - Telegram Bot API
+  - Gemini API / Claude API / OpenAI API / Ollama
+  - Claude Code / Codex Sessions / Antigravity Transcript Parsers
 outputs:
-  - tool
+  - local_tool
   - web_dashboard
-description: "Local-first personal context tracker that captures cross-platform AI conversations, file edits, git commits and window focus, then synthesizes daily research/work reviews via LLM."
-description_zh: "本機優先的個人全景活動追蹤系統，自動捕捉跨平台 AI 對話、檔案異動、Git commits 與視窗焦點，並由 LLM 產出每日工作與研究回顧。"
-key_metrics: "全系統已完成實測驗證：1. 徹底刪除 TestApp 測試列，Web UI 與後端實作動態紅黃綠燈（逾時 3 小時標紅、30 分鐘內標綠），杜絕假健康；2. 徹底清除所有佔位字串與 orphan 紀錄，真實 AI 結論配對率達 95.6% (1,944/2,034 筆，Codex 97.9%、Antigravity 94.8%、Claude Code 88.0%)；3. 實作論文 Top-Down Canonical Resolver，將 81 個碎片化子目錄收斂為清晰論文主專案；4. 排除 activityTracker 自身日誌干擾，恢復程式碼與論文雙軌即時監控；5. Telegram 預設啟用並支援晨報 dry-run 完整格式。"
+documentation:
+  readme: README.md
+  usage_guide: docs/USAGE.md
+  roadmap: ROADMAP.md
+  test_strategy: docs/TEST_STRATEGY.md
+description: "Local-first personal context tracker that captures cross-platform AI conversations, file edits, git commits and window focus, then synthesizes work reviews with a selected local or cloud LLM."
+description_zh: "本機優先的個人工作脈絡追蹤系統；事件儲存在本機，使用 cloud LLM 摘要時會將選定脈絡傳送至該 provider。"
+evidence_snapshot:
+  captured_at: "2026-08-24 16:35 Asia/Taipei"
+  ai_events_total: 2418
+  ai_responses_nonempty: 2053
+  ai_response_final_candidates: 1890
+  ai_response_partial: 66
+  ai_response_missing: 125
+  ai_rows_with_legacy_status: 337
+  ai_rows_with_provenance: 2161
+  stable_turn_key_duplicates: 0
+  browser_ai_events: 0
+  file_events: 1199
+  git_events: 130
+  window_events: 346
+  github_repos: 57
+  github_prs: 266
+  ingestion_checkpoints: 601
+  ingestion_checkpoint_errors: 0
+  latest_verified_backup:
+    path: "~/OmniContext/backups/omni_context-20260824-163533-514863.db"
+    integrity: ok
+    tables: 11
+    size_bytes: 10313728
+    sha256: "234047f2e351834abd698fbb3cb6f8a74d7c38bd9bd59c94fdd9d97c7457a032"
+  project_states:
+    active: 26
+    idle: 3
+    stale: 44
+  open_loop_lifecycle:
+    open: 4
+    resolved: 2
+    superseded: 1
+  runtime_findings:
+    - "重啟後 file/git/window/agent_log collectors 均回報 healthy"
+    - "runtime file watcher 已同時納入 Project_CodingSimulation 與學術目錄"
+    - "Browser extension 尚無實機 ingestion 證據"
+  p2_6_evidence:
+    localhost_monitor: passed_dashboard_and_extension_monitor_smoke
+    usage_date: "2026-08-24"
+    usage_coverage: partial
+    coverage_reason: continuous_coverage_ledger_not_available
+    observed_interfaces: 11
+    ai_goal_foreground_minutes_at_probe: 33.7
+    total_foreground_minutes_at_probe: 64.3
+    browser_events: 0
+    browser_capture_state: configured_unverified
+    extension_pairing_probe: passed_without_token_leak
+    hostile_origin_probe: blocked_403
+    scheduler_backend: builtin_timer
+    scheduled_jobs:
+      - daily_synthesis_job
+      - desktop_evening_job
+      - desktop_morning_job
+      - morning_briefing_job
+      - periodic_checkpoint_job
+      - usage_milestone_job
+    milestone_receipts: 0
+    milestone_dry_run: not_reached
+    visual_qa: passed_no_horizontal_overflow_and_no_console_errors
+quality_gates:
+  security_boundary: passed_local_contract_and_live_origin_test
+  ingestion_provenance: passed_local_rescan_601_sources
+  response_finalization: passed_as_final_candidate_contract_not_semantic_correctness
+  open_loop_lifecycle: passed_local_db_reconciliation
+  automated_tests: passed_34_contract_tests
+  usage_milestone_alpha: passed_contract_and_windows_dashboard_api_smoke
+  documentation_current: passed_readme_usage_roadmap_status_sync
+  backup_lifecycle: passed_online_backup_integrity_receipt_restore_pending
+  portability_baseline: implemented_source_level_release_matrix_pending
+  semantic_memory: pending
+  autonomous_execution: blocked_by_p2_5
+known_blockers:
+  - "Browser extension 實機 ingestion 仍為 0；需完成 Chrome/Edge pairing 與真實網站驗證"
+  - "P2.6 尚無 continuous coverage ledger，coverage 維持 partial；真實達標 Windows Toast 尚未觸發"
+  - "337 筆 legacy AI rows 無 response_status，僅保留為歷史資料，不進入 canonical synthesis/handoff 結論"
+  - "缺少 release-grade versioned migration、restore drill 與 wheel/sdist upgrade 驗證；verified backup 已建立"
+  - "macOS/Linux 尚未執行實機或 CI matrix；Windows-only window/notification 功能目前採明確降級"
+  - "project_engine 仍含個人根路徑 fallback，尚未完全 config-driven"
+key_metrics: "P0-P2 可日常運行，P3-1 已以 canonical turn contract 強化；P2.5 local security/data/lifecycle contracts 與 P2.6 usage/milestone alpha 已落地並通過 34 tests，且建立變更後 verified backup。Browser 實機 ingestion、真實達標 Toast、restore drill 與多平台 matrix 未完成；整體仍非 release-ready，P5 autonomous executor 維持 blocked。"

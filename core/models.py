@@ -28,6 +28,10 @@ class AIPromptEvent(Base):
     project_tag = Column(String(255), nullable=True, index=True)
     cwd = Column(String(1000), nullable=True)
     metadata_json = Column(Text, nullable=True)
+    turn_key = Column(String(128), unique=True, nullable=True, index=True)
+    source_path = Column(String(1500), nullable=True)
+    source_position = Column(Integer, nullable=True)
+    response_status = Column(String(50), nullable=True, index=True)  # missing, partial, final_candidate
 
     __table_args__ = (
         Index("ix_ai_platform_time", "platform", "timestamp"),
@@ -120,6 +124,51 @@ class OpenLoop(Base):
     confidence = Column(Float, default=1.0)
     created_at = Column(DateTime, default=get_local_now, index=True)
     resolved_at = Column(DateTime, nullable=True, index=True)
+    status = Column(String(30), default="open", nullable=False, index=True)
+    fingerprint = Column(String(64), nullable=True, index=True)
+    last_seen_at = Column(DateTime, default=get_local_now, index=True)
+    updated_at = Column(DateTime, default=get_local_now, onupdate=get_local_now)
+    resolution_note = Column(Text, nullable=True)
+
+
+class IngestionCheckpoint(Base):
+    """只有成功解析後才前移的持久化 collector checkpoint。"""
+    __tablename__ = "ingestion_checkpoints"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    collector = Column(String(80), nullable=False, index=True)
+    source_path = Column(String(1500), unique=True, nullable=False)
+    mtime_ns = Column(Integer, nullable=False, default=0)
+    size_bytes = Column(Integer, nullable=False, default=0)
+    source_position = Column(Integer, nullable=True)
+    last_success_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=get_local_now, onupdate=get_local_now)
+
+
+class MilestoneNotificationReceipt(Base):
+    """每日里程碑通知 receipt；避免 scheduler 重啟或重送造成重複提醒。"""
+    __tablename__ = "milestone_notification_receipts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    local_date = Column(String(10), nullable=False, index=True)
+    milestone_minutes = Column(Integer, nullable=False)
+    channel = Column(String(30), nullable=False, default="desktop")
+    interface_group = Column(String(120), nullable=False, default="AI collaboration")
+    observed_minutes = Column(Float, nullable=False, default=0.0)
+    status = Column(String(30), nullable=False, default="sent")  # sent, coalesced
+    message = Column(Text, nullable=True)
+    notified_at = Column(DateTime, default=get_local_now, nullable=False)
+
+    __table_args__ = (
+        Index(
+            "ux_milestone_receipt_date_threshold_channel",
+            "local_date",
+            "milestone_minutes",
+            "channel",
+            unique=True,
+        ),
+    )
 
 
 class GitHubRepoState(Base):

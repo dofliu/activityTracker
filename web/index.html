@@ -2,6 +2,7 @@
 <html lang="zh-TW" data-theme="dark">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" href="data:,">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OmniContext — 個人全景活動追蹤與 AI 回顧中樞</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -50,6 +51,39 @@
 
       <!-- 01 進行中工作 -->
       <section id="tab-projects" class="pane active">
+        <div class="overview-grid mb-14">
+          <div class="panel usage-panel">
+            <div class="panel-head">
+              <span class="mono-label accent" data-i18n="usage_title">TODAY · 前景使用與里程碑</span>
+              <span id="usage-coverage" class="trust noisy">LOADING</span>
+              <button id="btn-refresh-usage" class="btn btn-ghost btn-sm head-right" data-i18n="btn_refresh_usage">重新整理</button>
+            </div>
+            <div class="usage-body">
+              <div class="usage-goal">
+                <div class="mono-mini muted" data-i18n="usage_goal_label">AI 協作前景使用時間</div>
+                <div id="usage-goal-value" class="usage-value">—</div>
+                <div id="usage-goal-progress" class="muted small">載入中…</div>
+                <div class="usage-progress"><span id="usage-progress-bar"></span></div>
+                <div id="usage-boundary" class="usage-boundary">只代表已觀察到的前景時間，不代表生產力或實際工時。</div>
+              </div>
+              <div id="usage-interface-list" class="usage-list"><div class="placeholder">載入使用時間…</div></div>
+            </div>
+          </div>
+
+          <div class="panel extension-panel">
+            <div class="panel-head">
+              <span class="mono-label accent" data-i18n="extension_monitor_title">EXTENSION MONITOR</span>
+              <span id="extension-capture-badge" class="trust noisy">LOADING</span>
+              <a href="/extension-monitor" class="btn btn-ghost btn-sm head-right" data-i18n="btn_open_monitor">開啟完整監控</a>
+            </div>
+            <div class="extension-summary">
+              <div id="extension-summary-text" class="small muted">載入 Browser Extension 狀態…</div>
+              <div id="extension-platform-list" class="extension-platforms"></div>
+              <div class="usage-boundary" data-i18n="extension_pairing_boundary">localhost 可觀察採集狀態；ingest token 仍由 Extension popup 安全保存。</div>
+            </div>
+          </div>
+        </div>
+
         <div id="resume-card" class="resume">
           <div class="resume-head"><span class="mono-label" data-i18n="resume_head">RESUME HERE</span><span class="resume-head-zh" data-i18n="resume_sub">上次做到哪</span></div>
           <div class="resume-body"><div class="placeholder" data-i18n="ph_loading_projects">載入進行中工作…</div></div>
@@ -164,7 +198,33 @@
 
         <div class="panel mb-14">
           <div class="panel-head">
-            <span class="mono-label accent">04</span><span class="panel-title" data-i18n="settings_p4_title">GitHub 雲端整合 (全專案與 PR 追蹤)</span>
+            <span class="mono-label accent">04</span><span class="panel-title" data-i18n="settings_usage_title">每日使用時間與里程碑</span>
+            <span class="muted small" data-i18n="settings_usage_note">前景時間，不代表生產力或實際工時</span>
+          </div>
+          <div class="fields usage-settings-fields">
+            <label class="setting-check"><input type="checkbox" id="toggle-usage-tracking"><span data-i18n="usage_tracking_enabled">啟用使用時間統計</span></label>
+            <label class="setting-check"><input type="checkbox" id="toggle-usage-notifications"><span data-i18n="usage_notifications_enabled">啟用里程碑通知</span></label>
+            <div><div class="mono-mini muted mb-6" data-i18n="usage_daily_goal">DAILY GOAL / MIN</div><input type="number" id="input-usage-daily-goal" min="15" max="1440" value="360" class="mono"></div>
+            <div><div class="mono-mini muted mb-6" data-i18n="usage_milestones">MILESTONES / MIN</div><input type="text" id="input-usage-milestones" value="120, 240, 360" class="mono"></div>
+            <div><div class="mono-mini muted mb-6" data-i18n="usage_tone">TONE</div>
+              <select id="select-usage-tone">
+                <option value="neutral">Neutral</option>
+                <option value="encouraging">Encouraging</option>
+                <option value="praise">Praise</option>
+              </select>
+            </div>
+            <div><div class="mono-mini muted mb-6" data-i18n="usage_quiet_start">QUIET FROM</div><input type="time" id="input-usage-quiet-start" value="22:00" class="mono"></div>
+            <div><div class="mono-mini muted mb-6" data-i18n="usage_quiet_end">QUIET UNTIL</div><input type="time" id="input-usage-quiet-end" value="08:00" class="mono"></div>
+            <div><div class="mono-mini muted mb-6" data-i18n="usage_cooldown">COOLDOWN / MIN</div><input type="number" id="input-usage-cooldown" min="0" max="1440" value="60" class="mono"></div>
+          </div>
+          <div class="panel-foot">
+            <span class="muted small" data-i18n="usage_local_note">預設只在本機聚合，不呼叫 cloud LLM；介面分類規則可在 config.yaml 調整。</span>
+          </div>
+        </div>
+
+        <div class="panel mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent">05</span><span class="panel-title" data-i18n="settings_p4_title">GitHub 雲端整合 (全專案與 PR 追蹤)</span>
             <span id="gh-auth-badge" class="trust broken">未連線</span>
           </div>
           <div style="padding: 14px;">

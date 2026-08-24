@@ -193,7 +193,7 @@ def export_daily_brief(output_dir: Optional[str] = None) -> Dict[str, Any]:
     if not out_dir_str:
         out_dir_str = str(Path(__file__).parent.parent / "reports")
 
-    out_dir = Path(out_dir_str)
+    out_dir = cfg.expand_path(out_dir_str)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     written: List[str] = []
@@ -209,7 +209,7 @@ def export_daily_brief(output_dir: Optional[str] = None) -> Dict[str, Any]:
     # 選用：注入既有的 HTML 儀表板
     inject_target = cfg.get("exporters.daily_brief.inject_into", "")
     if inject_target:
-        target = Path(inject_target)
+        target = cfg.expand_path(inject_target)
         if target.exists():
             if _inject_into_file(target, render_html_fragment(data)):
                 written.append(str(target))

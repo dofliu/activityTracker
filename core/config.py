@@ -34,6 +34,20 @@ class Config:
                 return default
         return val
 
+    def expand_path(self, value: str | Path) -> Path:
+        """跨平台展開 `~` 與環境變數，不要求設定檔使用個人絕對路徑。"""
+        expanded = os.path.expandvars(os.path.expanduser(str(value)))
+        return Path(expanded)
+
+    def get_path(self, key_path: str, default: str | Path = "") -> Path:
+        return self.expand_path(self.get(key_path, default))
+
+    def get_paths(self, key_path: str) -> list[Path]:
+        values = self.get(key_path, [])
+        if not isinstance(values, list):
+            return []
+        return [self.expand_path(value) for value in values if str(value).strip()]
+
     @property
     def data(self) -> Dict[str, Any]:
         return self._config_data

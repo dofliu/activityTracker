@@ -5,6 +5,7 @@ import logging
 from typing import Optional, Tuple
 import ctypes
 import os
+import sys
 
 from core.config import get_config
 from core.database import get_db
@@ -93,6 +94,9 @@ class WindowWatcherService:
         enabled = self.cfg.get("watchers.window_watcher.enabled", True)
         if not enabled:
             logger.info("Window watcher is disabled in config.")
+            return
+        if sys.platform != "win32":
+            logger.warning("Window watcher is currently supported on Windows only; collector disabled.")
             return
 
         self._running = True

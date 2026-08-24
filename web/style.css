@@ -109,6 +109,29 @@ input, select, button { font-family: inherit; }
 .panel-title { font-size: 13px; font-weight: 700; }
 .panel-foot { padding: 0 14px 14px; display: flex; align-items: center; gap: 10px; }
 .row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.head-right { margin-left: auto; }
+
+/* ---------- Today usage & Extension Monitor ---------- */
+.overview-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(310px, 0.65fr); gap: 14px; }
+.usage-body { display: grid; grid-template-columns: minmax(210px, 0.72fr) minmax(0, 1.28fr); min-height: 188px; }
+.usage-goal { padding: 16px; border-right: 1px solid var(--bd); }
+.usage-value { font-family: "JetBrains Mono", monospace; font-size: 29px; font-weight: 900; margin: 5px 0 2px; }
+.usage-progress { height: 6px; margin: 12px 0 10px; background: var(--s2); overflow: hidden; }
+.usage-progress span { display: block; height: 100%; width: 0; background: var(--orange); transition: width 0.25s ease; }
+.usage-boundary { font-size: 10.5px; line-height: 1.5; color: var(--mu); margin-top: 10px; }
+.usage-list { padding: 8px 14px; min-width: 0; }
+.usage-row { display: grid; grid-template-columns: minmax(86px, 1fr) auto auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--bd); }
+.usage-row:last-child { border-bottom: none; }
+.usage-interface { font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.usage-duration { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--tx); }
+.usage-interactions { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--mu); }
+.extension-summary { padding: 14px; }
+.extension-platforms { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 12px; }
+.extension-platform { border: 1px solid var(--bd); background: var(--s2); padding: 8px 9px; }
+.extension-platform-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11.5px; font-weight: 700; }
+.extension-platform-sub { margin-top: 3px; font-family: "JetBrains Mono", monospace; font-size: 9.5px; color: var(--mu); }
+.setting-check { display: flex; align-items: center; gap: 7px; min-height: 33px; font-size: 12px; font-weight: 700; }
+.usage-settings-fields { grid-template-columns: repeat(4, 1fr); }
 
 /* ---------- Resume card ---------- */
 .resume { border: 1px solid var(--bd); background: var(--s1); margin-bottom: 14px; }
@@ -253,7 +276,7 @@ input, select, button { font-family: inherit; }
 .tag span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tag-x { color: var(--danger); cursor: pointer; font-weight: 700; }
 .input-row { display: flex; gap: 6px; }
-input[type="text"], input[type="number"], input[type="date"], select {
+input[type="text"], input[type="number"], input[type="date"], input[type="time"], select {
   flex: 1; min-width: 0; padding: 6px 9px; border: 1px solid var(--bd);
   background: var(--input); color: var(--tx); font-size: 12px;
 }
@@ -272,6 +295,12 @@ input[type="checkbox"] { accent-color: var(--orange); flex: none; }
 
 .fields { padding: 14px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; align-items: end; }
 .fields input, .fields select { width: 100%; }
+
+@media (max-width: 900px) {
+  .overview-grid, .usage-body { grid-template-columns: 1fr; }
+  .usage-goal { border-right: none; border-bottom: 1px solid var(--bd); }
+  .usage-settings-fields { grid-template-columns: 1fr 1fr; }
+}
 
 /* ---------- Two column (summaries / checkpoints) ---------- */
 .two-col { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 14px; }

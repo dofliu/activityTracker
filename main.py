@@ -3,10 +3,13 @@ import sys
 import time
 import argparse
 import logging
+import secrets
+import shutil
 import threading
 from datetime import datetime, date, timedelta
 from typing import Optional, List, Dict, Any
 from pathlib import Path
+import yaml
 
 # 強制 Windows 控制台輸出支援 UTF-8
 if sys.platform == "win32":
@@ -21,10 +24,25 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from core.config import get_config
 from core.database import get_db
-from core.models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, DailySummary, ProjectState, OpenLoop
+from core.models import (
+    AIPromptEvent,
+    FileActivityEvent,
+    GitActivityEvent,
+    WindowEvent,
+    DailySummary,
+    ProjectState,
+    OpenLoop,
+    IngestionCheckpoint,
+)
 from core.manager import get_manager
 from core.time_utils import get_local_now
-from core.project_engine import get_active_projects_list, get_open_loops_list, create_open_loop
+from core.project_engine import (
+    get_active_projects_list,
+    get_open_loops_list,
+    create_open_loop,
+    reconcile_open_loop_lifecycle,
+    transition_open_loop,
+)
 from synthesizer.aggregator import generate_daily_summary_pipeline, generate_periodic_checkpoint
 from scripts.cleanup_noise import cleanup_noise_and_demo_data
 from notifiers.telegram_notifier import TelegramNotifier
@@ -204,31 +222,153 @@ def cmd_checkpoint(hours: int = 2):
 
 def cmd_status():
     """查看本地 SQLite 資料庫累積事件統計與專案狀態"""
-    manager = get_manager()
-    status = manager.get_status()
+    import json
+    import urllib.request
+    from sqlalchemy import func
+
+    cfg = get_config()
+    status_source = "local fallback"
+    try:
+        host = cfg.get("server.host", "127.0.0.1")
+        port = int(cfg.get("server.port", 8765))
+        live_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
+        with urllib.request.urlopen(
+            f"http://{live_host}:{port}/api/v1/control/status",
+            timeout=2,
+        ) as response:
+            status = json.loads(response.read().decode("utf-8"))
+            status_source = "live API"
+    except Exception:
+        status = get_manager().get_status()
+
     db = get_db()
 
     with db.session_scope() as session:
-        proj_count = session.query(ProjectState).count()
-        open_loops_count = session.query(OpenLoop).filter(OpenLoop.resolved_at.is_(None)).count()
-        ai_resp_count = session.query(AIPromptEvent).filter(
+        project_counts = dict(
+            session.query(ProjectState.status, func.count(ProjectState.id))
+            .group_by(ProjectState.status)
+            .all()
+        )
+        open_loops_count = session.query(OpenLoop).filter(OpenLoop.status == "open").count()
+        ai_nonempty_count = session.query(AIPromptEvent).filter(
             AIPromptEvent.response_text.isnot(None),
+            func.length(func.trim(AIPromptEvent.response_text)) > 0,
             ~AIPromptEvent.response_text.like("[%Session]"),
             ~AIPromptEvent.response_text.like("[%Agent Session]")
+        ).count()
+        ai_final_candidate_count = session.query(AIPromptEvent).filter(
+            AIPromptEvent.response_status == "final_candidate",
+            AIPromptEvent.response_text.isnot(None),
+            func.length(func.trim(AIPromptEvent.response_text)) > 0,
+        ).count()
+        checkpoint_errors = session.query(IngestionCheckpoint).filter(
+            IngestionCheckpoint.last_error.isnot(None),
+            func.length(func.trim(IngestionCheckpoint.last_error)) > 0,
         ).count()
 
     print("\n" + "="*50)
     print("📊 OmniContext 系統統計數據")
     print("="*50)
-    print(f"• 監控狀態                 : {'🟢 運行中' if status['is_running'] else '🔴 已停止'}")
-    print(f"• 識別進行中專案數         : {proj_count} 個")
+    print(f"• 監控狀態                 : {'🟢 運行中' if status['is_running'] else '🔴 已停止'} ({status_source})")
+    print(f"• 專案狀態                 : active={project_counts.get('active', 0)}, idle={project_counts.get('idle', 0)}, stale={project_counts.get('stale', 0)}")
     print(f"• 未結待辦事項 (Open Loops): {open_loops_count} 項")
-    print(f"• AI 互動紀錄 (Prompts)    : {status['metrics']['ai_prompts_count']} 筆 (含真實 AI 回應: {ai_resp_count} 筆)")
+    print(f"• AI 互動紀錄 (Prompts)    : {status['metrics']['ai_prompts_count']} 筆")
+    print(f"  ├─ 非空 assistant 回應   : {ai_nonempty_count} 筆")
+    print(f"  └─ final candidate       : {ai_final_candidate_count} 筆")
     print(f"• 檔案與論文異動事件       : {status['metrics']['file_events_count']} 筆")
     print(f"• Git Commit 紀錄          : {status['metrics']['git_commits_count']} 筆")
     print(f"• 視窗焦點時間統計         : {status['metrics']['window_events_count']} 筆")
     print(f"• 已生成每日摘要報告       : {status['metrics']['daily_summaries_count']} 篇")
+    print(f"• Ingestion checkpoint 錯誤: {checkpoint_errors} 個來源")
+    runtime = status.get("collector_runtime", {})
+    freshness = status.get("collector_health", {})
+    if runtime:
+        print("• Collector runtime         : " + ", ".join(f"{k}={v}" for k, v in runtime.items()))
+    if freshness:
+        print("• Data freshness            : " + ", ".join(f"{k}={v}" for k, v in freshness.items()))
     print("="*50 + "\n")
+
+
+def cmd_open_loop(loop_id: int, status: str, note: Optional[str] = None):
+    """人工複核 Open Loop lifecycle。"""
+    result = transition_open_loop(loop_id, status, note)
+    print(
+        f"Open Loop #{result['id']}: "
+        f"{result['old_status']} -> {result['status']}"
+    )
+
+
+def cmd_reconcile_open_loops():
+    result = reconcile_open_loop_lifecycle()
+    print(
+        "Open Loop reconciliation: "
+        f"fingerprints={result['backfilled']}, superseded={result['superseded']}"
+    )
+
+
+def cmd_backup(output_dir: Optional[str] = None):
+    from core.data_lifecycle import create_configured_backup
+
+    receipt = create_configured_backup(output_dir)
+    print(f"backup: {receipt['path']}")
+    print(f"integrity: {receipt['integrity']}")
+    print(f"tables: {receipt['table_count']}")
+    print(f"size_bytes: {receipt['size_bytes']}")
+    print(f"sha256: {receipt['sha256']}")
+
+
+def cmd_init(
+    watch_directories: List[str],
+    show_token: bool = False,
+    rotate_token: bool = False,
+):
+    """建立可攜式本機設定，且只在 token 空白時產生 browser ingest capability。"""
+    root = Path(__file__).parent.resolve()
+    config_path = root / "config.yaml"
+    example_path = root / "config.example.yaml"
+
+    created = False
+    if not config_path.exists():
+        if not example_path.exists():
+            raise FileNotFoundError(f"找不到設定範本: {example_path}")
+        shutil.copy2(example_path, config_path)
+        created = True
+
+    config_data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    security = config_data.setdefault("security", {})
+    token = str(security.get("browser_extension_ingest_token", "") or "")
+    token_created = False
+    if not token or rotate_token:
+        token = secrets.token_urlsafe(32)
+        security["browser_extension_ingest_token"] = token
+        token_created = True
+
+    if watch_directories:
+        watcher = config_data.setdefault("watchers", {}).setdefault("file_watcher", {})
+        normalized = []
+        for raw_path in watch_directories:
+            path = str(Path(raw_path).expanduser().resolve())
+            if path not in normalized:
+                normalized.append(path)
+        watcher["watch_directories"] = normalized
+
+    config_path.write_text(
+        yaml.safe_dump(config_data, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+    for relative in ("reports", "logs/checkpoints"):
+        (root / relative).mkdir(parents=True, exist_ok=True)
+    get_config().load(config_path)
+
+    print(f"config: {config_path} ({'created' if created else 'updated'})")
+    print(f"database: {root / config_data.get('database', {}).get('db_path', 'omni_context.db')}")
+    if show_token:
+        print("browser extension ingest token（請貼到擴充套件設定）:")
+        print(token)
+    elif token_created:
+        print("browser extension ingest token: generated（以 --show-token 明確顯示）")
+    else:
+        print("browser extension ingest token: configured")
 
 
 def cmd_notify_telegram(action: str, date_str: Optional[str] = None, dry_run: bool = False):
@@ -361,11 +501,10 @@ def cmd_resume(project_key: Optional[str] = None, copy_to_clipboard: bool = Fals
 
     if copy_to_clipboard:
         try:
-            import subprocess
-            if sys.platform == "win32":
-                p = subprocess.Popen(["powershell.exe", "-NoProfile", "-Command", "Set-Clipboard", "-Value", "$input"], stdin=subprocess.PIPE)
-                p.communicate(input=md.encode("utf-8"))
-                print("⚡ [OK] 接續 Prompt 已成功複製到剪貼簿！可直接貼入任何 AI 視窗開工。")
+            from core.platform_services import copy_text_to_clipboard
+
+            copy_text_to_clipboard(md)
+            print("⚡ [OK] 接續 Prompt 已成功複製到剪貼簿！可直接貼入任何 AI 視窗開工。")
         except Exception as e:
             logger.warning(f"Could not copy to clipboard: {e}")
 
@@ -380,6 +519,16 @@ def main():
     resume_parser.add_argument("-c", "--copy", action="store_true", help="自動將生成的接續 Prompt 複製到剪貼簿")
     resume_parser.add_argument("--turns", type=int, default=5, help="納入之歷史 AI 對話回合數 (預設 5)")
     resume_parser.add_argument("--json", action="store_true", help="以 JSON 格式輸出結構化數據")
+
+    init_parser = subparsers.add_parser("init", help="建立跨平台本機設定與 browser ingest token")
+    init_parser.add_argument(
+        "--watch",
+        action="append",
+        default=[],
+        help="要監控的目錄，可重複指定；未指定時保留範本設定",
+    )
+    init_parser.add_argument("--show-token", action="store_true", help="顯示既有 browser ingest token")
+    init_parser.add_argument("--rotate-token", action="store_true", help="旋轉 browser ingest token")
 
     # run / web
     run_parser = subparsers.add_parser("run", help="啟動 Web 儀表板與後台監控服務")
@@ -425,6 +574,14 @@ def main():
     # status 指令
     subparsers.add_parser("status", help="查看當前數據庫統計與監控狀態")
 
+    loop_parser = subparsers.add_parser("open-loop", help="複核 Open Loop lifecycle")
+    loop_parser.add_argument("id", type=int, help="Open Loop ID")
+    loop_parser.add_argument("status", choices=["open", "stale", "resolved", "superseded"])
+    loop_parser.add_argument("--note", help="狀態變更原因")
+    subparsers.add_parser("open-loop-reconcile", help="回填 fingerprint 並收斂重複 Open Loops")
+    backup_parser = subparsers.add_parser("backup", help="建立並驗證 SQLite online backup")
+    backup_parser.add_argument("--dir", help="覆寫備份輸出目錄")
+
     args = parser.parse_args()
 
     if args.command in ["run", "web", None]:
@@ -436,6 +593,12 @@ def main():
             getattr(args, "copy", False),
             getattr(args, "turns", 5),
             getattr(args, "json", False)
+        )
+    elif args.command == "init":
+        cmd_init(
+            getattr(args, "watch", []),
+            getattr(args, "show_token", False),
+            getattr(args, "rotate_token", False),
         )
     elif args.command == "now":
         cmd_now()
@@ -456,6 +619,12 @@ def main():
         cleanup_noise_and_demo_data()
     elif args.command == "status":
         cmd_status()
+    elif args.command == "open-loop":
+        cmd_open_loop(args.id, args.status, getattr(args, "note", None))
+    elif args.command == "open-loop-reconcile":
+        cmd_reconcile_open_loops()
+    elif args.command == "backup":
+        cmd_backup(getattr(args, "dir", None))
     else:
         parser.print_help()
 

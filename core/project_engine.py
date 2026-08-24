@@ -1,11 +1,12 @@
 import re
 import os
 import time
+import hashlib
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Set
 from pathlib import Path
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 
 from core.database import get_db
 from core.models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, ProjectState, OpenLoop, GitHubRepoState, GitHubPREvent
@@ -20,10 +21,34 @@ BUCKET_PROJECT_KEYS = {
     "unassigned",
 }
 
+OPEN_LOOP_STATUSES = {"open", "stale", "resolved", "superseded"}
+
 
 def is_bucket_project(project_key: str | None) -> bool:
     """判斷是否為未歸戶的收容桶"""
     return (project_key or "").strip().lower() in BUCKET_PROJECT_KEYS
+
+
+def clean_open_loop_title(title: str) -> str:
+    raw_title = (title or "").strip()
+    cleaned = re.sub(
+        r"^\s*(\*\*)?(優先級|Priority)\s*\d+.*?\1[：:\s]*",
+        "",
+        raw_title,
+    ).strip()
+    cleaned = re.sub(r"^[：:\s\-*]+", "", cleaned).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned or raw_title
+
+
+def open_loop_fingerprint(project_key: str, title: str) -> str:
+    feature = re.sub(
+        r"[\s\*\`\(\)\[\]【】\.,:;!？。，：；_\\/\-]",
+        "",
+        clean_open_loop_title(title),
+    ).lower()
+    raw = f"{normalize_project_name(project_key).lower()}|{feature}"
+    return hashlib.sha256(raw.encode("utf-8", errors="replace")).hexdigest()
 
 
 # 卡片上「上次做到哪」只需要一句話，過長的 commit 內文或提問全文會把版面撐爆
@@ -334,7 +359,7 @@ def get_active_projects_list(force_refresh: bool = False) -> List[Dict[str, Any]
             
             loops_count = session.query(OpenLoop).filter(
                 OpenLoop.project_key == p.project_key,
-                OpenLoop.resolved_at.is_(None)
+                OpenLoop.status == "open",
             ).count()
 
             # 查詢對應的 GitHub 遠端倉庫與 PR 狀態
@@ -400,6 +425,7 @@ def get_active_projects_list(force_refresh: bool = False) -> List[Dict[str, Any]
 
             # 次之從 AI 活動的 cwd 判定
             latest_ai = session.query(AIPromptEvent).filter(
+                AIPromptEvent.turn_key.isnot(None),
                 (AIPromptEvent.project_tag == p.project_key) |
                 (AIPromptEvent.project_tag == p.display_name) |
                 (AIPromptEvent.cwd.like(f"%{p.project_key}%"))
@@ -434,7 +460,12 @@ def get_active_projects_list(force_refresh: bool = False) -> List[Dict[str, Any]
                     "platform": latest_ai.platform,
                     "url": latest_ai.url,
                     "prompt": latest_ai.prompt_text[:120] if latest_ai.prompt_text else None,
-                    "response": latest_ai.response_text[:160] if latest_ai.response_text else None,
+                    "response": latest_ai.response_text[:160]
+                    if latest_ai.response_status == "final_candidate" and latest_ai.response_text
+                    else None,
+                    "response_status": latest_ai.response_status or "legacy_unverified",
+                    "source_path": latest_ai.source_path,
+                    "source_position": latest_ai.source_position,
                     "conv_id": latest_ai.conversation_id,
                     "cwd": latest_ai.cwd
                 }
@@ -459,13 +490,20 @@ def get_active_projects_list(force_refresh: bool = False) -> List[Dict[str, Any]
         return result
 
 
-def get_open_loops_list(project_key: Optional[str] = None) -> List[Dict[str, Any]]:
-    """取得未結事項清單"""
+def get_open_loops_list(
+    project_key: Optional[str] = None,
+    statuses: Optional[Set[str]] = None,
+) -> List[Dict[str, Any]]:
+    """預設只回傳 actionable open items；stale 必須明確要求。"""
     db = get_db()
+    requested_statuses = statuses or {"open"}
+    invalid = requested_statuses - OPEN_LOOP_STATUSES
+    if invalid:
+        raise ValueError(f"Invalid Open Loop status: {sorted(invalid)}")
     with db.session_scope() as session:
-        query = session.query(OpenLoop).filter(OpenLoop.resolved_at.is_(None))
+        query = session.query(OpenLoop).filter(OpenLoop.status.in_(requested_statuses))
         if project_key:
-            query = query.filter(OpenLoop.project_key == project_key)
+            query = query.filter(func.lower(OpenLoop.project_key) == project_key.lower())
         loops = query.order_by(desc(OpenLoop.created_at)).all()
         return [
             {
@@ -473,7 +511,11 @@ def get_open_loops_list(project_key: Optional[str] = None) -> List[Dict[str, Any
                 "project_key": l.project_key,
                 "title": l.title,
                 "source_type": l.source_type,
-                "created_at": l.created_at.strftime("%Y-%m-%d %H:%M")
+                "status": l.status,
+                "confidence": l.confidence,
+                "created_at": l.created_at.strftime("%Y-%m-%d %H:%M"),
+                "last_seen_at": l.last_seen_at.strftime("%Y-%m-%d %H:%M") if l.last_seen_at else None,
+                "resolution_note": l.resolution_note,
             }
             for l in loops
         ]
@@ -488,44 +530,44 @@ def create_open_loop(
 ) -> int:
     """新增或更新未結事項 (Open Loop)，自動去除前綴標籤並具備特徵碼模糊去重機制"""
     db = get_db()
-    raw_title = title.strip()
-    
-    # 徹底去除 **優先級 1 (`activityTracker`)**：或 **Priority 1 (`...`)**: 等 Markdown 雜訊前綴
-    clean_title = re.sub(r"^\s*(\*\*)?(優先級|Priority)\s*\d+.*?\1[：:\s]*", "", raw_title).strip()
-    clean_title = re.sub(r"^[：:\s\-*]+", "", clean_title).strip()
-    if not clean_title:
-        clean_title = raw_title
+    clean_title = clean_open_loop_title(title)
 
     norm_key = normalize_project_name(project_key) if project_key else "General"
     if norm_key in ["General / Unassigned", ""]:
         norm_key = "General"
 
-    # 生成用於比對去重的精簡特徵字串
-    feature_text = re.sub(r"[\s\*\`\(\)\[\]【】\.,:;!？。，：；_\\/\-]", "", clean_title).lower()
+    fingerprint = open_loop_fingerprint(norm_key, clean_title)
+    now = get_local_now()
 
     with db.session_scope() as session:
-        # 查詢同專案中尚未解決的事項
-        existing_loops = session.query(OpenLoop).filter(
-            OpenLoop.project_key == norm_key,
-            OpenLoop.resolved_at.is_(None)
-        ).all()
+        existing = session.query(OpenLoop).filter(
+            func.lower(OpenLoop.project_key) == norm_key.lower(),
+            OpenLoop.fingerprint == fingerprint,
+        ).order_by(desc(OpenLoop.created_at)).first()
 
-        for el in existing_loops:
-            # 1. 完全相同
-            if el.title.strip() == clean_title:
-                return el.id
+        if not existing:
+            legacy_items = session.query(OpenLoop).filter(
+                func.lower(OpenLoop.project_key) == norm_key.lower(),
+                OpenLoop.fingerprint.is_(None),
+            ).all()
+            for candidate in legacy_items:
+                candidate.fingerprint = open_loop_fingerprint(
+                    candidate.project_key,
+                    candidate.title,
+                )
+                if candidate.fingerprint == fingerprint:
+                    existing = candidate
+                    break
 
-            # 2. 模糊特徵比對 (前 20 字元相同或特徵重合度高)
-            el_feature = re.sub(r"[\s\*\`\(\)\[\]【】\.,:;!？。，：；_\\/\-]", "", el.title).lower()
-
-            if feature_text and el_feature:
-                if feature_text == el_feature:
-                    el.title = clean_title  # 更新為最新措辭
-                    return el.id
-                if len(feature_text) >= 15 and len(el_feature) >= 15:
-                    if feature_text[:20] == el_feature[:20]:
-                        el.title = clean_title
-                        return el.id
+        if existing:
+            existing.title = clean_title
+            existing.last_seen_at = now
+            existing.updated_at = now
+            if existing.status in {"open", "stale"}:
+                existing.status = "open"
+                existing.resolved_at = None
+                existing.resolution_note = None
+            return existing.id
 
         loop = OpenLoop(
             project_key=norm_key,
@@ -533,11 +575,76 @@ def create_open_loop(
             source_type=source_type,
             source_event_id=source_event_id,
             confidence=confidence,
-            created_at=get_local_now()
+            created_at=now,
+            status="open",
+            fingerprint=fingerprint,
+            last_seen_at=now,
+            updated_at=now,
         )
         session.add(loop)
         session.flush()
         return loop.id
+
+
+def reconcile_open_loop_lifecycle() -> Dict[str, int]:
+    """回填 legacy fingerprint，並將重複 actionable item 標為 superseded。"""
+    db = get_db()
+    now = get_local_now()
+    backfilled = 0
+    superseded = 0
+    seen: Dict[str, int] = {}
+
+    with db.session_scope() as session:
+        loops = session.query(OpenLoop).order_by(OpenLoop.created_at, OpenLoop.id).all()
+        for loop in loops:
+            fingerprint = loop.fingerprint or open_loop_fingerprint(loop.project_key, loop.title)
+            if not loop.fingerprint:
+                loop.fingerprint = fingerprint
+                backfilled += 1
+            if loop.status not in {"open", "stale"}:
+                continue
+            if fingerprint not in seen:
+                seen[fingerprint] = loop.id
+                continue
+
+            canonical_id = seen[fingerprint]
+            loop.status = "superseded"
+            loop.resolved_at = now
+            loop.updated_at = now
+            loop.resolution_note = f"Duplicate of Open Loop #{canonical_id}"
+            superseded += 1
+
+    return {"backfilled": backfilled, "superseded": superseded}
+
+
+def transition_open_loop(loop_id: int, new_status: str, note: str | None = None) -> Dict[str, Any]:
+    """執行可稽核 lifecycle transition；reopen 使用 `open`。"""
+    normalized = (new_status or "").strip().lower()
+    if normalized not in OPEN_LOOP_STATUSES:
+        raise ValueError(f"Invalid Open Loop status: {new_status}")
+
+    db = get_db()
+    now = get_local_now()
+    with db.session_scope() as session:
+        loop = session.query(OpenLoop).filter_by(id=loop_id).first()
+        if not loop:
+            raise LookupError(f"Open Loop {loop_id} not found")
+        old_status = loop.status or ("resolved" if loop.resolved_at else "open")
+        loop.status = normalized
+        loop.updated_at = now
+        loop.resolution_note = (note or "").strip() or None
+        if normalized in {"resolved", "superseded"}:
+            loop.resolved_at = now
+        else:
+            loop.resolved_at = None
+        if normalized == "open":
+            loop.last_seen_at = now
+        return {
+            "id": loop.id,
+            "old_status": old_status,
+            "status": normalized,
+            "resolution_note": loop.resolution_note,
+        }
 
 
 def extract_and_save_open_loops_from_summary(summary_markdown: str, date_str: str) -> List[int]:

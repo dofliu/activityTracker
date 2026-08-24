@@ -39,6 +39,7 @@
       data: {
         platform: "claude",
         url: window.location.href,
+        conversation_id: window.location.pathname,
         prompt_text: promptText,
         response_text: null,
         project_tag: "Claude Web"
@@ -50,6 +51,8 @@
 
   function observeResponse(forPrompt) {
     let checkCount = 0;
+    let lastText = "";
+    let stableCount = 0;
     const interval = setInterval(() => {
       checkCount++;
       const responses = document.querySelectorAll(".font-claude-message, .grid-cols-1 .standard-markdown");
@@ -57,22 +60,40 @@
         const lastResp = responses[responses.length - 1];
         const respText = lastResp.innerText.trim();
         
-        if (respText.length > 20 && checkCount >= 5) {
+        stableCount = respText === lastText && respText.length > 20 ? stableCount + 1 : 0;
+        lastText = respText;
+        if (stableCount >= 2) {
           clearInterval(interval);
           chrome.runtime.sendMessage({
             type: "AI_INTERACTION_CAPTURED",
             data: {
               platform: "claude",
               url: window.location.href,
+              conversation_id: window.location.pathname,
               prompt_text: forPrompt,
-              response_text: respText.substring(0, 2000),
+              response_text: respText,
+              metadata: { capture_state: "stable_candidate" },
               project_tag: "Claude Web"
             }
           });
         }
       }
 
-      if (checkCount > 30) {
+      if (checkCount > 120) {
+        if (lastText.length > 20) {
+          chrome.runtime.sendMessage({
+            type: "AI_INTERACTION_CAPTURED",
+            data: {
+              platform: "claude",
+              url: window.location.href,
+              conversation_id: window.location.pathname,
+              prompt_text: forPrompt,
+              response_text: lastText,
+              metadata: { capture_state: "partial_timeout" },
+              project_tag: "Claude Web"
+            }
+          });
+        }
         clearInterval(interval);
       }
     }, 1500);

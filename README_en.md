@@ -7,6 +7,10 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
+> **Current status: Personal Alpha.** Windows Dashboard/API, the Extension token boundary, P2.6 usage milestones, and 34 contract tests are verified. Real browser events, a real milestone Toast, restore drill, wheel/sdist, and the macOS/Linux matrix remain incomplete; this is not release-ready.
+
+**Documentation:** [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
+
 **OmniContext** is a **local-first, privacy-focused** personal context intelligence and activity tracking hub. It automatically captures your cross-platform AI interactions (Claude Code, Codex, Antigravity, ChatGPT, Gemini, etc.), code commits, paper and file modifications, window time allocation, and deeply integrates with your GitHub repositories and Pull Request (PR) statuses.
 
 It is purpose-built to answer three fundamental questions at any moment:
@@ -32,7 +36,7 @@ It is purpose-built to answer three fundamental questions at any moment:
 │          └───────────────────────┼───────────────────────┘               │
 │                                  ▼                                       │
 │                      [ Local SQLite Database ]                           │
-│                      (omni_context.db · Zero Leak)                       │
+│               (omni_context.db · local; cloud LLM is opt-in)            │
 │                                  │                                       │
 │          ┌───────────────────────┴───────────────────────┐               │
 │          ▼                                               ▼               │
@@ -66,20 +70,26 @@ It is purpose-built to answer three fundamental questions at any moment:
   * **Antigravity** (`.gemini/brain/**`): Captures real-time sessions and tool outputs.
 * **Browser Extension (Chrome MV3)**:
   * Supports **ChatGPT**, **Google Gemini**, **Claude.ai**, and **Manus**.
-  * Features a 10-minute sliding window upsert to guarantee persistence of both user queries and complete AI replies.
+  * Uses a dedicated ingest token, stable turn key, and write-only capability boundary.
 
 ### 4. ⚡ Custom Date-Range AI Synthesis Engine
 * **Flexible Date Ranges**: Choose any start and end dates (`FROM ~ TO`) or use quick chips (`Today`, `Yesterday`, `This Week`, `Last 7 Days`, `Last 30 Days`) to synthesize executive multi-day review reports.
-* **Multi-Model Support**: Defaults to Google Gemini (`gemini-3.7-flash`), with built-in support for Anthropic Claude 3.5 Sonnet, OpenAI GPT-4o, and local Ollama.
+* **Multi-Model Support**: The release template defaults to local Ollama with scheduled synthesis disabled; Gemini, Anthropic, and OpenAI remain explicitly selectable.
 * **Open Loops Extraction**: Automatically analyzes daily activities and extracts actionable tasks into an interactive checklist.
 
 ### 5. 🌐 Full Bilingual (EN / 繁中) i18n & Theme Switcher
 * Topbar button provides seamless 1-click switching between `English` and `繁體中文`.
 * Full Dark / Light theme support with preferences persisted in `localStorage`.
 
-### 6. 🔔 Telegram Push Notifications & Background Autostart
-* Automated daily digests, morning briefings, and project stagnation alerts sent directly to Telegram.
+### 6. 🔔 Local Desktop Notifications & Background Autostart
+* Windows-native morning briefings, evening reviews, and project stagnation alerts; Telegram remains optional and disabled by default.
 * Includes a PowerShell background autostart installer (`scripts/install_autostart.ps1`).
+
+### 7. ⏱️ Daily Interface Usage & Milestones (P2.6 Alpha)
+* The dashboard shows observed foreground time and AI turns for Claude, Codex, ChatGPT, Gemini, Manus, Antigravity, VS Code, and other configured interfaces.
+* Daily goals, milestones, notification tone, quiet hours, and cooldown are configurable; SQLite receipts prevent duplicate notifications after restart.
+* Foreground time is not productivity or actual work time. Coverage remains `partial` until a continuous coverage ledger exists.
+* `http://127.0.0.1:8765/extension-monitor` exposes enabled/observed ingestion state, while token pairing remains inside the Extension popup.
 
 ---
 
@@ -96,11 +106,14 @@ cd activityTracker
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Create local config, directories, and a browser ingest token
+python main.py init --watch "/your/project/root"
 ```
 
 ### 2. Configure LLM API Keys
 
-OmniContext uses `Google Gemini` by default. Set the environment variable or configure it in `config.yaml`:
+The release template uses local Ollama. If you explicitly select Gemini, Anthropic, or OpenAI, set the relevant environment variable and provider in `config.yaml`:
 
 ```bash
 # Windows PowerShell
@@ -119,6 +132,8 @@ python main.py
 
 Open your browser and navigate to: **[http://127.0.0.1:8765](http://127.0.0.1:8765)**
 
+For Extension pairing, milestone configuration, backups, and troubleshooting, see **[docs/USAGE.md](docs/USAGE.md)**.
+
 ---
 
 ## 💻 CLI Command Reference
@@ -126,6 +141,7 @@ Open your browser and navigate to: **[http://127.0.0.1:8765](http://127.0.0.1:87
 | Command | Description | Example |
 | :--- | :--- | :--- |
 | `python main.py` | Start Web dashboard and background collectors | `python main.py` |
+| `python main.py init` | Create/update portable config and browser ingest token | `python main.py init --watch D:/Projects` |
 | `python main.py now` | Instant 1-second view of active projects, last 5 events, and open loops | `python main.py now` |
 | `python main.py summary` | Synthesize AI daily or range review | `python main.py summary --start 2026-08-20 --end 2026-08-23` |
 | `python main.py github status` | Inspect GitHub connection status, repo count, and rate limits | `python main.py github status` |
@@ -133,15 +149,28 @@ Open your browser and navigate to: **[http://127.0.0.1:8765](http://127.0.0.1:87
 | `python main.py checkpoint` | Manually generate a Markdown activity checkpoint log | `python main.py checkpoint --hours 2` |
 | `python main.py notify` | Trigger Telegram report or briefing push | `python main.py notify summary` |
 | `python main.py status` | View database metrics and collector states | `python main.py status` |
+| `python main.py backup` | Create and verify an SQLite online backup | `python main.py backup` |
 
 ---
 
 ## ⚙️ Configuration (`config.yaml`)
 
 ```yaml
-app:
+server:
   port: 8765
   host: "127.0.0.1"
+
+security:
+  allowed_origins:
+    - "http://127.0.0.1:8765"
+    - "http://localhost:8765"
+  allow_remote_clients: false
+  browser_extension_ingest_token_env: "OMNICONTEXT_INGEST_TOKEN"
+
+data_lifecycle:
+  backups_dir: "~/OmniContext/backups"
+  backup_retention_days: 30
+  auto_backup_on_start: false
 
 watchers:
   file_watcher:
@@ -149,7 +178,7 @@ watchers:
     watch_directories:
       - "D:/Project_CodingSimulation"
       - "D:/Dropbox/Project_Academic/Paper_and_Patent/01.JournalPapers"
-    extensions: [".tex", ".docx", ".md", ".pdf", ".py", ".txt"]
+    extensions: [".tex", ".docx", ".md", ".pdf", ".py"]
   
   git_watcher:
     enabled: true
@@ -169,11 +198,11 @@ watchers:
     manus: true
 
 synthesizer:
-  provider: "gemini"
+  provider: "ollama"
   gemini:
     model: "gemini-3.7-flash"
   schedule:
-    enabled: true
+    enabled: false
     time: "23:30"
   periodic_checkpoint:
     enabled: true
@@ -193,7 +222,9 @@ integrations:
 2. Toggle on **Developer mode** in the top right.
 3. Click **Load unpacked**.
 4. Select the `watchers/browser_extension/` directory in this project.
-5. All conversations on ChatGPT, Gemini, Claude.ai, and Manus will automatically sync locally!
+5. Run `python main.py init --show-token`, then paste the token into the extension popup and save it.
+6. Only supported-site events carrying a valid token can write to the local ingestion endpoint.
+7. After the popup reports a verified pairing, open `http://127.0.0.1:8765/extension-monitor` to inspect observed browser events.
 
 ---
 
@@ -203,14 +234,19 @@ integrations:
 activityTracker/
 ├── config.yaml                     # System configuration with hot reload
 ├── main.py                         # Main entry point and CLI dispatcher
+├── pyproject.toml                  # Packaging, CLI entry point, and pytest config
 ├── requirements.txt                # Python package dependencies
 ├── README.md                       # Traditional Chinese Documentation
 ├── README_en.md                    # English Documentation
+├── docs/USAGE.md                   # Setup, pairing, daily operation, backups, troubleshooting
 │
 ├── core/                           # Core service modules
 │   ├── database.py                 # SQLite session & engine management
 │   ├── models.py                   # SQLAlchemy models (Events, Projects, PRs)
 │   ├── server.py                   # FastAPI REST API & static file server
+│   ├── security.py                 # Origin, secret redaction, and extension token boundary
+│   ├── platform_services.py        # Cross-platform argv-based OS integration
+│   ├── data_lifecycle.py           # SQLite online backup and integrity receipt
 │   ├── project_engine.py           # Canonical project resolver & open loop engine
 │   ├── fs_utils.py                 # Native Windows folder picker utilities
 │   └── time_utils.py               # Unified timezone helpers
@@ -242,6 +278,8 @@ activityTracker/
 ├── scripts/                        # Automation scripts
 │   ├── install_autostart.ps1       # Windows startup scheduler installer
 │   └── uninstall_autostart.ps1     # Uninstaller script
+├── tests/                          # Security/data/lifecycle/portability contracts
+├── docs/                           # ADR and test strategy
 │
 ├── logs/checkpoints/               # Periodic activity checkpoint logs
 └── reports/                        # Daily & range Markdown reports
@@ -251,9 +289,12 @@ activityTracker/
 
 ## 🔒 Privacy & Security
 
-* **100% Local Storage**: All events are stored exclusively in your local SQLite database (`omni_context.db`).
-* **Zero Telemetry**: No third-party tracking, analytics, or remote logging.
-* **Git Commit Protection**: Database files, API keys, and personal Markdown reports are strictly ignored via `.gitignore`.
+* **Local event storage**: Events are stored in local SQLite (`omni_context.db`) without third-party analytics telemetry.
+* **LLM boundary**: Selecting Gemini, Anthropic, or OpenAI sends the assembled work context to that provider. Ollama keeps synthesis local.
+* **Local API boundary**: Loopback-only access, an exact Origin allowlist, secret redaction, and a browser-extension ingest token are enabled by default.
+* **Trust contract**: Canonical AI events carry a stable turn key, source provenance, and response status; partial/legacy responses are not treated as conclusions.
+* **Backup lifecycle**: `python main.py backup` uses SQLite's Online Backup API, runs `PRAGMA integrity_check`, and emits a SHA-256 receipt. Automatic pruning and restore are not yet enabled.
+* **Git protection**: Database files, API keys, and personal Markdown reports are ignored by default to reduce accidental commits.
 
 ---
 

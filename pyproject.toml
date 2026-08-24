@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omnicontext"
+version = "1.2.0"
+description = "Local-first personal context and activity tracker"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+authors = [{name = "Juihung Liu"}]
+dependencies = [
+  "fastapi>=0.110.0",
+  "uvicorn>=0.28.0",
+  "sqlalchemy>=2.0.0",
+  "pydantic>=2.6.0",
+  "pyyaml>=6.0.1",
+  "watchdog>=4.0.0",
+  "gitpython>=3.1.40",
+  "requests>=2.31.0",
+  "google-genai>=0.1.1",
+  "openai>=1.14.0",
+  "anthropic>=0.20.0",
+  "psutil>=5.9.0",
+  "apscheduler>=3.10.4",
+  "python-dotenv>=1.0.1",
+  "pywin32>=306; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+
+[project.scripts]
+omnicontext = "main:main"
+
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["core*", "exporters*", "integrations*", "notifiers*", "scripts*", "synthesizer*", "watchers*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+asyncio_default_fixture_loop_scope = "function"

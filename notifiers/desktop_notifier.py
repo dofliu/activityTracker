@@ -169,6 +169,31 @@ class DesktopNotifier:
             return True
         return self.send(title, lines)
 
+    def send_usage_milestone(
+        self,
+        summary: dict,
+        milestone_minutes: int,
+        message: str,
+        dry_run: bool = False,
+    ) -> bool:
+        """每日主要介面使用里程碑；message 已由可信度契約產生。"""
+        date_text = str(summary.get("date") or get_local_now().strftime("%Y-%m-%d"))
+        title = f"🏁 OmniContext 每日里程碑 ({date_text[5:]})"
+        lines = [message]
+        if summary.get("coverage_status") == "partial":
+            lines.append("資料 coverage 為 partial；顯示值是已觀察到的下限。")
+        if dry_run:
+            self._preview(title, lines)
+            return True
+        return self.send(
+            title,
+            lines,
+            launch_url=self.cfg.get(
+                "notifiers.desktop.launch_url",
+                "http://127.0.0.1:8765",
+            ),
+        )
+
     @staticmethod
     def _preview(title: str, lines: List[str]):
         print("\n" + "=" * 50)

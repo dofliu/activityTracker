@@ -22,7 +22,11 @@ def fetch_events_in_range(start_dt: datetime, end_dt: datetime) -> Dict[str, Any
     with db.session_scope() as session:
         ai_events = (
             session.query(AIPromptEvent)
-            .filter(AIPromptEvent.timestamp >= start_dt, AIPromptEvent.timestamp <= end_dt)
+            .filter(
+                AIPromptEvent.timestamp >= start_dt,
+                AIPromptEvent.timestamp <= end_dt,
+                AIPromptEvent.turn_key.isnot(None),
+            )
             .order_by(AIPromptEvent.timestamp.asc())
             .all()
         )
@@ -61,7 +65,12 @@ def fetch_events_in_range(start_dt: datetime, end_dt: datetime) -> Dict[str, Any
                     "time": e.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                     "platform": e.platform,
                     "prompt": e.prompt_text,
-                    "response": e.response_text or "",
+                    "response": e.response_text
+                    if e.response_status == "final_candidate" and e.response_text
+                    else "",
+                    "response_status": e.response_status or "legacy_unverified",
+                    "source_path": e.source_path or "",
+                    "source_position": e.source_position,
                     "tag": e.project_tag or ""
                 }
                 for e in ai_events

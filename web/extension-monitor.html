@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="data:,">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OmniContext Extension Monitor</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0b0b0c; --panel:#141416; --line:#2c2c31; --text:#f5f5f7; --muted:#9a9aa2; --orange:#f26a0f; --ok:#22c55e; --warn:#eab308; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:"Segoe UI","Microsoft JhengHei",sans-serif; }
+    main { max-width:900px; margin:0 auto; padding:32px 22px 48px; }
+    header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:20px; }
+    h1 { margin:0; font-size:25px; }
+    .sub { color:var(--muted); margin-top:6px; font-size:13px; }
+    a { color:var(--orange); text-decoration:none; font-weight:700; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .panel { border:1px solid var(--line); background:var(--panel); padding:17px; }
+    .wide { grid-column:1/-1; }
+    .label { color:var(--muted); font-size:11px; letter-spacing:1.6px; font-family:Consolas,monospace; }
+    .value { font-size:24px; font-weight:800; margin:7px 0; }
+    .badge { display:inline-block; padding:3px 7px; font:700 11px Consolas,monospace; border:1px solid; }
+    .ok { color:var(--ok); } .warn { color:var(--warn); }
+    .platforms { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; margin-top:14px; }
+    .platform { border:1px solid var(--line); padding:11px; }
+    .platform-top { display:flex; justify-content:space-between; gap:8px; font-weight:700; }
+    .meta { color:var(--muted); font:11px Consolas,monospace; margin-top:7px; line-height:1.6; }
+    .boundary { color:var(--muted); font-size:12px; line-height:1.7; margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+    button { border:1px solid var(--line); background:transparent; color:var(--text); padding:8px 12px; cursor:pointer; font-weight:700; }
+    button:hover { border-color:var(--orange); }
+    @media(max-width:700px){.grid,.platforms{grid-template-columns:1fr 1fr}header{display:block}header nav{margin-top:12px}}
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>OmniContext Extension Monitor</h1>
+        <div class="sub">localhost ingestion visibility · Extension pairing remains isolated</div>
+      </div>
+      <nav><a href="/">← 返回 OmniContext 主頁</a></nav>
+    </header>
+
+    <div class="grid">
+      <section class="panel">
+        <div class="label">LOCAL SERVICE</div>
+        <div id="service-value" class="value">連線中…</div>
+        <span id="service-badge" class="badge warn">CHECKING</span>
+      </section>
+      <section class="panel">
+        <div class="label">BROWSER INGESTION</div>
+        <div id="events-value" class="value">—</div>
+        <div id="events-meta" class="meta">載入中…</div>
+      </section>
+      <section class="panel wide">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div class="label">SUPPORTED PLATFORMS</div>
+          <button id="refresh">重新整理</button>
+        </div>
+        <div id="platforms" class="platforms"></div>
+        <div class="boundary">
+          `enabled` 只表示設定已開啟；`observed` 表示資料庫至少看過一筆 Browser Extension event，兩者都不等於完整 coverage。localhost 不會讀取或顯示 Extension token；請在 Chrome/Edge Extension popup 完成配對。
+        </div>
+      </section>
+    </div>
+  </main>
+  <script>
+    const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[char]));
+    const formatTime = value => value ? new Date(value).toLocaleString() : "—";
+    async function refresh() {
+      const service = document.getElementById("service-value");
+      const badge = document.getElementById("service-badge");
+      try {
+        const response = await fetch("/api/v1/extension/status");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        service.textContent = "本機服務正常";
+        badge.textContent = "ONLINE"; badge.className = "badge ok";
+        const extension = data.extension || {};
+        document.getElementById("events-value").textContent = `${extension.events_today || 0} today`;
+        document.getElementById("events-meta").textContent = `total ${extension.events_total || 0} · last ${formatTime(extension.last_capture_at)} · server token ${extension.token_configured ? "configured" : "missing"}`;
+        document.getElementById("platforms").innerHTML = (data.platforms || []).map(item => {
+          const state = !item.enabled ? "OFF" : item.observation_status === "observed" ? "OBSERVED" : "WAITING";
+          return `<div class="platform"><div class="platform-top"><span>${escapeHtml(item.label)}</span><span class="${state === "OBSERVED" ? "ok" : "warn"}">${state}</span></div><div class="meta">today ${item.events_today || 0}<br>total ${item.events_total || 0}<br>last ${formatTime(item.last_capture_at)}</div></div>`;
+        }).join("");
+      } catch (error) {
+        service.textContent = "本機服務無法連線";
+        badge.textContent = "OFFLINE"; badge.className = "badge warn";
+        document.getElementById("events-meta").textContent = error.message;
+      }
+    }
+    document.getElementById("refresh").addEventListener("click", refresh);
+    refresh();
+    setInterval(refresh, 15000);
+  </script>
+</body>
+</html>

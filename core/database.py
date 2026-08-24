@@ -46,6 +46,8 @@ class Database:
 
         # 建立所有定義之資料表 (包含 project_states, open_loops 等)
         Base.metadata.create_all(bind=self._engine)
+        with self._engine.connect() as conn:
+            self._ensure_indexes(conn)
 
         self._session_factory = sessionmaker(
             autocommit=False,
@@ -54,14 +56,95 @@ class Database:
         )
 
     def _ensure_columns(self, conn):
-        """自動遷移補齊欄位"""
+        """Additive compatibility migration；正式 release 前將改為版本化 migration。"""
         try:
-            res = conn.execute(text("PRAGMA table_info(ai_prompt_events);")).fetchall()
-            existing_cols = {row[1] for row in res}
-            if existing_cols and "cwd" not in existing_cols:
-                conn.execute(text("ALTER TABLE ai_prompt_events ADD COLUMN cwd TEXT;"))
-        except Exception:
-            pass
+            self._add_columns_if_missing(
+                conn,
+                "ai_prompt_events",
+                {
+                    "cwd": "TEXT",
+                    "turn_key": "VARCHAR(128)",
+                    "source_path": "VARCHAR(1500)",
+                    "source_position": "INTEGER",
+                    "response_status": "VARCHAR(50)",
+                },
+            )
+            self._add_columns_if_missing(
+                conn,
+                "open_loops",
+                {
+                    "status": "VARCHAR(30) NOT NULL DEFAULT 'open'",
+                    "fingerprint": "VARCHAR(64)",
+                    "last_seen_at": "DATETIME",
+                    "updated_at": "DATETIME",
+                    "resolution_note": "TEXT",
+                },
+            )
+            if self._table_exists(conn, "open_loops"):
+                conn.execute(text(
+                    "UPDATE open_loops SET status = CASE "
+                    "WHEN resolved_at IS NULL THEN 'open' ELSE 'resolved' END "
+                    "WHERE status IS NULL OR status = ''"
+                ))
+                conn.execute(text(
+                    "UPDATE open_loops SET last_seen_at = COALESCE(last_seen_at, created_at), "
+                    "updated_at = COALESCE(updated_at, created_at)"
+                ))
+            conn.commit()
+        except Exception as exc:
+            raise RuntimeError(f"Database compatibility migration failed: {exc}") from exc
+
+    @staticmethod
+    def _add_columns_if_missing(conn, table_name: str, columns: dict[str, str]) -> None:
+        rows = conn.execute(text(f"PRAGMA table_info({table_name});")).fetchall()
+        existing = {row[1] for row in rows}
+        if not existing:
+            return
+        for column_name, declaration in columns.items():
+            if column_name not in existing:
+                conn.execute(text(
+                    f"ALTER TABLE {table_name} ADD COLUMN {column_name} {declaration};"
+                ))
+
+    @staticmethod
+    def _table_exists(conn, table_name: str) -> bool:
+        return conn.execute(
+            text("SELECT 1 FROM sqlite_master WHERE type='table' AND name=:name"),
+            {"name": table_name},
+        ).first() is not None
+
+    @staticmethod
+    def _ensure_indexes(conn) -> None:
+        """`create_all` 不會替既有表補 index，因此明確建立 idempotency 約束。"""
+        try:
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_ai_prompt_events_turn_key "
+                "ON ai_prompt_events(turn_key) WHERE turn_key IS NOT NULL;"
+            ))
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_ingestion_checkpoints_source_path "
+                "ON ingestion_checkpoints(source_path);"
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_ai_prompt_events_response_status "
+                "ON ai_prompt_events(response_status);"
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_open_loops_status ON open_loops(status);"
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_open_loops_fingerprint ON open_loops(fingerprint);"
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_open_loops_last_seen_at ON open_loops(last_seen_at);"
+            ))
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_milestone_receipt_date_threshold_channel "
+                "ON milestone_notification_receipts(local_date, milestone_minutes, channel);"
+            ))
+            conn.commit()
+        except Exception as exc:
+            raise RuntimeError(f"Database index migration failed: {exc}") from exc
 
     def get_session(self) -> Session:
         return self._session_factory()

@@ -2,6 +2,7 @@ import os
 import re
 import json
 import time
+import hashlib
 import threading
 from pathlib import Path
 from datetime import datetime
@@ -10,7 +11,7 @@ from typing import Set, Dict, Any, Optional, List, Tuple
 
 from core.config import get_config
 from core.database import get_db
-from core.models import AIPromptEvent
+from core.models import AIPromptEvent, IngestionCheckpoint
 from core.time_utils import get_local_now
 
 logger = logging.getLogger("OmniContext.AgentLogWatcher")
@@ -57,6 +58,67 @@ def extract_text_from_content(content: Any) -> str:
         return "\n".join(parts).strip()
     if isinstance(content, dict):
         return str(content.get("text") or content.get("content") or "").strip()
+
+
+def normalize_assistant_candidate(text: str | None) -> str:
+    """只保留可作為人類可讀回應的 assistant message。"""
+    candidate = (text or "").strip()
+    if len(candidate) < 3 or candidate.startswith("[") or candidate.startswith("<"):
+        return ""
+    return candidate
+
+
+def select_last_assistant_message(messages: List[str]) -> str:
+    """同一 turn 以最後一個有效 assistant message 作為 final candidate。"""
+    for message in reversed(messages):
+        candidate = normalize_assistant_candidate(message)
+        if candidate:
+            return candidate
+    return ""
+
+
+def build_turn_key(platform: str, source_path: str, source_position: int) -> str:
+    raw = f"{platform}|{Path(source_path).resolve()}|{source_position}"
+    return hashlib.sha256(raw.encode("utf-8", errors="replace")).hexdigest()
+
+
+def eof_response_status(file_path: Path, response: str | None, settle_seconds: int = 120) -> str:
+    if not response:
+        return "missing"
+    return "partial" if time.time() - file_path.stat().st_mtime < settle_seconds else "final_candidate"
+
+
+def classify_response_status(
+    response: str | None,
+    *,
+    explicit_final: bool = False,
+    boundary_closed: bool = False,
+) -> str:
+    """明確 final marker 優先；沒有 marker 時，只有下一個 user turn 能封閉前一輪。"""
+    if not response:
+        return "missing"
+    if explicit_final or boundary_closed:
+        return "final_candidate"
+    return "partial"
+
+
+def iter_jsonl_records(file_path: Path):
+    """逐行解析 JSONL；任何壞行都讓 checkpoint 保持 error，禁止靜默前移。"""
+    malformed: List[Tuple[int, str]] = []
+    with open(file_path, "r", encoding="utf-8", errors="replace") as stream:
+        for line_number, raw_line in enumerate(stream, start=1):
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                yield line_number, json.loads(line)
+            except json.JSONDecodeError as exc:
+                malformed.append((line_number, exc.msg))
+    if malformed:
+        preview = ", ".join(f"line {line}: {reason}" for line, reason in malformed[:3])
+        raise ValueError(f"Malformed JSONL ({len(malformed)} lines): {preview}")
+
+
 def extract_claude_user_text(content: Any) -> str:
     """提取 Claude Code 的 User Prompt 文字，並過濾純 tool_result 雜訊"""
     if not content:
@@ -175,8 +237,8 @@ class AgentLogWatcherService:
         self._running = False
         self._thread: threading.Thread | None = None
         self._processed_hashes: Set[str] = set()
-        # 增量掃描快取：記錄檔案的 (mtime, size) 避免重複讀取無變更檔案
-        self._file_states: Dict[str, Tuple[float, int]] = {}
+        # Process cache 只是加速；SQLite checkpoint 才是跨重啟的可信狀態。
+        self._file_states: Dict[str, Tuple[int, int]] = {}
 
     def start(self):
         enabled = self.cfg.get("watchers.agent_log_watcher.enabled", True)
@@ -208,19 +270,61 @@ class AgentLogWatcherService:
                 time.sleep(1)
 
     def _should_scan_file(self, file_path: Path, full_history: bool) -> bool:
-        """增量檔案檢查：未變更的檔案直接跳過"""
+        """只比較 checkpoint，不在解析前前移狀態。"""
         if full_history:
             return True
         try:
             stat = file_path.stat()
-            current_state = (stat.st_mtime, stat.st_size)
-            path_str = str(file_path)
+            current_state = (stat.st_mtime_ns, stat.st_size)
+            path_str = str(file_path.resolve())
             if self._file_states.get(path_str) == current_state:
                 return False
-            self._file_states[path_str] = current_state
+
+            db = get_db()
+            with db.session_scope() as session:
+                checkpoint = session.query(IngestionCheckpoint).filter_by(
+                    source_path=path_str
+                ).first()
+                if checkpoint and (
+                    checkpoint.mtime_ns,
+                    checkpoint.size_bytes,
+                ) == current_state and not checkpoint.last_error:
+                    self._file_states[path_str] = current_state
+                    return False
             return True
         except Exception:
             return True
+
+    def _mark_file_scanned(self, file_path: Path, error: str | None = None) -> None:
+        """成功後才寫入 signature；失敗只寫 error 並保留可重試狀態。"""
+        path_str = str(file_path.resolve())
+        stat = None
+        try:
+            stat = file_path.stat()
+        except OSError:
+            if error is None:
+                raise
+        db = get_db()
+        with db.session_scope() as session:
+            checkpoint = session.query(IngestionCheckpoint).filter_by(
+                source_path=path_str
+            ).first()
+            if not checkpoint:
+                checkpoint = IngestionCheckpoint(
+                    collector="agent_log_watcher",
+                    source_path=path_str,
+                    mtime_ns=0,
+                    size_bytes=0,
+                )
+                session.add(checkpoint)
+            checkpoint.last_error = error
+            checkpoint.updated_at = get_local_now()
+            if error is None and stat is not None:
+                checkpoint.mtime_ns = stat.st_mtime_ns
+                checkpoint.size_bytes = stat.st_size
+                checkpoint.source_position = stat.st_size
+                checkpoint.last_success_at = get_local_now()
+                self._file_states[path_str] = (stat.st_mtime_ns, stat.st_size)
 
     def scan_all_agents(self, full_history: bool = False):
         cfg = get_config()
@@ -245,18 +349,21 @@ class AgentLogWatcherService:
     # 1. Claude Code 日誌解析 (以 projects/**/*.jsonl 為核心成對提取 User 與 Assistant 回應)
     # =========================================================================
     def scan_claude_code_logs(self, full_history: bool = False):
-        user_home = Path.home()
-        claude_dir = user_home / ".claude"
+        claude_dir = self.cfg.get_path(
+            "watchers.agent_log_watcher.claude_code_logs_path",
+            Path.home() / ".claude",
+        )
         if not claude_dir.exists():
             return
 
         db = get_db()
         projects_dir = claude_dir / "projects"
-        has_scanned_projects = False
+        project_files = list(projects_dir.glob("**/*.jsonl")) if projects_dir.exists() else []
+        has_project_logs = bool(project_files)
 
         # 1. 優先讀取 projects/**/*.jsonl (成對解析 User 與 Assistant 完整回答)
-        if projects_dir.exists():
-            for proj_jsonl in projects_dir.glob("**/*.jsonl"):
+        if has_project_logs:
+            for proj_jsonl in project_files:
                 if not self._should_scan_file(proj_jsonl, full_history):
                     continue
 
@@ -265,94 +372,107 @@ class AgentLogWatcherService:
                     current_user_time = None
                     current_cwd = None
                     current_session_id = None
+                    current_user_position = None
                     accumulated_responses: List[str] = []
+                    explicit_final_responses: List[str] = []
 
-                    with open(proj_jsonl, "r", encoding="utf-8", errors="ignore") as f:
-                        for line in f:
-                            line = line.strip()
-                            if not line:
-                                continue
-                            try:
-                                item = json.loads(line)
-                                msg_type = item.get("type")
-                                ts = parse_timestamp_safe(item.get("timestamp") or item.get("createdAt"))
+                    for line_number, item in iter_jsonl_records(proj_jsonl):
+                        msg_type = item.get("type")
+                        ts = parse_timestamp_safe(item.get("timestamp") or item.get("createdAt"))
 
-                                if msg_type == "user":
-                                    msg = item.get("message", {})
-                                    content = msg.get("content") if isinstance(msg, dict) else item.get("content")
-                                    user_text = extract_claude_user_text(content)
+                        if msg_type == "user":
+                            msg = item.get("message", {})
+                            content = msg.get("content") if isinstance(msg, dict) else item.get("content")
+                            user_text = extract_claude_user_text(content)
 
-                                    if user_text and len(user_text) >= 2:
-                                        if current_user_prompt and current_user_time:
-                                            full_resp = "\n\n".join(accumulated_responses).strip() if accumulated_responses else None
-                                            self._upsert_ai_event(
-                                                db, platform="claude_code", conv_id=current_session_id,
-                                                prompt=current_user_prompt, response=full_resp,
-                                                cwd=current_cwd, timestamp=current_user_time
-                                            )
-                                        current_user_prompt = user_text
-                                        current_user_time = ts or get_local_now()
-                                        current_cwd = item.get("cwd") or (str(proj_jsonl.parent) if proj_jsonl.parent else None)
-                                        current_session_id = item.get("sessionId")
-                                        accumulated_responses = []
+                            if user_text and len(user_text) >= 2:
+                                if current_user_prompt and current_user_time:
+                                    explicit_final = select_last_assistant_message(explicit_final_responses)
+                                    full_resp = explicit_final or select_last_assistant_message(accumulated_responses) or None
+                                    self._upsert_ai_event(
+                                        db, platform="claude_code", conv_id=current_session_id,
+                                        prompt=current_user_prompt, response=full_resp,
+                                        cwd=current_cwd, timestamp=current_user_time,
+                                        turn_key=build_turn_key("claude_code", str(proj_jsonl), current_user_position or 0),
+                                        source_path=str(proj_jsonl.resolve()),
+                                        source_position=current_user_position,
+                                        response_status=classify_response_status(
+                                            full_resp,
+                                            explicit_final=bool(explicit_final),
+                                            boundary_closed=True,
+                                        ),
+                                    )
+                                current_user_prompt = user_text
+                                current_user_time = ts or get_local_now()
+                                current_cwd = item.get("cwd") or str(proj_jsonl.parent)
+                                current_session_id = item.get("sessionId")
+                                current_user_position = line_number
+                                accumulated_responses = []
+                                explicit_final_responses = []
 
-                                elif msg_type == "assistant":
-                                    msg = item.get("message", {})
-                                    content = msg.get("content") if isinstance(msg, dict) else item.get("content")
-                                    assistant_text = extract_claude_assistant_text(content)
-                                    if assistant_text and not assistant_text.startswith("["):
-                                        accumulated_responses.append(assistant_text)
-                            except Exception:
-                                continue
-
-                        # 處理最後一筆
-                        if current_user_prompt and current_user_time:
-                            full_resp = "\n\n".join(accumulated_responses).strip() if accumulated_responses else None
-                            self._upsert_ai_event(
-                                db, platform="claude_code", conv_id=current_session_id,
-                                prompt=current_user_prompt, response=full_resp,
-                                cwd=current_cwd, timestamp=current_user_time
-                            )
-                    has_scanned_projects = True
+                        elif msg_type == "assistant":
+                            msg = item.get("message", {})
+                            content = msg.get("content") if isinstance(msg, dict) else item.get("content")
+                            assistant_text = extract_claude_assistant_text(content)
+                            if assistant_text and not assistant_text.startswith("["):
+                                accumulated_responses.append(assistant_text)
+                                if isinstance(msg, dict) and msg.get("stop_reason") == "end_turn":
+                                    explicit_final_responses.append(assistant_text)
+                    # 處理最後一筆
+                    if current_user_prompt and current_user_time:
+                        explicit_final = select_last_assistant_message(explicit_final_responses)
+                        full_resp = explicit_final or select_last_assistant_message(accumulated_responses) or None
+                        self._upsert_ai_event(
+                            db, platform="claude_code", conv_id=current_session_id,
+                            prompt=current_user_prompt, response=full_resp,
+                            cwd=current_cwd, timestamp=current_user_time,
+                            turn_key=build_turn_key("claude_code", str(proj_jsonl), current_user_position or 0),
+                            source_path=str(proj_jsonl.resolve()),
+                            source_position=current_user_position,
+                            response_status=classify_response_status(
+                                full_resp,
+                                explicit_final=bool(explicit_final),
+                                boundary_closed=False,
+                            ),
+                        )
+                    self._mark_file_scanned(proj_jsonl)
                 except Exception as e:
+                    self._mark_file_scanned(proj_jsonl, str(e))
                     logger.debug(f"Error reading Claude project log {proj_jsonl}: {e}")
 
         # 2. 僅在無 projects 目錄時才以 history.jsonl 作為備援回退
         history_file = claude_dir / "history.jsonl"
-        if not has_scanned_projects and history_file.exists() and self._should_scan_file(history_file, full_history):
+        if not has_project_logs and history_file.exists() and self._should_scan_file(history_file, full_history):
             try:
-                with open(history_file, "r", encoding="utf-8", errors="ignore") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            item = json.loads(line)
-                            prompt_text = item.get("display") or item.get("text") or item.get("prompt")
-                            if not prompt_text or len(prompt_text.strip()) < 2:
-                                continue
+                for line_number, item in iter_jsonl_records(history_file):
+                    prompt_text = item.get("display") or item.get("text") or item.get("prompt")
+                    if not prompt_text or len(prompt_text.strip()) < 2:
+                        continue
 
-                            event_time = parse_timestamp_safe(item.get("timestamp"))
-                            if not event_time:
-                                continue
+                    event_time = parse_timestamp_safe(item.get("timestamp"))
+                    if not event_time:
+                        continue
 
-                            project_path = item.get("project") or item.get("cwd")
-                            clean_prompt = prompt_text.strip()
+                    project_path = item.get("project") or item.get("cwd")
+                    clean_prompt = prompt_text.strip()
+                    hash_key = f"claude_code_hist:{clean_prompt[:50]}:{event_time.strftime('%Y%m%d%H%M')}"
+                    if hash_key in self._processed_hashes:
+                        continue
 
-                            hash_key = f"claude_code_hist:{clean_prompt[:50]}:{event_time.strftime('%Y%m%d%H%M')}"
-                            if hash_key in self._processed_hashes:
-                                continue
-
-                            self._upsert_ai_event(
-                                db, platform="claude_code", conv_id=None,
-                                prompt=clean_prompt, response=None,
-                                cwd=str(project_path) if project_path else None,
-                                timestamp=event_time
-                            )
-                            self._processed_hashes.add(hash_key)
-                        except Exception:
-                            continue
+                    self._upsert_ai_event(
+                        db, platform="claude_code", conv_id=None,
+                        prompt=clean_prompt, response=None,
+                        cwd=str(project_path) if project_path else None,
+                        timestamp=event_time,
+                        turn_key=build_turn_key("claude_code", str(history_file), line_number),
+                        source_path=str(history_file.resolve()),
+                        source_position=line_number,
+                        response_status="missing",
+                    )
+                    self._processed_hashes.add(hash_key)
+                self._mark_file_scanned(history_file)
             except Exception as e:
+                self._mark_file_scanned(history_file, str(e))
                 logger.debug(f"Error reading Claude history.jsonl: {e}")
 
     # =========================================================================
@@ -370,31 +490,29 @@ class AgentLogWatcherService:
         history_file = codex_dir / "history.jsonl"
         if history_file.exists() and self._should_scan_file(history_file, full_history):
             try:
-                with open(history_file, "r", encoding="utf-8", errors="ignore") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            item = json.loads(line)
-                            prompt_text = item.get("prompt") or item.get("text") or item.get("display")
-                            if not prompt_text or len(prompt_text.strip()) < 2:
-                                continue
+                for line_number, item in iter_jsonl_records(history_file):
+                    prompt_text = item.get("prompt") or item.get("text") or item.get("display")
+                    if not prompt_text or len(prompt_text.strip()) < 2:
+                        continue
 
-                            event_time = parse_timestamp_safe(item.get("ts") or item.get("timestamp") or item.get("time"))
-                            if not event_time:
-                                continue
+                    event_time = parse_timestamp_safe(item.get("ts") or item.get("timestamp") or item.get("time"))
+                    if not event_time:
+                        continue
 
-                            cwd = item.get("cwd") or item.get("project")
-                            clean_prompt = prompt_text.strip()
-                            self._upsert_ai_event(
-                                db, platform="codex", conv_id=item.get("session_id"),
-                                prompt=clean_prompt, response=None,
-                                cwd=str(cwd) if cwd else None, timestamp=event_time
-                            )
-                        except Exception:
-                            continue
+                    cwd = item.get("cwd") or item.get("project")
+                    clean_prompt = prompt_text.strip()
+                    self._upsert_ai_event(
+                        db, platform="codex", conv_id=item.get("session_id"),
+                        prompt=clean_prompt, response=None,
+                        cwd=str(cwd) if cwd else None, timestamp=event_time,
+                        turn_key=build_turn_key("codex", str(history_file), line_number),
+                        source_path=str(history_file.resolve()),
+                        source_position=line_number,
+                        response_status="missing",
+                    )
+                self._mark_file_scanned(history_file)
             except Exception as e:
+                self._mark_file_scanned(history_file, str(e))
                 logger.debug(f"Error reading Codex history.jsonl: {e}")
 
         # 2. 讀取 sessions/**/*.json 與 sessions/**/*.jsonl (包含 2026/08 活躍對話)
@@ -411,100 +529,153 @@ class AgentLogWatcherService:
                         self._parse_codex_json_session(db, s_file)
                     else:
                         self._parse_codex_jsonl_session(db, s_file)
+                    self._mark_file_scanned(s_file)
                 except Exception as e:
+                    self._mark_file_scanned(s_file, str(e))
                     logger.debug(f"Error parsing Codex session {s_file}: {e}")
 
     def _parse_codex_json_session(self, db, file_path: Path):
         """解析舊版格式 Codex .json 檔案"""
-        with open(file_path, "r", encoding="utf-8", errors="ignore") as fp:
+        with open(file_path, "r", encoding="utf-8", errors="replace") as fp:
             data = json.load(fp)
             session_info = data.get("session", {})
             session_id = session_info.get("id")
             session_time = parse_timestamp_safe(session_info.get("timestamp"))
             items = data.get("items", [])
-
             current_prompt = ""
             current_time = session_time
-            for it in items:
+            current_position: int | None = None
+            assistant_messages: List[str] = []
+
+            def flush_turn(boundary_closed: bool = False) -> None:
+                nonlocal current_prompt, current_time, current_position, assistant_messages
+                if not current_prompt:
+                    return
+                response = select_last_assistant_message(assistant_messages) or None
+                self._upsert_ai_event(
+                    db,
+                    platform="codex",
+                    conv_id=session_id,
+                    prompt=current_prompt,
+                    response=response,
+                    cwd=None,
+                    timestamp=current_time or get_local_now(),
+                    turn_key=build_turn_key("codex", str(file_path), current_position or 0),
+                    source_path=str(file_path.resolve()),
+                    source_position=current_position,
+                    response_status=classify_response_status(
+                        response,
+                        boundary_closed=boundary_closed,
+                    ),
+                )
+                current_prompt = ""
+                current_time = None
+                current_position = None
+                assistant_messages = []
+
+            for item_index, it in enumerate(items, start=1):
                 role = it.get("role")
                 content = extract_text_from_content(it.get("content"))
                 if role == "user" and content:
                     if "<recommended_plugins>" in content or len(content) < 2:
                         continue
+                    flush_turn(boundary_closed=True)
                     current_prompt = content
+                    current_position = item_index
                 elif role == "assistant" and current_prompt:
-                    self._upsert_ai_event(
-                        db, platform="codex", conv_id=session_id,
-                        prompt=current_prompt, response=content if content else None,
-                        cwd=None, timestamp=current_time or get_local_now()
-                    )
-                    current_prompt = ""
+                    candidate = normalize_assistant_candidate(content)
+                    if candidate:
+                        assistant_messages.append(candidate)
+
+            flush_turn(boundary_closed=False)
 
     def _parse_codex_jsonl_session(self, db, file_path: Path):
-        """解析新版格式 Codex .jsonl 檔案 (2025/2026 rollout session)"""
+        """解析 Codex rollout；同一 turn 保留最後一個有效 assistant message。"""
         session_id = None
         session_cwd = None
         current_prompt = ""
         current_time = None
+        current_position: int | None = None
+        assistant_messages: List[str] = []
+        explicit_final_messages: List[str] = []
 
-        with open(file_path, "r", encoding="utf-8", errors="ignore") as fp:
-            for line in fp:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    d = json.loads(line)
-                    t = d.get("type")
-                    ts = parse_timestamp_safe(d.get("timestamp"))
-                    payload = d.get("payload", {})
-
-                    if t == "session_meta" and isinstance(payload, dict):
-                        session_id = payload.get("id")
-                        session_cwd = payload.get("cwd")
-
-                    elif t == "response_item" and isinstance(payload, dict):
-                        role = payload.get("role")
-                        content = extract_text_from_content(payload.get("content"))
-
-                        if role == "user" and content:
-                            if "<recommended_plugins>" in content or len(content) < 2:
-                                continue
-                            current_prompt = content
-                            current_time = ts or get_local_now()
-
-                        elif role == "assistant" and current_prompt:
-                            clean_cnt = (content or "").strip()
-                            if not clean_cnt.startswith("[") and not clean_cnt.startswith("<") and len(clean_cnt) >= 3:
-                                self._upsert_ai_event(
-                                    db, platform="codex", conv_id=session_id,
-                                    prompt=current_prompt, response=clean_cnt,
-                                    cwd=session_cwd, timestamp=current_time or ts or get_local_now()
-                                )
-                                current_prompt = ""
-                                current_time = None
-
-                    elif t == "event_msg" and isinstance(payload, dict):
-                        p_type = payload.get("type")
-                        if p_type == "agent_message" and current_prompt:
-                            msg_text = extract_text_from_content(payload.get("message") or payload.get("text"))
-                            clean_msg = (msg_text or "").strip()
-                            if clean_msg and not clean_msg.startswith("[") and not clean_msg.startswith("<") and len(clean_msg) >= 3:
-                                self._upsert_ai_event(
-                                    db, platform="codex", conv_id=session_id,
-                                    prompt=current_prompt, response=clean_msg,
-                                    cwd=session_cwd, timestamp=current_time or ts or get_local_now()
-                                )
-                                current_prompt = ""
-                                current_time = None
-                except Exception:
-                    continue
-
-        if current_prompt and current_time:
+        def flush_turn(boundary_closed: bool = False) -> None:
+            nonlocal current_prompt, current_time, current_position, assistant_messages, explicit_final_messages
+            if not current_prompt:
+                return
+            final_response = select_last_assistant_message(explicit_final_messages)
+            response = final_response or select_last_assistant_message(assistant_messages) or None
             self._upsert_ai_event(
-                db, platform="codex", conv_id=session_id,
-                prompt=current_prompt, response=None,
-                cwd=session_cwd, timestamp=current_time
+                db,
+                platform="codex",
+                conv_id=session_id,
+                prompt=current_prompt,
+                response=response,
+                cwd=session_cwd,
+                timestamp=current_time or get_local_now(),
+                turn_key=build_turn_key("codex", str(file_path), current_position or 0),
+                source_path=str(file_path.resolve()),
+                source_position=current_position,
+                response_status=classify_response_status(
+                    response,
+                    explicit_final=bool(final_response),
+                    boundary_closed=boundary_closed,
+                ),
             )
+            current_prompt = ""
+            current_time = None
+            current_position = None
+            assistant_messages = []
+            explicit_final_messages = []
+
+        for line_number, d in iter_jsonl_records(file_path):
+            t = d.get("type")
+            ts = parse_timestamp_safe(d.get("timestamp"))
+            payload = d.get("payload", {})
+
+            if t == "session_meta" and isinstance(payload, dict):
+                session_id = payload.get("id")
+                session_cwd = payload.get("cwd")
+
+            elif t == "response_item" and isinstance(payload, dict):
+                role = payload.get("role")
+                content = extract_text_from_content(payload.get("content"))
+
+                if role == "user" and content:
+                    if "<recommended_plugins>" in content or len(content) < 2:
+                        continue
+                    flush_turn(boundary_closed=True)
+                    current_prompt = content
+                    current_time = ts or get_local_now()
+                    current_position = line_number
+
+                elif role == "assistant" and current_prompt:
+                    candidate = normalize_assistant_candidate(content)
+                    if candidate and candidate not in assistant_messages:
+                        assistant_messages.append(candidate)
+                    if payload.get("phase") == "final_answer" and candidate:
+                        if candidate not in explicit_final_messages:
+                            explicit_final_messages.append(candidate)
+
+            elif t == "event_msg" and isinstance(payload, dict):
+                p_type = payload.get("type")
+                if p_type == "agent_message" and current_prompt:
+                    msg_text = extract_text_from_content(payload.get("message") or payload.get("text"))
+                    candidate = normalize_assistant_candidate(msg_text)
+                    if candidate and candidate not in assistant_messages:
+                        assistant_messages.append(candidate)
+                elif p_type == "item_completed" and current_prompt:
+                    item = payload.get("item", {})
+                    if isinstance(item, dict) and item.get("type") == "AgentMessage":
+                        msg_text = extract_text_from_content(item.get("content"))
+                        candidate = normalize_assistant_candidate(msg_text)
+                        if candidate and candidate not in assistant_messages:
+                            assistant_messages.append(candidate)
+                        if item.get("phase") == "final_answer" and candidate:
+                            if candidate not in explicit_final_messages:
+                                explicit_final_messages.append(candidate)
+
+        flush_turn(boundary_closed=False)
 
     # =========================================================================
     # 3. Antigravity 日誌解析 (含 PLANNER_RESPONSE 真實助理回應提取)
@@ -514,7 +685,7 @@ class AgentLogWatcherService:
         if not path_str:
             return
 
-        base_path = Path(path_str)
+        base_path = self.cfg.expand_path(path_str)
         if not base_path.exists():
             return
 
@@ -527,58 +698,72 @@ class AgentLogWatcherService:
             conv_id = transcript_path.parent.parent.name
             current_prompt = ""
             current_time = None
+            current_position: int | None = None
             latest_real_response = ""
+            latest_response_explicit_final = False
 
             try:
-                with open(transcript_path, "r", encoding="utf-8", errors="ignore") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            item = json.loads(line)
-                            step_type = item.get("type")
-                            ts = parse_timestamp_safe(item.get("created_at") or item.get("timestamp"))
+                for line_number, item in iter_jsonl_records(transcript_path):
+                    step_type = item.get("type")
+                    ts = parse_timestamp_safe(item.get("created_at") or item.get("timestamp"))
 
-                            if step_type == "USER_INPUT":
-                                raw_prompt = item.get("content", "")
-                                clean_prompt = raw_prompt.strip()
-                                if clean_prompt.startswith("<USER_REQUEST>"):
-                                    clean_prompt = clean_prompt.replace("<USER_REQUEST>", "").replace("</USER_REQUEST>", "").strip()
+                    if step_type == "USER_INPUT":
+                        raw_prompt = item.get("content", "")
+                        clean_prompt = raw_prompt.strip()
+                        if clean_prompt.startswith("<USER_REQUEST>"):
+                            clean_prompt = clean_prompt.replace("<USER_REQUEST>", "").replace("</USER_REQUEST>", "").strip()
 
-                                # 過濾系統內部注入訊息與 Checkpoint Summary
-                                if "<SYSTEM_MESSAGE>" in clean_prompt or "<CONTEXT_SUMMARY>" in clean_prompt:
-                                    continue
-
-                                if len(clean_prompt) >= 2:
-                                    # 遇到新提問：先寫入上一輪提問與其最終真實回答
-                                    if current_prompt and current_time:
-                                        self._upsert_ai_event(
-                                            db, platform="antigravity", conv_id=conv_id,
-                                            prompt=current_prompt, response=latest_real_response if latest_real_response else None,
-                                            url=str_path, timestamp=current_time
-                                        )
-                                    current_prompt = clean_prompt
-                                    current_time = ts or datetime.fromtimestamp(transcript_path.stat().st_mtime)
-                                    latest_real_response = ""
-
-                            elif step_type == "PLANNER_RESPONSE":
-                                model_content = (item.get("content") or "").strip()
-                                # 排除純空字串或工具調用字串，只保留實質結論
-                                if model_content and len(model_content) >= 5 and not model_content.startswith("<") and not model_content.startswith("["):
-                                    latest_real_response = model_content
-
-                        except Exception:
+                        # 過濾系統內部注入訊息與 Checkpoint Summary
+                        if "<SYSTEM_MESSAGE>" in clean_prompt or "<CONTEXT_SUMMARY>" in clean_prompt:
                             continue
 
-                    # 寫入最後一輪
-                    if current_prompt and current_time:
-                        self._upsert_ai_event(
-                            db, platform="antigravity", conv_id=conv_id,
-                            prompt=current_prompt, response=latest_real_response if latest_real_response else None,
-                            url=str_path, timestamp=current_time
-                        )
+                        if len(clean_prompt) >= 2:
+                            # 遇到新提問：先寫入上一輪提問與其最終真實回答
+                            if current_prompt and current_time:
+                                self._upsert_ai_event(
+                                    db, platform="antigravity", conv_id=conv_id,
+                                    prompt=current_prompt, response=latest_real_response if latest_real_response else None,
+                                    url=str_path, timestamp=current_time,
+                                    turn_key=build_turn_key("antigravity", str(transcript_path), current_position or 0),
+                                    source_path=str(transcript_path.resolve()),
+                                    source_position=current_position,
+                                    response_status=classify_response_status(
+                                        latest_real_response,
+                                        explicit_final=latest_response_explicit_final,
+                                        boundary_closed=True,
+                                    ),
+                                )
+                            current_prompt = clean_prompt
+                            current_time = ts or datetime.fromtimestamp(transcript_path.stat().st_mtime)
+                            current_position = line_number
+                            latest_real_response = ""
+                            latest_response_explicit_final = False
+
+                    elif step_type == "PLANNER_RESPONSE":
+                        model_content = (item.get("content") or "").strip()
+                        # 排除純空字串或工具調用字串，只保留實質結論
+                        if model_content and len(model_content) >= 5 and not model_content.startswith("<") and not model_content.startswith("["):
+                            latest_real_response = model_content
+                            latest_response_explicit_final = item.get("status") == "DONE"
+
+                # 寫入最後一輪
+                if current_prompt and current_time:
+                    self._upsert_ai_event(
+                        db, platform="antigravity", conv_id=conv_id,
+                        prompt=current_prompt, response=latest_real_response if latest_real_response else None,
+                        url=str_path, timestamp=current_time,
+                        turn_key=build_turn_key("antigravity", str(transcript_path), current_position or 0),
+                        source_path=str(transcript_path.resolve()),
+                        source_position=current_position,
+                        response_status=classify_response_status(
+                            latest_real_response,
+                            explicit_final=latest_response_explicit_final,
+                            boundary_closed=False,
+                        ),
+                    )
+                self._mark_file_scanned(transcript_path)
             except Exception as e:
+                self._mark_file_scanned(transcript_path, str(e))
                 logger.debug(f"Could not read transcript {transcript_path}: {e}")
 
     # =========================================================================
@@ -588,7 +773,11 @@ class AgentLogWatcherService:
         self, db, platform: str, conv_id: Optional[str],
         prompt: str, response: Optional[str],
         cwd: Optional[str] = None, url: Optional[str] = None,
-        timestamp: Optional[datetime] = None
+        timestamp: Optional[datetime] = None,
+        turn_key: Optional[str] = None,
+        source_path: Optional[str] = None,
+        source_position: Optional[int] = None,
+        response_status: Optional[str] = None,
     ):
         # 先脫殼再判斷：避免把包在標籤裡的真實提問誤判為雜訊
         clean_prompt = clean_prompt_text(prompt)
@@ -600,11 +789,10 @@ class AgentLogWatcherService:
             return
 
         # 清洗 response：嚴格過濾以 [ 開頭之工具調用字串與佔位符
-        clean_resp = (response or "").strip()
-        if clean_resp.startswith("[") or clean_resp.startswith("<") or clean_resp in ["[Executed in Antigravity Agent Session]", "[Codex CLI Session]"]:
-            clean_resp = None
-        if clean_resp and len(clean_resp) < 3:
-            clean_resp = None
+        clean_resp = normalize_assistant_candidate(response) or None
+        normalized_status = response_status or ("final_candidate" if clean_resp else "missing")
+        if normalized_status not in {"missing", "partial", "final_candidate"}:
+            normalized_status = "partial" if clean_resp else "missing"
 
         # 針對 Documents/Codex 等一次性暫存目錄做正規化標籤
         tag = None
@@ -620,15 +808,30 @@ class AgentLogWatcherService:
         event_time = timestamp or get_local_now()
 
         with db.session_scope() as session:
-            # 依 platform + conversation_id (或 prompt) 查詢既有紀錄
-            query = session.query(AIPromptEvent).filter(
-                AIPromptEvent.platform == platform,
-                AIPromptEvent.prompt_text == clean_prompt
-            )
-            if conv_id:
-                query = query.filter(AIPromptEvent.conversation_id == conv_id)
+            # 有 provenance 時以 stable turn_key 區分同 conversation 的重複 prompt。
+            if turn_key:
+                query = session.query(AIPromptEvent).filter(AIPromptEvent.turn_key == turn_key)
+            else:
+                query = session.query(AIPromptEvent).filter(
+                    AIPromptEvent.platform == platform,
+                    AIPromptEvent.prompt_text == clean_prompt,
+                )
+                if conv_id:
+                    query = query.filter(AIPromptEvent.conversation_id == conv_id)
 
             existing = query.first()
+            if not existing and turn_key:
+                legacy_query = session.query(AIPromptEvent).filter(
+                    AIPromptEvent.turn_key.is_(None),
+                    AIPromptEvent.platform == platform,
+                    AIPromptEvent.prompt_text == clean_prompt,
+                    AIPromptEvent.timestamp == event_time,
+                )
+                if conv_id:
+                    legacy_query = legacy_query.filter(
+                        AIPromptEvent.conversation_id == conv_id
+                    )
+                existing = legacy_query.first()
             if not existing:
                 session.add(AIPromptEvent(
                     platform=platform,
@@ -638,17 +841,29 @@ class AgentLogWatcherService:
                     response_text=clean_resp,
                     project_tag=tag,
                     cwd=cwd,
-                    timestamp=event_time
+                    timestamp=event_time,
+                    turn_key=turn_key,
+                    source_path=source_path,
+                    source_position=source_position,
+                    response_status=normalized_status,
                 ))
             else:
-                # 若已有紀錄但先前沒有 response_text，或現在有了真實回應，進行補全
-                if clean_resp and (not existing.response_text or existing.response_text.startswith("[")):
+                # stable turn 每次都依完整來源重算，允許錯誤 final 降回 partial。
+                if clean_resp:
                     existing.response_text = clean_resp
-                elif not clean_resp and existing.response_text and existing.response_text.startswith("["):
+                    existing.response_status = normalized_status
+                elif not clean_resp and not existing.response_text:
                     existing.response_text = None
+                    existing.response_status = "missing"
                 if cwd and not existing.cwd:
                     existing.cwd = cwd
                 if tag and not existing.project_tag:
                     existing.project_tag = tag
                 if url and not existing.url:
                     existing.url = url
+                if turn_key and not existing.turn_key:
+                    existing.turn_key = turn_key
+                if source_path:
+                    existing.source_path = source_path
+                if source_position is not None:
+                    existing.source_position = source_position

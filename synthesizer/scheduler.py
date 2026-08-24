@@ -7,6 +7,7 @@ from .aggregator import generate_daily_summary_pipeline, generate_periodic_check
 from notifiers.telegram_notifier import TelegramNotifier
 from notifiers.desktop_notifier import DesktopNotifier
 from exporters.daily_brief import export_daily_brief
+from core.usage_analytics import evaluate_daily_milestones
 
 logger = logging.getLogger("OmniContext.Scheduler")
 
@@ -25,8 +26,12 @@ class SynthesisScheduler:
         checkpoint_enabled = self.cfg.get("synthesizer.periodic_checkpoint.enabled", True)
         telegram_enabled = self.cfg.get("notifiers.telegram.enabled", False)
         desktop_enabled = self.cfg.get("notifiers.desktop.enabled", True)
+        usage_milestones_enabled = (
+            self.cfg.get("usage_tracking.enabled", False)
+            and self.cfg.get("usage_tracking.notifications.enabled", False)
+        )
 
-        if not daily_enabled and not checkpoint_enabled and not telegram_enabled and not desktop_enabled:
+        if not daily_enabled and not checkpoint_enabled and not telegram_enabled and not desktop_enabled and not usage_milestones_enabled:
             logger.info("Schedulers are disabled in config.")
             return
 
@@ -96,21 +101,73 @@ class SynthesisScheduler:
                     )
                     logger.info(f"Desktop notification '{job_id}' scheduled for {d_h:02d}:{d_m:02d} daily.")
 
+            if usage_milestones_enabled:
+                usage_interval = max(
+                    5,
+                    int(self.cfg.get("usage_tracking.notifications.check_interval_minutes", 15)),
+                )
+                self._apscheduler.add_job(
+                    func=self._run_usage_milestone_job,
+                    trigger="interval",
+                    minutes=usage_interval,
+                    id="usage_milestone_job",
+                    replace_existing=True,
+                )
+                logger.info(
+                    f"Usage milestone evaluation scheduled every {usage_interval} minutes."
+                )
+
             self._apscheduler.start()
         except ImportError:
             # 原生執行緒排程備援機制
             self._running = True
             self._thread = threading.Thread(
                 target=self._std_scheduler_loop,
-                args=(hour, minute, interval_hours, daily_enabled, checkpoint_enabled),
+                args=(
+                    hour,
+                    minute,
+                    interval_hours,
+                    daily_enabled,
+                    checkpoint_enabled,
+                    telegram_enabled,
+                    desktop_enabled,
+                    usage_milestones_enabled,
+                ),
                 daemon=True
             )
             self._thread.start()
             logger.info("Synthesis scheduler (Built-in Timer) started.")
 
-    def _std_scheduler_loop(self, target_hour: int, target_minute: int, interval_hours: int, daily_enabled: bool, cp_enabled: bool):
+    def _std_scheduler_loop(
+        self,
+        target_hour: int,
+        target_minute: int,
+        interval_hours: int,
+        daily_enabled: bool,
+        cp_enabled: bool,
+        telegram_enabled: bool,
+        desktop_enabled: bool,
+        usage_milestones_enabled: bool,
+    ):
         last_executed_day = None
         last_cp_time = time.time()
+        last_usage_time = 0.0
+        last_desktop_morning_day = None
+        last_desktop_evening_day = None
+        last_telegram_morning_day = None
+
+        desktop_morning = self._parse_clock(
+            self.cfg.get("notifiers.desktop.morning_briefing_time", "08:30"),
+            (8, 30),
+        )
+        desktop_evening = self._parse_clock(
+            self.cfg.get("notifiers.desktop.evening_summary_time", "22:00"),
+            (22, 0),
+        )
+        telegram_morning = self._parse_clock(
+            self.cfg.get("notifiers.telegram.morning_briefing_time", "09:00"),
+            (9, 0),
+        )
 
         while self._running:
             now = datetime.now()
@@ -126,7 +183,81 @@ class SynthesisScheduler:
                 last_cp_time = time.time()
                 self._run_checkpoint_job()
 
+            if usage_milestones_enabled:
+                usage_interval = max(
+                    5,
+                    int(self.cfg.get("usage_tracking.notifications.check_interval_minutes", 15)),
+                )
+                if (time.time() - last_usage_time) >= usage_interval * 60:
+                    last_usage_time = time.time()
+                    self._run_usage_milestone_job()
+
+            if (
+                desktop_enabled
+                and (now.hour, now.minute) == desktop_morning
+                and last_desktop_morning_day != today_str
+            ):
+                last_desktop_morning_day = today_str
+                self._run_desktop_morning_job()
+
+            if (
+                desktop_enabled
+                and (now.hour, now.minute) == desktop_evening
+                and last_desktop_evening_day != today_str
+            ):
+                last_desktop_evening_day = today_str
+                self._run_desktop_evening_job()
+
+            if (
+                telegram_enabled
+                and (now.hour, now.minute) == telegram_morning
+                and last_telegram_morning_day != today_str
+            ):
+                last_telegram_morning_day = today_str
+                self._run_morning_briefing_job()
+
             time.sleep(30)
+
+    @staticmethod
+    def _parse_clock(value, fallback: tuple[int, int]) -> tuple[int, int]:
+        try:
+            hour, minute = [int(part) for part in str(value).split(":", 1)]
+            if 0 <= hour <= 23 and 0 <= minute <= 59:
+                return hour, minute
+        except (TypeError, ValueError):
+            pass
+        return fallback
+
+    def configured_job_ids(self) -> list[str]:
+        jobs = []
+        if self.cfg.get("synthesizer.schedule.enabled", True):
+            jobs.append("daily_synthesis_job")
+        if self.cfg.get("synthesizer.periodic_checkpoint.enabled", True):
+            jobs.append("periodic_checkpoint_job")
+        if self.cfg.get("notifiers.telegram.enabled", False):
+            jobs.append("morning_briefing_job")
+        if self.cfg.get("notifiers.desktop.enabled", True):
+            jobs.extend(["desktop_morning_job", "desktop_evening_job"])
+        if (
+            self.cfg.get("usage_tracking.enabled", False)
+            and self.cfg.get("usage_tracking.notifications.enabled", False)
+        ):
+            jobs.append("usage_milestone_job")
+        return sorted(jobs)
+
+    def active_job_ids(self) -> list[str]:
+        if self._apscheduler and getattr(self._apscheduler, "running", False):
+            return sorted(job.id for job in self._apscheduler.get_jobs())
+        if self._thread and self._thread.is_alive():
+            return self.configured_job_ids()
+        return []
+
+    def backend_name(self) -> str:
+        if self._apscheduler and getattr(self._apscheduler, "running", False):
+            return "apscheduler"
+        if self._thread and self._thread.is_alive():
+            return "builtin_timer"
+        return "stopped"
 
     def _run_daily_job(self):
         logger.info("Triggering scheduled daily synthesis...")
@@ -180,6 +311,14 @@ class SynthesisScheduler:
             self._desktop.send_evening_summary()
         except Exception as e:
             logger.error(f"Error sending desktop evening summary: {e}", exc_info=True)
+
+    def _run_usage_milestone_job(self):
+        logger.info("Evaluating daily interface usage milestones...")
+        try:
+            result = evaluate_daily_milestones(notifier=self._desktop)
+            logger.info(f"Usage milestone evaluation: {result.get('status')}")
+        except Exception as e:
+            logger.error(f"Error evaluating usage milestone: {e}", exc_info=True)
 
     def _run_morning_briefing_job(self):
         logger.info("Triggering scheduled morning briefing...")

@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>OmniContext Status</title>
+  <title>OmniContext Extension Monitor</title>
   <style>
     body {
       width: 280px;
@@ -83,11 +83,26 @@
     button:hover {
       background: #2563eb;
     }
+    label {
+      display: block;
+      margin-top: 12px;
+      font-size: 11px;
+      color: #475569;
+    }
+    input {
+      box-sizing: border-box;
+      width: 100%;
+      margin-top: 4px;
+      padding: 7px;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      font-size: 12px;
+    }
   </style>
 </head>
 <body>
   <div class="header">
-    <h3>🌐 OmniContext Monitor</h3>
+    <h3>🌐 OmniContext Extension Monitor</h3>
   </div>
 
   <div id="status-container" class="status-badge status-offline">
@@ -95,18 +110,28 @@
     <span id="status-text">檢查本機連線中...</span>
   </div>
 
+  <div id="pairing-container" class="status-badge status-offline">
+    <span id="pairing-dot" class="dot dot-red"></span>
+    <span id="pairing-text">尚未驗證 Extension 配對</span>
+  </div>
+
   <div class="info">
     自動擷取當前頁面發送的 Prompt 與 AI 回應並即時傳送至本地 SQLite 庫。
   </div>
 
   <div class="platforms">
-    <div class="platform-tag">✓ Gemini</div>
-    <div class="platform-tag">✓ ChatGPT</div>
-    <div class="platform-tag">✓ Claude.ai</div>
-    <div class="platform-tag">✓ Manus.im</div>
+    <div class="platform-tag" data-platform="gemini">支援 · Gemini</div>
+    <div class="platform-tag" data-platform="chatgpt">支援 · ChatGPT</div>
+    <div class="platform-tag" data-platform="claude">支援 · Claude.ai</div>
+    <div class="platform-tag" data-platform="manus">支援 · Manus.im</div>
   </div>
 
+  <label for="ingest-token">Browser extension ingest token</label>
+  <input id="ingest-token" type="password" autocomplete="off" placeholder="OMNICONTEXT_INGEST_TOKEN">
+  <button id="btn-save-token">儲存 Token</button>
+
   <button id="btn-check">重新整理連線狀態</button>
+  <button id="btn-open-monitor">開啟 localhost Monitor</button>
 
   <script src="popup.js"></script>
 </body>

@@ -77,7 +77,7 @@ class GitWatcherService:
         # 每 30 分鐘重新遍歷一次倉庫結構
         now = time.time()
         if not self._cached_repos or (now - self._last_repo_discovery_time) > 1800:
-            configured_paths = self.cfg.get("watchers.git_watcher.repositories", [])
+            configured_paths = [str(path) for path in self.cfg.get_paths("watchers.git_watcher.repositories")]
             max_depth = self.cfg.get("watchers.git_watcher.max_depth", 3)
             self._cached_repos = discover_git_repos(configured_paths, max_depth=max_depth)
             self._last_repo_discovery_time = now

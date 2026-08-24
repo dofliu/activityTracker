@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "OmniContext AI Activity Capturer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "自動擷取 ChatGPT, Gemini, Claude, Manus 的對話與問答記錄並同步至本地 OmniContext 引擎",
   "permissions": [
     "storage"
@@ -20,7 +20,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "OmniContext Activity Monitor"
+    "default_title": "OmniContext Extension Monitor"
   },
   "content_scripts": [
     {

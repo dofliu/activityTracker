@@ -1,11 +1,19 @@
 import logging
+import sys
 import threading
 from typing import Dict, Any, Optional
 from datetime import datetime
 from core.time_utils import get_local_now
 from core.config import get_config
 from core.database import get_db
-from core.models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, DailySummary
+from core.models import (
+    AIPromptEvent,
+    DailySummary,
+    FileActivityEvent,
+    GitActivityEvent,
+    IngestionCheckpoint,
+    WindowEvent,
+)
 from watchers.file_watcher import FileWatcherService
 from watchers.git_watcher import GitWatcherService
 from watchers.window_watcher import WindowWatcherService
@@ -92,6 +100,16 @@ class WatcherManager:
             git_count = session.query(GitActivityEvent).count()
             win_count = session.query(WindowEvent).count()
             summary_count = session.query(DailySummary).count()
+            ai_nonempty_count = session.query(AIPromptEvent).filter(
+                func.length(func.trim(AIPromptEvent.response_text)) > 0
+            ).count()
+            ai_final_candidate_count = session.query(AIPromptEvent).filter(
+                AIPromptEvent.response_status == "final_candidate"
+            ).count()
+            checkpoint_count = session.query(IngestionCheckpoint).count()
+            checkpoint_error_count = session.query(IngestionCheckpoint).filter(
+                IngestionCheckpoint.last_error.isnot(None)
+            ).count()
 
             last_ai = session.query(func.max(AIPromptEvent.timestamp)).scalar()
             last_file = session.query(func.max(FileActivityEvent.timestamp)).scalar()
@@ -101,6 +119,8 @@ class WatcherManager:
         def _calc_health(enabled: bool, last_dt: Optional[datetime]) -> str:
             if not enabled:
                 return "disabled"
+            if not self._is_running:
+                return "stopped"
             if not last_dt:
                 return "stale"
             diff_sec = (now - last_dt).total_seconds()
@@ -114,9 +134,52 @@ class WatcherManager:
         watchers_cfg = {
             "file_watcher": cfg.get("watchers.file_watcher.enabled", True),
             "git_watcher": cfg.get("watchers.git_watcher.enabled", True),
-            "window_watcher": cfg.get("watchers.window_watcher.enabled", True),
+            "window_watcher": cfg.get("watchers.window_watcher.enabled", True) and sys.platform == "win32",
             "agent_log_watcher": cfg.get("watchers.agent_log_watcher.enabled", True),
-            "scheduler": cfg.get("synthesizer.schedule.enabled", True),
+            "scheduler": (
+                cfg.get("synthesizer.schedule.enabled", True)
+                or cfg.get("synthesizer.periodic_checkpoint.enabled", True)
+                or (
+                    cfg.get("usage_tracking.enabled", False)
+                    and cfg.get("usage_tracking.notifications.enabled", False)
+                )
+            ),
+        }
+
+        def _thread_alive(service: Any) -> bool:
+            thread = getattr(service, "_thread", None)
+            apscheduler = getattr(service, "_apscheduler", None)
+            return bool(
+                (thread and thread.is_alive())
+                or (apscheduler and getattr(apscheduler, "running", False))
+            )
+
+        collector_runtime = {
+            "file_watcher": (
+                "disabled" if not watchers_cfg["file_watcher"]
+                else "running" if self.file_watcher.observer.is_alive()
+                else "stopped"
+            ),
+            "git_watcher": (
+                "disabled" if not watchers_cfg["git_watcher"]
+                else "running" if _thread_alive(self.git_watcher)
+                else "stopped"
+            ),
+            "window_watcher": (
+                "disabled" if not watchers_cfg["window_watcher"]
+                else "running" if _thread_alive(self.window_watcher)
+                else "stopped"
+            ),
+            "agent_log_watcher": (
+                "disabled" if not watchers_cfg["agent_log_watcher"]
+                else "running" if _thread_alive(self.agent_log_watcher)
+                else "stopped"
+            ),
+            "scheduler": (
+                "disabled" if not watchers_cfg["scheduler"]
+                else "running" if _thread_alive(self.scheduler)
+                else "stopped"
+            ),
         }
 
         collector_health = {
@@ -127,10 +190,20 @@ class WatcherManager:
             "scheduler": "healthy" if watchers_cfg["scheduler"] else "disabled",
         }
 
+        try:
+            scheduled_jobs = self.scheduler.active_job_ids()
+            scheduler_backend = self.scheduler.backend_name()
+        except Exception:
+            scheduled_jobs = []
+            scheduler_backend = "unknown"
+
         return {
             "is_running": self._is_running,
             "watchers": watchers_cfg,
+            "collector_runtime": collector_runtime,
             "collector_health": collector_health,
+            "scheduled_jobs": scheduled_jobs,
+            "scheduler_backend": scheduler_backend,
             "last_events": {
                 "file_watcher": last_file.strftime("%Y-%m-%d %H:%M:%S") if last_file else None,
                 "git_watcher": last_git.strftime("%Y-%m-%d %H:%M:%S") if last_git else None,
@@ -139,10 +212,14 @@ class WatcherManager:
             },
             "metrics": {
                 "ai_prompts_count": ai_count,
+                "ai_nonempty_responses_count": ai_nonempty_count,
+                "ai_final_candidates_count": ai_final_candidate_count,
                 "file_events_count": file_count,
                 "git_commits_count": git_count,
                 "window_events_count": win_count,
                 "daily_summaries_count": summary_count,
+                "ingestion_checkpoints_count": checkpoint_count,
+                "ingestion_checkpoint_errors_count": checkpoint_error_count,
             },
             "targets": {
                 "watch_directories": cfg.get("watchers.file_watcher.watch_directories", []),
@@ -150,7 +227,10 @@ class WatcherManager:
                 "file_extensions": cfg.get("watchers.file_watcher.extensions", []),
                 "llm_provider": cfg.get("synthesizer.provider", "gemini"),
                 "schedule_time": cfg.get("synthesizer.schedule.time", "23:30"),
-                "periodic_interval_hours": cfg.get("synthesizer.periodic_checkpoint.interval_hours", 2)
+                "periodic_interval_hours": cfg.get("synthesizer.periodic_checkpoint.interval_hours", 2),
+                "usage_tracking_enabled": cfg.get("usage_tracking.enabled", False),
+                "usage_milestones_enabled": cfg.get("usage_tracking.notifications.enabled", False),
+                "platform": sys.platform,
             }
         }
 

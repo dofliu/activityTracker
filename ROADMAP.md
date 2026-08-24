@@ -1,6 +1,6 @@
 # OmniContext 開發規劃與成果紀錄 — P0 ~ P6
 
-> 最新更新日期：2026-08-24　｜　當前進度：95% (P3-1 Context Handoff 實作完成，UI/OpenLoops 互動全面優化，P5 主動秘書 AI 架構確立)
+> 最新更新日期：2026-08-24　｜　目前狀態：**personal alpha / P2.5 hardening + P2.6 usage milestone alpha**。P3-1 已完成；P2.5 local contracts、P2.6 alpha 與 P6 source baseline 已落地，但 release matrix 尚未通過，整體不具 release-ready 或 autonomous-ready 資格。
 > 本文件記錄 OmniContext 從 0 到 1 的缺陷修復歷程、已完成之架構改造與未來的維運與延伸規劃。
 
 ---
@@ -11,12 +11,12 @@
 
 | 評估指標 | 初始狀態 (2026-08-22) | 現行實測成果 (2026-08-23 校準) | 改善效益與判定 |
 | :--- | :--- | :--- | :--- |
-| **AI 對話捕捉總量** | 10 筆 (7 筆當日 + 3 筆假資料) | **2,034 筆真實對話** | 跨 3 大本機 Agent 工具，清除 257 筆 orphan 重複紀錄 |
-| **AI 真實結論配對率** | 0% (僅單向問句) | **95.6% (1,944 筆實質回答)** | **嚴格排除佔位符 (剩餘 0 筆)**：Codex 97.9%、Antigravity 94.8%、Claude Code 88.0% |
+| **AI 對話事件列** | 10 筆 (7 筆當日 + 3 筆假資料) | **2,418 筆（2026-08-24 16:35 快照）** | 其中 2,161 筆具 source provenance；337 筆 legacy rows 保留但不列入 canonical 結論 |
+| **AI 回應可信狀態** | 0% (僅單向問句) | **2,053 非空／1,890 final candidates／66 partial** | Codex/Claude/Antigravity 優先使用來源的 explicit final marker；final candidate 仍不代表語意正確 |
 | **檔案監控噪音比** | 3574 筆雜訊 / 1 筆論文 | **單日 ~70 筆真實寫作/代碼** | 移除 .txt、過濾自身 logs 與 CASE-* 實驗數據，設單日 5 次單檔上限 |
 | **Git 倉庫覆蓋率** | 0 個 (要求根目錄為 repo) | **49+ 個 Git Repos 遞迴探索** | 90+ 筆真實 Commits 跨專案納管與 PR 即時追蹤 |
 | **專案分類正確性** | 全數落入論文 (單一 .md 誤判) | **Top-Down Canonical Resolver** | 81 個碎片化子目錄收斂為清楚的論文與代碼主專案 |
-| **Open Loops 歸戶率** | 0% (全落入 General) | **100% 精準指派至各專案** | 清洗 Markdown 前綴、支援含空格與中文專案名稱 (`113-01 離岸風電實務`) |
+| **Open Loops** | 0 筆 | **4 open／2 resolved／1 superseded** | 完成 fingerprint 回填、重複收斂與既有事項人工複核 |
 | **採集器健康度狀態** | 假資料覆蓋 / 靜默未知 | **動態紅黃綠燈（逾時 3 小時標紅）** | 刪除 TestApp 測試列，Web UI 即時顯示狀態與最後寫入時間 |
 
 ---
@@ -39,10 +39,10 @@
 
 ### ✅ P1：主力 AI 日誌全量接入與專案狀態層
 1. **三大本機 Agent 日誌深度解析**：
-   - **Codex CLI**：解析 `rollout-*.jsonl`，過濾工具調用字串（配對率 97.9%）。
-   - **Antigravity**：重構 `transcript.jsonl` 解析器，精準提取 PLANNER_RESPONSE 最終文字結論（配對率 94.8%）。
-   - **Claude Code**：深度解析 `projects/**/*.jsonl`，清除 `history.jsonl` 無回答的 orphan 紀錄，成對累積多輪對話（配對率 88.0%）。
-   - **完全清除佔位符**：資料庫與 Prompt 組裝全面過濾 `[external_agent_tool_call]` 與 `[Codex CLI Session]` 等佔位字串，剩餘佔位符歸零。
+   - **Codex CLI**：解析 `rollout-*.jsonl`，以新 user turn／EOF 建立 turn boundary，保留最後有效 assistant message。
+   - **Antigravity**：解析 `transcript.jsonl` 的 USER_INPUT／PLANNER_RESPONSE，保存來源位置與 final-candidate 狀態。
+   - **Claude Code**：優先解析 `projects/**/*.jsonl`；只有來源本身缺回答時才保留 missing 狀態。
+   - **佔位符過濾**：Prompt 組裝排除 `[external_agent_tool_call]`、`[Codex CLI Session]` 等非人類回應；不再以舊配對率作 release 指標。
 2. **專案狀態收斂引擎 (`core/project_engine.py`)**：
    - 實作 Top-Down Canonical Project Resolver，將 `response_final`、`closure_qa`、`word_pdf_v7` 等論文修訂版子目錄正確歸戶至所屬主論文（如 `1150820-opcuaPaperManus`、`09.agentSkill`）。
    - 排除 `researchProgress.md` 等單一檔名誤判為獨立專案。
@@ -61,8 +61,8 @@
 3. **安全防護與單一實例保證**：
    - 清理 Git 追蹤之 `config.yaml`、`.instance.lock` 與敏感金鑰，提供標準 `config.example.yaml`。
    - 加入單一實例檔案鎖（Single Instance Lock），杜絕多進程並發讀寫 SQLite 衝突。
-4. **主動通知器 (`notifiers/telegram_notifier.py`)**：
-   - 預設啟用推播開關，支援 `python main.py notify briefing --dry-run` 與實際發送。
+4. **通知通道**：
+   - Windows desktop notifier 為主要通道；Telegram notifier 保留為 opt-in，未設定 token/chat ID 時不得視為可用。
 
 ---
 
@@ -88,8 +88,7 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 - 採集端 `_upsert_ai_event()` 已加上同一組過濾（`is_cli_artifact()`），並先以 `clean_prompt_text()` 脫去 `<USER_REQUEST>`、`<ADDITIONAL_METADATA>` 等包裹標籤再判斷，避免誤刪真實提問。
 - 實測清除 179 筆 CLI 雜訊與 2 筆假視窗事件，真實配對率由 84.9% 提升至 **85.9%**（Codex 98%、Antigravity 94%、Claude Code 53%）。
 
-> Claude Code 的 53% 是資料來源限制，非缺陷：`~/.claude/history.jsonl` 本身只存提問不存回應，
-> 這批紀錄永遠無法配對；`projects/**/*.jsonl` 來源的配對率則正常。
+> 舊版 pairing percentage 僅以 response 是否非空計算，已降級為歷史 heuristic，不再代表 final answer。`~/.claude/history.jsonl` 本身只存提問，canonical contract 會將其標成 `missing`。
 
 ### 視窗採集器心跳 `watchers/window_watcher.py`
 - 每 5 分鐘（`heartbeat_minutes`）記錄一次實際讀到的前景視窗，讀不到時以 WARNING 標示。
@@ -109,6 +108,100 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 
 ---
 
+## 2.5 P2.5：Reliability, Security, Lifecycle & Portability Gate（進行中）
+
+> Architecture decision：在語意記憶與自主執行之前，先讓「來源、turn、回應、待辦、權限與執行平台」都有明確契約。P5 在本節所有 release blockers 關閉前維持 blocked。
+
+**2026-08-24 實作結果：**34 個 contract tests 通過（含 fresh-database migration、P2.6 usage/milestone 與 scheduler fallback）；Windows live API 已驗證惡意 Origin 403、secret redaction、extension token fail-closed。phase-aware 重掃 601 個 transcript sources，checkpoint errors 0、stable turn-key duplicates 0；coverage 因尚無 continuous ledger 正確維持 `partial`。SQLite online backup 已產生並通過 integrity/SHA-256 驗證，並新增可操作的 [`docs/USAGE.md`](docs/USAGE.md)。尚未通過的部分是 real-browser ingestion、versioned migration／restore drill、wheel/sdist 與 macOS/Linux matrix。
+
+### P2.5-S1 本機 API 安全邊界
+
+- 禁止 wildcard CORS；只允許設定中的 local dashboard origins。
+- 跨來源 browser extension ingestion 必須使用獨立 ingest token，不得取得其他 API 權限。
+- `/api/v1/config` 回應遮蔽 token、API key、secret、chat ID；設定更新保留既有 secret，避免遮蔽值覆蓋真值。
+- 所有本機檔案／終端機啟動改用 argument list，禁止 `shell=True`；URL 只允許 `http` / `https`。
+- 驗收：惡意 Origin 讀取設定或 events 得到 403；allowed Origin 正常；config response 不含明文 secret；path payload 不進入 shell。
+
+### P2.5-R1 採集完整性與可追溯性
+
+- 每一筆 AI turn 增加 stable `turn_key`、`source_path`、`source_position` 與 `response_status`。
+- Codex session 以 explicit `phase=final_answer` 或下一個 user turn 封閉上一輪；active EOF 保留 `partial`，後續掃描可升級或降級狀態。
+- 建立持久化 ingestion checkpoint；只有解析成功後才更新 `(mtime_ns, size)`，失敗必須保留可重試狀態。
+- 驗收：同一 conversation 重複相同 prompt 不互相覆蓋；重啟後未變檔案不重掃；解析失敗不前移 checkpoint；重新掃描可更新較新的 assistant response。
+
+### P2.5-D1 資料可信度指標
+
+- 分開呈現 `response_non_null`、`response_nonempty`、`response_final_candidate`，禁止以 non-null 代替「真實結論」。
+- `status` CLI 優先讀取 live service status，無服務時才使用 local fallback。
+- 專案數分列 active / idle / stale，不再把全部 ProjectState 稱為「進行中」。
+- 健康度除了最後事件時間，也記錄 checkpoint/error；「沒有活動」與「collector 故障」不得混為一談。
+
+### P2.5-L1 Open Loop 生命週期
+
+- 狀態至少包含 `open / stale / resolved / superseded`，並保存 `last_seen_at`、`resolution_note`、來源與 fingerprint。
+- 重複摘要只更新 `last_seen_at`；不得無限制建立重複事項。
+- Handoff 與提醒預設只顯示 open；stale 必須要求複核，不得直接交給 P5 執行。
+- 驗收：resolve、reopen、supersede、stale 均有 API/CLI test；過時事項不再出現在 actionable handoff。
+
+### P2.5-P1 跨平台與發佈基線
+
+- 建立 Windows / macOS / Linux platform service abstraction；不支援的功能明確降級，不在 import 階段修改 registry 或 OS 狀態。
+- `config.example.yaml` 不含個人絕對路徑；路徑支援 `~` 與環境變數展開。
+- 建立 `pyproject.toml`、pytest 基線與 CI-ready test commands；測試從 P6 提前到 P2.5。
+- `main.py init --watch <path>` 已可產生本機 `config.yaml`、必要目錄與 extension token；Agent/Git 自動偵測與 notification capability probe 尚待完成。
+
+### P2.5 Release Gate
+
+- [x] Security contract tests 與 Windows live Origin/token probe 通過。
+- [x] Transcript pairing / stable turn key / malformed JSONL / checkpoint fail-closed tests 通過。
+- [x] Open Loop lifecycle contract tests 通過，現有過時與重複事項完成一次人工複核。
+- [ ] Windows 實機 smoke test 通過；macOS/Linux 至少完成 import、config、CLI 降級測試。
+- [x] README 隱私聲明明確區分 local storage、cloud LLM processing 與 optional integrations。
+- [x] SQLite online backup 產生 integrity 與 SHA-256 receipt；restore drill 仍屬 release gate。
+- [ ] 無 High/Critical blocker 後，才可開始 P3-2；P5 executor 另需獨立安全 gate。
+
+---
+
+## 2.6 P2.6：主要介面使用時間與每日里程碑教練（Alpha 已實作）
+
+> 需求來源：2026-08-24 使用者臨時需求。完整規格見 [`docs/FEATURE-001-daily-interface-usage-milestone-coach.md`](docs/FEATURE-001-daily-interface-usage-milestone-coach.md)。本項為 **MoSCoW: Should Have**，不得取代 P2.5 的資料可靠性與 release blockers。
+
+**2026-08-24 實作證據：**localhost 主頁與 `/extension-monitor` 已完成 live smoke；usage API 回傳 11 個當日介面、coverage `partial`，Extension token pairing probe 通過且未洩漏 token。內建 scheduler 已實機回報 usage milestone、每日 synthesis、checkpoint、Telegram opt-in 與早晚 desktop jobs。34 個 tests 通過，包含 interval overlap/dedup、跨午夜、unsupported platform、milestone receipt、quiet hours、cooldown、scheduler fallback 與 Extension security。Browser 實機 event 仍為 0，Windows Toast 也尚未以真實達標事件觸發，因此維持 alpha。
+
+### 產品目的
+
+- 依每日、每週統計 Claude Code、Codex、ChatGPT、Claude.ai、Gemini、Manus、VS Code 等主要介面的 **foreground active time**。
+- 允許使用者設定每日里程碑；達標時以 dashboard 與 desktop notification 提醒、肯定或鼓勵，例如「今天 Claude + Codex 前景使用時間已達 6 小時」。
+- 長時間使用時可選擇顯示休息提醒；語氣、門檻、quiet hours、通知頻率與是否啟用均由使用者設定。
+
+### 信任與隱私邊界
+
+- 使用時間以去除重疊後的前景視窗區間計算；AI event 只做互動次數，不可與 window duration 相加造成 double counting。
+- 明確標示為「前景使用時間」，不得宣稱為實際工作時間、生產力、專注度或成果品質。
+- collector 中斷或平台不支援時顯示 `partial / unavailable`，不得把資料缺口呈現為 0 小時。
+- 分類規則必須 config-driven；window title 預設只做本機分類並支援遮蔽，不因本功能上傳 cloud LLM。
+- 每個里程碑每日只通知一次，保存 notification receipt，並支援 opt-out、quiet hours 與 cooldown。
+
+### 介面分工
+
+- **Browser Extension popup**：定位為 `Extension Monitor / Ingestion Bridge`，負責本機連線、ingest token 與各網站採集狀態；可顯示一句今日摘要，但不是完整分析主頁。
+- **Web Dashboard**：新增「今日使用與里程碑」區塊，呈現各介面時間、資料 coverage、目標進度與最近達成項目。
+- **Desktop notification**：達標或長時間使用時提供可配置的提醒／鼓勵；點擊後回到 dashboard 詳情。
+
+### 依賴與驗收
+
+- 依賴：P2.5 window collector reliability、跨平台 capability probe、notification abstraction；browser-only 平台需完成 extension 實機 ingestion 才能宣稱完整 coverage。
+- [x] 相同或重疊 interval 不重複計時，跨午夜正確切分至本機日期。
+- [x] app/interface mapping 可由 config 增修，unknown 類別保留並顯示為 `Other`。
+- [x] Dashboard 同時顯示時間、coverage 與資料更新時間。
+- [x] milestone notification 具 idempotency、quiet hours、cooldown 與使用者關閉選項。
+- [x] Windows Dashboard/API 與 Extension token pairing 已實機驗證。
+- [ ] 真實達標 Toast、macOS/Linux CI/實機仍待完成。
+- [x] Contract tests 已覆蓋 interval merge、跨午夜、缺失平台、通知去重與內建 scheduler job contract。
+- [ ] DST 與完整 retention/privacy matrix 仍待補。
+
+---
+
 # 第二階段規劃：從「日誌」到「記憶」
 
 > 規劃日期：2026-08-24
@@ -119,7 +212,7 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 ### 3.1 已累積的資料資產
 
 ```
-2,047 筆 AI 對話 · 1,775 筆完整問答配對 · 約 236 萬字元
+2,418 筆 AI event rows · 1,890 筆 final candidates · 66 筆 partial · 約 393 萬字元
 時間跨度 2025-05-19 ~ 2026-08-24（15 個月）
 70 個專案狀態 · 57 個 GitHub repos · 266 筆 PR
 ```
@@ -152,15 +245,15 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 | :--- | :--- | :--- |
 | 核心邏輯硬編碼個人路徑 | `project_engine.py:415-418` 寫死 `D:/Project_CodingSimulation` 四層 | 🔴 他人安裝後歸戶會壞 |
 | 僅支援 Windows | 視窗採集、桌面通知、開機排程綁 win32 / PowerShell | 🟡 Mac / Linux 使用者無法進入 |
-| 無測試、無打包 | 缺 `tests/`、`pyproject.toml`、`setup.py` | 🟡 無法 `pip install`，重構風險高 |
-| 首次啟動需手改 config | 無引導，`config.example.yaml` 全是個人絕對路徑 | 🔴 十分鐘內裝不起來即流失 |
+| 發佈打包未驗證 | 已有 `tests/` 與 `pyproject.toml`，但 wheel/sdist、upgrade、assets 尚未 smoke test | 🟡 發布後可能缺靜態資源或升級失敗 |
+| 首次啟動引導未完整 | `main.py init --watch` 已可用，但 Agent/Git 自動偵測與 capability probe 未完成 | 🟡 基本可啟動，複雜來源仍需調 config |
 | 必須自備 LLM 金鑰 | 無金鑰時只剩事件流 | 🟡 Ollama 路徑已在，可作免金鑰預設 |
 
 前兩項決定「能不能用」，後三項決定「願不願意留下」。
 
 ---
 
-## 4. P3：記憶層（進行中：95%）
+## 4. P3：記憶層（P3-1 已完成；P3-2～P3-5 待 P2.5 gate）
 
 > 目標：讓 236 萬字元從「存著」變成「用得到」。**不需要任何新的採集器。**
 
@@ -181,7 +274,7 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 ### P3-2 本機語意檢索索引
 
-- 以本機 embedding（Ollama / RTX 4080）對 1,775 筆完整問答建索引，**資料不出本機**。
+- 以本機 embedding（Ollama / RTX 4080）只對具 provenance 的 canonical final candidates 建索引，**資料不出本機**；索引前重新量測數量，不把本次 1,890 筆快照硬編碼為永久母數。
 - 新增 `ai_embeddings` 資料表與增量索引流程，沿用既有的 `(mtime, size)` 增量掃描模式。
 - 驗收：對歷史問題的語意查詢能回傳正確的原始對話，冷啟動建索引時間可接受。
 
@@ -217,7 +310,7 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 ---
 
-## 6. P5：主動秘書 AI 與自主執行架構 (Proactive AI Secretary & Autonomous Worker)
+## 6. P5：主動秘書 AI 與自主執行架構（規劃完成；executor blocked by P2.5）
 
 > 核心目標：從「被動記錄與定時摘要」躍升為「主動感知狀態 ➔ 預判前瞻需求 ➔ 提出行動提案 ➔ 一鍵授權背景自主作業」。
 
@@ -275,11 +368,11 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 ---
 
-## 7. P6：開源整備（在 P3 & P5 核心完成後進行）
+## 7. P6：開源與發佈整備（portability/test 基線提前於 P2.5）
 
 1. 將 `project_engine.py` 的硬編碼路徑抽成設定項。
-2. 新增 `python main.py init` 互動式引導，自動偵測本機 Agent 日誌路徑與 Git 根目錄。
-3. 建立 `pyproject.toml` 與基本測試（優先覆蓋 `is_cli_artifact`、`resolve_project_from_path`、`summarize_action` 這類純函式）。
+2. 擴充已建立的 `python main.py init`，加入本機 Agent 日誌、Git 根目錄與 notification capability 自動偵測。
+3. 擴大 P2.5 已建立的 `pyproject.toml`、34 個 tests 與 verified backup，加入 packaging、upgrade、restore drill 與多平台 CI matrix。
 4. 無 LLM 金鑰時預設走 Ollama，確保零金鑰也能完整體驗。
 5. 跨平台：視窗採集與桌面通知抽象出平台介面，Windows 以外先降級為停用而非報錯。
 
@@ -288,19 +381,22 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 ## 8. 建議執行順序
 
 ```
-✅ P3-1 resume（專案接續 Context Handoff 與 Web 一鍵複製 — 已完成）
+P2.5-S1 API 安全邊界
+  → P2.5-R1 採集 provenance / final-response / checkpoint
+  → P2.5-L1 Open Loop lifecycle
+  → P2.5-P1 pytest / platform abstraction / generic config
+  → ✅ P3-1 resume（已完成，並以新資料契約重新驗收）
   → P3-2 語意索引（Ollama / 本機向量化）
   → P3-3 omni ask（問自己的歷史庫）
-  → P5-1 主動情境推論與前瞻提案引擎（Proactive Proposals）
-  → P5-2 & P5-3 安全授權閘門與 Agent Dispatcher 自主執行
-  → P5-4 Telegram / Web 雙向授權按鈕
   → P3-5 Session 敘事層
+  → P5-1 Proposal-only 主動建議（不執行修改）
+  → P5 executor 獨立安全驗收
   → P4 收集層補完
   → P6 開源整備
 ```
 
 理由：
-1. **P3-1** 已證明現有 Context 能夠高質量提煉並餵給任何 AI。
-2. **P3-2 + P3-3** 賦予秘書「檢索歷史」的能力。
-3. **P5 主動秘書** 則讓系統真正從「被動工具」轉化為「主動助理」，發揮全景感知與背景調度的最大乘數效應。
+1. P3-1 已證明 Context Handoff 的產品價值，但 final-response 與 Open Loop 仍需可信度 gate。
+2. P3-2 + P3-3 只有建立在可追溯 turn contract 上，語意檢索結果才可被引用與回查。
+3. P5 先做 proposal-only；任何自主修改都必須具備 allowlist、dirty-worktree check、timeout、cancel、audit receipt 與分級批准。
 

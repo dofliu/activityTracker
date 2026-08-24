@@ -80,6 +80,23 @@ const I18N = {
     btn_save_apply: "儲存並套用",
     settings_save_note: "寫回 config.yaml 後即時熱更新",
     settings_p4_title: "GitHub 雲端整合 (全專案與 PR 追蹤)",
+    usage_title: "TODAY · 前景使用與里程碑",
+    btn_refresh_usage: "重新整理",
+    usage_goal_label: "AI 協作前景使用時間",
+    extension_monitor_title: "EXTENSION MONITOR",
+    btn_open_monitor: "開啟完整監控",
+    extension_pairing_boundary: "localhost 可觀察採集狀態；ingest token 仍由 Extension popup 安全保存。",
+    settings_usage_title: "每日使用時間與里程碑",
+    settings_usage_note: "前景時間，不代表生產力或實際工時",
+    usage_tracking_enabled: "啟用使用時間統計",
+    usage_notifications_enabled: "啟用里程碑通知",
+    usage_daily_goal: "DAILY GOAL / MIN",
+    usage_milestones: "MILESTONES / MIN",
+    usage_tone: "TONE",
+    usage_quiet_start: "QUIET FROM",
+    usage_quiet_end: "QUIET UNTIL",
+    usage_cooldown: "COOLDOWN / MIN",
+    usage_local_note: "預設只在本機聚合，不呼叫 cloud LLM；介面分類規則可在 config.yaml 調整。",
     gh_opt1_title: "快捷方式 1 (推薦)：本機 GITHUB CLI",
     btn_gh_auto_connect: "🔑 一鍵從本機 gh CLI 同步認證",
     gh_opt1_sub: "免手動輸入 Token，自動讀取本機登入之 GitHub 帳號",
@@ -188,6 +205,23 @@ const I18N = {
     btn_save_apply: "Save & Apply",
     settings_save_note: "Hot reloaded directly into config.yaml",
     settings_p4_title: "GitHub Cloud Integration (Public & Private Repos + PRs)",
+    usage_title: "TODAY · FOREGROUND USE & MILESTONES",
+    btn_refresh_usage: "Refresh",
+    usage_goal_label: "AI collaboration foreground time",
+    extension_monitor_title: "EXTENSION MONITOR",
+    btn_open_monitor: "Open Full Monitor",
+    extension_pairing_boundary: "localhost can observe capture state; the ingest token remains in the Extension popup.",
+    settings_usage_title: "Daily Usage & Milestones",
+    settings_usage_note: "Foreground time, not productivity or actual work hours",
+    usage_tracking_enabled: "Enable usage analytics",
+    usage_notifications_enabled: "Enable milestone notifications",
+    usage_daily_goal: "DAILY GOAL / MIN",
+    usage_milestones: "MILESTONES / MIN",
+    usage_tone: "TONE",
+    usage_quiet_start: "QUIET FROM",
+    usage_quiet_end: "QUIET UNTIL",
+    usage_cooldown: "COOLDOWN / MIN",
+    usage_local_note: "Aggregated locally without a cloud LLM; interface rules remain configurable in config.yaml.",
     gh_opt1_title: "Option 1 (Recommended): Local GITHUB CLI",
     btn_gh_auto_connect: "🔑 1-Click Auth via Local gh CLI",
     gh_opt1_sub: "No manual PAT needed, automatically reads local logged-in GitHub account",
@@ -326,8 +360,10 @@ document.addEventListener("DOMContentLoaded", () => {
   loadGitHubStatus();
   loadSummaries();
   loadCheckpoints();
+  loadUsagePanels();
 
   setInterval(() => { refreshStatus(); refreshFeed(); }, POLL_MS);
+  setInterval(loadUsagePanels, 30000);
 });
 
 // ---------------------------------------------------------------- theme
@@ -356,7 +392,7 @@ function initTabs() {
       tab.classList.add("active");
       const id = tab.dataset.tab;
       $(id).classList.add("active");
-      if (id === "tab-projects") loadProjects();
+      if (id === "tab-projects") { loadProjects(); loadUsagePanels(); }
       if (id === "tab-settings") loadConfig();
       if (id === "tab-summaries") loadSummaries();
       if (id === "tab-checkpoints") loadCheckpoints();
@@ -377,6 +413,7 @@ function initControls() {
   $("btn-trigger-cp-now").addEventListener("click", triggerCheckpoint);
   $("btn-quick-summary").addEventListener("click", () => generateSummary(null));
   $("btn-refresh-projects").addEventListener("click", () => loadProjects(true));
+  $("btn-refresh-usage").addEventListener("click", loadUsagePanels);
 
   document.querySelectorAll(".filters .chip").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -405,6 +442,86 @@ async function refreshStatus() {
     $("status-text").textContent = t("status_disconnected");
     $("status-pill").className = "pill pill-off";
   }
+}
+
+function formatUsageDuration(seconds) {
+  const totalMinutes = Math.max(0, Math.round(Number(seconds || 0) / 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (!hours) return `${minutes}m`;
+  return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
+}
+
+async function loadUsagePanels() {
+  const [usageResult, extensionResult] = await Promise.allSettled([
+    getJSON("/api/v1/usage/today"),
+    getJSON("/api/v1/extension/status")
+  ]);
+  if (usageResult.status === "fulfilled") renderUsagePanel(usageResult.value);
+  else renderUsagePanelError();
+  if (extensionResult.status === "fulfilled") renderExtensionPanel(extensionResult.value);
+  else renderExtensionPanelError();
+}
+
+function renderUsagePanel(data) {
+  const goal = data.goal || {};
+  const coverage = data.coverage_status || "unavailable";
+  const coverageBadge = $("usage-coverage");
+  coverageBadge.className = "trust " + (coverage === "complete" ? "ok" : coverage === "partial" ? "noisy" : "broken");
+  coverageBadge.textContent = coverage.toUpperCase();
+
+  $("usage-goal-value").textContent = formatUsageDuration(goal.foreground_seconds || 0);
+  const progress = Number(goal.progress_percent || 0);
+  const goalText = currentLang === "zh-TW"
+    ? `${goal.label || "AI 協作"}：${Number(goal.foreground_minutes || 0).toFixed(1)} / ${goal.daily_goal_minutes || 0} 分鐘（${progress.toFixed(1)}%）`
+    : `${goal.label || "AI collaboration"}: ${Number(goal.foreground_minutes || 0).toFixed(1)} / ${goal.daily_goal_minutes || 0} min (${progress.toFixed(1)}%)`;
+  $("usage-goal-progress").textContent = goalText;
+  $("usage-progress-bar").style.width = `${Math.min(100, Math.max(0, progress))}%`;
+  const dataUpdated = data.data_updated_at ? new Date(data.data_updated_at).toLocaleString() : "—";
+  $("usage-boundary").textContent = currentLang === "zh-TW"
+    ? `只代表已觀察到的前景時間，不代表生產力或實際工時。Coverage：${data.coverage_note || coverage}；最後資料：${dataUpdated}`
+    : `Observed foreground time only; not productivity or actual work hours. Coverage: ${data.coverage_note || coverage}; last data: ${dataUpdated}`;
+
+  const rows = (data.interfaces || [])
+    .filter(item => Number(item.foreground_seconds || 0) > 0 || Number(item.ai_interaction_count || 0) > 0)
+    .slice(0, 8);
+  $("usage-interface-list").innerHTML = rows.length ? rows.map(item => `
+    <div class="usage-row">
+      <span class="usage-interface">${esc(item.name)}</span>
+      <span class="usage-duration">${formatUsageDuration(item.foreground_seconds)}</span>
+      <span class="usage-interactions">${Number(item.ai_interaction_count || 0)} turns</span>
+    </div>`).join("") : `<div class="placeholder">${currentLang === "zh-TW" ? "今日尚無已觀察到的介面使用資料。" : "No observed interface usage today."}</div>`;
+}
+
+function renderUsagePanelError() {
+  $("usage-coverage").className = "trust broken";
+  $("usage-coverage").textContent = "UNAVAILABLE";
+  $("usage-interface-list").innerHTML = `<div class="placeholder">${currentLang === "zh-TW" ? "無法載入使用時間。" : "Unable to load usage data."}</div>`;
+}
+
+function renderExtensionPanel(data) {
+  const extension = data.extension || {};
+  const observed = extension.capture_status === "observed";
+  const badge = $("extension-capture-badge");
+  badge.className = "trust " + (observed ? "ok" : "noisy");
+  badge.textContent = observed ? "OBSERVED" : "UNVERIFIED";
+  const last = extension.last_capture_at ? new Date(extension.last_capture_at).toLocaleString() : "—";
+  $("extension-summary-text").textContent = currentLang === "zh-TW"
+    ? `Server token：${extension.token_configured ? "已設定" : "未設定"}；今日 Browser events：${extension.events_today || 0}；最後採集：${last}`
+    : `Server token: ${extension.token_configured ? "configured" : "missing"}; browser events today: ${extension.events_today || 0}; last capture: ${last}`;
+  $("extension-platform-list").innerHTML = (data.platforms || []).map(item => {
+    const state = !item.enabled ? "OFF" : item.observation_status === "observed" ? "OBSERVED" : "WAITING";
+    return `<div class="extension-platform">
+      <div class="extension-platform-top"><span>${esc(item.label)}</span><span class="${state === "OBSERVED" ? "accent" : "muted"}">${state}</span></div>
+      <div class="extension-platform-sub">today ${Number(item.events_today || 0)} · total ${Number(item.events_total || 0)}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderExtensionPanelError() {
+  $("extension-capture-badge").className = "trust broken";
+  $("extension-capture-badge").textContent = "OFFLINE";
+  $("extension-summary-text").textContent = currentLang === "zh-TW" ? "無法取得 Extension Monitor 狀態。" : "Extension Monitor is unavailable.";
 }
 
 function renderStats(m) {
@@ -1039,6 +1156,7 @@ async function loadConfig() {
     currentConfig = await getJSON("/api/v1/config");
     const w = currentConfig.watchers || {};
     const s = currentConfig.synthesizer || {};
+    const usage = currentConfig.usage_tracking || {};
 
     configDirs = (w.file_watcher && w.file_watcher.watch_directories) || [];
     configRepos = (w.git_watcher && w.git_watcher.repositories) || [];
@@ -1064,6 +1182,15 @@ async function loadConfig() {
     $("toggle-claude-web").checked = browser.claude_web !== false;
     $("toggle-manus").checked = browser.manus !== false;
     $("toggle-window-focus").checked = !(w.window_watcher && w.window_watcher.enabled === false);
+    $("toggle-usage-tracking").checked = usage.enabled === true;
+    const usageNotifications = usage.notifications || {};
+    $("toggle-usage-notifications").checked = usageNotifications.enabled === true;
+    $("input-usage-daily-goal").value = usage.daily_goal_minutes || 360;
+    $("input-usage-milestones").value = (usage.milestones_minutes || [120, 240, 360]).join(", ");
+    $("select-usage-tone").value = usageNotifications.tone || "encouraging";
+    $("input-usage-quiet-start").value = usageNotifications.quiet_hours_start || "22:00";
+    $("input-usage-quiet-end").value = usageNotifications.quiet_hours_end || "08:00";
+    $("input-usage-cooldown").value = usageNotifications.cooldown_minutes ?? 60;
   } catch (e) { console.error("config load failed", e); }
 }
 
@@ -1103,6 +1230,21 @@ async function saveSettings() {
   cfg.synthesizer.provider = provider;
   cfg.synthesizer[provider] = cfg.synthesizer[provider] || {};
   cfg.synthesizer[provider].model = $("input-model-name").value.trim();
+
+  cfg.usage_tracking = cfg.usage_tracking || {};
+  cfg.usage_tracking.enabled = $("toggle-usage-tracking").checked;
+  cfg.usage_tracking.daily_goal_minutes = Math.max(15, parseInt($("input-usage-daily-goal").value, 10) || 360);
+  const milestones = $("input-usage-milestones").value
+    .split(",")
+    .map(value => parseInt(value.trim(), 10))
+    .filter(value => Number.isInteger(value) && value > 0);
+  cfg.usage_tracking.milestones_minutes = [...new Set(milestones)].sort((a, b) => a - b);
+  cfg.usage_tracking.notifications = cfg.usage_tracking.notifications || {};
+  cfg.usage_tracking.notifications.enabled = $("toggle-usage-notifications").checked;
+  cfg.usage_tracking.notifications.tone = $("select-usage-tone").value;
+  cfg.usage_tracking.notifications.quiet_hours_start = $("input-usage-quiet-start").value || "22:00";
+  cfg.usage_tracking.notifications.quiet_hours_end = $("input-usage-quiet-end").value || "08:00";
+  cfg.usage_tracking.notifications.cooldown_minutes = Math.max(0, parseInt($("input-usage-cooldown").value, 10) || 0);
 
   const btn = $("btn-save-settings");
   const label = btn.textContent;

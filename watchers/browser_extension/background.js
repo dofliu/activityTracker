@@ -19,7 +19,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const payload = message.data;
     const hasResp = Boolean(payload.response_text && payload.response_text.trim().length > 0);
     const pHash = simpleHash(payload.prompt_text.trim());
-    const dedupKey = `${payload.platform}:${pHash}:${hasResp ? 'resp' : 'req'}`;
+    const responseHash = hasResp ? simpleHash(payload.response_text.trim()) : "request";
+    const conversationRef = payload.conversation_id || payload.url || sender.tab?.url || "unknown";
+    const bucket = Math.floor(Date.now() / 600000);
+    const dedupKey = `${payload.platform}:${simpleHash(conversationRef)}:${pHash}:${responseHash}:${bucket}`;
 
     // 使用 chrome.storage.session 防止 Service Worker 休眠遺失或重複
     chrome.storage.session.get([dedupKey], (res) => {
@@ -51,10 +54,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function sendEventToServer(payload) {
+  const stored = await chrome.storage.local.get(["omnicontext_ingest_token"]);
+  const ingestToken = (stored.omnicontext_ingest_token || "").trim();
+  if (!ingestToken) {
+    throw new Error("尚未設定 OmniContext ingest token");
+  }
   const response = await fetch(SERVER_URL, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "X-OmniContext-Ingest-Token": ingestToken
     },
     body: JSON.stringify(payload)
   });

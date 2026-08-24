@@ -1,12 +1,14 @@
+import logging
 import os
+import hashlib
 import yaml
 from pathlib import Path
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, Depends, HTTPException, Query, Body
+from fastapi import FastAPI, Depends, HTTPException, Query, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 import json
 
@@ -14,13 +16,49 @@ from .database import get_db
 from .config import get_config, DEFAULT_CONFIG_PATH
 from .models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, DailySummary, ProjectState, OpenLoop, GitHubRepoState, GitHubPREvent
 from .manager import get_manager
+from .platform_services import open_local_path, open_web_url
+from .security import (
+    configured_allowed_origins,
+    extension_ingest_authorized,
+    is_extension_origin,
+    is_loopback_host,
+    merge_redacted_config,
+    origin_is_allowed,
+    redact_config,
+)
+from .extension_monitor import build_extension_status
+from .usage_analytics import evaluate_daily_milestones, get_usage_summary
 from .time_utils import get_local_now
-from .project_engine import get_active_projects_list, get_open_loops_list, refresh_project_states
+from .project_engine import (
+    get_active_projects_list,
+    get_open_loops_list,
+    refresh_project_states,
+    transition_open_loop,
+)
 from synthesizer.aggregator import (
     generate_daily_summary_pipeline,
     generate_periodic_checkpoint,
     list_periodic_checkpoints
 )
+
+logger = logging.getLogger("OmniContext.Server")
+_startup_cfg = get_config()
+_allowed_origins = configured_allowed_origins(_startup_cfg)
+
+
+def browser_conversation_key(conversation_id: str | None, url: str | None) -> str:
+    if conversation_id and conversation_id.strip():
+        return conversation_id.strip()
+    conversation_ref = (url or "unknown").strip()
+    return hashlib.sha256(
+        conversation_ref.encode("utf-8", errors="replace")
+    ).hexdigest()[:32]
+
+
+def browser_response_status(response: str | None, capture_state: str | None) -> str:
+    if not (response or "").strip():
+        return "missing"
+    return "final_candidate" if (capture_state or "").lower() == "stable_candidate" else "partial"
 
 app = FastAPI(
     title="OmniContext Local Engine & Web Dashboard",
@@ -28,14 +66,40 @@ app = FastAPI(
     version="1.2.0"
 )
 
-# 啟用 CORS 允許 Chrome Extension 和本機前端存取
+# 僅允許本機 dashboard origins；browser extension 走獨立 write-only token boundary。
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_allowed_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def enforce_local_security_boundary(request: Request, call_next):
+    cfg = get_config()
+    client_host = request.client.host if request.client else None
+    allow_remote = bool(cfg.get("security.allow_remote_clients", False))
+    if not allow_remote and not is_loopback_host(client_host):
+        return JSONResponse(status_code=403, content={"detail": "Remote clients are disabled"})
+
+    origin = request.headers.get("origin")
+    allowed_origins = configured_allowed_origins(cfg)
+    if origin and not origin_is_allowed(origin, allowed_origins):
+        # Extension 可讀 health；只有帶 ingest token 才能寫入 AI event。
+        if is_extension_origin(origin) and request.url.path == "/api/v1/health":
+            return await call_next(request)
+        if is_extension_origin(origin) and request.url.path in {
+            "/api/v1/events/ai",
+            "/api/v1/extension/status",
+        }:
+            token = request.headers.get("x-omnicontext-ingest-token")
+            if extension_ingest_authorized(token, cfg):
+                return await call_next(request)
+        return JSONResponse(status_code=403, content={"detail": "Origin is not allowed"})
+
+    return await call_next(request)
 
 # 掛載 Web 靜態資源目錄
 WEB_DIR = Path(__file__).parent.parent / "web"
@@ -51,6 +115,14 @@ def index_page():
     if index_file.exists():
         return FileResponse(str(index_file))
     return HTMLResponse("<h2>OmniContext Web Dashboard is initializing... Please refresh shortly.</h2>")
+
+
+@app.get("/extension-monitor", response_class=HTMLResponse)
+def extension_monitor_page():
+    monitor_file = WEB_DIR / "extension-monitor.html"
+    if monitor_file.exists():
+        return FileResponse(str(monitor_file))
+    return HTMLResponse("<h2>OmniContext Extension Monitor is initializing...</h2>")
 
 
 # =====================================================================
@@ -114,27 +186,10 @@ class GenerateCheckpointRequest(BaseModel):
     hours: int = Field(2, ge=1, le=24, description="回溯時數")
 
 
+class UsageMilestoneEvaluateRequest(BaseModel):
+    date: Optional[str] = Field(None, description="本機日期 YYYY-MM-DD；僅允許當日通知")
+    dry_run: bool = Field(False, description="只回傳預覽，不發送通知或寫入 receipt")
 
-def ensure_openfolder_protocol():
-    """註冊 openfolder:// 瀏覽器直通協議 (僅寫入 HKCU，不需管理員權限)"""
-    import sys
-    if sys.platform != "win32":
-        return
-    try:
-        import winreg
-        key_path = r"Software\Classes\openfolder"
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
-            winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "URL:Open Folder Protocol")
-            winreg.SetValueEx(key, "URL Protocol", 0, winreg.REG_SZ, "")
-        
-        cmd_path = key_path + r"\shell\open\command"
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_path) as cmd_key:
-            cmd = 'powershell.exe -WindowStyle Hidden -NoProfile -Command "$raw = \'%1\'; $p = [System.Uri]::UnescapeDataString(($raw -replace \'^openfolder:/*\', \'\')); if (Test-Path $p) { explorer.exe $p } else { explorer.exe (Split-Path $p) }"'
-            winreg.SetValueEx(cmd_key, "", 0, winreg.REG_SZ, cmd)
-    except Exception as e:
-        logger.warning(f"Could not register openfolder protocol: {e}")
-
-ensure_openfolder_protocol()
 
 
 # =====================================================================
@@ -143,6 +198,36 @@ ensure_openfolder_protocol()
 @app.get("/api/v1/health")
 def health_check():
     return {"status": "ok", "service": "OmniContext", "time": get_local_now().isoformat()}
+
+
+@app.get("/api/v1/extension/status")
+def get_extension_monitor_status(request: Request):
+    """Dashboard 可看觀測狀態；Extension 帶 token 時另可驗證 pairing。"""
+    return build_extension_status(
+        request.headers.get("x-omnicontext-ingest-token")
+    )
+
+
+@app.get("/api/v1/usage/today")
+def get_today_usage(date_str: Optional[str] = Query(None, alias="date")):
+    try:
+        manager_status = get_manager().get_status()
+        return get_usage_summary(date_str, manager_status=manager_status)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="date must use YYYY-MM-DD") from exc
+
+
+@app.post("/api/v1/usage/milestones/evaluate")
+def evaluate_usage_milestones(payload: UsageMilestoneEvaluateRequest):
+    try:
+        manager_status = get_manager().get_status()
+        return evaluate_daily_milestones(
+            payload.date,
+            manager_status=manager_status,
+            dry_run=payload.dry_run,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="date must use YYYY-MM-DD") from exc
 
 
 @app.get("/api/v1/control/status")
@@ -172,45 +257,14 @@ class OpenPathRequest(BaseModel):
 @app.post("/api/v1/control/open_path")
 def open_system_path(payload: OpenPathRequest):
     """在宿主機直接開啟本機資料夾、VS Code、終端機或指定網頁"""
-    import subprocess
-    import os
-    import sys
-    import webbrowser
-
     try:
         if payload.url:
-            webbrowser.open(payload.url)
+            open_web_url(payload.url)
             return {"status": "success", "message": f"已在瀏覽器開啟: {payload.url}"}
-
-        target_path = os.path.abspath(payload.path) if payload.path else None
-        if not target_path or not os.path.exists(target_path):
-            return {"status": "error", "message": f"本機路徑不存在: {payload.path}"}
-
-        if payload.action == "vscode":
-            subprocess.Popen(f'code "{target_path}"', shell=True)
-            return {"status": "success", "message": f"已在 VS Code 開啟: {target_path}"}
-
-        elif payload.action == "terminal":
-            if sys.platform == "win32":
-                folder = target_path if os.path.isdir(target_path) else os.path.dirname(target_path)
-                subprocess.Popen(f'start powershell.exe -NoExit -Command "Set-Location \'{folder}\'"', shell=True)
-            return {"status": "success", "message": f"已在終端機開啟: {target_path}"}
-
-        else: # explorer
-            if sys.platform == "win32":
-                norm_path = os.path.normpath(target_path)
-                import ctypes
-                # 使用 ShellExecuteW 直接向 Windows Desktop Shell 發送開啟視窗指令
-                ret = ctypes.windll.shell32.ShellExecuteW(None, "open", norm_path, None, None, 1)
-                if ret <= 32:
-                    # 備援：使用 cmd /c start 開啟前台視窗
-                    subprocess.Popen(f'cmd.exe /c start "" "{norm_path}"', shell=True)
-            elif sys.platform == "darwin":
-                subprocess.Popen(["open", target_path])
-            else:
-                subprocess.Popen(["xdg-open", target_path])
-
-            return {"status": "success", "message": f"已在檔案總管開啟: {target_path}"}
+        if not payload.path:
+            raise ValueError("必須提供 path 或 url")
+        open_local_path(payload.path, payload.action or "explorer")
+        return {"status": "success", "message": f"已執行 {payload.action}: {payload.path}"}
     except Exception as e:
         logger.error(f"Error opening path {payload.path}: {e}")
         return {"status": "error", "message": str(e)}
@@ -248,21 +302,41 @@ def get_project_handoff_api(
 
 
 @app.get("/api/v1/open-loops")
-def get_open_loops(project: Optional[str] = None):
+def get_open_loops(project: Optional[str] = None, status: str = "open"):
     """取得未結事項清單"""
-    return get_open_loops_list(project_key=project)
+    statuses = {item.strip().lower() for item in status.split(",") if item.strip()}
+    try:
+        return get_open_loops_list(project_key=project, statuses=statuses)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/v1/open-loops/{loop_id}/resolve")
 def resolve_open_loop(loop_id: int):
     """將未結事項標記為已解決"""
-    db = get_db()
-    with db.session_scope() as session:
-        loop = session.query(OpenLoop).filter_by(id=loop_id).first()
-        if not loop:
-            raise HTTPException(status_code=404, detail="Open loop not found")
-        loop.resolved_at = get_local_now()
-    return {"status": "success", "message": "Open loop marked as resolved"}
+    try:
+        result = transition_open_loop(loop_id, "resolved", "Resolved from dashboard")
+        return {"status": "success", "transition": result}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+class OpenLoopTransitionRequest(BaseModel):
+    status: str = Field(..., description="open, stale, resolved, superseded")
+    note: Optional[str] = None
+
+
+@app.post("/api/v1/open-loops/{loop_id}/transition")
+def update_open_loop_lifecycle(loop_id: int, payload: OpenLoopTransitionRequest):
+    try:
+        return {
+            "status": "success",
+            "transition": transition_open_loop(loop_id, payload.status, payload.note),
+        }
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # =====================================================================
@@ -271,14 +345,16 @@ def resolve_open_loop(loop_id: int):
 @app.get("/api/v1/config")
 def get_system_config():
     cfg = get_config()
-    return cfg.data
+    return redact_config(cfg.data)
 
 
 @app.post("/api/v1/config")
 def update_system_config(new_config: Dict[str, Any] = Body(...)):
     try:
+        cfg = get_config()
+        merged_config = merge_redacted_config(cfg.data, new_config)
         with open(DEFAULT_CONFIG_PATH, "w", encoding="utf-8") as f:
-            yaml.safe_dump(new_config, f, allow_unicode=True, sort_keys=False)
+            yaml.safe_dump(merged_config, f, allow_unicode=True, sort_keys=False)
         
         manager = get_manager()
         manager.reload_config()
@@ -322,13 +398,20 @@ def create_or_update_ai_event(payload: AIPromptCreate):
     elif plat in ("manus", "manus_web"):
         browser_enabled = cfg.get("watchers.browser.manus", True)
     else:
-        browser_enabled = cfg.get(f"watchers.browser.{plat}", True)
+        raise HTTPException(status_code=400, detail=f"Unsupported browser platform: {plat}")
 
     if not browser_enabled:
         return {"status": "skipped", "message": f"{payload.platform} monitoring is disabled in settings"}
 
     db = get_db()
     clean_prompt = payload.prompt_text.strip()
+    if len(clean_prompt) < 2:
+        raise HTTPException(status_code=422, detail="prompt_text is too short")
+    clean_response = (payload.response_text or "").strip() or None
+    now = get_local_now()
+    conversation_key = browser_conversation_key(payload.conversation_id, payload.url)
+    capture_state = str((payload.metadata or {}).get("capture_state", "")).lower()
+    response_status = browser_response_status(clean_response, capture_state)
 
     with db.session_scope() as session:
         # 尋找最近 10 分鐘內、相同平台與 Prompt 的記錄 (Upsert 邏輯)
@@ -337,6 +420,7 @@ def create_or_update_ai_event(payload: AIPromptCreate):
             session.query(AIPromptEvent)
             .filter(
                 AIPromptEvent.platform == payload.platform,
+                AIPromptEvent.conversation_id == conversation_key,
                 AIPromptEvent.prompt_text == clean_prompt,
                 AIPromptEvent.timestamp >= recent_cutoff
             )
@@ -346,24 +430,32 @@ def create_or_update_ai_event(payload: AIPromptCreate):
 
         if existing:
             # 若已有記錄且新 payload 帶有回應內容，則更新回應
-            if payload.response_text:
-                existing.response_text = payload.response_text
+            if clean_response:
+                existing.response_text = clean_response
+                existing.response_status = response_status
                 if payload.url: existing.url = payload.url
                 if payload.project_tag: existing.project_tag = payload.project_tag
                 if payload.cwd: existing.cwd = payload.cwd
             return {"status": "updated", "message": "Existing AI event updated with response"}
 
         # 否則新增記錄
+        bucket = int(now.timestamp() // 600)
+        browser_turn_key = hashlib.sha256(
+            f"browser|{plat}|{conversation_key}|{clean_prompt}|{bucket}".encode("utf-8")
+        ).hexdigest()
         event = AIPromptEvent(
             platform=payload.platform,
             url=payload.url,
-            conversation_id=payload.conversation_id,
+            conversation_id=conversation_key,
             prompt_text=clean_prompt,
-            response_text=payload.response_text,
+            response_text=clean_response,
             project_tag=payload.project_tag,
             cwd=payload.cwd,
             metadata_json=json.dumps(payload.metadata, ensure_ascii=False) if payload.metadata else None,
-            timestamp=get_local_now()
+            timestamp=now,
+            turn_key=browser_turn_key,
+            source_path=payload.url,
+            response_status=response_status,
         )
         session.add(event)
     return {"status": "created", "message": "New AI event logged"}
@@ -434,7 +526,7 @@ def create_window_event(payload: WindowEventCreate):
 @app.get("/api/v1/events/recent")
 def get_recent_events(
     limit: int = Query(50, ge=1, le=200),
-    event_type: str = Query("all", regex="^(all|ai|file|git|window)$"),
+    event_type: str = Query("all", pattern="^(all|ai|file|git|window)$"),
     project: Optional[str] = Query(None)
 ):
     db = get_db()
@@ -456,7 +548,10 @@ def get_recent_events(
                     "timestamp": a.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                     "title": f"[{a.platform.upper()}] {a.prompt_text[:60]}...",
                     "detail": a.prompt_text,
-                    "response": a.response_text,
+                    "response": a.response_text if a.response_status == "final_candidate" else None,
+                    "response_status": a.response_status or "legacy_unverified",
+                    "source_path": a.source_path,
+                    "source_position": a.source_position,
                     "badge": a.platform,
                     "project": a.project_tag or "AI Chat"
                 })
@@ -538,11 +633,16 @@ def create_checkpoint_log(req: GenerateCheckpointRequest = Body(...)):
 @app.get("/api/v1/logs/checkpoints/{filename}")
 def read_checkpoint_file(filename: str):
     cfg = get_config()
-    cp_dir = Path(cfg.get("exporters.checkpoints_dir", "logs/checkpoints"))
+    cp_dir = cfg.expand_path(cfg.get("exporters.checkpoints_dir", "logs/checkpoints"))
     if not cp_dir.is_absolute():
         cp_dir = Path(__file__).parent.parent / cp_dir
 
-    file_path = cp_dir / filename
+    if Path(filename).name != filename:
+        raise HTTPException(status_code=400, detail="Invalid checkpoint filename")
+    cp_root = cp_dir.resolve()
+    file_path = (cp_root / filename).resolve()
+    if file_path.parent != cp_root:
+        raise HTTPException(status_code=400, detail="Invalid checkpoint path")
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Checkpoint file not found")
     
@@ -759,5 +859,3 @@ def list_github_prs(state: Optional[str] = None):
             }
             for pr in prs
         ]
-
-

@@ -60,14 +60,16 @@ def build_project_handoff(
         loops_db = session.query(OpenLoop).filter(
             (OpenLoop.project_key == project_key) |
             (OpenLoop.project_key == display_name),
-            OpenLoop.resolved_at.is_(None)
-        ).order_by(desc(OpenLoop.created_at)).all()
+            OpenLoop.status == "open"
+        ).order_by(desc(OpenLoop.last_seen_at), desc(OpenLoop.created_at)).all()
 
         open_loops = [
             {
                 "id": l.id,
                 "title": l.title,
-                "created_at": l.created_at.strftime("%Y-%m-%d %H:%M") if l.created_at else ""
+                "status": l.status,
+                "created_at": l.created_at.strftime("%Y-%m-%d %H:%M") if l.created_at else "",
+                "last_seen_at": l.last_seen_at.strftime("%Y-%m-%d %H:%M") if l.last_seen_at else "",
             }
             for l in loops_db
         ]
@@ -119,6 +121,7 @@ def build_project_handoff(
                 local_path = str(fp.parent)
 
         latest_ai = session.query(AIPromptEvent).filter(
+            AIPromptEvent.turn_key.isnot(None),
             (AIPromptEvent.project_tag == project_key) |
             (AIPromptEvent.project_tag == display_name) |
             (AIPromptEvent.cwd.like(f"%{project_key}%"))
@@ -185,6 +188,7 @@ def build_project_handoff(
 
         # 7. 查詢最近真實 AI 對話問答
         ai_events_db = session.query(AIPromptEvent).filter(
+            AIPromptEvent.turn_key.isnot(None),
             (AIPromptEvent.project_tag == project_key) |
             (AIPromptEvent.project_tag == display_name) |
             (AIPromptEvent.cwd.like(f"%{project_key}%"))
@@ -200,11 +204,18 @@ def build_project_handoff(
             if resp_clean.startswith("[") and resp_clean.endswith("]"):
                 resp_clean = ""
 
+            response_status = ev.response_status or "legacy_unverified"
+            if response_status != "final_candidate":
+                resp_clean = ""
+
             recent_ai_turns.append({
                 "platform": ev.platform,
                 "time": ev.timestamp.strftime("%Y-%m-%d %H:%M") if ev.timestamp else "",
                 "prompt": prompt_clean,
-                "response": resp_clean[:500] if resp_clean else "（無結論摘要）"
+                "response": resp_clean[:500] if resp_clean else "（無可信結論候選）",
+                "response_status": response_status,
+                "source_path": ev.source_path,
+                "source_position": ev.source_position,
             })
             if len(recent_ai_turns) >= turns_limit:
                 break
@@ -290,11 +301,20 @@ def format_handoff_markdown(data: Dict[str, Any]) -> str:
             resp_snip = turn.get("response", "").replace("\n", " ")
             if len(resp_snip) > 220:
                 resp_snip = resp_snip[:220] + "..."
+            trust = turn.get("response_status", "legacy_unverified")
+            source_path = turn.get("source_path")
+            source_position = turn.get("source_position")
+            source = ""
+            if source_path:
+                source = f" · 來源 `{source_path}`"
+                if source_position is not None:
+                    source += f":{source_position}"
             
             turns_lines.append(
                 f"**回合 {i} [{plat} · {t_time}]**\n"
                 f"• 提問：{prompt_snip}\n"
-                f"• 結論/回覆：{resp_snip}"
+                f"• 回應可信狀態：`{trust}`{source}\n"
+                f"• 結論候選：{resp_snip}"
             )
         ai_text = "\n\n".join(turns_lines)
     else:

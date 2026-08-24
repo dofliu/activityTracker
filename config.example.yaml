@@ -2,14 +2,23 @@ server:
   host: 127.0.0.1
   port: 8765
   log_level: info
+security:
+  allowed_origins:
+  - http://127.0.0.1:8765
+  - http://localhost:8765
+  allow_remote_clients: false
+  browser_extension_ingest_token_env: OMNICONTEXT_INGEST_TOKEN
+  browser_extension_ingest_token: ''
 database:
   db_path: omni_context.db
+data_lifecycle:
+  backups_dir: ~/OmniContext/backups
+  backup_retention_days: 30
+  auto_backup_on_start: false
 watchers:
   file_watcher:
     enabled: true
-    watch_directories:
-    - D:/Dropbox/Project_Academic/Paper&Patent/01.國際期刊(發表年月)
-    - D:/Project_CodingSimulation
+    watch_directories: []
     extensions:
     - .tex
     - .docx
@@ -35,8 +44,7 @@ watchers:
     - '**/.*'
   git_watcher:
     enabled: true
-    repositories:
-    - D:/Project_CodingSimulation
+    repositories: []
     scan_interval_seconds: 300
   window_watcher:
     enabled: true
@@ -49,8 +57,8 @@ watchers:
     - Windows Shell Experience Host
   agent_log_watcher:
     enabled: true
-    antigravity_logs_path: C:/Users/user/.gemini/antigravity/brain
-    claude_code_logs_path: C:/Users/user/.claude
+    antigravity_logs_path: ~/.gemini/antigravity/brain
+    claude_code_logs_path: ~/.claude
     claude_code: true
     codex: true
     antigravity: true
@@ -59,14 +67,69 @@ watchers:
     chatgpt: true
     claude_web: true
     manus: true
+usage_tracking:
+  enabled: true
+  goal_label: AI 協作
+  goal_interfaces:
+  - Claude Code
+  - Claude
+  - Codex
+  - ChatGPT
+  - Gemini
+  - Manus
+  - Antigravity
+  daily_goal_minutes: 360
+  milestones_minutes:
+  - 120
+  - 240
+  - 360
+  max_interval_seconds: 3600
+  interface_rules:
+  - name: Codex
+    app_contains: [codex]
+    title_contains: [codex]
+  - name: Claude Code
+    app_contains: [claude-code, claude_code]
+    title_contains: [claude code]
+  - name: ChatGPT
+    app_contains: [chatgpt]
+    title_contains: [chatgpt, chat.openai.com]
+  - name: Claude
+    app_contains: [claude]
+    title_contains: [claude.ai, claude]
+  - name: Gemini
+    app_contains: [gemini]
+    title_contains: [gemini]
+  - name: Manus
+    app_contains: [manus]
+    title_contains: [manus]
+  - name: Antigravity
+    app_contains: [antigravity]
+    title_contains: [antigravity]
+  - name: VS Code
+    app_contains: [code.exe, visual studio code]
+    title_contains: [visual studio code]
+  - name: Terminal
+    app_contains: [windowsterminal, powershell, terminal, cmd.exe]
+    title_contains: []
+  - name: Browser
+    app_contains: [chrome, msedge, firefox, brave]
+    title_contains: []
+  notifications:
+    enabled: false
+    tone: encouraging
+    quiet_hours_start: '22:00'
+    quiet_hours_end: '08:00'
+    cooldown_minutes: 60
+    check_interval_minutes: 15
 synthesizer:
   schedule:
-    enabled: true
+    enabled: false
     time: '23:30'
   periodic_checkpoint:
     enabled: true
     interval_hours: 2
-  provider: gemini
+  provider: ollama
   gemini:
     model: gemini-3.7-flash
     api_key_env: GEMINI_API_KEY
@@ -97,13 +160,13 @@ notifiers:
 exporters:
   daily_brief:
     enabled: true
-    output_dir: D:/Project_CodingSimulation
+    output_dir: ~/OmniContext
     inject_into: ''
   reports_dir: reports
   checkpoints_dir: logs/checkpoints
   obsidian:
     enabled: false
-    vault_daily_notes_dir: C:/Users/user/Documents/ObsidianVault/DailyNotes
+    vault_daily_notes_dir: ~/Documents/ObsidianVault/DailyNotes
 integrations:
   github:
     enabled: true

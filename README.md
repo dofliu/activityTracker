@@ -7,7 +7,11 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-**OmniContext** 是一個**本機優先（Local-First）、注重絕對隱私**的個人上下文記憶中樞與工作進度追蹤系統。它能全自動捕獲您在電腦上的跨平台 AI 對話（Claude Code、Codex、Antigravity、ChatGPT、Gemini 等）、程式碼提交、檔案與論文寫作異動、視窗時間分配，並深度整合 GitHub 雲端倉庫與 Pull Request (PR) 狀態。
+> **目前狀態：Personal Alpha。** Windows Dashboard/API、Extension token boundary、P2.6 usage milestone 與 34 個 contract tests 已驗證；real-browser event、真實達標 Toast、restore drill、wheel/sdist 與 macOS/Linux matrix 尚未完成，因此不是 release-ready。
+
+**文件入口：**[完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
+
+**OmniContext** 是一個**本機優先（Local-First）、具有明確資料邊界**的個人上下文記憶中樞與工作進度追蹤系統。它能捕獲跨平台 AI 對話（Claude Code、Codex、Antigravity、ChatGPT、Gemini 等）、程式碼提交、檔案與論文寫作異動、視窗時間分配，並整合 GitHub 雲端倉庫與 Pull Request (PR) 狀態。
 
 隨時幫助您回答三個核心問題：
 1. **「我現在正在進行哪些專案？」**
@@ -32,7 +36,7 @@
 │          └───────────────────────┼───────────────────────┘               │
 │                                  ▼                                       │
 │                    [ 本機 SQLite 資料庫儲存 ]                            │
-│                    (omni_context.db · 零外洩)                            │
+│             (omni_context.db · 本機儲存；cloud LLM 為 opt-in)            │
 │                                  │                                       │
 │          ┌───────────────────────┴───────────────────────┐               │
 │          ▼                                               ▼               │
@@ -59,14 +63,14 @@
   * 提取各 PR 的標題、狀態（Open / Merged / Draft）、分支流向（`head -> base`）、CI 測試結果（`SUCCESS` / `PENDING` / `FAILURE`）與審查狀態。
   * Web 儀表板提供直接點擊跳轉至 GitHub PR 的超連結。
 
-### 3. 🤖 跨平台 AI 對話全景記錄（問答完整解析）
+### 3. 🤖 跨平台 AI 對話全景記錄（來源可追溯；P2.5 強化中）
 * **本機 CLI / IDE Agent**：
   * **Claude Code**（`~/.claude/projects/`）：完整記錄命令、提問與對話細節。
   * **Codex**（`~/.codex/sessions/**`）：解析 Rollout JSONL 與 Assistant 訊息回覆。
   * **Antigravity**（`.gemini/brain/**`）：即時擷取對話與執行工具。
 * **瀏覽器擴充套件（Chrome Extension MV3）**：
   * 支援 **ChatGPT**、**Gemini**、**Claude.ai**、**Manus**。
-  * 具備 10 分鐘滑動窗口 Upsert 去重，同時保存**使用者提問**與 **AI 完整回答內容**。
+  * 以獨立 ingest token 實施 write-only capability boundary，並以穩定 turn key Upsert。
 
 ### 4. ⚡ 自訂日期區間 AI 工作回顧（LLM Synthesis Engine）
 * **任意日期範圍報告**：支援從 Web UI 選擇起訖日期（`FROM ~ TO`）或使用 `今日`、`昨日`、`本週`、`近 7 天`、`近 30 天` 快捷標籤，一鍵產出多日全景回顧。
@@ -88,6 +92,12 @@
 * 提供 Windows 開機自動背景啟動安裝腳本（`scripts/install_autostart.ps1`）。
 * Telegram 通道保留為選用（預設關閉）。
 
+### 7. ⏱️ 每日主要介面使用時間與里程碑（P2.6 Alpha）
+* 主頁顯示 Claude、Codex、ChatGPT、Gemini、Manus、Antigravity、VS Code 等介面的每日 **foreground active time** 與 AI turns。
+* 使用者可設定每日目標、里程碑、通知語氣、quiet hours 與 cooldown；SQLite receipt 防止重啟後重複通知。
+* 數值只代表已觀察到的前景時間，不等於生產力或實際工時；coverage ledger 尚未完成前一律標示 `partial`。
+* `http://127.0.0.1:8765/extension-monitor` 可觀察 Browser Extension 的 enabled／observed 狀態，但 token pairing 仍只能在 Extension popup 完成。
+
 ---
 
 ## 🚀 快速開始
@@ -96,18 +106,21 @@
 
 需求環境：**Python 3.10+**
 
-```bash
+```console
 # 複製專案
 git clone https://github.com/dofliu/activityTracker.git
 cd activityTracker
 
 # 安裝 Python 依賴套件
 pip install -r requirements.txt
+
+# 建立本機設定、目錄與 browser ingest token
+python main.py init --watch "/your/project/root"
 ```
 
 ### 2. 設定 LLM API 金鑰
 
-系統預設使用 `Google Gemini`，請設定環境變數或於 `config.yaml` 中配置：
+發布範本預設使用本機 `Ollama` 且關閉排程摘要。若主動選用 `Google Gemini`、Anthropic 或 OpenAI，請設定環境變數並在 `config.yaml` 指定 provider：
 
 ```bash
 # Windows PowerShell
@@ -126,6 +139,8 @@ python main.py
 
 啟動後於瀏覽器開啟：**[http://127.0.0.1:8765](http://127.0.0.1:8765)**
 
+完整的 Extension 配對、里程碑設定、備份與故障排查流程見 **[docs/USAGE.md](docs/USAGE.md)**。
+
 ---
 
 ## 💻 CLI 指令完全指南
@@ -135,6 +150,7 @@ OmniContext 支援完整的終端命令列操作：
 | 指令 | 說明 | 範例 |
 | :--- | :--- | :--- |
 | `python main.py` | 啟動 Web 儀表板與背景採集服務 | `python main.py` |
+| `python main.py init` | 建立／更新跨平台設定與 extension token | `python main.py init --watch D:/Projects` |
 | `python main.py resume` | 產出專案接續 Context Handoff（支援 `--copy` 一鍵複製貼入 AI） | `python main.py resume activityTracker -c` |
 | `python main.py now` | 一秒查詢當前進行中專案、最近 5 筆活動與未結事項 | `python main.py now` |
 | `python main.py summary` | 生成 AI 摘要日報（支援自訂區間與強制更新） | `python main.py summary --start 2026-08-20 --end 2026-08-23` |
@@ -144,6 +160,8 @@ OmniContext 支援完整的終端命令列操作：
 | `python main.py brief` | 產出每日簡報檔案至每日入口目錄 | `python main.py brief --notify` |
 | `python main.py notify` | 手動觸發提醒（預設桌面通知） | `python main.py notify briefing --dry-run` |
 | `python main.py status` | 查看資料庫累積數據指標與採集器運行狀態 | `python main.py status` |
+| `python main.py open-loop` | 人工複核 Open Loop lifecycle | `python main.py open-loop 12 resolved --note "done"` |
+| `python main.py backup` | 使用 SQLite Online Backup API 建立並驗證備份 | `python main.py backup` |
 
 ---
 
@@ -152,9 +170,21 @@ OmniContext 支援完整的終端命令列操作：
 系統設定檔支援 Web 介面即時儲存與熱更新：
 
 ```yaml
-app:
+server:
   port: 8765
   host: "127.0.0.1"
+
+security:
+  allowed_origins:
+    - "http://127.0.0.1:8765"
+    - "http://localhost:8765"
+  allow_remote_clients: false
+  browser_extension_ingest_token_env: "OMNICONTEXT_INGEST_TOKEN"
+
+data_lifecycle:
+  backups_dir: "~/OmniContext/backups"
+  backup_retention_days: 30
+  auto_backup_on_start: false
 
 watchers:
   file_watcher:
@@ -162,7 +192,7 @@ watchers:
     watch_directories:
       - "D:/Project_CodingSimulation"
       - "D:/Dropbox/Project_Academic/Paper_and_Patent/01.JournalPapers"
-    extensions: [".tex", ".docx", ".md", ".pdf", ".py", ".txt"]
+    extensions: [".tex", ".docx", ".md", ".pdf", ".py"]
   
   git_watcher:
     enabled: true
@@ -206,7 +236,9 @@ integrations:
 2. 開啟右上角 **「開發人員模式」 (Developer mode)**。
 3. 點選 **「載入未封裝項目」 (Load unpacked)**。
 4. 選擇本專案中的 `watchers/browser_extension/` 資料夾。
-5. 安裝完成後，當您造訪 ChatGPT、Gemini、Claude.ai 或 Manus 時，提問與 AI 回覆將自動同步至本地 OmniContext！
+5. 執行 `python main.py init --show-token`，將 token 貼到擴充套件 popup 後儲存。
+6. 只有帶有效 token 的支援網站事件，才能寫入本機 `/api/v1/events/ai`。
+7. popup 顯示「配對成功」後，可由 `http://127.0.0.1:8765/extension-monitor` 查看各網站是否已有 observed event。
 
 ---
 
@@ -216,14 +248,19 @@ integrations:
 activityTracker/
 ├── config.yaml                     # 系統設定檔（支援 Web UI 熱更新）
 ├── main.py                         # 主入口與 CLI 命令列分發
+├── pyproject.toml                  # 跨平台安裝、CLI entry point 與 pytest 設定
 ├── requirements.txt                # 專案相依套件清單
 ├── README.md                       # 繁體中文說明文件
 ├── README_en.md                    # English Documentation
+├── docs/USAGE.md                   # 安裝、配對、日常操作、備份與故障排查
 │
 ├── core/                           # 核心服務模組
 │   ├── database.py                 # SQLite 連線與 Session 管理
 │   ├── models.py                   # SQLAlchemy 資料庫模型 (Events, Projects, PRs)
 │   ├── server.py                   # FastAPI REST API 與靜態伺服器
+│   ├── security.py                 # Origin、secret redaction 與 extension token boundary
+│   ├── platform_services.py        # Windows/macOS/Linux argv 型 OS 整合
+│   ├── data_lifecycle.py           # SQLite online backup 與 integrity receipt
 │   ├── project_engine.py           # 專案智能歸戶、多檔案聚合與未結事項引擎
 │   ├── fs_utils.py                 # 本機原生檔案總管/瀏覽對話框工具
 │   └── time_utils.py               # 統一本地時區解析工具
@@ -255,6 +292,8 @@ activityTracker/
 ├── scripts/                        # 自動化與維護腳本
 │   ├── install_autostart.ps1       # Windows 開機自動啟動註冊腳本
 │   └── uninstall_autostart.ps1     # 移除開機自動啟動腳本
+├── tests/                          # security/data/lifecycle/portability contract tests
+├── docs/                           # ADR、test strategy 與 hardening acceptance 文件
 │
 ├── logs/checkpoints/               # 週期性活動快照儲存目錄
 └── reports/                        # 每日/區間 Markdown 報告儲存目錄
@@ -267,9 +306,9 @@ activityTracker/
 ### 目前累積的資料資產
 
 ```
-2,047 筆 AI 對話 · 1,775 筆完整問答配對 · 約 236 萬字元
+2,418 筆 AI event rows · 2,053 筆非空回應 · 1,890 筆 final candidates · 66 筆 partial（2026-08-24 16:35 快照）
 時間跨度 2025-05-19 ~ 2026-08-24（15 個月）
-70 個專案狀態 · 57 個 GitHub repos · 266 筆 PR
+72 個專案狀態 · 57 個 GitHub repos · 266 筆 PR
 ```
 
 ### 這個專案的差異化定位
@@ -289,10 +328,11 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 
 | 階段 | 內容 | 說明 |
 | :--- | :--- | :--- |
-| **P3** | 記憶層 (95%) | ✅ P3-1 專案接續 Context Handoff（`main.py resume` + Web 一鍵複製）、P3-2 本機語意檢索、P3-3 `omni ask` 問自己的歷史、重複工作偵測、Session 敘事層 |
+| **P2.5** | 可信度與安全 hardening | API security boundary、ingestion provenance/finalization、Open Loop lifecycle、pytest 與跨平台基線 |
+| **P3** | 記憶層 | ✅ P3-1 Context Handoff；P3-2 本機語意檢索、P3-3 `omni ask`、重複工作偵測與 Session 敘事層待 P2.5 gate |
 | **P4** | 收集層補完 | 瀏覽器閱讀內容、行事曆與會議、終端機指令歷史、未 commit 的工作狀態 |
 | **P5** | 主動秘書 AI 與自主執行 | 主動情境推論與前瞻提案、三級安全守門員（L0/L1/L2）、Agent Dispatcher 調度自主執行、Telegram/Web 一鍵批准、晨間前瞻與晚間交接、`STATUS.yaml` 自動維護 |
-| **P6** | 開源整備 | 抽離硬編碼路徑、`main.py init` 引導、pyproject 與測試、跨平台抽象 |
+| **P6** | 開源整備 | 已建立 `main.py init`、`pyproject.toml`、path expansion、跨平台 argv 抽象與 contract tests；wheel/sdist release smoke test 尚待完成 |
 
 > 收集越多不等於越有用：檔案事件曾從 3,575 筆噪音 → 4,327 筆 → 收斂至 789 筆。
 > 新增採集來源必須先通過「能否改變決策」的檢驗。
@@ -305,18 +345,21 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 
 * 部分歸戶邏輯仍硬編碼專案根路徑（`core/project_engine.py`）。
 * 視窗採集、桌面通知與開機排程僅支援 **Windows**。
-* 尚無 `pyproject.toml` 與測試，暫不支援 `pip install`。
-* 首次啟動需手動編輯 `config.yaml` 的絕對路徑。
+* `pyproject.toml` 與 P2.5 contract tests 已建立；尚未完成 wheel/sdist release packaging 驗收。
+* `main.py init --watch <path>` 已取代手動複製設定；複雜來源仍需於 `config.yaml` 調整。
 
-以上將於 **P6 開源整備** 階段處理。
+剩餘項目將於 **P6 開源整備** 階段持續處理。
 
 ---
 
 ## 🔒 隱私與安全聲明
 
-* **100% 本機儲存**：所有活動事件均保存在本機 SQLite 資料庫中（`omni_context.db`）。
-* **零雲端遙測**：系統不包含任何外部追蹤代碼或第三方分析工具。
-* **Git 提交防護**：資料庫檔案、API 金鑰與個人 Markdown 報告均已預設加入 `.gitignore`，確保私密對話與工作日誌絕不上傳公開倉庫。
+* **事件本機儲存**：活動事件保存在本機 SQLite（`omni_context.db`），不含第三方 analytics telemetry。
+* **LLM 資料邊界**：選擇 Gemini、Anthropic 或 OpenAI 產生摘要時，組裝後的工作脈絡會傳送至該 provider；選擇 Ollama 才是完整本機推論。
+* **Local API**：採 deny-by-default Origin boundary、loopback-only 預設、敏感設定遮蔽與 browser-extension ingestion capability，避免一般網頁跨來源讀取本機工作紀錄。
+* **資料可信度**：canonical AI event 必須具備 `turn_key`、source provenance 與 `response_status`；partial／legacy 回應不作為摘要或 handoff 結論。
+* **備份生命週期**：`python main.py backup` 使用 SQLite Online Backup API，完成後執行 `PRAGMA integrity_check` 並輸出 SHA-256 receipt；自動清理與 restore 尚未啟用。
+* **Git 提交防護**：資料庫檔案、API 金鑰與個人 Markdown 報告已預設加入 `.gitignore`，降低誤提交私密資料的風險。
 
 ---
 

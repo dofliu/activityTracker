@@ -174,21 +174,20 @@ class FileWatcherService:
             logger.info("File watcher is disabled in config.")
             return
 
-        directories = self.cfg.get("watchers.file_watcher.watch_directories", [])
+        directories = self.cfg.get_paths("watchers.file_watcher.watch_directories")
         exts = set(self.cfg.get("watchers.file_watcher.extensions", [".tex", ".docx", ".md", ".pdf", ".txt", ".py"]))
         ignore_patterns = self.cfg.get("watchers.file_watcher.ignore_patterns", [])
 
         handler = ActivityFileHandler(allowed_exts=exts, ignore_patterns=ignore_patterns)
         scheduled_count = 0
 
-        for d_str in directories:
-            d_path = Path(d_str)
+        for d_path in directories:
             if d_path.exists() and d_path.is_dir():
                 self.observer.schedule(handler, str(d_path), recursive=True)
                 logger.info(f"Watching directory: {d_path}")
                 scheduled_count += 1
             else:
-                logger.warning(f"Watch directory not found: {d_str}")
+                logger.warning(f"Watch directory not found: {d_path}")
 
         if scheduled_count > 0:
             self.observer.start()
