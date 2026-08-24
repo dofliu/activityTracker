@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **目前狀態：Personal Alpha。** Windows Dashboard/API、Extension token boundary、P2.6 usage milestone 與 34 個 contract tests 已驗證；real-browser event、真實達標 Toast、restore drill、wheel/sdist 與 macOS/Linux matrix 尚未完成，因此不是 release-ready。
+> **目前狀態：Personal Alpha。** Windows Dashboard/API、Extension token boundary、P2.6 usage milestone、isolated restore drill 與 36 個 contract tests 已驗證；real-browser event、真實達標 Toast、versioned migration、wheel/sdist 與 macOS/Linux matrix 尚未完成，因此不是 release-ready。
 
 **文件入口：**[完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
 
@@ -162,6 +162,7 @@ OmniContext 支援完整的終端命令列操作：
 | `python main.py status` | 查看資料庫累積數據指標與採集器運行狀態 | `python main.py status` |
 | `python main.py open-loop` | 人工複核 Open Loop lifecycle | `python main.py open-loop 12 resolved --note "done"` |
 | `python main.py backup` | 使用 SQLite Online Backup API 建立並驗證備份 | `python main.py backup` |
+| `python main.py restore-drill` | 在隔離暫存 DB 驗證最新／指定備份，不覆蓋 live DB | `python main.py restore-drill` |
 
 ---
 
@@ -358,7 +359,7 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 * **LLM 資料邊界**：選擇 Gemini、Anthropic 或 OpenAI 產生摘要時，組裝後的工作脈絡會傳送至該 provider；選擇 Ollama 才是完整本機推論。
 * **Local API**：採 deny-by-default Origin boundary、loopback-only 預設、敏感設定遮蔽與 browser-extension ingestion capability，避免一般網頁跨來源讀取本機工作紀錄。
 * **資料可信度**：canonical AI event 必須具備 `turn_key`、source provenance 與 `response_status`；partial／legacy 回應不作為摘要或 handoff 結論。
-* **備份生命週期**：`python main.py backup` 使用 SQLite Online Backup API，完成後執行 `PRAGMA integrity_check` 並輸出 SHA-256 receipt；自動清理與 restore 尚未啟用。
+* **備份生命週期**：`python main.py backup` 使用 SQLite Online Backup API 並輸出 integrity／SHA-256；`python main.py restore-drill` 於隔離暫存 DB 驗證 schema 與 row counts 並保存 JSON receipt，不覆蓋 live DB。自動 retention pruning 與正式 upgrade migration 尚未完成。
 * **Git 提交防護**：資料庫檔案、API 金鑰與個人 Markdown 報告已預設加入 `.gitignore`，降低誤提交私密資料的風險。
 
 ---

@@ -20,6 +20,7 @@ OmniContext 已能擷取本機 AI transcripts、檔案、Git、視窗與 GitHub 
 4. Open Loop 採明確狀態機，stale/superseded 不得進入 actionable handoff。
 5. OS-specific 行為經 platform service 執行，不在 module import 階段修改 OS 狀態。
 6. 每項契約先有自動化測試，才允許上層功能依賴。
+7. Restore drill 只能寫入隔離暫存 DB，驗證 integrity、schema 與 row counts 後移除暫存檔並保存 receipt；不得接受 live DB destination。
 
 ## Options Considered
 
@@ -38,7 +39,7 @@ OmniContext 已能擷取本機 AI transcripts、檔案、Git、視窗與 GitHub 
 - P3-2、P3-3 可引用 stable turn 與原始來源。
 - P5 proposal 只能使用 `open` 且通過 freshness 規則的事項。
 - Browser extension 初次設定需要 pairing/ingest token 流程。
-- Release 前仍需正式 migration、backup/restore 與 CI platform matrix。
+- Online backup 與 isolated restore drill 已可提供可回查 receipt；release 前仍需 versioned migration、packaging/upgrade 與 CI platform matrix。
 
 ## Acceptance
 

@@ -112,7 +112,7 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 
 > Architecture decision：在語意記憶與自主執行之前，先讓「來源、turn、回應、待辦、權限與執行平台」都有明確契約。P5 在本節所有 release blockers 關閉前維持 blocked。
 
-**2026-08-24 實作結果：**34 個 contract tests 通過（含 fresh-database migration、P2.6 usage/milestone 與 scheduler fallback）；Windows live API 已驗證惡意 Origin 403、secret redaction、extension token fail-closed。phase-aware 重掃 601 個 transcript sources，checkpoint errors 0、stable turn-key duplicates 0；coverage 因尚無 continuous ledger 正確維持 `partial`。SQLite online backup 已產生並通過 integrity/SHA-256 驗證，並新增可操作的 [`docs/USAGE.md`](docs/USAGE.md)。尚未通過的部分是 real-browser ingestion、versioned migration／restore drill、wheel/sdist 與 macOS/Linux matrix。
+**2026-08-24 實作結果：**36 個 contract tests 通過（含 fresh-database migration、P2.6 usage/milestone、scheduler fallback 與 non-destructive restore drill）；Windows live API 已驗證惡意 Origin 403、secret redaction、extension token fail-closed。phase-aware 重掃 601 個 transcript sources，checkpoint errors 0、stable turn-key duplicates 0；coverage 因尚無 continuous ledger 正確維持 `partial`。SQLite online backup 與 isolated restore drill 已在真實備份上通過 integrity、schema、row-count 驗證並保存 receipt，另新增可操作的 [`docs/USAGE.md`](docs/USAGE.md)。尚未通過的部分是 real-browser ingestion、versioned migration、wheel/sdist upgrade 與 macOS/Linux matrix。
 
 ### P2.5-S1 本機 API 安全邊界
 
@@ -157,7 +157,7 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 - [x] Open Loop lifecycle contract tests 通過，現有過時與重複事項完成一次人工複核。
 - [ ] Windows 實機 smoke test 通過；macOS/Linux 至少完成 import、config、CLI 降級測試。
 - [x] README 隱私聲明明確區分 local storage、cloud LLM processing 與 optional integrations。
-- [x] SQLite online backup 產生 integrity 與 SHA-256 receipt；restore drill 仍屬 release gate。
+- [x] SQLite online backup 產生 integrity 與 SHA-256 evidence；isolated restore drill 通過 schema／row-count parity 並保存 JSON receipt。
 - [ ] 無 High/Critical blocker 後，才可開始 P3-2；P5 executor 另需獨立安全 gate。
 
 ---
@@ -372,7 +372,7 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 1. 將 `project_engine.py` 的硬編碼路徑抽成設定項。
 2. 擴充已建立的 `python main.py init`，加入本機 Agent 日誌、Git 根目錄與 notification capability 自動偵測。
-3. 擴大 P2.5 已建立的 `pyproject.toml`、34 個 tests 與 verified backup，加入 packaging、upgrade、restore drill 與多平台 CI matrix。
+3. 擴大 P2.5 已建立的 `pyproject.toml`、36 個 tests、verified backup 與 restore drill，加入 versioned migration、packaging/upgrade 與多平台 CI matrix。
 4. 無 LLM 金鑰時預設走 Ollama，確保零金鑰也能完整體驗。
 5. 跨平台：視窗採集與桌面通知抽象出平台介面，Windows 以外先降級為停用而非報錯。
 

@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **Current status: Personal Alpha.** Windows Dashboard/API, the Extension token boundary, P2.6 usage milestones, and 34 contract tests are verified. Real browser events, a real milestone Toast, restore drill, wheel/sdist, and the macOS/Linux matrix remain incomplete; this is not release-ready.
+> **Current status: Personal Alpha.** Windows Dashboard/API, the Extension token boundary, P2.6 usage milestones, an isolated restore drill, and 36 contract tests are verified. Real browser events, a real milestone Toast, versioned migrations, wheel/sdist, and the macOS/Linux matrix remain incomplete; this is not release-ready.
 
 **Documentation:** [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
 
@@ -150,6 +150,7 @@ For Extension pairing, milestone configuration, backups, and troubleshooting, se
 | `python main.py notify` | Trigger Telegram report or briefing push | `python main.py notify summary` |
 | `python main.py status` | View database metrics and collector states | `python main.py status` |
 | `python main.py backup` | Create and verify an SQLite online backup | `python main.py backup` |
+| `python main.py restore-drill` | Restore a backup into an isolated temporary DB without replacing the live DB | `python main.py restore-drill` |
 
 ---
 
@@ -293,7 +294,7 @@ activityTracker/
 * **LLM boundary**: Selecting Gemini, Anthropic, or OpenAI sends the assembled work context to that provider. Ollama keeps synthesis local.
 * **Local API boundary**: Loopback-only access, an exact Origin allowlist, secret redaction, and a browser-extension ingest token are enabled by default.
 * **Trust contract**: Canonical AI events carry a stable turn key, source provenance, and response status; partial/legacy responses are not treated as conclusions.
-* **Backup lifecycle**: `python main.py backup` uses SQLite's Online Backup API, runs `PRAGMA integrity_check`, and emits a SHA-256 receipt. Automatic pruning and restore are not yet enabled.
+* **Backup lifecycle**: `python main.py backup` uses SQLite's Online Backup API and emits integrity/SHA-256 evidence. `python main.py restore-drill` verifies schema and row counts in an isolated temporary DB and saves a JSON receipt without replacing the live DB. Automatic pruning and versioned upgrade migrations remain incomplete.
 * **Git protection**: Database files, API keys, and personal Markdown reports are ignored by default to reduce accidental commits.
 
 ---

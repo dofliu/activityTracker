@@ -317,6 +317,22 @@ def cmd_backup(output_dir: Optional[str] = None):
     print(f"sha256: {receipt['sha256']}")
 
 
+def cmd_restore_drill(
+    backup_path: Optional[str] = None,
+    receipt_dir: Optional[str] = None,
+):
+    from core.data_lifecycle import run_configured_restore_drill
+
+    receipt = run_configured_restore_drill(backup_path, receipt_dir)
+    print(f"restore_drill: {receipt['status']}")
+    print(f"source_backup: {receipt['source_backup']['path']}")
+    print(f"integrity: {receipt['isolated_restore']['integrity']}")
+    print(f"schema_match: {receipt['checks']['schema_match']}")
+    print(f"row_counts_match: {receipt['checks']['row_counts_match']}")
+    print(f"temporary_copy_retained: {receipt['isolated_restore']['temporary_copy_retained']}")
+    print(f"receipt: {receipt['receipt_path']}")
+
+
 def cmd_init(
     watch_directories: List[str],
     show_token: bool = False,
@@ -581,6 +597,12 @@ def main():
     subparsers.add_parser("open-loop-reconcile", help="回填 fingerprint 並收斂重複 Open Loops")
     backup_parser = subparsers.add_parser("backup", help="建立並驗證 SQLite online backup")
     backup_parser.add_argument("--dir", help="覆寫備份輸出目錄")
+    restore_parser = subparsers.add_parser(
+        "restore-drill",
+        help="在隔離暫存資料庫執行非破壞性 restore drill",
+    )
+    restore_parser.add_argument("--backup", help="指定備份；未指定時使用最新備份")
+    restore_parser.add_argument("--receipt-dir", help="覆寫 restore drill receipt 目錄")
 
     args = parser.parse_args()
 
@@ -625,6 +647,11 @@ def main():
         cmd_reconcile_open_loops()
     elif args.command == "backup":
         cmd_backup(getattr(args, "dir", None))
+    elif args.command == "restore-drill":
+        cmd_restore_drill(
+            getattr(args, "backup", None),
+            getattr(args, "receipt_dir", None),
+        )
     else:
         parser.print_help()
 

@@ -179,6 +179,18 @@ python main.py open-loop-reconcile
 python main.py backup
 ```
 
+在隔離暫存資料庫執行 restore drill：
+
+```powershell
+# 自動使用 backups_dir 中最新的 .db
+python main.py restore-drill
+
+# 或指定備份與 receipt 目錄
+python main.py restore-drill `
+  --backup "C:\Users\me\OmniContext\backups\omni_context-YYYYMMDD-HHMMSS.db" `
+  --receipt-dir "C:\Users\me\OmniContext\backups\restore_drills"
+```
+
 成功輸出應包含：
 
 - backup path
@@ -187,7 +199,9 @@ python main.py backup
 - file size
 - SHA-256
 
-備份預設位於 `~/OmniContext/backups`。目前已支援建立與驗證備份，但正式 restore CLI、upgrade migration 與自動 retention pruning 仍屬 release gate；不要直接用檔案複製覆蓋正在執行的 SQLite database。
+備份預設位於 `~/OmniContext/backups`。`restore-drill` 會以 read-only 方式開啟來源備份、還原到 OS 暫存目錄，比對 integrity、table list、schema fingerprint 與 row counts，最後刪除暫存 DB，只保存不含 row content 的 JSON receipt。它不提供 live database destination，因此不會覆蓋正式資料。
+
+Versioned upgrade migration、自動 retention pruning 與正式 rollback 操作程序仍屬 release gate；不要直接用檔案複製覆蓋正在執行的 SQLite database。
 
 ## 7. 平台能力
 

@@ -7,7 +7,7 @@ status: active_hardening
 release_ready: false
 last_updated: "2026-08-24"
 current_phase: "P2.5 hardening + P2.6 Usage/Milestone Alpha"
-next_milestone: "完成 versioned migration、restore drill、real-browser ingestion／Toast evidence 與 Windows/macOS/Linux release matrix"
+next_milestone: "完成 versioned migration、real-browser ingestion／Toast evidence、wheel/sdist upgrade 與 Windows/macOS/Linux release matrix"
 planned_features:
   - id: FEATURE-001
     name: "每日主要介面使用時間與里程碑教練"
@@ -60,6 +60,15 @@ evidence_snapshot:
     tables: 11
     size_bytes: 10313728
     sha256: "234047f2e351834abd698fbb3cb6f8a74d7c38bd9bd59c94fdd9d97c7457a032"
+  latest_restore_drill:
+    captured_at: "2026-08-24 16:57 Asia/Taipei"
+    source_backup: "~/OmniContext/backups/omni_context-20260824-163533-514863.db"
+    receipt: "~/OmniContext/backups/restore_drills/restore-drill-20260824-165711-563244.json"
+    status: passed
+    integrity: ok
+    schema_match: true
+    row_counts_match: true
+    temporary_copy_retained: false
   project_states:
     active: 26
     idle: 3
@@ -100,10 +109,10 @@ quality_gates:
   ingestion_provenance: passed_local_rescan_601_sources
   response_finalization: passed_as_final_candidate_contract_not_semantic_correctness
   open_loop_lifecycle: passed_local_db_reconciliation
-  automated_tests: passed_34_contract_tests
+  automated_tests: passed_36_contract_tests
   usage_milestone_alpha: passed_contract_and_windows_dashboard_api_smoke
   documentation_current: passed_readme_usage_roadmap_status_sync
-  backup_lifecycle: passed_online_backup_integrity_receipt_restore_pending
+  backup_lifecycle: passed_online_backup_and_isolated_restore_drill
   portability_baseline: implemented_source_level_release_matrix_pending
   semantic_memory: pending
   autonomous_execution: blocked_by_p2_5
@@ -111,7 +120,7 @@ known_blockers:
   - "Browser extension 實機 ingestion 仍為 0；需完成 Chrome/Edge pairing 與真實網站驗證"
   - "P2.6 尚無 continuous coverage ledger，coverage 維持 partial；真實達標 Windows Toast 尚未觸發"
   - "337 筆 legacy AI rows 無 response_status，僅保留為歷史資料，不進入 canonical synthesis/handoff 結論"
-  - "缺少 release-grade versioned migration、restore drill 與 wheel/sdist upgrade 驗證；verified backup 已建立"
+  - "缺少 release-grade versioned migration 與 wheel/sdist upgrade 驗證；verified backup 與 isolated restore drill 已通過"
   - "macOS/Linux 尚未執行實機或 CI matrix；Windows-only window/notification 功能目前採明確降級"
   - "project_engine 仍含個人根路徑 fallback，尚未完全 config-driven"
-key_metrics: "P0-P2 可日常運行，P3-1 已以 canonical turn contract 強化；P2.5 local security/data/lifecycle contracts 與 P2.6 usage/milestone alpha 已落地並通過 34 tests，且建立變更後 verified backup。Browser 實機 ingestion、真實達標 Toast、restore drill 與多平台 matrix 未完成；整體仍非 release-ready，P5 autonomous executor 維持 blocked。"
+key_metrics: "P0-P2 可日常運行，P3-1 已以 canonical turn contract 強化；P2.5 local security/data/lifecycle contracts 與 P2.6 usage/milestone alpha 已落地並通過 36 tests，verified backup 與 isolated restore drill 均通過。Browser 實機 ingestion、真實達標 Toast、versioned migration、packaging upgrade 與多平台 matrix 未完成；整體仍非 release-ready，P5 autonomous executor 維持 blocked。"
