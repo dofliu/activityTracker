@@ -8,6 +8,7 @@ import subprocess
 import sys
 import webbrowser
 from pathlib import Path
+from typing import Callable
 from urllib.parse import urlparse
 
 
@@ -75,13 +76,19 @@ def open_local_path(path: str, action: str = "explorer") -> None:
     subprocess.Popen(build_open_command(path, action), shell=False)
 
 
-def build_clipboard_command() -> list[str]:
-    if sys.platform == "win32":
+def build_clipboard_command(
+    system: str | None = None,
+    which: Callable[[str], str | None] | None = None,
+) -> list[str]:
+    """建立 clipboard argv；允許測試注入 OS 與 executable discovery。"""
+    current_system = system or sys.platform
+    find_executable = which or shutil.which
+    if current_system == "win32":
         return ["powershell.exe", "-NoProfile", "-Command", "$input | Set-Clipboard"]
-    if sys.platform == "darwin":
+    if current_system == "darwin":
         return ["pbcopy"]
     for candidate, args in (("wl-copy", []), ("xclip", ["-selection", "clipboard"])):
-        executable = shutil.which(candidate)
+        executable = find_executable(candidate)
         if executable:
             return [executable, *args]
     raise RuntimeError("找不到 wl-copy 或 xclip，無法寫入 Linux clipboard")

@@ -1,4 +1,7 @@
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10 使用相容套件。
+    import tomli as tomllib
 from pathlib import Path
 
 import yaml

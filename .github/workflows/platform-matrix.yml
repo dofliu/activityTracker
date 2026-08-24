@@ -54,6 +54,8 @@ jobs:
           python -m pip install --force-reinstall --no-deps $wheel
           $smokeHome = Join-Path $env:RUNNER_TEMP "omnicontext-installed-smoke"
           $receipt = Join-Path $env:RUNNER_TEMP "omnicontext-installed-smoke.json"
+          $env:OMNICONTEXT_HOME = $smokeHome
+          Remove-Item Env:OMNICONTEXT_CONFIG -ErrorAction SilentlyContinue
           Push-Location $env:RUNNER_TEMP
           try {
             python "$env:GITHUB_WORKSPACE/scripts/verify_installed_package.py" --expect-home $smokeHome --receipt $receipt

@@ -16,6 +16,13 @@ def test_open_command_is_argv_not_shell_string(tmp_path):
 
 
 def test_clipboard_command_is_cross_platform_argv():
-    command = build_clipboard_command()
-    assert isinstance(command, list)
-    assert command
+    windows = build_clipboard_command(system="win32")
+    macos = build_clipboard_command(system="darwin")
+    linux = build_clipboard_command(
+        system="linux",
+        which=lambda name: f"/usr/bin/{name}" if name == "wl-copy" else None,
+    )
+
+    assert windows[0] == "powershell.exe"
+    assert macos == ["pbcopy"]
+    assert linux == ["/usr/bin/wl-copy"]
