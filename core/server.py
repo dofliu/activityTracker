@@ -225,6 +225,28 @@ def get_active_projects():
     return get_active_projects_list()
 
 
+@app.get("/api/v1/projects/{project_key}/handoff")
+def get_project_handoff_api(
+    project_key: str,
+    turns: int = Query(5, ge=1, le=20, description="納入之歷史 AI 對話回合數")
+):
+    """取得指定專案的 Context Handoff 結構化接續 Prompt (P3-1)"""
+    from core.handoff_engine import build_project_handoff, format_handoff_markdown
+    try:
+        data = build_project_handoff(project_key, turns_limit=turns)
+        markdown_text = format_handoff_markdown(data)
+        return {
+            "status": "success",
+            "project_key": project_key,
+            "display_name": data.get("display_name") or project_key,
+            "markdown": markdown_text,
+            "data": data
+        }
+    except Exception as e:
+        logger.error(f"Error building handoff for {project_key}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/v1/open-loops")
 def get_open_loops(project: Optional[str] = None):
     """取得未結事項清單"""

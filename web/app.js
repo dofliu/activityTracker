@@ -126,7 +126,9 @@ const I18N = {
     sec_open_loops: "OPEN LOOPS (未結事項)",
     sec_gh_pr: "GITHUB REPO & PULL REQUESTS (遠端倉庫與 PR 追蹤)",
     btn_snapshot_now: "產出此刻快照",
-    files_modified_summary: "異動 {files} 等共 {count} 個檔案"
+    files_modified_summary: "異動 {files} 等共 {count} 個檔案",
+    btn_copy_handoff: "📋 複製接續 Prompt",
+    btn_copy_handoff_short: "📋 接續 Prompt"
   },
   "en": {
     lang_btn: "🌐 繁體中文",
@@ -228,7 +230,9 @@ const I18N = {
     sec_open_loops: "OPEN LOOPS",
     sec_gh_pr: "GITHUB REPO & PULL REQUESTS",
     btn_snapshot_now: "Snapshot Now",
-    files_modified_summary: "Modified {files} ({count} files total)"
+    files_modified_summary: "Modified {files} ({count} files total)",
+    btn_copy_handoff: "📋 Copy Handoff Prompt",
+    btn_copy_handoff_short: "📋 Handoff"
   }
 };
 
@@ -582,6 +586,22 @@ function attachActionGroupListeners(parentEl) {
   });
 }
 
+async function copyProjectHandoff(projectKey, displayName) {
+  try {
+    showToast(currentLang === "zh-TW" ? "⏳ 正在提煉專案接續記憶..." : "⏳ Building context handoff...");
+    const res = await getJSON(`/api/v1/projects/${encodeURIComponent(projectKey)}/handoff?turns=5`);
+    if (res && res.markdown) {
+      await navigator.clipboard.writeText(res.markdown);
+      const name = displayName || res.display_name || projectKey;
+      showToast(currentLang === "zh-TW" ? `⚡ 已複製 [${name}] 接續 Prompt！可直接貼入任何 AI 開工` : `⚡ Copied [${name}] handoff prompt to clipboard!`);
+    } else {
+      showToast("⚠️ 無法生成接續 Prompt");
+    }
+  } catch (e) {
+    showToast("⚠️ 複製失敗: " + e.message);
+  }
+}
+
 function renderResume() {
   const box = document.querySelector("#resume-card .resume-body");
   const p = projectsCache[0];
@@ -595,11 +615,19 @@ function renderResume() {
       <div class="resume-action">${esc(p.last_action_summary || "無紀錄")}</div>
       <div class="resume-meta">${esc(p.last_activity_at)} · ${esc(p.category || "")} · ${t("open_loop_count")} ${p.open_loops_count}</div>
     </div>
-    <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+    <div style="display:flex; align-items:center; gap:8px; flex-shrink:0; flex-wrap:wrap;">
       ${renderActionGroup(p)}
+      <button class="btn" data-copy-handoff="${esc(p.project_key)}" data-name="${esc(p.display_name)}" style="background:var(--s2); border:1px solid var(--bd); color:var(--tx); font-weight:600; font-size:12px; padding:6px 12px; cursor:pointer;" title="${currentLang === 'zh-TW' ? '一鍵複製結構化接續 Prompt 貼入 AI 開工' : 'Copy structured handoff prompt for AI'}">${t("btn_copy_handoff")}</button>
       <button class="btn btn-primary" data-resume="${esc(p.project_key)}">${currentLang === "zh-TW" ? "接續 →" : "Resume →"}</button>
     </div>`;
   attachActionGroupListeners(box);
+  const copyBtn = box.querySelector("[data-copy-handoff]");
+  if (copyBtn) {
+    copyBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      copyProjectHandoff(p.project_key, p.display_name);
+    });
+  }
   const btn = box.querySelector("[data-resume]");
   if (btn) btn.addEventListener("click", () => expandProject(p.project_key, true));
 }
@@ -768,7 +796,8 @@ async function renderProjectDetail(key) {
           <span class="mono-mini accent" style="font-weight:700; flex-shrink:0;">LOCAL PATH:</span>
           <code style="font-size:11.5px; background:transparent; color:var(--tx); word-break:break-all;">${esc(proj.local_path || '尚未定位到本機路徑')}</code>
         </div>
-        <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
+        <div style="display:flex; gap:8px; align-items:center; flex-shrink:0;">
+          <button class="btn" data-detail-handoff="${esc(proj.project_key)}" data-name="${esc(proj.display_name)}" style="background:var(--s2); border:1px solid var(--bd); color:var(--tx); font-weight:600; font-size:11.5px; padding:4px 10px; cursor:pointer;" title="${currentLang === 'zh-TW' ? '一鍵複製結構化接續 Prompt 貼入 AI 開工' : 'Copy structured handoff prompt for AI'}">${t("btn_copy_handoff")}</button>
           ${renderActionGroup(proj)}
         </div>
       </div>`;
@@ -796,6 +825,13 @@ async function renderProjectDetail(key) {
     </div>`;
 
   attachActionGroupListeners(slot);
+  const detailHandoffBtn = slot.querySelector("[data-detail-handoff]");
+  if (detailHandoffBtn && proj) {
+    detailHandoffBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      copyProjectHandoff(proj.project_key, proj.display_name);
+    });
+  }
   const cpBtn = slot.querySelector("[data-cp]");
   if (cpBtn) cpBtn.addEventListener("click", (ev) => { ev.stopPropagation(); triggerCheckpoint(); });
 }

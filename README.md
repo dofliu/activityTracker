@@ -135,6 +135,7 @@ OmniContext 支援完整的終端命令列操作：
 | 指令 | 說明 | 範例 |
 | :--- | :--- | :--- |
 | `python main.py` | 啟動 Web 儀表板與背景採集服務 | `python main.py` |
+| `python main.py resume` | 產出專案接續 Context Handoff（支援 `--copy` 一鍵複製貼入 AI） | `python main.py resume activityTracker -c` |
 | `python main.py now` | 一秒查詢當前進行中專案、最近 5 筆活動與未結事項 | `python main.py now` |
 | `python main.py summary` | 生成 AI 摘要日報（支援自訂區間與強制更新） | `python main.py summary --start 2026-08-20 --end 2026-08-23` |
 | `python main.py github status` | 查看當前 GitHub 連線帳號、倉庫數與 API 額度 | `python main.py github status` |

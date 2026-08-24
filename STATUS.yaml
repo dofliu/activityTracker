@@ -1,10 +1,10 @@
 name: OmniContext Activity Tracker
 name_zh: OmniContext 個人全景活動追蹤系統
 category: personal_tools
-progress: 92
+progress: 95
 status: active
 last_updated: "2026-08-24"
-next_milestone: "P3 記憶層：專案接續 Context Handoff (main.py resume) 與本機語意檢索"
+next_milestone: "P3 記憶層：本機語意檢索索引 (P3-2 Ollama / 本機 Embedding) 與 omni ask (P3-3)"
 technologies:
   - Python
   - FastAPI

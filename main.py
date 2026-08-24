@@ -334,9 +334,52 @@ def cmd_github(action: str):
         print(f"✅ 同步完成！已同步 {res.get('synced_repos_count')} 個專案與 {res.get('synced_prs_count')} 筆 PR 狀態。")
 
 
+def cmd_resume(project_key: Optional[str] = None, copy_to_clipboard: bool = False, turns: int = 5, as_json: bool = False):
+    """產出結構化專案接續 Prompt (P3-1 Context Handoff)"""
+    from core.handoff_engine import build_project_handoff, format_handoff_markdown
+    import json
+
+    if not project_key:
+        active_list = get_active_projects_list()
+        if active_list:
+            project_key = active_list[0].get("project_key")
+        else:
+            project_key = "activityTracker"
+
+    data = build_project_handoff(project_key, turns_limit=turns)
+
+    if as_json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return
+
+    md = format_handoff_markdown(data)
+    print("\n" + "=" * 65)
+    print(f"📋 專案接續 Context Handoff: {data.get('display_name') or project_key}")
+    print("=" * 65 + "\n")
+    print(md)
+    print("=" * 65)
+
+    if copy_to_clipboard:
+        try:
+            import subprocess
+            if sys.platform == "win32":
+                p = subprocess.Popen(["powershell.exe", "-NoProfile", "-Command", "Set-Clipboard", "-Value", "$input"], stdin=subprocess.PIPE)
+                p.communicate(input=md.encode("utf-8"))
+                print("⚡ [OK] 接續 Prompt 已成功複製到剪貼簿！可直接貼入任何 AI 視窗開工。")
+        except Exception as e:
+            logger.warning(f"Could not copy to clipboard: {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="OmniContext - 個人全景上下文與進行中專案智慧中樞")
     subparsers = parser.add_subparsers(dest="command", help="子指令")
+
+    # resume 指令 (P3-1)
+    resume_parser = subparsers.add_parser("resume", help="產出專案接續 Prompt (Context Handoff)，一鍵接續任何 AI 開工")
+    resume_parser.add_argument("project", nargs="?", help="專案名稱或識別碼 (未指定時預設當前最活躍專案)")
+    resume_parser.add_argument("-c", "--copy", action="store_true", help="自動將生成的接續 Prompt 複製到剪貼簿")
+    resume_parser.add_argument("--turns", type=int, default=5, help="納入之歷史 AI 對話回合數 (預設 5)")
+    resume_parser.add_argument("--json", action="store_true", help="以 JSON 格式輸出結構化數據")
 
     # run / web
     run_parser = subparsers.add_parser("run", help="啟動 Web 儀表板與後台監控服務")
@@ -387,6 +430,13 @@ def main():
     if args.command in ["run", "web", None]:
         autostart = not getattr(args, "no_autostart", False) if args.command else True
         run_web_and_services(autostart_monitoring=autostart)
+    elif args.command == "resume":
+        cmd_resume(
+            getattr(args, "project", None),
+            getattr(args, "copy", False),
+            getattr(args, "turns", 5),
+            getattr(args, "json", False)
+        )
     elif args.command == "now":
         cmd_now()
     elif args.command == "summary":
