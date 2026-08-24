@@ -1,6 +1,11 @@
 from fastapi.testclient import TestClient
 
-from core.server import app, browser_conversation_key, browser_response_status
+from core.server import (
+    app,
+    browser_conversation_key,
+    browser_response_status,
+    get_system_config,
+)
 
 
 client = TestClient(app)
@@ -19,6 +24,17 @@ def test_config_response_redacts_secrets():
     browser_token = payload.get("security", {}).get("browser_extension_ingest_token")
     assert github_token in {"", "***REDACTED***"}
     assert browser_token in {"", "***REDACTED***"}
+
+
+def test_empty_config_keeps_public_secret_field_contract(monkeypatch):
+    class EmptyConfig:
+        data = {}
+
+    monkeypatch.setattr("core.server.get_config", lambda: EmptyConfig())
+    payload = get_system_config()
+
+    assert payload["integrations"]["github"]["token"] == ""
+    assert payload["security"]["browser_extension_ingest_token"] == ""
 
 
 def test_extension_ingest_without_token_is_denied():

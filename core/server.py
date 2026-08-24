@@ -370,7 +370,18 @@ def update_open_loop_lifecycle(loop_id: int, payload: OpenLoopTransitionRequest)
 @app.get("/api/v1/config")
 def get_system_config():
     cfg = get_config()
-    return redact_config(cfg.data)
+    public_config = redact_config(cfg.data)
+
+    # 即使是首次啟動、尚未建立 config.yaml，也維持安全相關欄位的
+    # 固定回應結構。前端因此能明確區分「未設定」與「API 契約缺失」，
+    # 同時不會洩漏任何 secret。
+    public_config.setdefault("integrations", {}).setdefault("github", {}).setdefault(
+        "token", ""
+    )
+    public_config.setdefault("security", {}).setdefault(
+        "browser_extension_ingest_token", ""
+    )
+    return public_config
 
 
 @app.post("/api/v1/config")
