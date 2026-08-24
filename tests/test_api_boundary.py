@@ -92,6 +92,8 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     )
     assert monitor.status_code == 200
     assert "OmniContext Extension Monitor" in monitor.text
+    assert "尚未驗證 Extension" in monitor.text
+    assert "Extension token 配對成功" in monitor.text
     assert "chrome.storage" not in monitor.text
     assert "/api/v1/extension/status" in monitor.text
     assert dashboard.status_code == 200

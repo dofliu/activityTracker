@@ -1,0 +1,50 @@
+# OmniContext Release Checklist
+
+**Candidate:** `1.3.0a1`
+**Date:** 2026-08-24
+**Scope:** Packaging Alpha；不是公開 release 授權
+
+## Pre-Deploy
+
+- [x] 47 個 contract tests 通過。
+- [x] SQLite migration fresh/legacy/live upgrade 為 `4/4`。
+- [x] Wheel/sdist build 在隔離 PEP 517 environment 通過。
+- [x] Artifact receipt 確認 config template、Dashboard、Extension assets 與 CLI entry point 均存在。
+- [x] Artifact 不含 `config.yaml`、SQLite database 或 local secrets。
+- [x] Fresh wheel install 使用 package 外的 writable application home。
+- [x] `1.2.0 → 1.3.0a1` isolated upgrade smoke 通過。
+- [ ] macOS/Linux CI matrix 通過。
+- [ ] 真實 Chrome/Edge pairing 與至少一筆 Browser event 通過。
+
+## Deploy / Publish
+
+- [ ] 在乾淨 Windows VM 重跑 install、service 與 Extension pairing。
+- [ ] 建立 signed/tagged release candidate。
+- [ ] 發布 wheel/sdist 到目標 registry。
+- [ ] 驗證下載後 SHA-256 與本機 build receipt 一致。
+- [ ] 監看啟動錯誤、migration state、HTTP health 與 collector health。
+
+目前以上 publish 項目未獲授權也未執行，因此專案仍為 `release_ready: false`。
+
+## Post-Deploy
+
+- [ ] 驗證 `omnicontext init`、`assets-status`、`extension-path` 與 `migration-status`。
+- [ ] 驗證 Dashboard、Extension Monitor 與 `/static/app.js` HTTP 200。
+- [ ] 確認 Browser event、foreground coverage 與 notification claim boundary 未被放寬。
+- [ ] 更新 release notes、STATUS 與遠端 tag SHA。
+
+## Rollback Triggers
+
+- Runtime 寫入 `site-packages` 或其他非 application-home 目錄。
+- Config、database 或 secret 被打入 artifact。
+- Schema state 不是 `up_to_date 4/4`，或出現 checksum/newer-version error。
+- Health、Dashboard、Extension Monitor 或 static assets 任一無法讀取。
+- Upgrade 後既有 config/database 不可讀或 row-count/schema contract 失敗。
+
+## Rollback Procedure
+
+1. 停止確切的 OmniContext process，不終止未確認的 port owner。
+2. 保留 application home 與 verified SQLite backup；不得用檔案複製覆蓋執行中的 DB。
+3. 解除候選 package，回到已驗證 source checkout/commit；`1.2.0` wheel 本身缺 assets，不作為完整 packaged rollback target。
+4. 執行 `migration-status`、backup integrity 與 isolated restore drill。
+5. 只有 health、schema 與資料 contract 都恢復後才重啟 collectors。

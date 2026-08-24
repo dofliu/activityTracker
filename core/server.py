@@ -13,7 +13,8 @@ from pydantic import BaseModel, Field
 import json
 
 from .database import get_db
-from .config import get_config, DEFAULT_CONFIG_PATH
+from . import __version__
+from .config import get_config
 from .models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, DailySummary, ProjectState, OpenLoop, GitHubRepoState, GitHubPREvent
 from .manager import get_manager
 from .platform_services import open_local_path, open_web_url
@@ -29,6 +30,7 @@ from .security import (
 from .extension_monitor import build_extension_status
 from .usage_analytics import evaluate_daily_milestones, get_usage_summary
 from .time_utils import get_local_now
+from .runtime_paths import resolve_runtime_path, web_assets_dir
 from .project_engine import (
     get_active_projects_list,
     get_open_loops_list,
@@ -63,7 +65,7 @@ def browser_response_status(response: str | None, capture_state: str | None) -> 
 app = FastAPI(
     title="OmniContext Local Engine & Web Dashboard",
     description="個人全景上下文與活動記憶核心 API 與 Web 儀表板",
-    version="1.2.0"
+    version=__version__
 )
 
 # 僅允許本機 dashboard origins；browser extension 走獨立 write-only token boundary。
@@ -102,9 +104,9 @@ async def enforce_local_security_boundary(request: Request, call_next):
     return await call_next(request)
 
 # 掛載 Web 靜態資源目錄
-WEB_DIR = Path(__file__).parent.parent / "web"
-if not WEB_DIR.exists():
-    WEB_DIR.mkdir(parents=True, exist_ok=True)
+WEB_DIR = web_assets_dir()
+if not WEB_DIR.is_dir():
+    raise RuntimeError(f"OmniContext Web assets are missing: {WEB_DIR}")
 
 app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 
@@ -353,7 +355,8 @@ def update_system_config(new_config: Dict[str, Any] = Body(...)):
     try:
         cfg = get_config()
         merged_config = merge_redacted_config(cfg.data, new_config)
-        with open(DEFAULT_CONFIG_PATH, "w", encoding="utf-8") as f:
+        cfg.config_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(cfg.config_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(merged_config, f, allow_unicode=True, sort_keys=False)
         
         manager = get_manager()
@@ -633,9 +636,9 @@ def create_checkpoint_log(req: GenerateCheckpointRequest = Body(...)):
 @app.get("/api/v1/logs/checkpoints/{filename}")
 def read_checkpoint_file(filename: str):
     cfg = get_config()
-    cp_dir = cfg.expand_path(cfg.get("exporters.checkpoints_dir", "logs/checkpoints"))
-    if not cp_dir.is_absolute():
-        cp_dir = Path(__file__).parent.parent / cp_dir
+    cp_dir = resolve_runtime_path(
+        cfg.get("exporters.checkpoints_dir", "logs/checkpoints")
+    )
 
     if Path(filename).name != filename:
         raise HTTPException(status_code=400, detail="Invalid checkpoint filename")
@@ -769,7 +772,8 @@ def connect_github(req: GitHubConnectRequest):
     else:
         cfg.data["integrations"]["github"]["token"] = ""  # 使用 gh CLI 動態讀取
 
-    with open(DEFAULT_CONFIG_PATH, "w", encoding="utf-8") as f:
+    cfg.config_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(cfg.config_path, "w", encoding="utf-8") as f:
         yaml.safe_dump(cfg.data, f, allow_unicode=True, sort_keys=False)
 
     # 立即執行一次同步
@@ -789,7 +793,8 @@ def disconnect_github():
     if "integrations" in cfg.data and "github" in cfg.data["integrations"]:
         cfg.data["integrations"]["github"]["enabled"] = False
         cfg.data["integrations"]["github"]["token"] = ""
-        with open(DEFAULT_CONFIG_PATH, "w", encoding="utf-8") as f:
+        cfg.config_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(cfg.config_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(cfg.data, f, allow_unicode=True, sort_keys=False)
     return {"status": "success", "message": "已解除 GitHub 整合連線"}
 

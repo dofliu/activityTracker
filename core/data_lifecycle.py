@@ -12,24 +12,19 @@ from pathlib import Path
 from typing import Any
 
 from core.config import get_config
+from core.runtime_paths import resolve_runtime_path
 
 
 def configured_database_path() -> Path:
     cfg = get_config()
-    configured = cfg.expand_path(cfg.get("database.db_path", "omni_context.db"))
-    if configured.is_absolute():
-        return configured.resolve()
-    return (Path(__file__).parent.parent / configured).resolve()
+    return resolve_runtime_path(cfg.get("database.db_path", "omni_context.db"))
 
 
 def configured_backup_dir() -> Path:
     cfg = get_config()
-    configured = cfg.expand_path(
+    return resolve_runtime_path(
         cfg.get("data_lifecycle.backups_dir", "~/OmniContext/backups")
     )
-    if configured.is_absolute():
-        return configured.resolve()
-    return (Path(__file__).parent.parent / configured).resolve()
 
 
 def verify_sqlite_database(db_path: str | Path) -> dict[str, Any]:

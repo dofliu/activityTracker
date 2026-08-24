@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **目前狀態：Personal Alpha。** Windows Dashboard/API、Extension token boundary、P2.6 usage milestone、SQLite schema migration 4/4、isolated restore drill 與 42 個 contract tests 已驗證；real-browser event、真實達標 Toast、wheel/sdist upgrade 與 macOS/Linux matrix 尚未完成，因此不是 release-ready。
+> **目前狀態：Personal Alpha。** Windows Dashboard/API、Extension token boundary、P2.6 usage milestone、SQLite schema migration 4/4、wheel/sdist fresh/upgrade/assets smoke、isolated restore drill 與 47 個 contract tests 已驗證；real-browser event、真實達標 Toast、正式 rollback 與 macOS/Linux matrix 尚未完成，因此不是 release-ready。
 
 **文件入口：**[完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
 
@@ -113,12 +113,22 @@
 git clone https://github.com/dofliu/activityTracker.git
 cd activityTracker
 
-# 安裝 Python 依賴套件
-pip install -r requirements.txt
+# Source checkout／開發模式
+python -m pip install -e ".[dev]"
 
 # 建立本機設定、目錄與 browser ingest token
 python main.py init --watch "/your/project/root"
 ```
+
+若使用已建置的 Alpha wheel：
+
+```console
+python -m pip install omnicontext-1.3.0a1-py3-none-any.whl
+omnicontext init --watch "/your/project/root"
+omnicontext assets-status
+```
+
+Wheel 尚未公開發布。Installed wheel 預設將 config、database 與 reports 放在使用者可寫的 `~/OmniContext`，不寫入 `site-packages`；可用 `OMNICONTEXT_HOME` 或 `OMNICONTEXT_CONFIG` 覆寫。
 
 ### 2. 設定 LLM API 金鑰
 
@@ -166,6 +176,10 @@ OmniContext 支援完整的終端命令列操作：
 | `python main.py backup` | 使用 SQLite Online Backup API 建立並驗證備份 | `python main.py backup` |
 | `python main.py restore-drill` | 在隔離暫存 DB 驗證最新／指定備份，不覆蓋 live DB | `python main.py restore-drill` |
 | `python main.py migration-status` | 唯讀查看目前／最新 schema version、pending 與相容性 | `python main.py migration-status` |
+| `python main.py assets-status` | 檢查 packaged config/Web/Extension assets | `python main.py assets-status` |
+| `python main.py extension-path` | 顯示 Chrome/Edge Load unpacked 目錄 | `python main.py extension-path` |
+
+Installed wheel 可將表中的 `python main.py` 改為 `omnicontext`。
 
 ---
 
@@ -239,7 +253,7 @@ integrations:
 1. 開啟 Chrome 或 Edge 瀏覽器，進入 `chrome://extensions/`。
 2. 開啟右上角 **「開發人員模式」 (Developer mode)**。
 3. 點選 **「載入未封裝項目」 (Load unpacked)**。
-4. 選擇本專案中的 `watchers/browser_extension/` 資料夾。
+4. 執行 `python main.py extension-path`（wheel 安裝則為 `omnicontext extension-path`），將輸出的資料夾選為 Load unpacked。
 5. 執行 `python main.py init --show-token`，將 token 貼到擴充套件 popup 後儲存。
 6. 只有帶有效 token 的支援網站事件，才能寫入本機 `/api/v1/events/ai`。
 7. popup 顯示「配對成功」後，可由 `http://127.0.0.1:8765/extension-monitor` 查看各網站是否已有 observed event。
@@ -253,15 +267,18 @@ activityTracker/
 ├── config.yaml                     # 系統設定檔（支援 Web UI 熱更新）
 ├── main.py                         # 主入口與 CLI 命令列分發
 ├── pyproject.toml                  # 跨平台安裝、CLI entry point 與 pytest 設定
+├── MANIFEST.in                     # sdist assets 與 privacy exclusions
 ├── requirements.txt                # 專案相依套件清單
 ├── README.md                       # 繁體中文說明文件
 ├── README_en.md                    # English Documentation
 ├── docs/USAGE.md                   # 安裝、配對、日常操作、備份與故障排查
 ├── docs/ADR-003-versioned-sqlite-migrations.md  # Schema migration 架構決策
+├── docs/ADR-004-packaged-runtime-layout.md       # Wheel/sdist runtime layout 決策
 │
 ├── core/                           # 核心服務模組
 │   ├── database.py                 # SQLite 連線與 Session 管理
 │   ├── migrations.py               # Append-only schema registry、checksum 與升級守門
+│   ├── runtime_paths.py            # Source/wheel application home 與 packaged assets
 │   ├── models.py                   # SQLAlchemy 資料庫模型 (Events, Projects, PRs)
 │   ├── server.py                   # FastAPI REST API 與靜態伺服器
 │   ├── security.py                 # Origin、secret redaction 與 extension token boundary
@@ -338,7 +355,7 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 | **P3** | 記憶層 | ✅ P3-1 Context Handoff；P3-2 本機語意檢索、P3-3 `omni ask`、重複工作偵測與 Session 敘事層待 P2.5 gate |
 | **P4** | 收集層補完 | 瀏覽器閱讀內容、行事曆與會議、終端機指令歷史、未 commit 的工作狀態 |
 | **P5** | 主動秘書 AI 與自主執行 | 主動情境推論與前瞻提案、三級安全守門員（L0/L1/L2）、Agent Dispatcher 調度自主執行、Telegram/Web 一鍵批准、晨間前瞻與晚間交接、`STATUS.yaml` 自動維護 |
-| **P6** | 開源整備 | 已建立 `main.py init`、`pyproject.toml`、versioned migration、path expansion、跨平台 argv 抽象與 contract tests；wheel/sdist release smoke test 尚待完成 |
+| **P6** | 開源整備 | `1.3.0a1` wheel/sdist contents、fresh install、`1.2.0 → 1.3.0a1` upgrade、assets 與 writable application home 已在 Windows 隔離環境通過；macOS/Linux matrix 與公開 release gate 待完成 |
 
 > 收集越多不等於越有用：檔案事件曾從 3,575 筆噪音 → 4,327 筆 → 收斂至 789 筆。
 > 新增採集來源必須先通過「能否改變決策」的檢驗。
@@ -351,7 +368,7 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 
 * 部分歸戶邏輯仍硬編碼專案根路徑（`core/project_engine.py`）。
 * 視窗採集、桌面通知與開機排程僅支援 **Windows**。
-* `pyproject.toml`、schema migration 4/4 與 P2.5 contract tests 已建立；尚未完成 wheel/sdist install/upgrade/assets 驗收。
+* `pyproject.toml`、schema migration 4/4 與 Windows wheel/sdist install/upgrade/assets 驗收已完成；macOS/Linux CI／實機尚未完成。
 * `main.py init --watch <path>` 已取代手動複製設定；複雜來源仍需於 `config.yaml` 調整。
 
 剩餘項目將於 **P6 開源整備** 階段持續處理。
@@ -364,8 +381,9 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 * **LLM 資料邊界**：選擇 Gemini、Anthropic 或 OpenAI 產生摘要時，組裝後的工作脈絡會傳送至該 provider；選擇 Ollama 才是完整本機推論。
 * **Local API**：採 deny-by-default Origin boundary、loopback-only 預設、敏感設定遮蔽與 browser-extension ingestion capability，避免一般網頁跨來源讀取本機工作紀錄。
 * **資料可信度**：canonical AI event 必須具備 `turn_key`、source provenance 與 `response_status`；partial／legacy 回應不作為摘要或 handoff 結論。
-* **備份生命週期**：`python main.py backup` 使用 SQLite Online Backup API 並輸出 integrity／SHA-256；`python main.py restore-drill` 於隔離暫存 DB 驗證 schema 與 row counts 並保存 JSON receipt，不覆蓋 live DB。自動 retention pruning 與正式 wheel/sdist upgrade/rollback 程序尚未完成。
+* **備份生命週期**：`python main.py backup` 使用 SQLite Online Backup API 並輸出 integrity／SHA-256；`python main.py restore-drill` 於隔離暫存 DB 驗證 schema 與 row counts 並保存 JSON receipt，不覆蓋 live DB。Windows wheel upgrade smoke 已通過；自動 retention pruning 與正式 production rollback rehearsal 尚未完成。
 * **Schema migration**：append-only registry 保存 version/name/checksum；既有 DB upgrade 前自動產生 verified backup。Checksum mismatch 或未知較新版本會 fail-closed，不允許舊版 runtime 繼續開啟。
+* **Artifact 邊界**：wheel/sdist content receipt 會檢查必要 assets，並拒絕夾帶 `config.yaml`、SQLite database 或 local secrets。
 * **Git 提交防護**：資料庫檔案、API 金鑰與個人 Markdown 報告已預設加入 `.gitignore`，降低誤提交私密資料的風險。
 
 ---

@@ -22,6 +22,7 @@
 - Versioned migration：fresh DB 與 legacy DB 到達相同 latest version；舊資料與 lifecycle backfill 保留；重跑不新增 receipt。
 - Migration safety：checksum mismatch、未知較新版本與 migration exception 都必須 fail-closed；失敗版本不得寫入 applied receipt。
 - Open Loop API：resolve、reopen、stale、supersede；actionable list 只含 open。
+- Packaging runtime：`OMNICONTEXT_HOME`／`OMNICONTEXT_CONFIG`、relative data path、config template、Web/Extension assets 與 `init` writable-home contract。
 
 ### Smoke tests
 
@@ -53,7 +54,26 @@ python main.py resume activityTracker --turns 3 --json
 python main.py backup
 python main.py restore-drill
 python main.py migration-status
+python main.py assets-status
+python main.py extension-path
 ```
+
+## P6 Wheel/SDist Release Matrix
+
+### Artifact content
+
+- Wheel 必須包含 config template、Web Dashboard、Extension Monitor、Browser Extension 與 console entry point。
+- SDist 必須包含 README、STATUS、ADR/usage docs、source assets 與 build manifest。
+- Wheel/sdist 不得包含 `config.yaml`、SQLite database、API keys、local reports 或 private receipts。
+- `python scripts/verify_release_artifacts.py <dist-dir>` 必須產生 `passed` receipt 與 SHA-256。
+
+### Installed package
+
+- Fresh wheel install 必須在 package 外建立 writable application home、config 與 schema `4/4` database。
+- 上一版 wheel upgrade 必須確實替換 distribution version，保留 package 外的 data boundary。
+- Health、Dashboard、Extension Monitor 與 `/static/app.js` 必須回傳 HTTP 200。
+- `assets-status` 與 `extension-path` 必須在 source checkout／installed wheel 都可用。
+- Windows isolated venv 通過不能替代 macOS/Linux CI／實機與 unsupported-feature graceful degradation。
 
 ## P2.6 Extension Monitor 與 Usage Milestone Matrix
 

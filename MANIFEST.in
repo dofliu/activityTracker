@@ -1,0 +1,14 @@
+include LICENSE
+include README.md
+include README_en.md
+include ROADMAP.md
+include STATUS.yaml
+include config.example.yaml
+recursive-include docs *.md *.png
+recursive-include web *.html *.css *.js
+recursive-include watchers/browser_extension *.html *.js *.json
+prune build
+prune dist
+prune logs
+prune reports
+global-exclude __pycache__ *.py[cod] *.db *.db-shm *.db-wal .env config.yaml

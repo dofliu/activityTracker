@@ -1,14 +1,15 @@
 [build-system]
-requires = ["setuptools>=69", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "omnicontext"
-version = "1.2.0"
+dynamic = ["version"]
 description = "Local-first personal context and activity tracker"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {file = "LICENSE"}
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{name = "Juihung Liu"}]
 dependencies = [
   "fastapi>=0.110.0",
@@ -36,10 +37,26 @@ omnicontext = "main:main"
 
 [tool.setuptools]
 py-modules = ["main"]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {attr = "core.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["core*", "exporters*", "integrations*", "notifiers*", "scripts*", "synthesizer*", "watchers*"]
+include = ["core*", "exporters*", "integrations*", "notifiers*", "scripts*", "synthesizer*", "watchers*", "web*"]
+
+[tool.setuptools.package-data]
+web = ["*.html", "*.css", "*.js"]
+watchers = [
+  "browser_extension/*.html",
+  "browser_extension/*.js",
+  "browser_extension/*.json",
+  "browser_extension/content_scripts/*.js",
+]
+
+[tool.setuptools.data-files]
+"share/omnicontext" = ["config.example.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

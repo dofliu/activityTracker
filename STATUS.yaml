@@ -1,13 +1,13 @@
 name: OmniContext Activity Tracker
 name_zh: OmniContext 個人全景活動追蹤系統
 category: personal_tools
-progress: 72
+progress: 75
 progress_basis: "依 P0-P6 加權里程碑估計；不是 release readiness 百分比"
 status: active_hardening
 release_ready: false
 last_updated: "2026-08-24"
-current_phase: "P2.5 hardening + P2.6 Usage/Milestone Alpha"
-next_milestone: "完成 wheel/sdist install/upgrade/assets smoke、real-browser ingestion／Toast evidence 與 Windows/macOS/Linux release matrix"
+current_phase: "P2.5 hardening + P2.6 Usage/Milestone + P6 Packaging Alpha"
+next_milestone: "完成 real-browser ingestion／Toast evidence、formal rollback rehearsal 與 Windows/macOS/Linux release matrix"
 planned_features:
   - id: FEATURE-001
     name: "每日主要介面使用時間與里程碑教練"
@@ -99,6 +99,7 @@ evidence_snapshot:
     - "重啟後 file/git/window/agent_log collectors 均回報 healthy"
     - "runtime file watcher 已同時納入 Project_CodingSimulation 與學術目錄"
     - "Browser extension 尚無實機 ingestion 證據"
+    - "Extension Monitor live API：local service ok、server token configured，但 pairing_verified=false 且 Browser events=0；不得宣稱 Extension 已連線"
   p2_6_evidence:
     localhost_monitor: passed_dashboard_and_extension_monitor_smoke
     usage_date: "2026-08-24"
@@ -122,16 +123,34 @@ evidence_snapshot:
     milestone_receipts: 0
     milestone_dry_run: not_reached
     visual_qa: passed_no_horizontal_overflow_and_no_console_errors
+  packaging_evidence:
+    captured_at: "2026-08-24 18:35 Asia/Taipei"
+    candidate_version: 1.3.0a1
+    baseline_1_2_0_wheel_runtime_assets: missing
+    pep517_wheel_sdist_build: passed
+    artifact_content_receipt: passed
+    artifact_privacy_exclusions: passed_no_config_database_or_local_secrets
+    fresh_wheel_install: passed_isolated_windows_venv
+    upgrade_path: passed_1_2_0_to_1_3_0a1
+    installed_application_home_outside_package: true
+    installed_schema_migration: up_to_date_4_of_4
+    installed_http_endpoints:
+      health: 200
+      dashboard: 200
+      extension_monitor: 200
+      static_app_js: 200
+    receipts_retained_in_os_temp_only: true
 quality_gates:
   security_boundary: passed_local_contract_and_live_origin_test
   ingestion_provenance: passed_local_rescan_601_sources
   response_finalization: passed_as_final_candidate_contract_not_semantic_correctness
   open_loop_lifecycle: passed_local_db_reconciliation
-  automated_tests: passed_42_contract_tests
+  automated_tests: passed_47_contract_tests
   usage_milestone_alpha: passed_contract_and_windows_dashboard_api_smoke
   documentation_current: passed_readme_usage_roadmap_status_sync
   backup_lifecycle: passed_online_backup_and_isolated_restore_drill
   versioned_migration: passed_fresh_legacy_backup_copy_and_live_upgrade_4_of_4
+  packaging_windows_alpha: passed_artifacts_fresh_upgrade_assets_and_writable_home
   portability_baseline: implemented_source_level_release_matrix_pending
   semantic_memory: pending
   autonomous_execution: blocked_by_p2_5
@@ -139,7 +158,7 @@ known_blockers:
   - "Browser extension 實機 ingestion 仍為 0；需完成 Chrome/Edge pairing 與真實網站驗證"
   - "P2.6 尚無 continuous coverage ledger，coverage 維持 partial；真實達標 Windows Toast 尚未觸發"
   - "337 筆 legacy AI rows 無 response_status，僅保留為歷史資料，不進入 canonical synthesis/handoff 結論"
-  - "缺少 wheel/sdist install/upgrade/assets 驗證與正式 rollback 操作程序；versioned migration 4/4、verified backup 與 isolated restore drill 已通過"
+  - "Windows wheel/sdist install/upgrade/assets 已驗證，但 formal production rollback rehearsal 與 public publish/tag 尚未執行"
   - "macOS/Linux 尚未執行實機或 CI matrix；Windows-only window/notification 功能目前採明確降級"
   - "project_engine 仍含個人根路徑 fallback，尚未完全 config-driven"
-key_metrics: "P0-P2 可日常運行，P3-1 已以 canonical turn contract 強化；P2.5 local security/data/lifecycle contracts、SQLite migration 4/4 與 P2.6 usage/milestone alpha 已落地並通過 42 tests，pre/post-migration verified backups 與 isolated restore drills 均通過。Browser 實機 ingestion、真實達標 Toast、packaging upgrade 與多平台 matrix 未完成；整體仍非 release-ready，P5 autonomous executor 維持 blocked。"
+key_metrics: "P0-P2 可日常運行，P3-1 已以 canonical turn contract 強化；P2.5 security/data/lifecycle、SQLite migration 4/4、P2.6 usage/milestone 與 Windows P6 packaging alpha 已落地並通過 47 tests。Wheel/sdist contents、fresh/1.2.0 upgrade、writable home、pre/post-migration backups 與 restore drills 均通過。Browser pairing/實機 ingestion、真實達標 Toast、formal rollback 與 macOS/Linux matrix 未完成；整體仍非 release-ready，P5 autonomous executor 維持 blocked。"

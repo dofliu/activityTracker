@@ -1,10 +1,10 @@
 # OmniContext 使用說明
 
-> 適用版本：Personal Alpha / P2.5 hardening + P2.6 usage milestone alpha
+> 適用版本：`1.3.0a1` Personal Alpha / P2.5 + P2.6 + P6 packaging hardening
 >
 > 主要驗證平台：Windows 11、Python 3.12、Chrome/Edge MV3
 
-本文件提供可直接執行的安裝、啟動、Browser Extension 配對、每日使用、備份與故障排查流程。架構決策與開發進度分別見 [ADR-001](ADR-001-p2-5-trust-boundary.md)、[ADR-002](ADR-002-extension-monitor-and-usage-milestones.md) 與 [ROADMAP](../ROADMAP.md)。
+本文件提供可直接執行的安裝、啟動、Browser Extension 配對、每日使用、備份與故障排查流程。架構決策另見 [ADR-001](ADR-001-p2-5-trust-boundary.md)、[ADR-002](ADR-002-extension-monitor-and-usage-milestones.md)、[ADR-003](ADR-003-versioned-sqlite-migrations.md)、[ADR-004](ADR-004-packaged-runtime-layout.md) 與 [Release Checklist](RELEASE_CHECKLIST.md)。
 
 ## 1. 安裝與初始化
 
@@ -27,11 +27,22 @@ python -m pip install -e ".[dev]"
 python -m pip install -r requirements.txt
 ```
 
+本機建置出的 Alpha wheel 可安裝為：
+
+```powershell
+python -m pip install .\dist\omnicontext-1.3.0a1-py3-none-any.whl
+omnicontext assets-status
+```
+
+目前沒有公開 registry release。Wheel 模式預設使用 `~/OmniContext` 作為 writable application home；source checkout 為保持相容，仍使用 checkout root。可用 `OMNICONTEXT_HOME` 覆寫完整目錄，或以 `OMNICONTEXT_CONFIG` 指定設定檔；相對 database/report 路徑不會寫入 `site-packages`。
+
 ### 1.2 建立本機設定
 
 ```powershell
 python main.py init --watch "D:\Projects"
 ```
+
+Wheel 安裝可改用 `omnicontext init --watch "D:\Projects"`。
 
 - `--watch` 可重複使用，加入多個監控根目錄。
 - 指令會建立本機 `config.yaml`、必要資料目錄與 Browser Extension ingest token。
@@ -71,7 +82,13 @@ Extension popup 與 localhost Monitor 是兩個不同入口：
 1. 開啟 `chrome://extensions/` 或 `edge://extensions/`。
 2. 啟用 Developer mode。
 3. 選擇 Load unpacked。
-4. 載入 `watchers/browser_extension/`。
+4. 取得目前安裝版本的 Extension 目錄並載入：
+
+```powershell
+python main.py extension-path
+# Wheel 安裝：omnicontext extension-path
+```
+
 5. 在本機 PowerShell 取得 token：
 
 ```powershell
@@ -81,7 +98,7 @@ python main.py init --show-token
 6. 將 token 貼入 Extension popup 並儲存。
 7. popup 顯示 pairing 成功後，開啟支援網站並完成一輪對話，再到 Extension Monitor 查看 `observed` 狀態。
 
-目前支援 ChatGPT、Claude.ai、Gemini 與 Manus。`enabled` 只代表設定允許；只有出現至少一筆真實 browser event 才能稱為 `observed`。請勿把 token 放入截圖、issue、commit 或公開日誌。
+目前支援 ChatGPT、Claude.ai、Gemini 與 Manus。Monitor 顯示 ONLINE 只證明 localhost service 正常；「尚未驗證 Extension／WAITING EVENT」表示資料庫仍無真實 Browser event，不能當作 pairing 成功。`enabled` 只代表設定允許；只有 popup 顯示配對成功且出現至少一筆真實 browser event 才能稱為 `observed`。請勿把 token 放入截圖、issue、commit 或公開日誌。
 
 如需旋轉 token：
 
@@ -211,13 +228,13 @@ python main.py restore-drill `
 
 備份預設位於 `~/OmniContext/backups`。`restore-drill` 會以 read-only 方式開啟來源備份、還原到 OS 暫存目錄，比對 integrity、table list、schema fingerprint 與 row counts，最後刪除暫存 DB，只保存不含 row content 的 JSON receipt。它不提供 live database destination，因此不會覆蓋正式資料。
 
-自動 retention pruning、wheel/sdist upgrade 與正式 rollback 操作程序仍屬 release gate；不要直接用檔案複製覆蓋正在執行的 SQLite database。
+Windows isolated wheel fresh/upgrade/assets smoke 已通過。自動 retention pruning、macOS/Linux matrix 與正式 production rollback rehearsal 仍屬 release gate；不要直接用檔案複製覆蓋正在執行的 SQLite database。
 
 ## 7. 平台能力
 
 | 功能 | Windows | macOS / Linux |
 |---|---|---|
-| FastAPI、SQLite、CLI log ingestion | 已實測 | source-level baseline，待 CI／實機 |
+| FastAPI、SQLite、CLI log ingestion | source + wheel isolated smoke 已實測 | source-level baseline，待 CI／實機 |
 | Browser Extension | Chrome/Edge Alpha | Chromium 理論可用，待實機 |
 | Window foreground collector | 支援 | 明確降級，不宣稱可用 |
 | Desktop notification | WinRT Toast／MessageBox fallback | 明確降級，待平台實作 |
@@ -259,7 +276,11 @@ Get-NetTCPConnection -LocalPort 8765 -State Listen
 python -m pytest -q
 python -m compileall -q core synthesizer notifiers watchers exporters tests
 python main.py migration-status
+python main.py assets-status
+python scripts/verify_release_artifacts.py dist
 git diff --check
 ```
+
+完整 wheel/sdist 發布門檻、rollback triggers 與未完成項目見 [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)。Build 成功本身不能替代 fresh install、upgrade、assets、privacy exclusions 與多平台驗證。
 
 回報問題時可附：OS、Python 版本、執行命令、錯誤文字、`python main.py status` 的非敏感部分與重現步驟。不要附上 `config.yaml`、database、完整 transcript、API key、Extension token 或私人檔案路徑。

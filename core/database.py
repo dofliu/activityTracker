@@ -1,9 +1,9 @@
-from pathlib import Path
 from contextlib import contextmanager
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from .config import get_config
 from .migrations import upgrade_sqlite_database
+from .runtime_paths import resolve_runtime_path
 
 
 class Database:
@@ -20,18 +20,14 @@ class Database:
 
     def init_db(self) -> None:
         cfg = get_config()
-        db_path = cfg.expand_path(cfg.get("database.db_path", "omni_context.db"))
-        if not db_path.is_absolute():
-            root_dir = Path(__file__).parent.parent
-            db_path = root_dir / db_path
-        db_path = db_path.resolve()
+        db_path = resolve_runtime_path(
+            cfg.get("database.db_path", "omni_context.db")
+        )
         db_path.parent.mkdir(parents=True, exist_ok=True)
 
-        backup_dir = cfg.expand_path(
+        backup_dir = resolve_runtime_path(
             cfg.get("data_lifecycle.backups_dir", "~/OmniContext/backups")
         )
-        if not backup_dir.is_absolute():
-            backup_dir = (Path(__file__).parent.parent / backup_dir).resolve()
         self._migration_receipt = upgrade_sqlite_database(
             db_path,
             backup_before=bool(

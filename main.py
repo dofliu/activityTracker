@@ -24,6 +24,14 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from core.config import get_config
 from core.database import get_db
+from core.runtime_paths import (
+    browser_extension_assets_dir,
+    config_template_path,
+    default_config_path,
+    resolve_runtime_path,
+    runtime_asset_status,
+    runtime_data_root,
+)
 from core.models import (
     AIPromptEvent,
     FileActivityEvent,
@@ -56,12 +64,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger("OmniContext.Main")
 
-LOCK_FILE = Path(__file__).parent / ".instance.lock"
+LOCK_FILE = resolve_runtime_path(".instance.lock")
 
 
 def acquire_instance_lock() -> bool:
     """單一實例鎖 (Single Instance Lock)：防止重複啟動造成資料庫衝突"""
     try:
+        LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
         if LOCK_FILE.exists():
             content = LOCK_FILE.read_text().strip()
             if content:
@@ -362,9 +371,11 @@ def cmd_init(
     rotate_token: bool = False,
 ):
     """建立可攜式本機設定，且只在 token 空白時產生 browser ingest capability。"""
-    root = Path(__file__).parent.resolve()
-    config_path = root / "config.yaml"
-    example_path = root / "config.example.yaml"
+    root = runtime_data_root()
+    config_path = default_config_path()
+    example_path = config_template_path()
+    root.mkdir(parents=True, exist_ok=True)
+    config_path.parent.mkdir(parents=True, exist_ok=True)
 
     created = False
     if not config_path.exists():
@@ -396,11 +407,16 @@ def cmd_init(
         encoding="utf-8",
     )
     for relative in ("reports", "logs/checkpoints"):
-        (root / relative).mkdir(parents=True, exist_ok=True)
+        resolve_runtime_path(relative).mkdir(parents=True, exist_ok=True)
     get_config().load(config_path)
 
     print(f"config: {config_path} ({'created' if created else 'updated'})")
-    print(f"database: {root / config_data.get('database', {}).get('db_path', 'omni_context.db')}")
+    print(
+        "database: "
+        + str(resolve_runtime_path(
+            config_data.get("database", {}).get("db_path", "omni_context.db")
+        ))
+    )
     if show_token:
         print("browser extension ingest token（請貼到擴充套件設定）:")
         print(token)
@@ -408,6 +424,30 @@ def cmd_init(
         print("browser extension ingest token: generated（以 --show-token 明確顯示）")
     else:
         print("browser extension ingest token: configured")
+
+
+def cmd_assets_status():
+    """檢查 wheel/source 中必要 runtime assets，不輸出任何設定密鑰。"""
+    status = runtime_asset_status()
+    print(f"status: {status['status']}")
+    print(f"application_home: {status['application_home']}")
+    print(f"runtime_data_root: {status['runtime_data_root']}")
+    print(f"config_path: {status['config_path']}")
+    print(f"config_template: {status['config_template']}")
+    print(f"web_assets: {status['web_assets']}")
+    print(f"browser_extension: {status['browser_extension']}")
+    for name, passed in status["checks"].items():
+        print(f"{name}: {'ok' if passed else 'missing'}")
+    if status["status"] != "ok":
+        raise SystemExit(1)
+
+
+def cmd_extension_path():
+    """輸出可供 Chrome/Edge Load unpacked 使用的目錄。"""
+    extension_dir = browser_extension_assets_dir().resolve()
+    if not (extension_dir / "manifest.json").is_file():
+        raise FileNotFoundError(f"找不到 Browser Extension assets: {extension_dir}")
+    print(extension_dir)
 
 
 def cmd_notify_telegram(action: str, date_str: Optional[str] = None, dry_run: bool = False):
@@ -631,6 +671,14 @@ def main():
         help="唯讀檢查 SQLite schema migration version 與相容性",
     )
     migration_status_parser.add_argument("--db", help="覆寫要檢查的 SQLite database")
+    subparsers.add_parser(
+        "assets-status",
+        help="檢查 config/Web/Browser Extension runtime assets",
+    )
+    subparsers.add_parser(
+        "extension-path",
+        help="顯示 Chrome/Edge Load unpacked 的 Browser Extension 目錄",
+    )
 
     args = parser.parse_args()
 
@@ -682,6 +730,10 @@ def main():
         )
     elif args.command == "migration-status":
         cmd_migration_status(getattr(args, "db", None))
+    elif args.command == "assets-status":
+        cmd_assets_status()
+    elif args.command == "extension-path":
+        cmd_extension_path()
     else:
         parser.print_help()
 

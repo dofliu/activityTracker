@@ -2,8 +2,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict
 import yaml
-
-DEFAULT_CONFIG_PATH = Path(__file__).parent.parent / "config.yaml"
+from .runtime_paths import default_config_path
 
 
 class Config:
@@ -17,7 +16,12 @@ class Config:
         return cls._instance
 
     def load(self, config_path: str | Path | None = None) -> None:
-        path = Path(config_path) if config_path else DEFAULT_CONFIG_PATH
+        path = (
+            Path(config_path).expanduser().resolve()
+            if config_path
+            else default_config_path()
+        )
+        self._config_path = path
         if path.exists():
             with open(path, "r", encoding="utf-8") as f:
                 self._config_data = yaml.safe_load(f) or {}
@@ -51,6 +55,10 @@ class Config:
     @property
     def data(self) -> Dict[str, Any]:
         return self._config_data
+
+    @property
+    def config_path(self) -> Path:
+        return self._config_path
 
 
 def get_config(config_path: str | Path | None = None) -> Config:

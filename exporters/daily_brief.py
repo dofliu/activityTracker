@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from core.config import get_config
+from core.runtime_paths import resolve_runtime_path
 from core.time_utils import get_local_now
 from core.project_engine import get_active_projects_list, get_open_loops_list, is_bucket_project
 
@@ -191,9 +192,9 @@ def export_daily_brief(output_dir: Optional[str] = None) -> Dict[str, Any]:
 
     out_dir_str = output_dir or cfg.get("exporters.daily_brief.output_dir", "")
     if not out_dir_str:
-        out_dir_str = str(Path(__file__).parent.parent / "reports")
+        out_dir_str = "reports"
 
-    out_dir = cfg.expand_path(out_dir_str)
+    out_dir = resolve_runtime_path(out_dir_str)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     written: List[str] = []

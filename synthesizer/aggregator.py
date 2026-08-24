@@ -8,6 +8,7 @@ import logging
 from core.database import get_db
 from core.models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, DailySummary, ProjectState, OpenLoop, GitHubPREvent
 from core.config import get_config
+from core.runtime_paths import resolve_runtime_path
 from core.time_utils import get_local_now
 from core.project_engine import get_active_projects_list, get_open_loops_list, refresh_project_states, extract_and_save_open_loops_from_summary
 from .prompt_templates import RANGE_PROJECT_SYNTHESIS_SYSTEM, RANGE_PROJECT_SYNTHESIS_USER
@@ -218,10 +219,7 @@ def save_summary_to_file(label_str: str, markdown_content: str) -> Path:
     """將生成的 Markdown 報告存檔於 reports/ 與 Obsidian"""
     cfg = get_config()
     reports_dir_str = cfg.get("exporters.reports_dir", "reports")
-    reports_dir = Path(reports_dir_str)
-    if not reports_dir.is_absolute():
-        root_dir = Path(__file__).parent.parent
-        reports_dir = root_dir / reports_dir
+    reports_dir = resolve_runtime_path(reports_dir_str)
     reports_dir.mkdir(parents=True, exist_ok=True)
 
     # 檔名清理
@@ -244,10 +242,7 @@ def save_summary_to_file(label_str: str, markdown_content: str) -> Path:
 def generate_periodic_checkpoint(hours: int = 2) -> Dict[str, Any]:
     cfg = get_config()
     checkpoints_dir_str = cfg.get("exporters.checkpoints_dir", "logs/checkpoints")
-    cp_dir = Path(checkpoints_dir_str)
-    if not cp_dir.is_absolute():
-        root_dir = Path(__file__).parent.parent
-        cp_dir = root_dir / cp_dir
+    cp_dir = resolve_runtime_path(checkpoints_dir_str)
     cp_dir.mkdir(parents=True, exist_ok=True)
 
     now = get_local_now()
@@ -311,10 +306,7 @@ def generate_periodic_checkpoint(hours: int = 2) -> Dict[str, Any]:
 def list_periodic_checkpoints() -> List[Dict[str, Any]]:
     cfg = get_config()
     checkpoints_dir_str = cfg.get("exporters.checkpoints_dir", "logs/checkpoints")
-    cp_dir = Path(checkpoints_dir_str)
-    if not cp_dir.is_absolute():
-        root_dir = Path(__file__).parent.parent
-        cp_dir = root_dir / cp_dir
+    cp_dir = resolve_runtime_path(checkpoints_dir_str)
 
     if not cp_dir.exists():
         return []

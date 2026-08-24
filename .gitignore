@@ -13,6 +13,10 @@ __pycache__/
 venv/
 env/
 ENV/
+build/
+dist/
+*.egg-info/
+.packaging-smoke/
 
 # Database files (Local privacy storage)
 *.db

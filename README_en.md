@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **Current status: Personal Alpha.** Windows Dashboard/API, the Extension token boundary, P2.6 usage milestones, SQLite schema migration 4/4, an isolated restore drill, and 42 contract tests are verified. Real browser events, a real milestone Toast, wheel/sdist upgrade, and the macOS/Linux matrix remain incomplete; this is not release-ready.
+> **Current status: Personal Alpha.** Windows Dashboard/API, the Extension token boundary, P2.6 usage milestones, SQLite schema migration 4/4, wheel/sdist fresh/upgrade/assets smoke, an isolated restore drill, and 47 contract tests are verified. Real browser events, a real milestone Toast, a formal rollback rehearsal, and the macOS/Linux matrix remain incomplete; this is not release-ready.
 
 **Documentation:** [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
 
@@ -106,12 +106,22 @@ Requires **Python 3.10+**
 git clone https://github.com/dofliu/activityTracker.git
 cd activityTracker
 
-# Install dependencies
-pip install -r requirements.txt
+# Source checkout / development mode
+python -m pip install -e ".[dev]"
 
 # Create local config, directories, and a browser ingest token
 python main.py init --watch "/your/project/root"
 ```
+
+For a locally built Alpha wheel:
+
+```bash
+python -m pip install omnicontext-1.3.0a1-py3-none-any.whl
+omnicontext init --watch "/your/project/root"
+omnicontext assets-status
+```
+
+The wheel is not publicly released. Installed wheels keep config, database, and reports under the writable `~/OmniContext` by default rather than `site-packages`; `OMNICONTEXT_HOME` and `OMNICONTEXT_CONFIG` can override this.
 
 ### 2. Configure LLM API Keys
 
@@ -154,6 +164,10 @@ For Extension pairing, milestone configuration, backups, and troubleshooting, se
 | `python main.py backup` | Create and verify an SQLite online backup | `python main.py backup` |
 | `python main.py restore-drill` | Restore a backup into an isolated temporary DB without replacing the live DB | `python main.py restore-drill` |
 | `python main.py migration-status` | Read current/latest schema versions, pending steps, and compatibility | `python main.py migration-status` |
+| `python main.py assets-status` | Verify packaged config/Web/Extension assets | `python main.py assets-status` |
+| `python main.py extension-path` | Print the Chrome/Edge Load unpacked directory | `python main.py extension-path` |
+
+With an installed wheel, replace `python main.py` with `omnicontext`.
 
 ---
 
@@ -225,7 +239,7 @@ integrations:
 1. Open Chrome or Edge and navigate to `chrome://extensions/`.
 2. Toggle on **Developer mode** in the top right.
 3. Click **Load unpacked**.
-4. Select the `watchers/browser_extension/` directory in this project.
+4. Run `python main.py extension-path` (or `omnicontext extension-path` for a wheel) and select the printed directory.
 5. Run `python main.py init --show-token`, then paste the token into the extension popup and save it.
 6. Only supported-site events carrying a valid token can write to the local ingestion endpoint.
 7. After the popup reports a verified pairing, open `http://127.0.0.1:8765/extension-monitor` to inspect observed browser events.
@@ -299,8 +313,9 @@ activityTracker/
 * **LLM boundary**: Selecting Gemini, Anthropic, or OpenAI sends the assembled work context to that provider. Ollama keeps synthesis local.
 * **Local API boundary**: Loopback-only access, an exact Origin allowlist, secret redaction, and a browser-extension ingest token are enabled by default.
 * **Trust contract**: Canonical AI events carry a stable turn key, source provenance, and response status; partial/legacy responses are not treated as conclusions.
-* **Backup lifecycle**: `python main.py backup` uses SQLite's Online Backup API and emits integrity/SHA-256 evidence. `python main.py restore-drill` verifies schema and row counts in an isolated temporary DB and saves a JSON receipt without replacing the live DB. Automatic pruning and formal wheel/sdist upgrade/rollback procedures remain incomplete.
+* **Backup lifecycle**: `python main.py backup` uses SQLite's Online Backup API and emits integrity/SHA-256 evidence. `python main.py restore-drill` verifies schema and row counts in an isolated temporary DB and saves a JSON receipt without replacing the live DB. Windows wheel upgrade smoke has passed; automatic pruning and a formal production rollback rehearsal remain incomplete.
 * **Schema migration**: An append-only registry records version/name/checksum. Existing databases receive a verified backup before upgrade; checksum mismatches and unknown newer versions fail closed.
+* **Artifact boundary**: Wheel/sdist content receipts verify required assets and reject `config.yaml`, SQLite databases, and local secrets.
 * **Git protection**: Database files, API keys, and personal Markdown reports are ignored by default to reduce accidental commits.
 
 ---
