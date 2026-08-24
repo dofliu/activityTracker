@@ -146,6 +146,23 @@ class IngestionCheckpoint(Base):
     updated_at = Column(DateTime, default=get_local_now, onupdate=get_local_now)
 
 
+class BrowserExtensionHeartbeat(Base):
+    """經 ingest token 驗證的 Extension 存活與非敏感診斷 receipt。"""
+
+    __tablename__ = "browser_extension_heartbeats"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    instance_id = Column(String(64), unique=True, nullable=False, index=True)
+    extension_version = Column(String(32), nullable=False)
+    ready_platforms_json = Column(Text, nullable=True)
+    last_capture_status = Column(String(40), nullable=False, default="none")
+    last_capture_at = Column(DateTime, nullable=True)
+    last_error_code = Column(String(80), nullable=True)
+    offline_queue_size = Column(Integer, nullable=False, default=0)
+    first_seen_at = Column(DateTime, default=get_local_now, nullable=False)
+    last_seen_at = Column(DateTime, default=get_local_now, nullable=False, index=True)
+
+
 class MilestoneNotificationReceipt(Base):
     """每日里程碑通知 receipt；避免 scheduler 重啟或重送造成重複提醒。"""
     __tablename__ = "milestone_notification_receipts"

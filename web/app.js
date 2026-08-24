@@ -502,15 +502,17 @@ function renderUsagePanelError() {
 function renderExtensionPanel(data) {
   const extension = data.extension || {};
   const observed = extension.capture_status === "observed";
+  const paired = extension.heartbeat_verified === true;
   const badge = $("extension-capture-badge");
-  badge.className = "trust " + (observed ? "ok" : "noisy");
-  badge.textContent = observed ? "OBSERVED" : "UNVERIFIED";
+  badge.className = "trust " + (observed || paired ? "ok" : "noisy");
+  badge.textContent = observed ? "OBSERVED" : paired ? "PAIRED" : "UNVERIFIED";
   const last = extension.last_capture_at ? new Date(extension.last_capture_at).toLocaleString() : "—";
+  const heartbeat = extension.last_heartbeat_at ? new Date(extension.last_heartbeat_at).toLocaleString() : "—";
   $("extension-summary-text").textContent = currentLang === "zh-TW"
-    ? `Server token：${extension.token_configured ? "已設定" : "未設定"}；今日 Browser events：${extension.events_today || 0}；最後採集：${last}`
-    : `Server token: ${extension.token_configured ? "configured" : "missing"}; browser events today: ${extension.events_today || 0}; last capture: ${last}`;
+    ? `Server token：${extension.token_configured ? "已設定" : "未設定"}；Heartbeat：${heartbeat}；今日 Browser events：${extension.events_today || 0}；最後採集：${last}`
+    : `Server token: ${extension.token_configured ? "configured" : "missing"}; heartbeat: ${heartbeat}; browser events today: ${extension.events_today || 0}; last capture: ${last}`;
   $("extension-platform-list").innerHTML = (data.platforms || []).map(item => {
-    const state = !item.enabled ? "OFF" : item.observation_status === "observed" ? "OBSERVED" : "WAITING";
+    const state = !item.enabled ? "OFF" : item.observation_status === "observed" ? "OBSERVED" : item.content_script_seen ? "CONTENT READY" : "WAITING";
     return `<div class="extension-platform">
       <div class="extension-platform-top"><span>${esc(item.label)}</span><span class="${state === "OBSERVED" ? "accent" : "muted"}">${state}</span></div>
       <div class="extension-platform-sub">today ${Number(item.events_today || 0)} · total ${Number(item.events_total || 0)}</div>

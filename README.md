@@ -7,13 +7,15 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **目前狀態：Personal Alpha。** Windows Dashboard/API、Extension token boundary、P2.6 usage milestone、SQLite schema migration 4/4、wheel/sdist fresh/upgrade/assets smoke、isolated restore drill 與 47 個 contract tests 已驗證；real-browser event、真實達標 Toast、正式 rollback 與 macOS/Linux matrix 尚未完成，因此不是 release-ready。
+> **目前狀態：Personal Alpha。** Windows Dashboard/API、Extension token boundary、verified heartbeat contract、P2.6 usage milestone、SQLite schema migration 5/5、wheel/sdist fresh/upgrade/assets smoke、isolated restore drill 與 52 個 contract tests 已驗證；Gemini Browser ingestion 已觀察 3 筆事件（2 筆含回應），但新版 Extension heartbeat 實機 receipt、其他網站、真實達標 Toast、正式 rollback 與 macOS/Linux matrix 尚未完成，因此不是 release-ready。
 
 **文件入口：**[完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
 
 ![OmniContext 架構與未來 Roadmap](docs/assets/omnicontext-architecture-roadmap-card-v1.png)
 
 **OmniContext** 是一個**本機優先（Local-First）、具有明確資料邊界**的個人上下文記憶中樞與工作進度追蹤系統。它能捕獲跨平台 AI 對話（Claude Code、Codex、Antigravity、ChatGPT、Gemini 等）、程式碼提交、檔案與論文寫作異動、視窗時間分配，並整合 GitHub 雲端倉庫與 Pull Request (PR) 狀態。
+
+它與單一 AI 的 memory／chat import 不同：**OmniContext 的 canonical context 屬於使用者與專案，不屬於任何一家 AI provider。** 除了多個 AI 的對話與工作狀態，也把 local Repository、branch/commit、檔案異動、IDE/terminal、foreground activity 與 Open Loops 納入同一條可追溯時間線，再產生 provider-neutral Context Handoff。完整定位與證據邊界見[產品定位](docs/PRODUCT_POSITIONING.md)。
 
 隨時幫助您回答三個核心問題：
 1. **「我現在正在進行哪些專案？」**
@@ -123,7 +125,7 @@ python main.py init --watch "/your/project/root"
 若使用已建置的 Alpha wheel：
 
 ```console
-python -m pip install omnicontext-1.3.0a1-py3-none-any.whl
+python -m pip install omnicontext-1.3.0a2-py3-none-any.whl
 omnicontext init --watch "/your/project/root"
 omnicontext assets-status
 ```
@@ -355,7 +357,7 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 | **P3** | 記憶層 | ✅ P3-1 Context Handoff；P3-2 本機語意檢索、P3-3 `omni ask`、重複工作偵測與 Session 敘事層待 P2.5 gate |
 | **P4** | 收集層補完 | 瀏覽器閱讀內容、行事曆與會議、終端機指令歷史、未 commit 的工作狀態 |
 | **P5** | 主動秘書 AI 與自主執行 | 主動情境推論與前瞻提案、三級安全守門員（L0/L1/L2）、Agent Dispatcher 調度自主執行、Telegram/Web 一鍵批准、晨間前瞻與晚間交接、`STATUS.yaml` 自動維護 |
-| **P6** | 開源整備 | `1.3.0a1` wheel/sdist contents、fresh install、`1.2.0 → 1.3.0a1` upgrade、assets 與 writable application home 已在 Windows 隔離環境通過；macOS/Linux matrix 與公開 release gate 待完成 |
+| **P6** | 開源整備 | `1.3.0a2` wheel/sdist contents、fresh install、`1.2.0 → 1.3.0a2` upgrade、assets 與 writable application home 已在 Windows 隔離環境通過；macOS/Linux matrix 與公開 release gate 待完成 |
 
 > 收集越多不等於越有用：檔案事件曾從 3,575 筆噪音 → 4,327 筆 → 收斂至 789 筆。
 > 新增採集來源必須先通過「能否改變決策」的檢驗。
@@ -368,7 +370,7 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 
 * 部分歸戶邏輯仍硬編碼專案根路徑（`core/project_engine.py`）。
 * 視窗採集、桌面通知與開機排程僅支援 **Windows**。
-* `pyproject.toml`、schema migration 4/4 與 Windows wheel/sdist install/upgrade/assets 驗收已完成；macOS/Linux CI／實機尚未完成。
+* `pyproject.toml`、schema migration 5/5 與 Windows wheel/sdist install/upgrade/assets 驗收已完成；macOS/Linux CI／實機尚未完成。
 * `main.py init --watch <path>` 已取代手動複製設定；複雜來源仍需於 `config.yaml` 調整。
 
 剩餘項目將於 **P6 開源整備** 階段持續處理。

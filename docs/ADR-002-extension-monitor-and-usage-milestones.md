@@ -20,6 +20,8 @@ Browser Extension popup 現在同時呈現 local service health 與 ingest token
 4. 第一版不建立 materialized daily summary；由 pure aggregation service 即時計算，避免 derived data 漂移。資料量增加後再評估 materialization。
 5. 每日 milestone 使用獨立 receipt table，以 `(local_date, milestone_minutes, channel)` unique key 保證 idempotency。
 6. 在沒有 continuous coverage ledger 前，usage API 最高只回報 `partial`；collector 不支援或停用則為 `unavailable`。
+7. Extension `1.2.0` 每分鐘以 `chrome.alarms` 送出經 ingest token 驗證的 heartbeat；server 只保存 instance ID、版本、content-ready platforms、capture status、error code、queue size 與時間，不保存 token、URL、Prompt 或 Response。
+8. localhost Monitor 可讀取最近的 heartbeat receipt，因此可區分 service online、Extension recently paired、content script ready 與 browser event observed；heartbeat 逾期不抹除歷史 event，但不能宣稱目前仍在線。
 
 ## Options Considered
 
@@ -74,4 +76,6 @@ Browser Extension popup 現在同時呈現 local service health 與 ingest token
 4. [x] 主頁新增今日使用與 Extension Monitor card。
 5. [x] scheduler 接入 milestone evaluation，release template 預設 opt-in。
 6. [x] Windows Dashboard/API 與 browser-extension token pairing probe 通過；token 未出現在回應，惡意 Origin 為 403。
-7. [ ] 補真實網站 browser event、真實達標 Toast、DST 與 macOS/Linux evidence。
+7. [x] Gemini 真實網站 browser ingestion 已觀察 3 筆 event，其中 2 筆具非空 response。
+8. [x] Heartbeat persistence、token gate、privacy payload、MV3 alarms 與 content-ready contract tests 通過。
+9. [ ] 瀏覽器重新載入 Extension `1.2.0` 後取得 live heartbeat receipt；再補 ChatGPT/Claude/Manus、真實達標 Toast、DST 與 macOS/Linux evidence。

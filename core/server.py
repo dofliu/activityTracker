@@ -9,7 +9,7 @@ from fastapi import FastAPI, Depends, HTTPException, Query, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 import json
 
 from .database import get_db
@@ -27,7 +27,7 @@ from .security import (
     origin_is_allowed,
     redact_config,
 )
-from .extension_monitor import build_extension_status
+from .extension_monitor import build_extension_status, record_extension_heartbeat
 from .usage_analytics import evaluate_daily_milestones, get_usage_summary
 from .time_utils import get_local_now
 from .runtime_paths import resolve_runtime_path, web_assets_dir
@@ -94,6 +94,7 @@ async def enforce_local_security_boundary(request: Request, call_next):
             return await call_next(request)
         if is_extension_origin(origin) and request.url.path in {
             "/api/v1/events/ai",
+            "/api/v1/extension/heartbeat",
             "/api/v1/extension/status",
         }:
             token = request.headers.get("x-omnicontext-ingest-token")
@@ -139,6 +140,18 @@ class AIPromptCreate(BaseModel):
     project_tag: Optional[str] = None
     cwd: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+
+
+class ExtensionHeartbeatCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    instance_id: str = Field(..., min_length=1, max_length=64)
+    extension_version: str = Field(..., min_length=1, max_length=32)
+    ready_platforms: list[str] = Field(default_factory=list, max_length=4)
+    last_capture_status: str = Field("none", max_length=40)
+    last_capture_at: Optional[datetime] = None
+    last_error_code: Optional[str] = Field(None, max_length=80)
+    offline_queue_size: int = Field(0, ge=0, le=100)
 
 
 class FileActivityCreate(BaseModel):
@@ -208,6 +221,16 @@ def get_extension_monitor_status(request: Request):
     return build_extension_status(
         request.headers.get("x-omnicontext-ingest-token")
     )
+
+
+@app.post("/api/v1/extension/heartbeat", status_code=202)
+def receive_extension_heartbeat(payload: ExtensionHeartbeatCreate, request: Request):
+    """只接受帶正確 ingest token 的非敏感 Extension heartbeat。"""
+    cfg = get_config()
+    token = request.headers.get("x-omnicontext-ingest-token")
+    if not extension_ingest_authorized(token, cfg):
+        raise HTTPException(status_code=401, detail="Extension ingest token is invalid")
+    return record_extension_heartbeat(payload.model_dump())
 
 
 @app.get("/api/v1/usage/today")

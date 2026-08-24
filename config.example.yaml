@@ -68,6 +68,7 @@ watchers:
     chatgpt: true
     claude_web: true
     manus: true
+    heartbeat_stale_minutes: 5
 usage_tracking:
   enabled: true
   goal_label: AI 協作

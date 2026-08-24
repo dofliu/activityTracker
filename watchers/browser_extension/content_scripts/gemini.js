@@ -2,6 +2,7 @@
 
 (function() {
   console.log("[OmniContext] Gemini watcher initialized.");
+  chrome.runtime.sendMessage({ type: "OMNICONTEXT_CONTENT_READY", platform: "gemini" });
 
   let lastPrompt = "";
   let lastPromptTime = 0;
@@ -24,7 +25,15 @@
   function captureCurrentInput() {
     // 尋找 Gemini 輸入框
     const inputEl = document.querySelector("div.ql-editor, div[contenteditable='true'], textarea");
-    if (!inputEl) return;
+    if (!inputEl) {
+      chrome.runtime.sendMessage({
+        type: "OMNICONTEXT_CAPTURE_DIAGNOSTIC",
+        platform: "gemini",
+        status: "error",
+        error_code: "input_selector_not_found"
+      });
+      return;
+    }
 
     const promptText = (inputEl.innerText || inputEl.value || "").trim();
     if (!promptText || promptText.length < 2) return;
@@ -35,7 +44,7 @@
     lastPrompt = promptText;
     lastPromptTime = now;
 
-    console.log("[OmniContext] Captured Gemini Prompt:", promptText.substring(0, 50));
+    console.log("[OmniContext] Gemini prompt detected.");
 
     // 發送給 background worker
     chrome.runtime.sendMessage({
@@ -98,6 +107,13 @@
               metadata: { capture_state: "partial_timeout" },
               project_tag: "Gemini Web"
             }
+          });
+        } else {
+          chrome.runtime.sendMessage({
+            type: "OMNICONTEXT_CAPTURE_DIAGNOSTIC",
+            platform: "gemini",
+            status: "error",
+            error_code: "response_selector_not_found"
           });
         }
         clearInterval(interval);

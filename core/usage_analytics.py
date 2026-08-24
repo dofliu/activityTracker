@@ -255,9 +255,9 @@ def aggregate_window_events(
     return result
 
 
-def _parse_target_date(value: date | str | None) -> date:
+def _parse_target_date(value: date | str | None, *, default_date: date | None = None) -> date:
     if value is None:
-        return get_local_now().date()
+        return default_date or get_local_now().date()
     if isinstance(value, date):
         return value
     return datetime.strptime(str(value), "%Y-%m-%d").date()
@@ -292,7 +292,7 @@ def get_usage_summary(
     cfg = cfg or get_config()
     database = database or get_db()
     now = now or get_local_now()
-    local_date = _parse_target_date(target_date)
+    local_date = _parse_target_date(target_date, default_date=now.date())
     range_start = datetime.combine(local_date, time.min)
     range_end = range_start + timedelta(days=1)
     rules = interface_rules_from_config(cfg)
@@ -498,7 +498,7 @@ def evaluate_daily_milestones(
     cfg = cfg or get_config()
     database = database or get_db()
     now = now or get_local_now()
-    local_date = _parse_target_date(target_date)
+    local_date = _parse_target_date(target_date, default_date=now.date())
 
     if local_date != now.date():
         return {"status": "skipped", "reason": "milestones_only_evaluate_current_day"}

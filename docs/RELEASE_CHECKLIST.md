@@ -1,20 +1,22 @@
 # OmniContext Release Checklist
 
-**Candidate:** `1.3.0a1`
-**Date:** 2026-08-24
+**Candidate:** `1.3.0a2`
+**Date:** 2026-08-25
 **Scope:** Packaging Alpha；不是公開 release 授權
 
 ## Pre-Deploy
 
-- [x] 47 個 contract tests 通過。
-- [x] SQLite migration fresh/legacy/live upgrade 為 `4/4`。
+- [x] 52 個 contract tests 通過。
+- [x] SQLite migration fresh/legacy/live upgrade 為 `5/5`。
 - [x] Wheel/sdist build 在隔離 PEP 517 environment 通過。
 - [x] Artifact receipt 確認 config template、Dashboard、Extension assets 與 CLI entry point 均存在。
 - [x] Artifact 不含 `config.yaml`、SQLite database 或 local secrets。
 - [x] Fresh wheel install 使用 package 外的 writable application home。
-- [x] `1.2.0 → 1.3.0a1` isolated upgrade smoke 通過。
+- [x] `1.2.0 → 1.3.0a2` isolated upgrade smoke 通過。
 - [ ] macOS/Linux CI matrix 通過。
-- [ ] 真實 Chrome/Edge pairing 與至少一筆 Browser event 通過。
+- [x] Gemini Browser ingestion 已觀察 3 筆 event，其中 2 筆有 response。
+- [ ] Extension `1.2.0` 重新載入後的 recent verified heartbeat receipt 通過。
+- [ ] ChatGPT、Claude、Manus real-browser ingestion 尚未逐站驗證。
 
 ## Deploy / Publish
 
@@ -37,7 +39,7 @@
 
 - Runtime 寫入 `site-packages` 或其他非 application-home 目錄。
 - Config、database 或 secret 被打入 artifact。
-- Schema state 不是 `up_to_date 4/4`，或出現 checksum/newer-version error。
+- Schema state 不是 `up_to_date 5/5`，或出現 checksum/newer-version error。
 - Health、Dashboard、Extension Monitor 或 static assets 任一無法讀取。
 - Upgrade 後既有 config/database 不可讀或 row-count/schema contract 失敗。
 

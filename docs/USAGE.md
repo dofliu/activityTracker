@@ -1,6 +1,6 @@
 # OmniContext 使用說明
 
-> 適用版本：`1.3.0a1` Personal Alpha / P2.5 + P2.6 + P6 packaging hardening
+> 適用版本：`1.3.0a2` Personal Alpha / P2.5 + P2.6 + verified Extension heartbeat + P6 packaging hardening
 >
 > 主要驗證平台：Windows 11、Python 3.12、Chrome/Edge MV3
 
@@ -30,7 +30,7 @@ python -m pip install -r requirements.txt
 本機建置出的 Alpha wheel 可安裝為：
 
 ```powershell
-python -m pip install .\dist\omnicontext-1.3.0a1-py3-none-any.whl
+python -m pip install .\dist\omnicontext-1.3.0a2-py3-none-any.whl
 omnicontext assets-status
 ```
 
@@ -96,9 +96,10 @@ python main.py init --show-token
 ```
 
 6. 將 token 貼入 Extension popup 並儲存。
-7. popup 顯示 pairing 成功後，開啟支援網站並完成一輪對話，再到 Extension Monitor 查看 `observed` 狀態。
+7. 在 `chrome://extensions/`／`edge://extensions/` 按一次 Reload，讓 Extension `1.2.0` background 與 content scripts 生效。
+8. popup 顯示 pairing 成功與近期 Heartbeat 後，開啟支援網站並完成一輪對話，再到 Extension Monitor 查看 `OBSERVED` 狀態。
 
-目前支援 ChatGPT、Claude.ai、Gemini 與 Manus。Monitor 顯示 ONLINE 只證明 localhost service 正常；「尚未驗證 Extension／WAITING EVENT」表示資料庫仍無真實 Browser event，不能當作 pairing 成功。`enabled` 只代表設定允許；只有 popup 顯示配對成功且出現至少一筆真實 browser event 才能稱為 `observed`。請勿把 token 放入截圖、issue、commit 或公開日誌。
+目前支援 ChatGPT、Claude.ai、Gemini 與 Manus。Monitor 顯示 ONLINE 只證明 localhost service 正常；RECENT HEARTBEAT 代表 Extension 曾以正確 token 抵達 server；CONTENT READY 代表支援網站載入過 content script；只有 OBSERVED 才代表資料庫已有真實 Browser event。任何單一狀態都不代表完整 coverage。請勿把 token 放入截圖、issue、commit 或公開日誌。
 
 如需旋轉 token：
 
@@ -196,7 +197,7 @@ python main.py open-loop-reconcile
 python main.py migration-status
 ```
 
-正常結果應為 `state: up_to_date`、`schema_version: 4/4`、`pending_versions: []`。這個指令不會建立或修改 database。
+正常結果應為 `state: up_to_date`、`schema_version: 5/5`、`pending_versions: []`。這個指令不會建立或修改 database。
 
 OmniContext 啟動時會執行 append-only migration registry。既有有資料 DB 只要存在 pending version，便先依 `data_lifecycle.auto_backup_before_migration` 建立 verified online backup；migration 成功後才寫入 `schema_migrations` receipt。若偵測 checksum mismatch、history gap 或未知較新版本，服務會拒絕繼續啟動。
 
@@ -244,13 +245,17 @@ Windows isolated wheel fresh/upgrade/assets smoke 已通過。自動 retention p
 
 ### Extension Monitor 顯示 `configured_unverified`
 
-表示 token 已設定，但資料庫尚無真實 browser event。依序確認：
+表示 token 已設定，但 server 尚無近期 verified heartbeat。依序確認：
 
 1. 本機 service 是否仍在 `127.0.0.1:8765` 執行。
 2. Extension popup pairing 是否成功。
 3. 對應平台是否在 `watchers.browser` 中啟用。
-4. Extension service worker 的錯誤訊息與 offline queue。
-5. 完成一輪包含 assistant response 的真實對話後重新整理 Monitor。
+4. 到 `chrome://extensions/`／`edge://extensions/` 對 OmniContext 按 Reload。
+5. 重新載入支援網站分頁並打開 popup，觸發立即 heartbeat。
+6. Extension service worker 的非敏感 error code 與 offline queue。
+7. 完成一輪包含 assistant response 的真實對話後重新整理 Monitor。
+
+`last_error_code` 只會顯示如 `http_401`、`input_selector_not_found` 等診斷碼，不包含 URL、token 或對話內容。
 
 ### 使用時間看起來偏少
 

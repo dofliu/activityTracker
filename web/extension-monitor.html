@@ -59,7 +59,7 @@
         </div>
         <div id="platforms" class="platforms"></div>
         <div class="boundary">
-          <strong>判讀方式：</strong>本機服務 ONLINE 只代表 Dashboard/API 正常；「尚未驗證 Extension」表示尚無 Browser event，不能證明 Extension 已配對。請以 Chrome/Edge Extension popup 顯示「Extension token 配對成功」為準，再於支援網站完成一次對話，狀態才會變成 OBSERVED。
+          <strong>判讀方式：</strong>ONLINE 只代表 Dashboard/API 正常；RECENT HEARTBEAT 代表 Extension 曾以正確 token 抵達本機服務；CONTENT READY 代表支援網站載入過 content script；只有 OBSERVED 才代表資料庫已有 Browser event。上述狀態都不等於完整 coverage。
         </div>
       </section>
     </div>
@@ -78,21 +78,37 @@
         badge.textContent = "ONLINE"; badge.className = "badge ok";
         const extension = data.extension || {};
         const observed = extension.capture_status === "observed";
+        const paired = extension.heartbeat_verified === true;
+        const staleHeartbeat = extension.connection_status === "stale_verified_heartbeat";
         const headline = observed
-          ? `${extension.events_today || 0} today`
-          : extension.token_configured
-            ? "尚未驗證 Extension"
-            : "尚未設定 Server Token";
+          ? `${extension.events_today || 0} events today`
+          : paired
+            ? "Extension 已配對，等待事件"
+            : staleHeartbeat
+              ? "Extension heartbeat 已逾期"
+              : extension.token_configured
+                ? "尚未驗證 Extension"
+                : "尚未設定 Server Token";
         const guidance = observed
           ? "Browser ingestion 已觀察到事件"
-          : extension.token_configured
-            ? "請在 Extension popup 確認配對成功，並完成一次支援網站對話"
-            : "請先執行 init 並在 Extension popup 儲存 ingest token";
+          : paired
+            ? "Heartbeat 已驗證；請在支援網站完成一次對話"
+            : staleHeartbeat
+              ? "請重新載入 Extension 或開啟 popup 觸發 heartbeat"
+              : extension.token_configured
+                ? "請在 Extension popup 儲存 token 並重新整理"
+                : "請先執行 init 並在 Extension popup 儲存 ingest token";
         document.getElementById("events-value").textContent = headline;
-        document.getElementById("events-meta").textContent = `${guidance} · total ${extension.events_total || 0} · last ${formatTime(extension.last_capture_at)}`;
+        document.getElementById("events-meta").textContent = `${guidance} · heartbeat ${formatTime(extension.last_heartbeat_at)} · capture ${extension.last_capture_status || "none"} · queue ${extension.offline_queue_size || 0} · events ${extension.events_total || 0}`;
         document.getElementById("platforms").innerHTML = (data.platforms || []).map(item => {
-          const state = !item.enabled ? "OFF" : item.observation_status === "observed" ? "OBSERVED" : "WAITING";
-          const stateLabel = state === "WAITING" ? "WAITING EVENT" : state;
+          const state = !item.enabled
+            ? "OFF"
+            : item.observation_status === "observed"
+              ? "OBSERVED"
+              : item.content_script_seen
+                ? "CONTENT_READY"
+                : "WAITING";
+          const stateLabel = state === "WAITING" ? "WAITING EVENT" : state === "CONTENT_READY" ? "CONTENT READY" : state;
           return `<div class="platform"><div class="platform-top"><span>${escapeHtml(item.label)}</span><span class="${state === "OBSERVED" ? "ok" : "warn"}">${stateLabel}</span></div><div class="meta">today ${item.events_today || 0}<br>total ${item.events_total || 0}<br>last ${formatTime(item.last_capture_at)}</div></div>`;
         }).join("");
       } catch (error) {

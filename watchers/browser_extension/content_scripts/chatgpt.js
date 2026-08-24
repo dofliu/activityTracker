@@ -2,6 +2,7 @@
 
 (function() {
   console.log("[OmniContext] ChatGPT watcher initialized.");
+  chrome.runtime.sendMessage({ type: "OMNICONTEXT_CONTENT_READY", platform: "chatgpt" });
 
   let lastPrompt = "";
   let lastPromptTime = 0;
@@ -21,7 +22,15 @@
 
   function captureCurrentInput() {
     const inputEl = document.querySelector("#prompt-textarea, textarea[placeholder*='Message']");
-    if (!inputEl) return;
+    if (!inputEl) {
+      chrome.runtime.sendMessage({
+        type: "OMNICONTEXT_CAPTURE_DIAGNOSTIC",
+        platform: "chatgpt",
+        status: "error",
+        error_code: "input_selector_not_found"
+      });
+      return;
+    }
 
     const promptText = (inputEl.innerText || inputEl.value || "").trim();
     if (!promptText || promptText.length < 2) return;
@@ -32,7 +41,7 @@
     lastPrompt = promptText;
     lastPromptTime = now;
 
-    console.log("[OmniContext] Captured ChatGPT Prompt:", promptText.substring(0, 50));
+    console.log("[OmniContext] ChatGPT prompt detected.");
 
     chrome.runtime.sendMessage({
       type: "AI_INTERACTION_CAPTURED",
@@ -92,6 +101,13 @@
               metadata: { capture_state: "partial_timeout" },
               project_tag: "ChatGPT Web"
             }
+          });
+        } else {
+          chrome.runtime.sendMessage({
+            type: "OMNICONTEXT_CAPTURE_DIAGNOSTIC",
+            platform: "chatgpt",
+            status: "error",
+            error_code: "response_selector_not_found"
           });
         }
         clearInterval(interval);

@@ -7,13 +7,15 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **Current status: Personal Alpha.** Windows Dashboard/API, the Extension token boundary, P2.6 usage milestones, SQLite schema migration 4/4, wheel/sdist fresh/upgrade/assets smoke, an isolated restore drill, and 47 contract tests are verified. Real browser events, a real milestone Toast, a formal rollback rehearsal, and the macOS/Linux matrix remain incomplete; this is not release-ready.
+> **Current status: Personal Alpha.** Windows Dashboard/API, the Extension token boundary, the verified-heartbeat contract, P2.6 usage milestones, SQLite schema migration 5/5, wheel/sdist fresh/upgrade/assets smoke, an isolated restore drill, and 52 contract tests are verified. Gemini browser ingestion has produced 3 events (2 with responses), while a live receipt from the new Extension heartbeat, the other supported sites, a real milestone Toast, a formal rollback rehearsal, and the macOS/Linux matrix remain incomplete; this is not release-ready.
 
 **Documentation:** [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
 
 ![OmniContext architecture and future roadmap](docs/assets/omnicontext-architecture-roadmap-card-v1.png)
 
 **OmniContext** is a **local-first, privacy-focused** personal context intelligence and activity tracking hub. It automatically captures your cross-platform AI interactions (Claude Code, Codex, Antigravity, ChatGPT, Gemini, etc.), code commits, paper and file modifications, window time allocation, and deeply integrates with your GitHub repositories and Pull Request (PR) statuses.
+
+Unlike provider-specific memory or chat import, **OmniContext keeps canonical context with the user and project rather than with one AI provider.** It combines multi-AI activity with local repositories, branches/commits, file changes, IDE/terminal and foreground activity, and Open Loops, then produces a provider-neutral Context Handoff. See [Product Positioning](docs/PRODUCT_POSITIONING.md) for the current capability and evidence boundaries.
 
 It is purpose-built to answer three fundamental questions at any moment:
 1. **"What projects and workstreams am I actively working on?"**
@@ -116,7 +118,7 @@ python main.py init --watch "/your/project/root"
 For a locally built Alpha wheel:
 
 ```bash
-python -m pip install omnicontext-1.3.0a1-py3-none-any.whl
+python -m pip install omnicontext-1.3.0a2-py3-none-any.whl
 omnicontext init --watch "/your/project/root"
 omnicontext assets-status
 ```

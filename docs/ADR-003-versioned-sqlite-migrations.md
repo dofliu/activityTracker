@@ -86,4 +86,4 @@ OmniContext 目前在 `Database.init_db()` 以 table introspection 補欄位與 
 3. [x] 啟動流程接入 pre-migration verified backup。
 4. [x] 新增 read-only `migration-status` CLI。
 5. [x] 通過 fresh、legacy、idempotent、checksum mismatch、newer schema、failed migration 與 create-all bypass guard tests。
-6. [x] verified backup copy upgrade + restore drill 通過後，才執行 live upgrade；live DB 現為 4/4。
+6. [x] verified backup copy upgrade + restore drill 通過後，才執行 live upgrade；2026-08-25 heartbeat receipt migration 後 live DB 現為 5/5。

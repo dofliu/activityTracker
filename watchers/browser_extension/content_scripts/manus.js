@@ -2,6 +2,7 @@
 
 (function() {
   console.log("[OmniContext] Manus watcher initialized.");
+  chrome.runtime.sendMessage({ type: "OMNICONTEXT_CONTENT_READY", platform: "manus" });
 
   let lastPrompt = "";
   let lastPromptTime = 0;
@@ -21,7 +22,15 @@
 
   function captureCurrentInput() {
     const inputEl = document.querySelector("textarea, input[type='text'], div[contenteditable='true']");
-    if (!inputEl) return;
+    if (!inputEl) {
+      chrome.runtime.sendMessage({
+        type: "OMNICONTEXT_CAPTURE_DIAGNOSTIC",
+        platform: "manus",
+        status: "error",
+        error_code: "input_selector_not_found"
+      });
+      return;
+    }
 
     const promptText = (inputEl.innerText || inputEl.value || "").trim();
     if (!promptText || promptText.length < 2) return;
@@ -32,7 +41,7 @@
     lastPrompt = promptText;
     lastPromptTime = now;
 
-    console.log("[OmniContext] Captured Manus Prompt:", promptText.substring(0, 50));
+    console.log("[OmniContext] Manus prompt detected.");
 
     chrome.runtime.sendMessage({
       type: "AI_INTERACTION_CAPTURED",
@@ -92,6 +101,13 @@
               metadata: { capture_state: "partial_timeout" },
               project_tag: "Manus Task"
             }
+          });
+        } else {
+          chrome.runtime.sendMessage({
+            type: "OMNICONTEXT_CAPTURE_DIAGNOSTIC",
+            platform: "manus",
+            status: "error",
+            error_code: "response_selector_not_found"
           });
         }
         clearInterval(interval);

@@ -1,7 +1,15 @@
 # OmniContext 開發規劃與成果紀錄 — P0 ~ P6
 
-> 最新更新日期：2026-08-24　｜　目前狀態：**personal alpha / P2.5 hardening + P2.6 usage milestone alpha**。P3-1 已完成；P2.5 local contracts、P2.6 alpha 與 P6 source baseline 已落地，但 release matrix 尚未通過，整體不具 release-ready 或 autonomous-ready 資格。
+> 最新更新日期：2026-08-25　｜　目前狀態：**personal alpha / P2.5 hardening + P2.6 usage milestone alpha**。P3-1 已完成；P2.5 local contracts、P2.6 alpha、verified Extension heartbeat 與 P6 source baseline 已落地，但 release matrix 尚未通過，整體不具 release-ready 或 autonomous-ready 資格。
 > 本文件記錄 OmniContext 從 0 到 1 的缺陷修復歷程、已完成之架構改造與未來的維運與延伸規劃。
+
+---
+
+## 0.1 產品定位：不隸屬單一 AI 的工作脈絡層
+
+ChatGPT、Gemini、Claude、Grok 等產品正在強化各自平台內的 memory、Project、conversation continuity 或資料匯入。OmniContext 的差異不在複製同樣的 provider memory，而是把**多個 AI + local application + Repository/Git/GitHub + files + foreground activity + Open Loops**歸入使用者自己的本機時間線與 canonical project state。
+
+核心原則是：canonical context 屬於使用者與專案，不屬於任何一家 AI provider；Context Handoff 可交給不同 AI 接手，且每個結論保留 provenance、response status 與 coverage boundary。完整比較與 non-claims 見 [`docs/PRODUCT_POSITIONING.md`](docs/PRODUCT_POSITIONING.md)。
 
 ---
 
@@ -112,7 +120,7 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 
 > Architecture decision：在語意記憶與自主執行之前，先讓「來源、turn、回應、待辦、權限與執行平台」都有明確契約。P5 在本節所有 release blockers 關閉前維持 blocked。
 
-**2026-08-24 實作結果：**47 個 contract tests 通過；append-only SQLite migration registry 已完成 fresh/legacy/idempotent/checksum/newer-version/failure/create-all-bypass gates。Verified backup copy 與 live DB 均升級至 4/4，pre/post backups 通過 restore drill。`1.3.0a1` wheel/sdist content、privacy exclusions、fresh install、`1.2.0 → 1.3.0a1` upgrade、writable application home 與 Dashboard assets/endpoints 已在 Windows isolated venv 通過。Windows live API 已驗證惡意 Origin 403、secret redaction、extension token fail-closed；Browser events 仍為 0，因此 pairing/real-browser coverage 尚未驗證。尚未通過的是 real-browser ingestion、真實 Toast、formal rollback rehearsal 與 macOS/Linux matrix。
+**2026-08-25 實作結果：**52 個 contract tests 通過；append-only SQLite migration registry 已完成 fresh/legacy/idempotent/checksum/newer-version/failure/create-all-bypass gates。Live DB 已由 4/5 升級至 5/5，pre/post backups 及 restore drills 通過。Extension `1.2.0` 新增 token-authenticated heartbeat receipt、MV3 `chrome.alarms`、content-ready 與非敏感 error code；Prompt preview 已從 console 移除。Live DB 已觀察到 3 筆 Gemini Browser events，其中 2 筆具非空 response，證明至少一條真實 browser ingestion path 可運作；新版 heartbeat receipt 仍須由瀏覽器重新載入 Extension 後取得，其他網站 coverage、真實 Toast、formal rollback rehearsal 與 macOS/Linux matrix尚未通過。
 
 ### P2.5-S1 本機 API 安全邊界
 
@@ -159,7 +167,7 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 - [ ] Windows 實機 smoke test 通過；macOS/Linux 至少完成 import、config、CLI 降級測試。
 - [x] README 隱私聲明明確區分 local storage、cloud LLM processing 與 optional integrations。
 - [x] SQLite online backup 產生 integrity 與 SHA-256 evidence；isolated restore drill 通過 schema／row-count parity 並保存 JSON receipt。
-- [x] Versioned migration fresh/legacy/live upgrade 到 4/4；pre/post backups 與 restore drill 均通過。
+- [x] Versioned migration fresh/legacy/live upgrade 到 5/5；pre/post backups 與 restore drill 均通過。
 - [x] Windows wheel/sdist contents、fresh install、1.2.0 upgrade、assets、writable-home 與 privacy exclusions 通過。
 - [ ] 無 High/Critical blocker 後，才可開始 P3-2；P5 executor 另需獨立安全 gate。
 
@@ -199,7 +207,8 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 - [x] Dashboard 同時顯示時間、coverage 與資料更新時間。
 - [x] milestone notification 具 idempotency、quiet hours、cooldown 與使用者關閉選項。
 - [x] Windows Dashboard/API 與 Extension token pairing 已實機驗證。
-- [ ] 真實達標 Toast、macOS/Linux CI/實機仍待完成。
+- [x] Gemini 真實 Browser ingestion 已觀察 3 筆 event／2 筆非空 response。
+- [ ] 新版 Extension heartbeat 實機 receipt、ChatGPT/Claude/Manus、真實達標 Toast、macOS/Linux CI/實機仍待完成。
 - [x] Contract tests 已覆蓋 interval merge、跨午夜、缺失平台、通知去重與內建 scheduler job contract。
 - [ ] DST 與完整 retention/privacy matrix 仍待補。
 
@@ -375,7 +384,7 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 1. 將 `project_engine.py` 的硬編碼路徑抽成設定項。
 2. 擴充已建立的 `python main.py init`，加入本機 Agent 日誌、Git 根目錄與 notification capability 自動偵測。
-3. 維護 P2.5 已建立的 `pyproject.toml`、47 個 tests、versioned migration、verified backup 與 Windows wheel/sdist release receipts；下一步完成 macOS/Linux CI matrix 與 formal rollback rehearsal。
+3. 維護 P2.5 已建立的 `pyproject.toml`、52 個 tests、versioned migration、verified backup 與 Windows wheel/sdist release receipts；下一步完成 live heartbeat、macOS/Linux CI matrix 與 formal rollback rehearsal。
 4. 無 LLM 金鑰時預設走 Ollama，確保零金鑰也能完整體驗。
 5. 跨平台：視窗採集與桌面通知抽象出平台介面，Windows 以外先降級為停用而非報錯。
 

@@ -69,7 +69,7 @@ python main.py extension-path
 
 ### Installed package
 
-- Fresh wheel install 必須在 package 外建立 writable application home、config 與 schema `4/4` database。
+- Fresh wheel install 必須在 package 外建立 writable application home、config 與 schema `5/5` database。
 - 上一版 wheel upgrade 必須確實替換 distribution version，保留 package 外的 data boundary。
 - Health、Dashboard、Extension Monitor 與 `/static/app.js` 必須回傳 HTTP 200。
 - `assets-status` 與 `extension-path` 必須在 source checkout／installed wheel 都可用。
@@ -90,10 +90,13 @@ python main.py extension-path
 - `POST /api/v1/usage/milestones/evaluate` 在相同日期／門檻重送時不建立第二筆 receipt。
 - `GET /api/v1/extension/status` 不洩漏 token，並區分 configured、enabled、observed event。
 - Extension origin 未帶或帶錯 token 時 pairing probe 為 403；正確 token 才可通過。
+- `POST /api/v1/extension/heartbeat` 即使沒有 Origin 也必須要求 token；payload 不得包含 URL、Prompt、Response 或 token。
+- Heartbeat receipt 必須區分 recent/stale；離開 SQLAlchemy session 後仍可安全產生 status snapshot。
 
 ### Frontend / smoke tests
 
 - localhost `/extension-monitor` 不依賴 `chrome.storage`。
 - 主頁顯示「前景使用時間」與 `partial / unavailable`，不使用「工時／生產力」措辭。
 - popup 分開顯示 service health 與 token pairing status。
+- MV3 background 必須使用 `chrome.alarms`，每個 content script 回報 ready，console 不得輸出 Prompt preview。
 - Windows live API 與 dashboard render smoke；macOS/Linux 驗證 `unavailable` graceful degradation。

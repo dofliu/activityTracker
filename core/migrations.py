@@ -142,6 +142,33 @@ def _migration_004_milestone_receipts(connection: Connection) -> None:
     ))
 
 
+def _migration_005_browser_extension_heartbeat(connection: Connection) -> None:
+    connection.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS browser_extension_heartbeats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            instance_id VARCHAR(64) NOT NULL,
+            extension_version VARCHAR(32) NOT NULL,
+            ready_platforms_json TEXT,
+            last_capture_status VARCHAR(40) NOT NULL DEFAULT 'none',
+            last_capture_at DATETIME,
+            last_error_code VARCHAR(80),
+            offline_queue_size INTEGER NOT NULL DEFAULT 0,
+            first_seen_at DATETIME NOT NULL,
+            last_seen_at DATETIME NOT NULL
+        );
+        """
+    ))
+    connection.execute(text(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_browser_extension_heartbeat_instance "
+        "ON browser_extension_heartbeats(instance_id);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_browser_extension_heartbeat_last_seen "
+        "ON browser_extension_heartbeats(last_seen_at);"
+    ))
+
+
 MIGRATIONS: tuple[MigrationDefinition, ...] = (
     MigrationDefinition(
         1,
@@ -168,6 +195,13 @@ MIGRATIONS: tuple[MigrationDefinition, ...] = (
         "usage_milestone_receipt_identity",
         "milestone_notification_receipts:index:unique_date_threshold_channel",
         _migration_004_milestone_receipts,
+    ),
+    MigrationDefinition(
+        5,
+        "browser_extension_verified_heartbeat",
+        "browser_extension_heartbeats:create;"
+        "indexes:unique_instance,last_seen;privacy:no_url_no_prompt_no_token",
+        _migration_005_browser_extension_heartbeat,
     ),
 )
 
