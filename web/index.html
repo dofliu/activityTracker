@@ -261,27 +261,31 @@
     </main>
 
     <aside class="rail">
+      <!-- DATA TRUST (可收摺面板) -->
+      <details class="panel trust-panel" style="padding: 0; margin-bottom: 10px;">
+        <summary class="panel-head" style="cursor: pointer; padding: 10px 14px; user-select: none; display: flex; justify-content: space-between; align-items: center;">
+          <span class="mono-label accent" data-i18n="data_trust_title">DATA TRUST</span>
+          <span class="mono-mini" style="color: var(--ok); display: flex; align-items: center; gap: 6px;">8/8 PASS <span style="font-size: 9px;">▾</span></span>
+        </summary>
+        <div style="padding: 10px 14px 14px; border-top: 1px solid var(--bd);">
+          <div class="trust-note" data-i18n="data_trust_desc" style="color: var(--mu); padding: 0 0 10px 0; border-bottom: 1px solid var(--bd);">所有採集器與資料模型均通過正確性驗收，產出高信度真實紀錄。</div>
+          <div class="defects">
+            <div class="defect"><span data-i18n="trust_d1">統一時區 (Local Timezone)</span><span class="code ok">PASS</span></div>
+            <div class="defect"><span data-i18n="trust_d2">檔案防手震與噪音過濾 (Debounce)</span><span class="code ok">PASS</span></div>
+            <div class="defect"><span data-i18n="trust_d3">Git 遞迴多倉庫掃描 (64 Repos)</span><span class="code ok">PASS</span></div>
+            <div class="defect"><span data-i18n="trust_d4">Claude / Codex / Antigravity 日誌</span><span class="code ok">PASS</span></div>
+            <div class="defect"><span data-i18n="trust_d5">AI 提問與完整回應解析</span><span class="code ok">PASS</span></div>
+            <div class="defect"><span data-i18n="trust_d6">設定熱套用與開關聯動</span><span class="code ok">PASS</span></div>
+            <div class="defect"><span data-i18n="trust_d7">GitHub 雲端倉庫與 PR 狀態整合</span><span class="code ok">PASS</span></div>
+            <div class="defect"><span data-i18n="trust_d8">中英文多語言 i18n 與專案智能歸戶</span><span class="code ok">PASS</span></div>
+          </div>
+        </div>
+      </details>
+
+      <!-- OPEN LOOPS (主要待辦事項面板) -->
       <div class="panel">
         <div class="rail-head"><span data-i18n="rail_open_loops">OPEN LOOPS</span><span id="loop-tally">—</span></div>
         <div id="open-loops-list"><div class="placeholder" data-i18n="ph_loading_loops">載入未結事項…</div></div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head">
-          <span class="mono-label accent" data-i18n="data_trust_title">DATA TRUST</span>
-          <span class="mono-mini" style="color: var(--ok);">8 / 8 PASS</span>
-        </div>
-        <div class="trust-note" data-i18n="data_trust_desc" style="color: var(--mu);">所有採集器與資料模型均通過正確性驗收，產出高信度真實紀錄。</div>
-        <div class="defects">
-          <div class="defect"><span data-i18n="trust_d1">統一時區 (Local Timezone)</span><span class="code ok">PASS</span></div>
-          <div class="defect"><span data-i18n="trust_d2">檔案防手震與噪音過濾 (Debounce)</span><span class="code ok">PASS</span></div>
-          <div class="defect"><span data-i18n="trust_d3">Git 遞迴多倉庫掃描 (64 Repos)</span><span class="code ok">PASS</span></div>
-          <div class="defect"><span data-i18n="trust_d4">Claude / Codex / Antigravity 日誌</span><span class="code ok">PASS</span></div>
-          <div class="defect"><span data-i18n="trust_d5">AI 提問與完整回應解析</span><span class="code ok">PASS</span></div>
-          <div class="defect"><span data-i18n="trust_d6">設定熱套用與開關聯動</span><span class="code ok">PASS</span></div>
-          <div class="defect"><span data-i18n="trust_d7">GitHub 雲端倉庫與 PR 狀態整合</span><span class="code ok">PASS</span></div>
-          <div class="defect"><span data-i18n="trust_d8">中英文多語言 i18n 與專案智能歸戶</span><span class="code ok">PASS</span></div>
-        </div>
       </div>
     </aside>
   </div>

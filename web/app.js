@@ -18,6 +18,7 @@ let summaryView = "day";
 let configDirs = [];
 let configRepos = [];
 let githubStatus = null;
+let showAllProjects = false;
 
 const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t == null ? "" : t)
@@ -128,7 +129,11 @@ const I18N = {
     btn_snapshot_now: "產出此刻快照",
     files_modified_summary: "異動 {files} 等共 {count} 個檔案",
     btn_copy_handoff: "📋 複製接續 Prompt",
-    btn_copy_handoff_short: "📋 接續 Prompt"
+    btn_copy_handoff_short: "📋 接續 Prompt",
+    btn_show_more_projects: "▼ 展開更多 ({count} 個超過 60 天未活躍專案)",
+    btn_collapse_projects: "▲ 收合超過 60 天未活躍專案",
+    title_click_to_open_project: "點擊跳轉並展開此專案",
+    title_mark_resolved: "標記為已結案"
   },
   "en": {
     lang_btn: "🌐 繁體中文",
@@ -143,42 +148,42 @@ const I18N = {
     btn_quick_checkpoint: "⏱️ Checkpoint",
     btn_quick_summary: "⚡ Today's Summary",
     tab_projects: "01 · Active Workstreams",
-    tab_dashboard: "02 · Live Intel Feed",
+    tab_dashboard: "02 · Live Feed",
     tab_settings: "03 · Settings",
     tab_summaries: "04 · Daily Summaries",
-    tab_checkpoints: "05 · Activity Checkpoints",
+    tab_checkpoints: "05 · Checkpoints",
     resume_head: "RESUME HERE",
-    resume_sub: "Last Session",
-    btn_reindex_projects: "🔄 Reindex",
-    ph_loading_projects: "Loading workstreams…",
-    ph_no_projects: "No project activities detected yet. Activities will automatically be logged when coding, paper writing, or interacting with Claude / Codex.",
+    resume_sub: "Where You Left Off",
+    btn_reindex_projects: "🔄 Re-index",
+    ph_loading_projects: "Loading active workstreams…",
+    ph_no_projects: "No active projects detected yet. Edits, commits, and Claude / Codex / Antigravity sessions will populate this view.",
     active_workstreams: "ACTIVE WORKSTREAMS",
     feed_title: "LIVE FEED",
-    filter_all: "All",
+    filter_all: "ALL",
     filter_ai: "AI",
-    filter_file: "Files",
-    filter_git: "Git",
-    filter_window: "Window",
+    filter_file: "FILE",
+    filter_git: "GIT",
+    filter_window: "WINDOW",
     ph_loading_feed: "Loading live feed…",
-    ph_no_feed: "No activity records found.",
+    ph_no_feed: "No activity recorded yet.",
     collectors_title: "COLLECTORS",
     collector_file: "File Watcher",
     collector_git: "Git Scanner",
     collector_window: "Window Focus",
     collector_agent: "Agent Logs",
     collector_scheduler: "Scheduler",
-    collector_enabled: "● ENABLED",
-    collector_disabled: "○ DISABLED",
-    settings_p1_title: "Watch Directories",
+    collector_enabled: "● Active",
+    collector_disabled: "○ Off",
+    settings_p1_title: "Monitored Paths",
     label_file_dirs: "FILE DIRS",
     label_git_roots: "GIT ROOTS",
     btn_browse: "📁 Browse…",
     btn_add: "Add",
     ph_abs_path: "Absolute path…",
-    ph_git_path: "Git repo root…",
-    git_recursive_note: "Recursive scanning enabled: all nested repositories are automatically discovered.",
-    settings_p2_title: "Data Sources",
-    settings_p2_note: "Reliability badge on right",
+    ph_git_path: "Git root path…",
+    git_recursive_note: "Recursive scanning enabled: all nested repositories under root will be indexed.",
+    settings_p2_title: "Collector Sources",
+    settings_p2_note: "Right column indicates current validation status",
     settings_p3_title: "Synthesis & Schedules",
     btn_save_apply: "Save & Apply",
     settings_save_note: "Hot reloaded directly into config.yaml",
@@ -220,8 +225,8 @@ const I18N = {
     trust_d4: "Claude / Codex / Antigravity Logs",
     trust_d5: "AI Prompts & Full Assistant Responses",
     trust_d6: "Settings Hot Reload & Sync",
-    trust_d7: "GitHub Cloud Repos & PR Integration",
-    trust_d8: "Bilingual i18n & Canonical Project Resolver",
+    trust_d7: "GitHub Cloud Integration & PR Tracking",
+    trust_d8: "Bilingual i18n & Canonical Hierarchy",
     status_active: "Active",
     status_idle: "Idle {days}d",
     open_loop_count: "Open",
@@ -638,7 +643,27 @@ function renderProjects() {
     box.innerHTML = `<div class="placeholder">${t("ph_no_projects")}</div>`;
     return;
   }
-  box.innerHTML = projectsCache.map(p => {
+
+  const activeProjects = projectsCache.filter(p => (p.idle_days == null || p.idle_days <= 60));
+  const idleProjects = projectsCache.filter(p => (p.idle_days != null && p.idle_days > 60));
+
+  // 決定渲染之專案清單
+  let listToRender = projectsCache;
+  if (!showAllProjects) {
+    if (expandedProject && !activeProjects.some(p => p.project_key === expandedProject)) {
+      const exp = idleProjects.find(p => p.project_key === expandedProject);
+      listToRender = exp ? [...activeProjects, exp] : activeProjects;
+    } else {
+      listToRender = activeProjects;
+    }
+  }
+
+  const pCountEl = $("projects-count");
+  if (pCountEl) {
+    pCountEl.textContent = `${t("active_workstreams")} · ${showAllProjects ? projectsCache.length : activeProjects.length + ' / ' + projectsCache.length}`;
+  }
+
+  let projectsHtml = listToRender.map(p => {
     const bar = p.status === "active" ? "var(--orange)"
       : (p.open_loops_count > 0 ? "var(--warn)" : "var(--bd)");
     const loopColor = p.open_loops_count >= 3 ? "var(--orange)"
@@ -659,6 +684,9 @@ function renderProjects() {
       }
     }
 
+    const isIdleOver60 = p.idle_days != null && p.idle_days > 60;
+    const idleBadge = isIdleOver60 ? `<span class="trust" style="background:var(--s2); color:var(--mu); font-size:9px; margin-left:4px;">>60d</span>` : "";
+
     return `
       <div class="pitem" data-key="${esc(p.project_key)}">
         <div class="prow">
@@ -667,6 +695,7 @@ function renderProjects() {
             <div class="pname" style="display:flex; align-items:center;">
               <span>${esc(p.display_name)}</span>
               ${ghBadge}
+              ${idleBadge}
             </div>
             <div class="pmeta">${esc(p.category || "")} · ${statusLabel(p)}</div>
           </div>
@@ -680,7 +709,31 @@ function renderProjects() {
       </div>`;
   }).join("");
 
+  let toggleHtml = "";
+  if (idleProjects.length > 0) {
+    toggleHtml = `
+      <div style="text-align:center; padding:12px 0 10px; margin-top:6px; border-top:1px dashed var(--bd);">
+        <button id="btn-toggle-idle-projects" class="btn" style="background:var(--s2); border:1px solid var(--bd); color:var(--tx); font-size:11.5px; font-weight:600; padding:6px 16px; cursor:pointer;" title="切換超過 60 天未活躍的專案">
+          ${showAllProjects
+            ? t("btn_collapse_projects")
+            : t("btn_show_more_projects", { count: idleProjects.length })
+          }
+        </button>
+      </div>`;
+  }
+
+  box.innerHTML = projectsHtml + toggleHtml;
+
   attachActionGroupListeners(box);
+
+  const toggleBtn = box.querySelector("#btn-toggle-idle-projects");
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      showAllProjects = !showAllProjects;
+      renderProjects();
+    });
+  }
 
   box.querySelectorAll(".pitem").forEach(item => {
     item.querySelector(".prow").addEventListener("click", () => {
@@ -693,11 +746,18 @@ function renderProjects() {
 }
 
 function expandProject(key, scroll) {
+  if (key) {
+    // 若要展開的專案屬於 60 天以上閒置專案，自動切換至顯示全部
+    const isIdle = projectsCache.some(p => p.project_key === key && p.idle_days > 60);
+    if (isIdle) showAllProjects = true;
+  }
   expandedProject = key;
   renderProjects();
   if (key && scroll) {
-    const el = document.querySelector(`.pitem[data-key="${CSS.escape(key)}"]`);
-    if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 160, behavior: "smooth" });
+    setTimeout(() => {
+      const el = document.querySelector(`.pitem[data-key="${CSS.escape(key)}"]`);
+      if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 160, behavior: "smooth" });
+    }, 50);
   }
 }
 
@@ -855,16 +915,40 @@ function renderOpenLoops() {
     return;
   }
   box.innerHTML = loopsCache.map(l => `
-    <div class="loop" data-id="${l.id}">
-      <span class="loop-box"></span>
-      <div style="min-width:0">
+    <div class="loop" data-id="${l.id}" data-project="${esc(l.project_key)}" title="${t('title_click_to_open_project')}">
+      <div class="loop-main">
         <div class="loop-text">${esc(l.title)}</div>
-        <div class="loop-src">${esc(l.project_key)} · ${esc(l.created_at || "")}</div>
+        <div class="loop-src"><span style="color:var(--orange); font-weight:700;">${esc(l.project_key)}</span> · ${esc(l.created_at || "")}</div>
       </div>
+      <button class="loop-resolve-btn" data-resolve="${l.id}" title="${t('title_mark_resolved')}">✓</button>
     </div>`).join("");
 
   box.querySelectorAll(".loop").forEach(el => {
-    el.addEventListener("click", () => resolveLoop(el));
+    // 點選主要區域：跳轉至 01 進行中工作頁籤並展開該專案
+    el.addEventListener("click", (ev) => {
+      const pKey = el.dataset.project;
+      if (pKey) {
+        // 切換到 01 專案頁籤
+        const tabBtn = document.querySelector('.tabs button[data-tab="tab-projects"]');
+        if (tabBtn) tabBtn.click();
+
+        // 若屬於 60 天以上閒置專案，自動切換至顯示全部
+        const isIdle = projectsCache.some(p => p.project_key === pKey && p.idle_days > 60);
+        if (isIdle) showAllProjects = true;
+
+        expandProject(pKey, true);
+        showToast(currentLang === "zh-TW" ? `🎯 已定位並展開專案: ${pKey}` : `🎯 Focused project: ${pKey}`);
+      }
+    });
+
+    // 點選結案按鈕：確認解決此未結事項
+    const resBtn = el.querySelector("[data-resolve]");
+    if (resBtn) {
+      resBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        resolveLoop(el);
+      });
+    }
   });
 }
 
@@ -872,15 +956,26 @@ async function resolveLoop(el) {
   const id = el.dataset.id;
   if (el.classList.contains("done")) return;
   el.classList.add("done");
-  el.querySelector(".loop-box").textContent = "✓";
+  const resBtn = el.querySelector(".loop-resolve-btn");
+  if (resBtn) {
+    resBtn.style.background = "var(--ok)";
+    resBtn.style.borderColor = "var(--ok)";
+    resBtn.style.color = "#fff";
+  }
   try {
     await postJSON(`/api/v1/open-loops/${id}/resolve`);
     loopsCache = loopsCache.filter(l => String(l.id) !== String(id));
     $("loop-tally").textContent = String(loopsCache.length);
+    showToast(currentLang === "zh-TW" ? "⚡ 未結事項已標記為已結案！" : "⚡ Marked open loop as resolved!");
     setTimeout(() => { renderOpenLoops(); loadProjects(); }, 550);
   } catch (e) {
     el.classList.remove("done");
-    el.querySelector(".loop-box").textContent = "";
+    if (resBtn) {
+      resBtn.style.background = "";
+      resBtn.style.borderColor = "";
+      resBtn.style.color = "";
+    }
+    showToast("⚠️ 結案失敗: " + e.message);
   }
 }
 

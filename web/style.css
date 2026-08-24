@@ -328,12 +328,18 @@ input[type="checkbox"] { accent-color: var(--orange); flex: none; }
 
 /* ---------- Right rail ---------- */
 .rail-head { padding: 8px 13px; background: var(--orange); color: var(--orange-ink); font-family: "JetBrains Mono", monospace; font-size: 10.5px; letter-spacing: 2px; font-weight: 700; display: flex; justify-content: space-between; gap: 8px; }
-.loop { padding: 9px 13px; border-bottom: 1px solid var(--bd); border-left: 2px solid transparent; display: grid; grid-template-columns: 15px minmax(0, 1fr); gap: 9px; align-items: start; cursor: pointer; }
+details.trust-panel summary { list-style: none; outline: none; transition: background 0.15s ease; }
+details.trust-panel summary::-webkit-details-marker { display: none; }
+details.trust-panel summary:hover { background: var(--s2); }
+details.trust-panel[open] summary { border-bottom: none; }
+.loop { padding: 10px 13px; border-bottom: 1px solid var(--bd); border-left: 2px solid transparent; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; cursor: pointer; transition: all 0.15s ease; }
 .loop:hover { background: var(--s2); border-left-color: var(--orange); }
-.loop-box { width: 14px; height: 14px; margin-top: 2px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; border: 1px solid var(--bd); color: var(--orange-ink); }
-.loop.done .loop-box { background: var(--orange); border-color: var(--orange); }
-.loop-text { font-size: 12.5px; font-weight: 500; line-height: 1.45; }
+.loop-main { min-width: 0; flex: 1; }
+.loop-resolve-btn { width: 22px; height: 22px; flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; border: 1px solid var(--bd); background: var(--s1); color: var(--mu); border-radius: 3px; cursor: pointer; transition: all 0.15s ease; }
+.loop-resolve-btn:hover { background: var(--ok); border-color: var(--ok); color: #fff; }
+.loop.done { opacity: 0.6; }
 .loop.done .loop-text { text-decoration: line-through; color: var(--mu); }
+.loop-text { font-size: 12.5px; font-weight: 500; line-height: 1.45; }
 .loop-src { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--mu); margin-top: 3px; }
 .trust-note { padding: 11px 13px; font-size: 11.5px; color: var(--mu); line-height: 1.5; border-bottom: 1px solid var(--bd); }
 .defect { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 13px; border-bottom: 1px solid var(--bd); font-size: 11.5px; }
