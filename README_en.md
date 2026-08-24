@@ -7,9 +7,11 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **Current status: Personal Alpha.** Windows Dashboard/API, the Extension token boundary, P2.6 usage milestones, an isolated restore drill, and 36 contract tests are verified. Real browser events, a real milestone Toast, versioned migrations, wheel/sdist, and the macOS/Linux matrix remain incomplete; this is not release-ready.
+> **Current status: Personal Alpha.** Windows Dashboard/API, the Extension token boundary, P2.6 usage milestones, SQLite schema migration 4/4, an isolated restore drill, and 42 contract tests are verified. Real browser events, a real milestone Toast, wheel/sdist upgrade, and the macOS/Linux matrix remain incomplete; this is not release-ready.
 
 **Documentation:** [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
+
+![OmniContext architecture and future roadmap](docs/assets/omnicontext-architecture-roadmap-card-v1.png)
 
 **OmniContext** is a **local-first, privacy-focused** personal context intelligence and activity tracking hub. It automatically captures your cross-platform AI interactions (Claude Code, Codex, Antigravity, ChatGPT, Gemini, etc.), code commits, paper and file modifications, window time allocation, and deeply integrates with your GitHub repositories and Pull Request (PR) statuses.
 
@@ -151,6 +153,7 @@ For Extension pairing, milestone configuration, backups, and troubleshooting, se
 | `python main.py status` | View database metrics and collector states | `python main.py status` |
 | `python main.py backup` | Create and verify an SQLite online backup | `python main.py backup` |
 | `python main.py restore-drill` | Restore a backup into an isolated temporary DB without replacing the live DB | `python main.py restore-drill` |
+| `python main.py migration-status` | Read current/latest schema versions, pending steps, and compatibility | `python main.py migration-status` |
 
 ---
 
@@ -240,9 +243,11 @@ activityTracker/
 ├── README.md                       # Traditional Chinese Documentation
 ├── README_en.md                    # English Documentation
 ├── docs/USAGE.md                   # Setup, pairing, daily operation, backups, troubleshooting
+├── docs/ADR-003-versioned-sqlite-migrations.md  # Schema migration decision record
 │
 ├── core/                           # Core service modules
 │   ├── database.py                 # SQLite session & engine management
+│   ├── migrations.py               # Append-only registry, checksums, and upgrade guard
 │   ├── models.py                   # SQLAlchemy models (Events, Projects, PRs)
 │   ├── server.py                   # FastAPI REST API & static file server
 │   ├── security.py                 # Origin, secret redaction, and extension token boundary
@@ -294,7 +299,8 @@ activityTracker/
 * **LLM boundary**: Selecting Gemini, Anthropic, or OpenAI sends the assembled work context to that provider. Ollama keeps synthesis local.
 * **Local API boundary**: Loopback-only access, an exact Origin allowlist, secret redaction, and a browser-extension ingest token are enabled by default.
 * **Trust contract**: Canonical AI events carry a stable turn key, source provenance, and response status; partial/legacy responses are not treated as conclusions.
-* **Backup lifecycle**: `python main.py backup` uses SQLite's Online Backup API and emits integrity/SHA-256 evidence. `python main.py restore-drill` verifies schema and row counts in an isolated temporary DB and saves a JSON receipt without replacing the live DB. Automatic pruning and versioned upgrade migrations remain incomplete.
+* **Backup lifecycle**: `python main.py backup` uses SQLite's Online Backup API and emits integrity/SHA-256 evidence. `python main.py restore-drill` verifies schema and row counts in an isolated temporary DB and saves a JSON receipt without replacing the live DB. Automatic pruning and formal wheel/sdist upgrade/rollback procedures remain incomplete.
+* **Schema migration**: An append-only registry records version/name/checksum. Existing databases receive a verified backup before upgrade; checksum mismatches and unknown newer versions fail closed.
 * **Git protection**: Database files, API keys, and personal Markdown reports are ignored by default to reduce accidental commits.
 
 ---

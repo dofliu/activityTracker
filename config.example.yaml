@@ -15,6 +15,7 @@ data_lifecycle:
   backups_dir: ~/OmniContext/backups
   backup_retention_days: 30
   auto_backup_on_start: false
+  auto_backup_before_migration: true
 watchers:
   file_watcher:
     enabled: true

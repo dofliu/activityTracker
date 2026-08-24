@@ -19,6 +19,8 @@
 - FastAPI：惡意 Origin 為 403；local Origin 正常；config response 遮蔽 secrets。
 - SQLite：schema migration 後舊資料保留；checkpoint 成功才更新。
 - Data lifecycle：online backup 通過 integrity；restore drill 的 table list、schema fingerprint、row counts 必須相同，且不得保留或覆蓋 live DB。
+- Versioned migration：fresh DB 與 legacy DB 到達相同 latest version；舊資料與 lifecycle backfill 保留；重跑不新增 receipt。
+- Migration safety：checksum mismatch、未知較新版本與 migration exception 都必須 fail-closed；失敗版本不得寫入 applied receipt。
 - Open Loop API：resolve、reopen、stale、supersede；actionable list 只含 open。
 
 ### Smoke tests
@@ -50,6 +52,7 @@ python main.py now
 python main.py resume activityTracker --turns 3 --json
 python main.py backup
 python main.py restore-drill
+python main.py migration-status
 ```
 
 ## P2.6 Extension Monitor 與 Usage Milestone Matrix

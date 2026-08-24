@@ -197,6 +197,16 @@ class WatcherManager:
             scheduled_jobs = []
             scheduler_backend = "unknown"
 
+        migration_receipt = db.migration_receipt or {}
+        migration_after = migration_receipt.get("after", {})
+        database_migration = {
+            "state": migration_after.get("state", "unknown"),
+            "current_version": migration_after.get("current_version"),
+            "latest_version": migration_after.get("latest_version"),
+            "pending_versions": migration_after.get("pending_versions", []),
+            "applied_on_start": migration_receipt.get("applied_now", []),
+        }
+
         return {
             "is_running": self._is_running,
             "watchers": watchers_cfg,
@@ -204,6 +214,7 @@ class WatcherManager:
             "collector_health": collector_health,
             "scheduled_jobs": scheduled_jobs,
             "scheduler_backend": scheduler_backend,
+            "database_migration": database_migration,
             "last_events": {
                 "file_watcher": last_file.strftime("%Y-%m-%d %H:%M:%S") if last_file else None,
                 "git_watcher": last_git.strftime("%Y-%m-%d %H:%M:%S") if last_git else None,

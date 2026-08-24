@@ -32,6 +32,14 @@ def test_extension_ingest_without_token_is_denied():
 
 def test_extension_status_pairing_probe_requires_token(monkeypatch):
     monkeypatch.setenv("OMNICONTEXT_INGEST_TOKEN", "pairing-test-token")
+    monkeypatch.setattr(
+        "core.server.build_extension_status",
+        lambda provided_token: {
+            "extension": {
+                "pairing_verified": provided_token == "pairing-test-token",
+            }
+        },
+    )
     denied = client.get(
         "/api/v1/extension/status",
         headers={"Origin": "chrome-extension://test-extension"},

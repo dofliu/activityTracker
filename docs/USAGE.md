@@ -171,7 +171,17 @@ python main.py open-loop 12 open --note "需要重新處理"
 python main.py open-loop-reconcile
 ```
 
-## 6. 備份與資料生命週期
+## 6. Schema migration、備份與資料生命週期
+
+唯讀查看目前 schema 狀態：
+
+```powershell
+python main.py migration-status
+```
+
+正常結果應為 `state: up_to_date`、`schema_version: 4/4`、`pending_versions: []`。這個指令不會建立或修改 database。
+
+OmniContext 啟動時會執行 append-only migration registry。既有有資料 DB 只要存在 pending version，便先依 `data_lifecycle.auto_backup_before_migration` 建立 verified online backup；migration 成功後才寫入 `schema_migrations` receipt。若偵測 checksum mismatch、history gap 或未知較新版本，服務會拒絕繼續啟動。
 
 建立 verified SQLite online backup：
 
@@ -201,7 +211,7 @@ python main.py restore-drill `
 
 備份預設位於 `~/OmniContext/backups`。`restore-drill` 會以 read-only 方式開啟來源備份、還原到 OS 暫存目錄，比對 integrity、table list、schema fingerprint 與 row counts，最後刪除暫存 DB，只保存不含 row content 的 JSON receipt。它不提供 live database destination，因此不會覆蓋正式資料。
 
-Versioned upgrade migration、自動 retention pruning 與正式 rollback 操作程序仍屬 release gate；不要直接用檔案複製覆蓋正在執行的 SQLite database。
+自動 retention pruning、wheel/sdist upgrade 與正式 rollback 操作程序仍屬 release gate；不要直接用檔案複製覆蓋正在執行的 SQLite database。
 
 ## 7. 平台能力
 
@@ -248,6 +258,7 @@ Get-NetTCPConnection -LocalPort 8765 -State Listen
 ```powershell
 python -m pytest -q
 python -m compileall -q core synthesizer notifiers watchers exporters tests
+python main.py migration-status
 git diff --check
 ```
 

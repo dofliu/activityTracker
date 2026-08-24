@@ -7,9 +7,11 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **目前狀態：Personal Alpha。** Windows Dashboard/API、Extension token boundary、P2.6 usage milestone、isolated restore drill 與 36 個 contract tests 已驗證；real-browser event、真實達標 Toast、versioned migration、wheel/sdist 與 macOS/Linux matrix 尚未完成，因此不是 release-ready。
+> **目前狀態：Personal Alpha。** Windows Dashboard/API、Extension token boundary、P2.6 usage milestone、SQLite schema migration 4/4、isolated restore drill 與 42 個 contract tests 已驗證；real-browser event、真實達標 Toast、wheel/sdist upgrade 與 macOS/Linux matrix 尚未完成，因此不是 release-ready。
 
 **文件入口：**[完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
+
+![OmniContext 架構與未來 Roadmap](docs/assets/omnicontext-architecture-roadmap-card-v1.png)
 
 **OmniContext** 是一個**本機優先（Local-First）、具有明確資料邊界**的個人上下文記憶中樞與工作進度追蹤系統。它能捕獲跨平台 AI 對話（Claude Code、Codex、Antigravity、ChatGPT、Gemini 等）、程式碼提交、檔案與論文寫作異動、視窗時間分配，並整合 GitHub 雲端倉庫與 Pull Request (PR) 狀態。
 
@@ -163,6 +165,7 @@ OmniContext 支援完整的終端命令列操作：
 | `python main.py open-loop` | 人工複核 Open Loop lifecycle | `python main.py open-loop 12 resolved --note "done"` |
 | `python main.py backup` | 使用 SQLite Online Backup API 建立並驗證備份 | `python main.py backup` |
 | `python main.py restore-drill` | 在隔離暫存 DB 驗證最新／指定備份，不覆蓋 live DB | `python main.py restore-drill` |
+| `python main.py migration-status` | 唯讀查看目前／最新 schema version、pending 與相容性 | `python main.py migration-status` |
 
 ---
 
@@ -254,9 +257,11 @@ activityTracker/
 ├── README.md                       # 繁體中文說明文件
 ├── README_en.md                    # English Documentation
 ├── docs/USAGE.md                   # 安裝、配對、日常操作、備份與故障排查
+├── docs/ADR-003-versioned-sqlite-migrations.md  # Schema migration 架構決策
 │
 ├── core/                           # 核心服務模組
 │   ├── database.py                 # SQLite 連線與 Session 管理
+│   ├── migrations.py               # Append-only schema registry、checksum 與升級守門
 │   ├── models.py                   # SQLAlchemy 資料庫模型 (Events, Projects, PRs)
 │   ├── server.py                   # FastAPI REST API 與靜態伺服器
 │   ├── security.py                 # Origin、secret redaction 與 extension token boundary
@@ -333,7 +338,7 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 | **P3** | 記憶層 | ✅ P3-1 Context Handoff；P3-2 本機語意檢索、P3-3 `omni ask`、重複工作偵測與 Session 敘事層待 P2.5 gate |
 | **P4** | 收集層補完 | 瀏覽器閱讀內容、行事曆與會議、終端機指令歷史、未 commit 的工作狀態 |
 | **P5** | 主動秘書 AI 與自主執行 | 主動情境推論與前瞻提案、三級安全守門員（L0/L1/L2）、Agent Dispatcher 調度自主執行、Telegram/Web 一鍵批准、晨間前瞻與晚間交接、`STATUS.yaml` 自動維護 |
-| **P6** | 開源整備 | 已建立 `main.py init`、`pyproject.toml`、path expansion、跨平台 argv 抽象與 contract tests；wheel/sdist release smoke test 尚待完成 |
+| **P6** | 開源整備 | 已建立 `main.py init`、`pyproject.toml`、versioned migration、path expansion、跨平台 argv 抽象與 contract tests；wheel/sdist release smoke test 尚待完成 |
 
 > 收集越多不等於越有用：檔案事件曾從 3,575 筆噪音 → 4,327 筆 → 收斂至 789 筆。
 > 新增採集來源必須先通過「能否改變決策」的檢驗。
@@ -346,7 +351,7 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 
 * 部分歸戶邏輯仍硬編碼專案根路徑（`core/project_engine.py`）。
 * 視窗採集、桌面通知與開機排程僅支援 **Windows**。
-* `pyproject.toml` 與 P2.5 contract tests 已建立；尚未完成 wheel/sdist release packaging 驗收。
+* `pyproject.toml`、schema migration 4/4 與 P2.5 contract tests 已建立；尚未完成 wheel/sdist install/upgrade/assets 驗收。
 * `main.py init --watch <path>` 已取代手動複製設定；複雜來源仍需於 `config.yaml` 調整。
 
 剩餘項目將於 **P6 開源整備** 階段持續處理。
@@ -359,7 +364,8 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 * **LLM 資料邊界**：選擇 Gemini、Anthropic 或 OpenAI 產生摘要時，組裝後的工作脈絡會傳送至該 provider；選擇 Ollama 才是完整本機推論。
 * **Local API**：採 deny-by-default Origin boundary、loopback-only 預設、敏感設定遮蔽與 browser-extension ingestion capability，避免一般網頁跨來源讀取本機工作紀錄。
 * **資料可信度**：canonical AI event 必須具備 `turn_key`、source provenance 與 `response_status`；partial／legacy 回應不作為摘要或 handoff 結論。
-* **備份生命週期**：`python main.py backup` 使用 SQLite Online Backup API 並輸出 integrity／SHA-256；`python main.py restore-drill` 於隔離暫存 DB 驗證 schema 與 row counts 並保存 JSON receipt，不覆蓋 live DB。自動 retention pruning 與正式 upgrade migration 尚未完成。
+* **備份生命週期**：`python main.py backup` 使用 SQLite Online Backup API 並輸出 integrity／SHA-256；`python main.py restore-drill` 於隔離暫存 DB 驗證 schema 與 row counts 並保存 JSON receipt，不覆蓋 live DB。自動 retention pruning 與正式 wheel/sdist upgrade/rollback 程序尚未完成。
+* **Schema migration**：append-only registry 保存 version/name/checksum；既有 DB upgrade 前自動產生 verified backup。Checksum mismatch 或未知較新版本會 fail-closed，不允許舊版 runtime 繼續開啟。
 * **Git 提交防護**：資料庫檔案、API 金鑰與個人 Markdown 報告已預設加入 `.gitignore`，降低誤提交私密資料的風險。
 
 ---

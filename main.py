@@ -286,6 +286,14 @@ def cmd_status():
         print("• Collector runtime         : " + ", ".join(f"{k}={v}" for k, v in runtime.items()))
     if freshness:
         print("• Data freshness            : " + ", ".join(f"{k}={v}" for k, v in freshness.items()))
+    migration = status.get("database_migration", {})
+    if migration:
+        print(
+            "• Database migration        : "
+            f"{migration.get('state', 'unknown')} "
+            f"({migration.get('current_version', '?')}/"
+            f"{migration.get('latest_version', '?')})"
+        )
     print("="*50 + "\n")
 
 
@@ -331,6 +339,21 @@ def cmd_restore_drill(
     print(f"row_counts_match: {receipt['checks']['row_counts_match']}")
     print(f"temporary_copy_retained: {receipt['isolated_restore']['temporary_copy_retained']}")
     print(f"receipt: {receipt['receipt_path']}")
+
+
+def cmd_migration_status(db_path: Optional[str] = None):
+    from core.data_lifecycle import configured_database_path
+    from core.migrations import inspect_migration_status
+
+    target = Path(db_path).expanduser().resolve() if db_path else configured_database_path()
+    status = inspect_migration_status(target)
+    print(f"database: {status['database_path']}")
+    print(f"state: {status['state']}")
+    print(f"schema_version: {status['current_version']}/{status['latest_version']}")
+    print(f"applied_versions: {status['applied_versions']}")
+    print(f"pending_versions: {status['pending_versions']}")
+    if status["error"]:
+        print(f"error: {status['error']}")
 
 
 def cmd_init(
@@ -603,6 +626,11 @@ def main():
     )
     restore_parser.add_argument("--backup", help="指定備份；未指定時使用最新備份")
     restore_parser.add_argument("--receipt-dir", help="覆寫 restore drill receipt 目錄")
+    migration_status_parser = subparsers.add_parser(
+        "migration-status",
+        help="唯讀檢查 SQLite schema migration version 與相容性",
+    )
+    migration_status_parser.add_argument("--db", help="覆寫要檢查的 SQLite database")
 
     args = parser.parse_args()
 
@@ -652,6 +680,8 @@ def main():
             getattr(args, "backup", None),
             getattr(args, "receipt_dir", None),
         )
+    elif args.command == "migration-status":
+        cmd_migration_status(getattr(args, "db", None))
     else:
         parser.print_help()
 
