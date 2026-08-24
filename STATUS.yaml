@@ -1,13 +1,13 @@
 name: OmniContext Activity Tracker
 name_zh: OmniContext 個人全景活動追蹤系統
 category: personal_tools
-progress: 86
+progress: 88
 progress_basis: "依 P0-P6 加權里程碑估計；不是 release readiness 百分比"
 status: active_hardening
 release_ready: false
 last_updated: "2026-08-25"
 current_phase: "P2.6 Usage/Milestone + P3 Semantic Memory Alpha + P6 Cross-platform Gate"
-next_milestone: "取得 Extension 1.3.0 live heartbeat 與 Claude/Manus authenticated capture，完成 GitHub Actions 3-OS matrix receipts"
+next_milestone: "取得 Extension 1.3.0 live heartbeat 與 ChatGPT/Claude/Manus authenticated Extension-backed capture receipts"
 planned_features:
   - id: FEATURE-001
     name: "每日主要介面使用時間與里程碑教練"
@@ -190,20 +190,20 @@ quality_gates:
   ingestion_provenance: passed_local_rescan_601_sources
   response_finalization: passed_as_final_candidate_contract_not_semantic_correctness
   open_loop_lifecycle: passed_local_db_reconciliation
-  automated_tests: passed_59_contract_tests
+  automated_tests: passed_60_contract_tests
   usage_milestone_alpha: passed_contract_and_windows_dashboard_api_smoke
   documentation_current: passed_readme_usage_roadmap_status_sync
   backup_lifecycle: passed_online_backup_and_isolated_restore_drill
   versioned_migration: passed_fresh_legacy_backup_copy_and_live_upgrade_5_of_5
   packaging_windows_alpha: passed_artifacts_fresh_upgrade_assets_and_writable_home
-  portability_baseline: implemented_source_level_release_matrix_pending
+  portability_baseline: passed_github_actions_3_os_2_python_6_jobs_run_32757498004
   semantic_memory: passed_local_alpha_4102_of_4102
   autonomous_execution: blocked_by_p2_5
 known_blockers:
   - "Gemini Browser ingestion 已觀察 3 筆 event／2 筆 response，ChatGPT live selectors 已驗證；Extension 1.3.0 live heartbeat 與 Claude/Manus authenticated capture 尚未完成"
   - "P2.6 尚無 continuous coverage ledger，coverage 維持 partial；Windows milestone Toast E2E 已通過但不代表全天 coverage"
   - "337 筆 legacy AI rows 無 response_status，僅保留為歷史資料，不進入 canonical synthesis/handoff 結論"
-  - "Windows wheel/sdist install/upgrade/assets 與 formal rollback 已驗證；1.3.0a3 candidate packaging、public publish/tag 尚未執行"
-  - "Windows/macOS/Linux workflow 已建立但尚未推送取得真實 CI receipt；Windows-only window/notification 功能目前採明確降級"
+  - "Windows wheel/sdist install/upgrade/assets、formal rollback 與 1.3.0a3 candidate packaging 已驗證；public publish/tag 尚未執行"
+  - "Windows/Ubuntu/macOS × Python 3.10/3.12 CI run 32757498004 已通過；window/notification 實機能力仍限 Windows，其他平台採明確降級"
   - "project_engine 仍含個人根路徑 fallback，尚未完全 config-driven"
-key_metrics: "P0-P2 可日常運行；P3-1 handoff、P3-2 semantic index 4,102/4,102、P3-3 omni ask、SQLite schema 7/7、Windows Toast E2E 與 formal package+DB rollback 已通過。Gemini Browser 有 3 筆 event／2 筆 response，ChatGPT live selectors 已修復。Extension 1.3.0 heartbeat、Claude/Manus authenticated capture、1.3.0a3 packaging 與 3-OS CI receipts 尚未完成；整體仍非 release-ready，P5 autonomous executor 維持 blocked。"
+key_metrics: "P0-P2 可日常運行；P3-1 handoff、P3-2 semantic index 4,102/4,102、P3-3 omni ask、SQLite schema 7/7、Windows Toast E2E、formal package+DB rollback 與 3-OS/2-Python CI 六個 jobs 已通過。Gemini Browser 有 3 筆 event／2 筆 response，ChatGPT live selectors 已修復。Extension 1.3.0 heartbeat 與 ChatGPT/Claude/Manus authenticated Extension-backed capture receipts 尚未完成；整體仍非 release-ready，P5 autonomous executor 維持 blocked。"

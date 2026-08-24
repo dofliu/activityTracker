@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **Current status: Personal Alpha.** A real Windows milestone WinRT Toast E2E, schema 7/7, formal package+database rollback, a full local semantic index (4,102/4,102), and P3-3 `omni ask` have passed. ChatGPT's live DOM selectors were repaired; authenticated Claude/Manus captures and the post-push macOS/Linux CI receipts remain outstanding, so this is not release-ready.
+> **Current status: Personal Alpha.** A real Windows milestone WinRT Toast E2E, schema 7/7, formal package+database rollback, a full local semantic index (4,102/4,102), P3-3 `omni ask`, and the Windows/Ubuntu/macOS × Python 3.10/3.12 CI matrix have passed. ChatGPT's live DOM selectors were repaired; authenticated Extension-backed ChatGPT/Claude/Manus capture receipts remain outstanding, so this is not release-ready.
 
 **Documentation:** [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
 

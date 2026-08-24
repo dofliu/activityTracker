@@ -384,7 +384,7 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 1. 將 `project_engine.py` 的硬編碼路徑抽成設定項。
 2. 擴充已建立的 `python main.py init`，加入本機 Agent 日誌、Git 根目錄與 notification capability 自動偵測。
-3. 維護 `pyproject.toml`、contract tests、schema 7/7、verified backup、Windows packaging 與 formal rollback receipts；下一步取得 live heartbeat、Claude/Manus capture 與 3-OS CI receipts。
+3. 維護 `pyproject.toml`、contract tests、schema 7/7、verified backup、formal rollback，以及已通過的 Windows／Ubuntu／macOS × Python 3.10／3.12 CI receipts；下一步取得 live heartbeat 與 ChatGPT／Claude／Manus Extension-backed capture receipts。
 4. 無 LLM 金鑰時預設走 Ollama，確保零金鑰也能完整體驗。
 5. 跨平台：視窗採集與桌面通知抽象出平台介面，Windows 以外先降級為停用而非報錯。
 

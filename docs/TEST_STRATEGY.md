@@ -112,4 +112,4 @@ python main.py extension-path
 
 ## Platform CI Matrix
 
-`.github/workflows/platform-matrix.yml` 在 Windows、Ubuntu、macOS 的 Python 3.10/3.12 執行 pytest、compileall、Extension JS syntax、build、artifact privacy/content 與 installed writable-home/API/assets smoke。Workflow YAML 存在不等於通過；必須保存 GitHub Actions run/job 結果。
+`.github/workflows/platform-matrix.yml` 在 Windows、Ubuntu、macOS 的 Python 3.10/3.12 執行 pytest、compileall、Extension JS syntax、build、artifact privacy/content 與 installed writable-home/API/assets smoke。2026-08-25 GitHub Actions run `32757498004` 的六個 jobs 全數通過；未來 commit 仍須以各自 run receipt 判定，不沿用本次結果。

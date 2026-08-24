@@ -365,7 +365,7 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 | **P3** | 記憶層 | ✅ P3-1 Context Handoff；P3-2 本機語意檢索、P3-3 `omni ask`、重複工作偵測與 Session 敘事層待 P2.5 gate |
 | **P4** | 收集層補完 | 瀏覽器閱讀內容、行事曆與會議、終端機指令歷史、未 commit 的工作狀態 |
 | **P5** | 主動秘書 AI 與自主執行 | 主動情境推論與前瞻提案、三級安全守門員（L0/L1/L2）、Agent Dispatcher 調度自主執行、Telegram/Web 一鍵批准、晨間前瞻與晚間交接、`STATUS.yaml` 自動維護 |
-| **P6** | 開源整備 | `1.3.0a2` packaging baseline 與 formal rollback 已在 Windows 隔離環境通過；`1.3.0a3` candidate 與 3-OS GitHub Actions matrix 待完成 |
+| **P6** | 開源整備 | `1.3.0a3` candidate、formal rollback，以及 Windows／Ubuntu／macOS × Python 3.10／3.12 GitHub Actions matrix 已通過；仍待 Extension live receipts 與發佈授權 |
 
 > 收集越多不等於越有用：檔案事件曾從 3,575 筆噪音 → 4,327 筆 → 收斂至 789 筆。
 > 新增採集來源必須先通過「能否改變決策」的檢驗。
@@ -378,7 +378,7 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 
 * 部分歸戶邏輯仍硬編碼專案根路徑（`core/project_engine.py`）。
 * 視窗採集、桌面通知與開機排程僅支援 **Windows**。
-* `pyproject.toml`、schema migration 7/7、Windows wheel/sdist install/upgrade/assets 與 formal rollback 已完成；macOS/Linux CI receipt 尚未完成。
+* `pyproject.toml`、schema migration 7/7、formal rollback，以及 Windows／Ubuntu／macOS 的 wheel/sdist build、install、API/assets smoke 已完成。
 * `main.py init --watch <path>` 已取代手動複製設定；複雜來源仍需於 `config.yaml` 調整。
 
 剩餘項目將於 **P6 開源整備** 階段持續處理。
@@ -391,7 +391,7 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 * **LLM 資料邊界**：選擇 Gemini、Anthropic 或 OpenAI 產生摘要時，組裝後的工作脈絡會傳送至該 provider；選擇 Ollama 才是完整本機推論。
 * **Local API**：採 deny-by-default Origin boundary、loopback-only 預設、敏感設定遮蔽與 browser-extension ingestion capability，避免一般網頁跨來源讀取本機工作紀錄。
 * **資料可信度**：canonical AI event 必須具備 `turn_key`、source provenance 與 `response_status`；partial／legacy 回應不作為摘要或 handoff 結論。
-* **備份生命週期**：`python main.py backup` 使用 SQLite Online Backup API 並輸出 integrity／SHA-256；`python main.py restore-drill` 於隔離暫存 DB 驗證 schema 與 row counts 並保存 JSON receipt，不覆蓋 live DB。Windows wheel upgrade smoke 已通過；自動 retention pruning 與正式 production rollback rehearsal 尚未完成。
+* **備份生命週期**：`python main.py backup` 使用 SQLite Online Backup API 並輸出 integrity／SHA-256；`python main.py restore-drill` 於隔離暫存 DB 驗證 schema 與 row counts並保存 JSON receipt，不覆蓋 live DB。Formal package+DB rollback rehearsal 已通過；自動 retention pruning 尚未完成。
 * **Schema migration**：append-only registry 保存 version/name/checksum；既有 DB upgrade 前自動產生 verified backup。Checksum mismatch 或未知較新版本會 fail-closed，不允許舊版 runtime 繼續開啟。
 * **Artifact 邊界**：wheel/sdist content receipt 會檢查必要 assets，並拒絕夾帶 `config.yaml`、SQLite database 或 local secrets。
 * **Git 提交防護**：資料庫檔案、API 金鑰與個人 Markdown 報告已預設加入 `.gitignore`，降低誤提交私密資料的風險。

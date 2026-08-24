@@ -25,7 +25,9 @@
 
 - `.github/workflows/platform-matrix.yml`：Windows、Ubuntu、macOS × Python 3.10/3.12。
 - 每個 job 執行 pytest、compileall、Extension JS syntax、wheel/sdist build、artifact privacy/content receipt、installed writable-home/API/assets smoke。
-- 本文件建立時尚待推送後取得 GitHub Actions 真實結果；不得以 workflow YAML 存在宣稱多平台已通過。
+- GitHub Actions run `32757498004` 六個 jobs 全數通過；URL：<https://github.com/dofliu/activityTracker/actions/runs/32757498004>。
+- Matrix 實際揭露並修復 clean-config API 固定欄位、Python 3.10 `tomllib` compatibility、Linux clipboard test 對 host utility 的依賴，以及 installed-smoke 未設定 `OMNICONTEXT_HOME` 四項問題。
+- 此 receipt 證明 head SHA `fe7cc937ceb15686c32e1fd720a401ae99e7ba36` 的 source/build/install contracts；不等同各平台的 window collector、desktop notification 或 Browser Extension 實機 E2E。
 
 ## P3-2 / P3-3
 

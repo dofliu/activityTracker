@@ -246,13 +246,13 @@ python main.py restore-drill `
 
 備份預設位於 `~/OmniContext/backups`。`restore-drill` 會以 read-only 方式開啟來源備份、還原到 OS 暫存目錄，比對 integrity、table list、schema fingerprint 與 row counts，最後刪除暫存 DB，只保存不含 row content 的 JSON receipt。它不提供 live database destination，因此不會覆蓋正式資料。
 
-Windows isolated wheel fresh/upgrade/assets smoke 與 formal package+DB rollback rehearsal 已通過。Rollback 必須同時回復相容 wheel 與 pre-migration online backup，且在服務停止後處理 `.db-wal/.db-shm`；只覆蓋 `.db` 可能讓新 WAL 重新套回。自動 retention pruning 與 macOS/Linux 真實 CI receipt 仍屬 release gate。
+Windows isolated wheel fresh/upgrade/assets smoke 與 formal package+DB rollback rehearsal 已通過。Rollback 必須同時回復相容 wheel 與 pre-migration online backup，且在服務停止後處理 `.db-wal/.db-shm`；只覆蓋 `.db` 可能讓新 WAL 重新套回。Windows／Ubuntu／macOS × Python 3.10／3.12 CI matrix 已於 run `32757498004` 通過；自動 retention pruning 仍屬 release gate。
 
 ## 7. 平台能力
 
 | 功能 | Windows | macOS / Linux |
 |---|---|---|
-| FastAPI、SQLite、CLI log ingestion | source + wheel isolated smoke 已實測 | 3-OS workflow 已建立，待 push 後真實 CI receipt |
+| FastAPI、SQLite、CLI log ingestion | source + wheel isolated smoke 已實測 | Ubuntu／macOS wheel build、install 與 API/assets smoke 已由 CI run `32757498004` 實測 |
 | Browser Extension | Chrome/Edge Alpha | Chromium 理論可用，待實機 |
 | Window foreground collector | 支援 | 明確降級，不宣稱可用 |
 | Desktop notification | WinRT Toast／MessageBox fallback | 明確降級，待平台實作 |
