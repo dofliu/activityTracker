@@ -22,6 +22,7 @@ let showAllProjects = false;
 let llmStatusCache = null;
 let contextSessionsCache = null;
 let relatedContextCache = null;
+let secretaryProposalsCache = null;
 
 const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t == null ? "" : t)
@@ -58,6 +59,10 @@ const I18N = {
     btn_related_search: "查相似歷史",
     related_memory_empty: "輸入一段工作描述，從本機 semantic index 尋找相似紀錄。",
     related_memory_boundary: "查詢只送往本機 Ollama 且不保存；similarity 不代表工作重複或歷史結論正確。",
+    secretary_title: "SECRETARY SUGGESTIONS",
+    btn_refresh_proposals: "重新整理",
+    ph_loading_proposals: "正在整理可追溯建議…",
+    secretary_boundary: "只呈現本機 evidence 衍生建議；不保存、不呼叫 cloud LLM，也不會自動執行。",
     btn_reindex_projects: "🔄 重新歸戶",
     ph_loading_projects: "載入進行中工作…",
     ph_no_projects: "尚未識別到專案活動。進行程式開發、論文寫作或在 Claude / Codex 發問後將自動建立。",
@@ -198,6 +203,10 @@ const I18N = {
     btn_related_search: "Find Related History",
     related_memory_empty: "Enter a task description to search the local semantic index.",
     related_memory_boundary: "The query goes only to local Ollama and is not stored; similarity does not prove duplicate work or correct conclusions.",
+    secretary_title: "SECRETARY SUGGESTIONS",
+    btn_refresh_proposals: "Refresh",
+    ph_loading_proposals: "Deriving traceable suggestions…",
+    secretary_boundary: "Local evidence-derived suggestions only; not persisted, sent to a cloud LLM, or executed automatically.",
     btn_reindex_projects: "🔄 Re-index",
     ph_loading_projects: "Loading active workstreams…",
     ph_no_projects: "No active projects detected yet. Edits, commits, and Claude / Codex / Antigravity sessions will populate this view.",
@@ -348,6 +357,7 @@ function applyLanguage(lang) {
   renderProjects();
   renderOpenLoops();
   renderContextSessions();
+  renderSecretaryProposals();
   if (relatedContextCache) renderRelatedContext(relatedContextCache);
   if ($("llm-key-status-badge")) renderLLMStatus();
 }
@@ -398,6 +408,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadCheckpoints();
   loadUsagePanels();
   loadContextSessions();
+  loadSecretaryProposals();
 
   setInterval(() => { refreshStatus(); refreshFeed(); }, POLL_MS);
   setInterval(loadUsagePanels, 30000);
@@ -429,7 +440,7 @@ function initTabs() {
       tab.classList.add("active");
       const id = tab.dataset.tab;
       $(id).classList.add("active");
-      if (id === "tab-projects") { loadProjects(); loadUsagePanels(); loadContextSessions(); }
+      if (id === "tab-projects") { loadProjects(); loadUsagePanels(); loadContextSessions(); loadSecretaryProposals(); }
       if (id === "tab-settings") loadConfig();
       if (id === "tab-summaries") loadSummaries();
       if (id === "tab-checkpoints") loadCheckpoints();
@@ -452,6 +463,7 @@ function initControls() {
   $("btn-refresh-projects").addEventListener("click", () => loadProjects(true));
   $("btn-refresh-usage").addEventListener("click", loadUsagePanels);
   $("btn-refresh-sessions").addEventListener("click", loadContextSessions);
+  $("btn-refresh-proposals").addEventListener("click", loadSecretaryProposals);
   $("btn-related-search").addEventListener("click", searchRelatedContext);
   $("input-related-question").addEventListener("keydown", event => {
     if (event.key === "Enter") searchRelatedContext();
@@ -757,6 +769,47 @@ function renderRelatedContext(data) {
       <div class="related-memory-match-meta">${esc(item.source_ref)} · SCORE ${Number(item.score || 0).toFixed(3)} · ${esc(item.trust_status || "observed")}${item.project_key ? ` · ${esc(item.project_key)}` : ""}</div>
     </div>`).join("");
   box.innerHTML = `<div class="related-memory-advisory">${esc(advisory)}</div>${rows || ""}`;
+}
+
+// ---------------------------------------------------------------- P5-1 proposal-only secretary
+async function loadSecretaryProposals() {
+  const box = $("secretary-proposals-list");
+  try {
+    secretaryProposalsCache = await getJSON("/api/v1/secretary/proposals?limit=6");
+    renderSecretaryProposals();
+  } catch (e) {
+    if (box) box.innerHTML = `<div class="placeholder">${currentLang === "zh-TW" ? "建議暫時無法讀取。" : "Suggestions are temporarily unavailable."}</div>`;
+  }
+}
+
+function renderSecretaryProposals() {
+  const box = $("secretary-proposals-list");
+  const badge = $("secretary-proposals-badge");
+  if (!box || !badge) return;
+  if (!secretaryProposalsCache) return;
+  const proposals = secretaryProposalsCache.proposals || [];
+  badge.textContent = `${proposals.length} ${currentLang === "zh-TW" ? "項" : "ITEMS"}`;
+  badge.className = `trust ${proposals.length ? "noisy" : "ok"}`;
+  if (!proposals.length) {
+    box.innerHTML = `<div class="placeholder">${currentLang === "zh-TW" ? "目前沒有超過規則門檻的建議；不代表所有工作都已完成。" : "No suggestion crossed the current rule threshold; this does not prove all work is complete."}</div>`;
+    return;
+  }
+  box.innerHTML = proposals.map(item => {
+    const refs = (item.evidence_refs || []).map(ref => `<span class="proposal-ref">${esc(ref)}</span>`).join("");
+    const priority = String(item.priority || "medium").toUpperCase();
+    return `
+      <article class="proposal-card">
+        <div class="proposal-card-top">
+          <span class="proposal-project">${esc(item.project_key || "OmniContext")}</span>
+          <span class="trust ${item.priority === "high" ? "broken" : "noisy"}">${esc(priority)}</span>
+        </div>
+        <div class="proposal-title">${esc(item.title)}</div>
+        <div class="proposal-reason">${esc(item.reason)}</div>
+        <div class="proposal-action"><span>${currentLang === "zh-TW" ? "建議" : "Suggested"}</span>${esc(item.suggested_action)}</div>
+        <div class="proposal-meta"><span>${esc(item.risk_level || "L0_READ_ONLY")}</span><span>${currentLang === "zh-TW" ? "不執行" : "NOT EXECUTABLE"}</span></div>
+        <div class="proposal-refs">${refs}</div>
+      </article>`;
+  }).join("");
 }
 
 // ---------------------------------------------------------------- live feed

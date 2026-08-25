@@ -30,6 +30,7 @@ from .security import (
 from .extension_monitor import build_extension_status, record_extension_heartbeat
 from .capture_coverage import build_capture_coverage
 from .context_memory import build_recent_work_sessions, find_related_work
+from .proactive_secretary import build_action_proposals
 from .usage_analytics import evaluate_daily_milestones, get_usage_summary
 from .time_utils import get_local_now
 from .runtime_paths import resolve_runtime_path, web_assets_dir
@@ -292,6 +293,14 @@ def get_related_context(payload: RelatedMemoryRequest):
             status_code=503,
             detail="local_semantic_index_unavailable",
         ) from exc
+
+
+@app.get("/api/v1/secretary/proposals")
+def get_secretary_proposals(
+    limit: int = Query(6, ge=1, le=12),
+):
+    """P5-1 proposal-only derived view；不保存、不執行任何建議。"""
+    return build_action_proposals(limit=limit)
 
 
 @app.post("/api/v1/usage/milestones/evaluate")

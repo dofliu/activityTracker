@@ -1,6 +1,6 @@
 # OmniContext 開發規劃與成果紀錄 — P0 ~ P6
 
-> 最新更新日期：2026-08-25　｜　目前狀態：**personal alpha / P2.6 + P3 context memory alpha**。P3-1～P3-5、Windows Toast E2E、formal rollback 與 Windows/macOS/Linux CI receipts 已完成；ChatGPT live selectors 已修復。Claude/Manus authenticated capture 與 Extension live heartbeat 尚未完成，整體不具 release-ready 或 autonomous-ready 資格。
+> 最新更新日期：2026-08-26　｜　目前狀態：**personal alpha / P2.6 + P3 context memory + P5-1 proposal-only alpha**。P3-1～P3-5、Windows Toast E2E、formal rollback、Windows/macOS/Linux CI 與 P5-1 localhost receipts 已完成；ChatGPT live selectors 已修復。Claude/Manus authenticated capture 與 Extension live heartbeat 尚未完成，整體不具 release-ready 或 autonomous-ready 資格。
 > 本文件記錄 OmniContext 從 0 到 1 的缺陷修復歷程、已完成之架構改造與未來的維運與延伸規劃。
 
 ---
@@ -139,7 +139,9 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 - 每一筆 AI turn 增加 stable `turn_key`、`source_path`、`source_position` 與 `response_status`。
 - Codex session 以 explicit `phase=final_answer` 或下一個 user turn 封閉上一輪；active EOF 保留 `partial`，後續掃描可升級或降級狀態。
 - 建立持久化 ingestion checkpoint；只有解析成功後才更新 `(mtime_ns, size)`，失敗必須保留可重試狀態。
+- Agent log 採 source-level fault isolation；單一 Claude Desktop 目錄 `Access Denied` 或來源解析失敗不得中止 Codex、Claude Code、Antigravity 等其他來源。
 - 驗收：同一 conversation 重複相同 prompt 不互相覆蓋；重啟後未變檔案不重掃；解析失敗不前移 checkpoint；重新掃描可更新較新的 assistant response。
+- **Recovery receipt（2026-08-26）**：舊 split-start process 顯示 threads running，但 window 最後事件停在 `00:01:09`，Claude Desktop 權限錯誤也會中止整輪 Agent scan。完整停止後改以 `python main.py run` 整合啟動，window events `2281 → 2289`、AI events `2722 → 2800`，最後資料分別推進到 `00:47:31`／`00:47:13`；Dashboard 同步更新且完整測試 79/79。
 
 ### P2.5-D1 資料可信度指標
 
@@ -168,7 +170,7 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 - [x] Security contract tests 與 Windows live Origin/token probe 通過。
 - [x] Transcript pairing / stable turn key / malformed JSONL / checkpoint fail-closed tests 通過。
 - [x] Open Loop lifecycle contract tests 通過，現有過時與重複事項完成一次人工複核。
-- [ ] Windows 實機 smoke 已通過；macOS/Linux matrix workflow 已建立，待 push 後取得真實 receipt。
+- [x] Windows 實機 smoke 與 collector restart E2E 已通過；Windows／Ubuntu／macOS × Python 3.10/3.12 matrix run `32757498004` 六個 jobs 已取得真實 receipt。
 - [x] README 隱私聲明明確區分 local storage、cloud LLM processing 與 optional integrations。
 - [x] SQLite online backup 產生 integrity 與 SHA-256 evidence；isolated restore drill 通過 schema／row-count parity 並保存 JSON receipt。
 - [x] Versioned migration fresh/legacy/live upgrade到 7/7；pre/post backups、restore drill 與 formal package+DB rollback 均通過。
@@ -357,6 +359,9 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 ### P5-1 主動情境與意圖推論引擎 (`core/proactive_secretary.py`)
 - 監聽 SQLite WAL 事件流，在關鍵時機（工作停頓 15 分鐘、專案切換、未結事項逾時、早晨 08:30 / 晚間 22:00）觸發輕量 LLM 分析。
 - 自動生成具體的 `ActionProposal` 結構體（目標專案、情境依據、建議行動、預估風險、所需工具與執行命令）。
+- **2026-08-26 Alpha scope**：先落地 deterministic proposal-only derived view，只讀取 Project State、`open` Open Loops 與非敏感 Extension status；不呼叫 cloud LLM、不保存 proposal、不執行 command，也不提供批准按鈕。每項建議必須附可回查 `source_ref`，完整契約見 [`ADR-007`](docs/ADR-007-proposal-only-secretary.md)。
+- Alpha acceptance：穩定 ID／排序、evidence refs、hostile Origin 403、無 token/path/prompt 全文、主頁 `PROPOSAL ONLY` 標示，以及 localhost live smoke 均通過後才標記完成。
+- **Alpha receipt（2026-08-26）**：正式 localhost 從 78 個 Project States／9 個 actionable Open Loops 與 live Extension status 產生 2 張 proposal、3 個 evidence refs；`execution_available=false`、`cloud_llm_used=false`、`query_persisted=false`，hostile Origin 403。桌面與 494px UI 無頁面水平溢出、console 無錯誤；加入 collector source-isolation contract 後完整測試 79/79。
 - **具體場景範例**：
   - *論文情境*：「偵測到 `AI_Papers_Auto_Claude` 新增了 3 篇文獻引用但缺少 BibTeX，是否自動檢索 DOI 並補齊文獻庫？」
   - *代碼情境*：「偵測到 `wavePowerSimuPLC` 有 1 項未結事項已停滯 48 小時，是否為您整理現有差異並產出測試診斷腳本？」

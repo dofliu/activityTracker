@@ -17,6 +17,7 @@ build/
 dist/
 *.egg-info/
 .packaging-smoke/
+.test-tmp-*/
 
 # Database files (Local privacy storage)
 *.db
@@ -28,6 +29,7 @@ dist/
 # Local Generated Reports & Checkpoints
 reports/*.md
 !reports/.gitkeep
+logs/*.log
 logs/checkpoints/*.md
 !logs/checkpoints/.gitkeep
 scripts/.tz_migrated

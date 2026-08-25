@@ -146,3 +146,35 @@ def test_claude_desktop_project_log_preserves_provenance_and_is_idempotent(tmp_p
         assert event.response_status == "final_candidate"
         assert event.source_path == str(source.resolve())
         assert event.source_position == 1
+
+
+def test_agent_source_failure_does_not_block_remaining_sources(monkeypatch):
+    service = AgentLogWatcherService()
+    calls = []
+
+    monkeypatch.setattr(service.cfg, "get", lambda key, default=None: True)
+    monkeypatch.setattr(
+        service,
+        "scan_claude_code_logs",
+        lambda full_history=False: calls.append("claude_code"),
+    )
+
+    def fail_claude_desktop(full_history=False):
+        calls.append("claude_desktop")
+        raise PermissionError("access denied")
+
+    monkeypatch.setattr(service, "scan_claude_desktop_logs", fail_claude_desktop)
+    monkeypatch.setattr(
+        service,
+        "scan_codex_logs",
+        lambda full_history=False: calls.append("codex"),
+    )
+    monkeypatch.setattr(
+        service,
+        "scan_antigravity_logs",
+        lambda full_history=False: calls.append("antigravity"),
+    )
+
+    service.scan_all_agents(full_history=False)
+
+    assert calls == ["claude_code", "claude_desktop", "codex", "antigravity"]

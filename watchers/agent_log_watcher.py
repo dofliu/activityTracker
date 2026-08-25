@@ -332,27 +332,26 @@ class AgentLogWatcherService:
 
     def scan_all_agents(self, full_history: bool = False):
         cfg = get_config()
+        sources = (
+            ("claude_code", "Claude Code", self.scan_claude_code_logs),
+            ("claude_desktop", "Claude Desktop", self.scan_claude_desktop_logs),
+            ("codex", "Codex", self.scan_codex_logs),
+            ("antigravity", "Antigravity", self.scan_antigravity_logs),
+        )
 
-        # D6 假開關修復：嚴格檢查各 Agent 獨立開關
-        if cfg.get("watchers.agent_log_watcher.claude_code", True):
-            self.scan_claude_code_logs(full_history=full_history)
-        else:
-            logger.debug("Claude Code watcher is disabled in config.")
-
-        if cfg.get("watchers.agent_log_watcher.claude_desktop", True):
-            self.scan_claude_desktop_logs(full_history=full_history)
-        else:
-            logger.debug("Claude Desktop watcher is disabled in config.")
-
-        if cfg.get("watchers.agent_log_watcher.codex", True):
-            self.scan_codex_logs(full_history=full_history)
-        else:
-            logger.debug("Codex watcher is disabled in config.")
-
-        if cfg.get("watchers.agent_log_watcher.antigravity", True):
-            self.scan_antigravity_logs(full_history=full_history)
-        else:
-            logger.debug("Antigravity watcher is disabled in config.")
+        # 每個來源都是獨立的故障邊界；單一目錄權限或壞檔不可中止其他來源的採集。
+        for config_key, source_label, scan_source in sources:
+            if not cfg.get(f"watchers.agent_log_watcher.{config_key}", True):
+                logger.debug("%s watcher is disabled in config.", source_label)
+                continue
+            try:
+                scan_source(full_history=full_history)
+            except Exception as exc:
+                logger.error(
+                    "%s source scan skipped; remaining agent sources will continue: %s",
+                    source_label,
+                    exc,
+                )
 
     # =========================================================================
     # 1. Claude Code 日誌解析 (以 projects/**/*.jsonl 為核心成對提取 User 與 Assistant 回應)

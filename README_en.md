@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **Current status: Personal Alpha.** Windows milestone WinRT Toast E2E, schema 7/7, formal package+database rollback, P3-2 through P3-5 Context Memory Alpha, and the cross-platform CI matrix have passed. ChatGPT live DOM selectors were repaired, and Claude Desktop Cowork/local-agent transcript capture passed a Windows E2E. Authenticated Claude.ai/Manus Browser capture and a live Extension heartbeat still lack receipts, so this is not release-ready.
+> **Current status: Personal Alpha.** Windows milestone WinRT Toast E2E, schema 7/7, formal package+database rollback, P3-2 through P3-5 Context Memory Alpha, P5-1 proposal-only Alpha, a collector restart E2E, and the cross-platform CI matrix have passed. ChatGPT live DOM selectors were repaired, and Claude Desktop Cowork/local-agent transcript capture passed a Windows E2E. Authenticated Claude.ai/Manus Browser capture and a live Extension heartbeat still lack receipts, so this is not release-ready.
 
 **Documentation:** [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
 
@@ -77,6 +77,7 @@ It is purpose-built to answer three fundamental questions at any moment:
   * Supports **ChatGPT**, **Google Gemini**, **Claude.ai**, and **Manus**.
   * Uses a dedicated ingest token, stable turn key, and write-only capability boundary.
 * **Boundary**: normal Claude Desktop cloud-chat Chromium LevelDB cache is detected but not parsed and is never claimed as captured transcript content.
+* **Source fault isolation**: a permission or parser failure in one source such as Claude Desktop skips only that source; Codex, Claude Code, and Antigravity scans continue in the same cycle.
 
 ### 4. ⚡ Custom Date-Range AI Synthesis Engine
 * **Flexible Date Ranges**: Choose any start and end dates (`FROM ~ TO`) or use quick chips (`Today`, `Yesterday`, `This Week`, `Last 7 Days`, `Last 30 Days`) to synthesize executive multi-day review reports.
@@ -107,6 +108,11 @@ It is purpose-built to answer three fundamental questions at any moment:
 * `Recent Work Sessions` derives project-scoped clusters from AI turns, Git commits, and file events using a configurable inactivity gap. It is a read-only view and adds no new session table.
 * `Related History` searches the local semantic index from the dashboard or CLI, returns traceable source references and trust status, and does not persist the query.
 * Session grouping is not actual work time, focus, or productivity. Similarity is not proof that work is duplicated, correct, or reusable.
+
+### 10. 🧩 Proposal-only Secretary (P5-1 Alpha)
+* The first Alpha derives traceable next-step suggestions from local Project State, actionable Open Loops, and non-sensitive Extension diagnostics.
+* It does not call a cloud LLM, persist proposals, modify files, execute commands, or expose an approval action. See [ADR-007](docs/ADR-007-proposal-only-secretary.md) for the safety contract.
+* The localhost smoke produced two suggestions with three evidence references, blocked a hostile Origin with 403, and passed desktop plus 494px responsive rendering. This receipt does not authorize an executor.
 
 ---
 

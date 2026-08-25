@@ -11,6 +11,7 @@
 - Origin allowlist、secret redaction、URL/path validation。
 - Codex 同一 turn 多個 assistant messages 選擇最後有效回應。
 - Claude Code 與 Claude Desktop 共用 user/assistant boundary parser，但 platform provenance 與 stable turn key 必須分離。
+- 每個 Agent source 都是獨立 fault boundary；Claude Desktop `PermissionError` 不得阻止同輪 Codex、Claude Code 與 Antigravity scan。
 - Windows 超長 Claude Desktop session path 必須以 extended path 可讀；一般 cloud-chat cache 只能標示 detected/unparsed。
 - 同 conversation 重複 prompt 以 stable `turn_key` 分開。
 - Open Loop title normalization、fingerprint 與狀態轉換。
@@ -31,6 +32,7 @@
 - `python main.py status`：live service 存在時回報 live 狀態；無服務時安全 fallback。
 - `python main.py now` 與 `python main.py resume activityTracker --json` 可讀取既有資料。
 - Windows 實機 watcher 啟動、停止與單一實例；macOS/Linux 先驗證 import 與 unsupported feature graceful degradation。
+- Restart E2E 必須比較重啟前後 `last_events`、event count、usage `data_updated_at` 與 Dashboard render；thread `running` 或 Health API 200 不能替代資料實際前進。
 
 ## Data Integrity Gates
 
@@ -124,10 +126,21 @@ python main.py extension-path
 - Context Memory live smoke：24 小時 332 筆可歸戶 observations；session view 正常。Related query top score 約 0.50–0.59，明顯無關 query 約 0.33–0.35；0.50 只作本 corpus Alpha 起點。
 - Dashboard E2E 必須以真實點擊觸發 Related History，確認來源／score／trust 可見且 console 無 error；窄螢幕需驗證 Context Memory 收成單欄、頂部操作列換行且整頁無水平 overflow。
 
+## P5-1 Proposal-only Secretary Matrix
+
+- Engine 只直接讀取 Project State、`open` Open Loops 與非敏感 Extension status；不得呼叫會 refresh/write 的 helper。
+- 相同 evidence 產生穩定 proposal ID 與 deterministic order；`stale/resolved/superseded` 不得進入 actionable proposal。
+- 所有 proposal 必須附 `evidence_refs`，且回應不得包含 Open Loop 原文、prompt/response 全文、token、local path 或 executable command。
+- API 必須維持 `execution_available=false`、`cloud_llm_used=false`、`query_persisted=false`，hostile Origin 為 403。
+- Dashboard 必須顯示 `PROPOSAL ONLY`、risk level 與「不執行」邊界；桌面及 494px viewport 無 page-level horizontal overflow，console 無錯誤。
+- 任何 approve/execute endpoint、Agent Dispatcher 或 mutation 不在本矩陣授權範圍。
+
 ## Platform CI Matrix
 
 `.github/workflows/platform-matrix.yml` 在 Windows、Ubuntu、macOS 的 Python 3.10/3.12 執行 pytest、compileall、Extension JS syntax、build、artifact privacy/content 與 installed writable-home/API/assets smoke。2026-08-25 GitHub Actions run `32757498004` 的六個 jobs 全數通過；未來 commit 仍須以各自 run receipt 判定，不沿用本次結果。
 
-2026-08-25 Claude Desktop 修正後本機 `pytest` 為 **64/64**；Windows live incremental scan 新增 148 turns、125 筆非空 response、117 筆 `final_candidate`，stable parser 重跑不新增重複 turn。這是本機 Cowork／local-agent receipt，不外推為一般 Claude 雲端聊天 coverage。
+2026-08-26 本機完整 `pytest` 為 **79/79**。Collector recovery E2E 將 window events 從 2281 推進至 2289、AI events 從 2722 推進至 2800，Dashboard `data_updated_at` 同步前進；這證明該次 collector → SQLite → API → UI 路徑恢復，不代表全天 continuous coverage。
+
+Claude Desktop Cowork／local-agent Windows incremental scan曾新增 148 turns、125 筆非空 response、117 筆 `final_candidate`，stable parser 重跑不新增重複 turn。這是本機 Cowork／local-agent receipt，不外推為一般 Claude 雲端聊天 coverage。
 
 同批資料完成 incremental semantic index：來源與索引均為 4,380，`indexed=285 / unchanged=4095 / failures=0`；新增數包含掃描期間其他合法來源，不等同全部來自 Claude Desktop。

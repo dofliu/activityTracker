@@ -4,7 +4,7 @@
 >
 > 主要驗證平台：Windows 11、Python 3.12、Chrome/Edge MV3
 
-本文件提供可直接執行的安裝、啟動、Browser Extension 配對、每日使用、備份與故障排查流程。架構決策另見 [ADR-001](ADR-001-p2-5-trust-boundary.md)、[ADR-002](ADR-002-extension-monitor-and-usage-milestones.md)、[ADR-003](ADR-003-versioned-sqlite-migrations.md)、[ADR-004](ADR-004-packaged-runtime-layout.md)、[ADR-006](ADR-006-derived-context-sessions-and-related-history.md) 與 [Release Checklist](RELEASE_CHECKLIST.md)。
+本文件提供可直接執行的安裝、啟動、Browser Extension 配對、每日使用、備份與故障排查流程。架構決策另見 [ADR-001](ADR-001-p2-5-trust-boundary.md)、[ADR-002](ADR-002-extension-monitor-and-usage-milestones.md)、[ADR-003](ADR-003-versioned-sqlite-migrations.md)、[ADR-004](ADR-004-packaged-runtime-layout.md)、[ADR-006](ADR-006-derived-context-sessions-and-related-history.md)、[ADR-007](ADR-007-proposal-only-secretary.md) 與 [Release Checklist](RELEASE_CHECKLIST.md)。
 
 ## 1. 安裝與初始化
 
@@ -65,6 +65,7 @@ python main.py run
 ```
 
 `python main.py` 與 `python main.py web` 目前等同 `run`。
+長時間正式執行請直接使用整合啟動；`web --no-autostart` 再由 API 分段啟動只適合診斷，不作日常啟動方式。
 
 啟動後可使用下列入口：
 
@@ -78,7 +79,7 @@ python main.py run
 python main.py status
 ```
 
-應確認 `file_watcher`、`window_watcher`、`agent_log_watcher` 與 scheduler 的 runtime 狀態；`idle` 表示近期沒有新事件，不等於採集器故障。
+應確認 `file_watcher`、`window_watcher`、`agent_log_watcher` 與 scheduler 的 runtime 狀態；`idle` 表示近期沒有新事件，不等於採集器故障。若使用者確實切換視窗或產生 Agent log，還要確認 `last_events` 與 event count 是否向前推進；thread 顯示 `running` 不能單獨證明採集成功。
 
 ## 3. Browser Extension 安裝與配對
 
@@ -222,6 +223,18 @@ Dashboard「進行中工作」會同步顯示 `RECENT WORK SESSIONS` 與 `RELATE
 
 若本機 Ollama 或 semantic index 不可用，Related History 會明確顯示 unavailable，不改送 cloud。Session 的 span 只是首末事件時間差，不代表實際工時、專注度或任務連續性。
 
+### 查看 Proposal-only 主動秘書建議
+
+主頁 `SECRETARY SUGGESTIONS` 會從 Project State、actionable Open Loops 與 Extension diagnostics 顯示可追溯建議。每張卡片都附 `project_states:<id>`、`open_loops:<id>` 或 `extension_status:live` 等 evidence refs。
+
+也可唯讀查詢：
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8765/api/v1/secretary/proposals
+```
+
+P5-1 Alpha 沒有批准或執行功能，不保存 proposal、不呼叫 cloud LLM，也不修改檔案、Git 或外部系統。
+
 ### 建立工作快照與摘要
 
 ```powershell
@@ -319,6 +332,19 @@ Windows isolated wheel fresh/upgrade/assets smoke 與 formal package+DB rollback
 ### 使用時間看起來偏少
 
 先看 coverage badge。視窗採集器停止、電腦休眠、平台不支援、未知視窗分類或超過 `max_interval_seconds` 的事件，都不應被補值或外推。
+
+### 顯示 `MONITORING`，但資料時間停止更新
+
+先讀取真實 collector 狀態與最後事件，不要只重新整理瀏覽器：
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8765/api/v1/control/status
+Invoke-RestMethod http://127.0.0.1:8765/api/v1/usage/today
+```
+
+若前景視窗確實持續切換，但 `last_events.window_watcher` 與 `data_updated_at` 仍不前進，可先呼叫 `POST /api/v1/control/stop` 讓 collectors flush，再確認 8765 的 OwningProcess 確實是 OmniContext，停止該 PID 後使用 `python main.py run` 整合重啟。不要終止未確認的 Python 程序。
+
+Agent log 採 source-level fault isolation：Claude Desktop 某個目錄無權限時會跳過該來源，Codex、Claude Code 與 Antigravity 仍應繼續更新。Extension heartbeat 是獨立通道；重啟 localhost service 不等於 Extension 已重新配對。
 
 ### Scheduler 顯示 `builtin_timer`
 

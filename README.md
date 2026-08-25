@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **目前狀態：Personal Alpha。** Windows milestone WinRT Toast E2E、schema 7/7、formal package+DB rollback、P3-2～P3-5 與跨平台 CI 已通過；ChatGPT 真實 DOM selectors 已修復，Claude Desktop Cowork／local-agent transcript 已完成 Windows E2E。Claude.ai／Manus authenticated Browser capture 與 Extension live heartbeat 仍待真實 receipt，因此尚非 release-ready。
+> **目前狀態：Personal Alpha。** Windows milestone WinRT Toast E2E、schema 7/7、formal package+DB rollback、P3-2～P3-5、P5-1 proposal-only、collector restart E2E 與跨平台 CI 已通過；ChatGPT 真實 DOM selectors 已修復，Claude Desktop Cowork／local-agent transcript 已完成 Windows E2E。Claude.ai／Manus authenticated Browser capture 與 Extension live heartbeat 仍待真實 receipt，因此尚非 release-ready。
 
 **文件入口：**[完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
 
@@ -77,6 +77,7 @@
   * 支援 **ChatGPT**、**Gemini**、**Claude.ai**、**Manus**。
   * 以獨立 ingest token 實施 write-only capability boundary，並以穩定 turn key Upsert。
 * **明確邊界**：一般 Claude Desktop 雲端聊天目前只偵測 cache 存在，不解析 Chromium LevelDB，也不宣稱已取得對話內容。
+* **來源故障隔離**：Claude Desktop 等單一來源遇到目錄權限或解析錯誤時，只跳過該來源並繼續掃描 Codex、Claude Code 與 Antigravity，不再讓整輪 Agent 採集一起中止。
 
 ### 4. ⚡ 自訂日期區間 AI 工作回顧（LLM Synthesis Engine）
 * **任意日期範圍報告**：支援從 Web UI 選擇起訖日期（`FROM ~ TO`）或使用 `今日`、`昨日`、`本週`、`近 7 天`、`近 30 天` 快捷標籤，一鍵產出多日全景回顧。
@@ -114,6 +115,11 @@
 * 主頁將已歸戶的 AI、Git 與檔案事件依 project + inactivity gap 整理為 derived work session；每段保留穩定 session ID、來源計數與 SQLite `source_ref`，不新增資料表、不改寫原始事件。
 * `omni recall` 與主頁 `RELATED HISTORY` 使用 loopback Ollama 尋找相似歷史；查詢不保存，Ollama 不可用時不 fallback 到 cloud。
 * Session 是 temporal inference，不代表實際工時、連續專注或成果品質；similarity 也不能證明工作重複、歷史答案正確或仍然適用。架構決策見 [ADR-006](docs/ADR-006-derived-context-sessions-and-related-history.md)。
+
+### 10. 🧩 Proposal-only 主動秘書（P5-1 Alpha）
+* 第一版只把本機 Project State、actionable Open Loops 與 Extension diagnostics 整理成附 evidence refs 的下一步建議。
+* 不呼叫 cloud LLM、不寫入 SQLite、不修改檔案、不執行 command，也不提供批准執行；完整安全契約見 [ADR-007](docs/ADR-007-proposal-only-secretary.md)。
+* 正式 localhost 已產生 2 張建議與 3 個 evidence refs，惡意 Origin 為 403；桌面與 494px 介面 smoke 通過。此 receipt 不授權後續 executor。
 
 ---
 

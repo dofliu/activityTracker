@@ -231,6 +231,38 @@ def test_related_context_api_is_local_advisory_and_rejects_extra_fields(monkeypa
     assert rejected.status_code == 422
 
 
+def test_secretary_proposals_api_is_read_only_and_origin_protected(monkeypatch):
+    monkeypatch.setattr(
+        "core.server.build_action_proposals",
+        lambda **_kwargs: {
+            "status": "proposal_only",
+            "mode": "proposal_only",
+            "execution_available": False,
+            "cloud_llm_used": False,
+            "query_persisted": False,
+            "proposals": [
+                {
+                    "proposal_id": "stable-proposal-id",
+                    "evidence_refs": ["open_loops:7"],
+                    "execution_available": False,
+                }
+            ],
+        },
+    )
+    allowed = client.get(
+        "/api/v1/secretary/proposals?limit=4",
+        headers={"Origin": "http://127.0.0.1:8765"},
+    )
+    denied = client.get(
+        "/api/v1/secretary/proposals",
+        headers={"Origin": "https://evil.example"},
+    )
+    assert allowed.status_code == 200
+    assert allowed.json()["execution_available"] is False
+    assert allowed.json()["proposals"][0]["evidence_refs"] == ["open_loops:7"]
+    assert denied.status_code == 403
+
+
 def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     monitor = client.get(
         "/extension-monitor",
@@ -253,15 +285,19 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     assert "llm-key-status-badge" in dashboard.text
     assert "context-sessions-list" in dashboard.text
     assert "input-related-question" in dashboard.text
+    assert "secretary-proposals-list" in dashboard.text
+    assert "PROPOSAL ONLY" in dashboard.text
     assert "DATA CAPTURE" in dashboard.text
     assert "extension-capture-badge" not in dashboard.text
-    assert "style.css?v=1.3.0a4-ui6" in dashboard.text
-    assert "app.js?v=1.3.0a4-ui6" in dashboard.text
+    assert "style.css?v=1.3.0a4-ui7" in dashboard.text
+    assert "app.js?v=1.3.0a4-ui7" in dashboard.text
     assert "/extension-monitor" in dashboard.text
     stylesheet = client.get("/static/style.css")
     assert stylesheet.status_code == 200
     assert 'input:not([type="checkbox"])' in stylesheet.text
     assert ".usage-toggle-row" in stylesheet.text
+    assert ".split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }" in stylesheet.text
+    assert ".split-col { min-width: 0;" in stylesheet.text
 
 
 def test_checkpoint_path_traversal_is_denied():
