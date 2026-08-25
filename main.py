@@ -503,6 +503,65 @@ def cmd_ask(
     print(f"\nBoundary: {result['claim_boundary']}")
 
 
+def cmd_sessions(
+    project: Optional[str] = None,
+    hours: Optional[int] = None,
+    gap_minutes: Optional[int] = None,
+    limit: Optional[int] = None,
+    as_json: bool = False,
+):
+    """P3-5：將既有事件以 deterministic inactivity gap 聚合成工作階段。"""
+    from core.context_memory import build_recent_work_sessions
+
+    result = build_recent_work_sessions(
+        project=project,
+        hours=hours,
+        gap_minutes=gap_minutes,
+        limit=limit,
+    )
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    print(f"status: {result['status']} · sessions: {len(result['sessions'])}")
+    for item in result["sessions"]:
+        print(
+            f"[{item['session_id']}] {item['project_key']} · "
+            f"{item['started_at']} → {item['ended_at']} · "
+            f"{item['events_observed']} events"
+        )
+        print(f"  {item['headline']}")
+    print(f"\nBoundary: {result['claim_boundary']}")
+
+
+def cmd_recall(
+    question: str,
+    project: Optional[str] = None,
+    threshold: Optional[float] = None,
+    top_k: int = 8,
+    as_json: bool = False,
+):
+    """P3-4：提示相似的本機歷史 evidence，不保存查詢、不判定工作重複。"""
+    from core.context_memory import find_related_work
+
+    result = find_related_work(
+        question,
+        project=project,
+        threshold=threshold,
+        top_k=top_k,
+    )
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    print(result["advisory"])
+    for item in result["matches"]:
+        print(
+            f"[{item['citation']}] {item['source_ref']} · "
+            f"score={item['score']:.4f} · trust={item['trust_status']}"
+        )
+        print(f"  {item['title']}")
+    print(f"\nBoundary: {result['claim_boundary']}")
+
+
 def cmd_notify_telegram(action: str, date_str: Optional[str] = None, dry_run: bool = False):
     """測試或手動發送 Telegram 通知 (支援 --dry-run 預覽)"""
     notifier = TelegramNotifier()
@@ -719,6 +778,20 @@ def main():
     ask_parser.add_argument("--no-synthesis", action="store_true", help="只回傳 retrieval，不呼叫生成模型")
     ask_parser.add_argument("--json", action="store_true", help="輸出 JSON")
 
+    sessions_parser = subparsers.add_parser("sessions", help="列出 inferred work sessions (P3-5)")
+    sessions_parser.add_argument("--project", help="限制指定專案")
+    sessions_parser.add_argument("--hours", type=int, help="回溯時數（預設讀取 context_memory.recent_hours）")
+    sessions_parser.add_argument("--gap-minutes", type=int, help="切分 session 的 inactivity gap")
+    sessions_parser.add_argument("--limit", type=int, help="最多顯示 session 數")
+    sessions_parser.add_argument("--json", action="store_true", help="輸出 JSON")
+
+    recall_parser = subparsers.add_parser("recall", help="提示相似歷史工作 evidence (P3-4)")
+    recall_parser.add_argument("question", help="要比對的工作或問題")
+    recall_parser.add_argument("--project", help="限制指定專案")
+    recall_parser.add_argument("--threshold", type=float, help="相似度門檻（預設讀取 context_memory.related_threshold）")
+    recall_parser.add_argument("--top-k", type=int, default=8, help="候選來源數")
+    recall_parser.add_argument("--json", action="store_true", help="輸出 JSON")
+
     loop_parser = subparsers.add_parser("open-loop", help="複核 Open Loop lifecycle")
     loop_parser.add_argument("id", type=int, help="Open Loop ID")
     loop_parser.add_argument("status", choices=["open", "stale", "resolved", "superseded"])
@@ -796,6 +869,22 @@ def main():
             getattr(args, "project", None),
             getattr(args, "top_k", None),
             getattr(args, "no_synthesis", False),
+            getattr(args, "json", False),
+        )
+    elif args.command == "sessions":
+        cmd_sessions(
+            getattr(args, "project", None),
+            getattr(args, "hours", None),
+            getattr(args, "gap_minutes", None),
+            getattr(args, "limit", None),
+            getattr(args, "json", False),
+        )
+    elif args.command == "recall":
+        cmd_recall(
+            args.question,
+            getattr(args, "project", None),
+            getattr(args, "threshold", None),
+            getattr(args, "top_k", 8),
             getattr(args, "json", False),
         )
     elif args.command == "open-loop":

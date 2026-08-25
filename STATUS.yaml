@@ -1,12 +1,12 @@
 name: OmniContext Activity Tracker
 name_zh: OmniContext 個人全景活動追蹤系統
 category: personal_tools
-progress: 88
+progress: 91
 progress_basis: "依 P0-P6 加權里程碑估計；不是 release readiness 百分比"
 status: active_hardening
 release_ready: false
 last_updated: "2026-08-25"
-current_phase: "P2.6 Usage/Milestone + Desktop Capture Coverage + P3 Semantic Memory Alpha + P6 Cross-platform Gate"
+current_phase: "P2.6 Usage/Milestone + Desktop Capture Coverage + P3 Context Memory Alpha + P6 Cross-platform Gate"
 next_milestone: "取得 Extension 1.3.0 live heartbeat 與 Claude.ai/Manus authenticated Browser capture receipts"
 planned_features:
   - id: FEATURE-001
@@ -176,6 +176,26 @@ evidence_snapshot:
     retrieval_only_smoke: passed_with_source_refs
     local_answer_smoke: passed_llama3_1_8b_with_citations
     claim_boundary: "Similarity ranks local evidence; it does not validate source truth, semantic correctness or coverage."
+  context_memory_evidence:
+    status: passed_alpha
+    architecture: derived_view_no_schema_change
+    session_sources: [ai_turn, git_commit, file_activity]
+    session_gap_minutes: 45
+    live_window_hours: 24
+    live_observations_considered: 332
+    live_recent_sessions_returned: 6
+    default_window_live_observations_considered: 1972
+    default_window_live_recent_sessions_returned: 8
+    session_identity: stable_from_project_first_source_ref_and_start_time
+    window_focus: excluded_without_canonical_project_identity
+    related_history_transport: loopback_ollama_embedding_only
+    related_query_persisted: false
+    default_threshold: 0.50
+    related_score_probe: "0.50-0.59"
+    unrelated_score_probe: "0.33-0.35"
+    dashboard_e2e: passed_real_click_5_traceable_matches_no_console_error
+    narrow_viewport: passed_494px_no_page_horizontal_overflow
+    claim_boundary: "Temporal grouping is not task continuity or work time; similarity is not truth, duplication, or applicability."
   formal_rollback_evidence:
     status: passed
     path: "1.3.0a1/schema4 -> 1.3.0a2/schema5 -> 1.3.0a1/schema4"
@@ -184,12 +204,15 @@ evidence_snapshot:
     sentinel_row_preserved: true
     wal_shm_cleanup_required: true
   packaging_evidence:
-    captured_at: "2026-08-25 10:25 Asia/Taipei"
+    captured_at: "2026-08-25 23:34 Asia/Taipei"
     candidate_version: 1.3.0a4
     baseline_1_2_0_wheel_runtime_assets: missing
     pep517_wheel_sdist_build: passed
     artifact_content_receipt: passed
-    artifact_hashes: retained_in_build_receipt_not_embedded_in_artifact
+    artifact_hashes:
+      wheel_sha256: d6d5183c721e1c2ba1b1f9a5172fdee61a74a0cfbf78dbdcc490cc7a9c5785f1
+      sdist_sha256: a31441f37ff9e8a3040620a6c1c03d76d13635e66302fee16080e3aa4db2ad77
+    context_memory_assets_in_wheel_sdist: true
     artifact_privacy_exclusions: passed_no_config_database_or_local_secrets
     fresh_wheel_install: passed_1.3.0a4_isolated_windows_venv_with_host_dependencies
     upgrade_path: passed_1_2_0_to_1_3_0a2_with_pip_local_version_receipt
@@ -206,7 +229,7 @@ quality_gates:
   ingestion_provenance: passed_local_rescan_601_sources
   response_finalization: passed_as_final_candidate_contract_not_semantic_correctness
   open_loop_lifecycle: passed_local_db_reconciliation
-  automated_tests: passed_64_contract_tests
+  automated_tests: passed_74_contract_tests
   usage_milestone_alpha: passed_contract_and_windows_dashboard_api_smoke
   documentation_current: passed_readme_usage_roadmap_status_sync
   backup_lifecycle: passed_online_backup_and_isolated_restore_drill
@@ -214,6 +237,7 @@ quality_gates:
   packaging_windows_alpha: passed_artifacts_fresh_upgrade_assets_and_writable_home
   portability_baseline: passed_github_actions_3_os_2_python_6_jobs_run_32757498004
   semantic_memory: passed_local_alpha_4380_of_4380
+  context_memory: passed_related_history_and_derived_sessions_alpha
   autonomous_execution: blocked_by_p2_5
 known_blockers:
   - "Gemini Browser ingestion 已觀察 3 筆 event／2 筆 response，ChatGPT live selectors 已驗證；Extension 1.3.0 live heartbeat 與 Claude.ai/Manus authenticated Browser capture 尚未完成"
@@ -222,4 +246,4 @@ known_blockers:
   - "Windows wheel/sdist install/upgrade/assets、formal rollback 與 1.3.0a4 candidate packaging 已驗證；public publish/tag 尚未執行"
   - "Windows/Ubuntu/macOS × Python 3.10/3.12 CI run 32757498004 已通過；window/notification 實機能力仍限 Windows，其他平台採明確降級"
   - "project_engine 仍含個人根路徑 fallback，尚未完全 config-driven"
-key_metrics: "P0-P2 可日常運行；P3-1 handoff、P3-2 semantic index 4,380/4,380、P3-3 omni ask、SQLite schema 7/7、Windows Toast E2E、formal package+DB rollback 與 3-OS/2-Python CI 六個 jobs 已通過。Claude Desktop Cowork/local-agent 已匯入 148 turns／125 responses，incremental semantic index 新增 285 documents；一般 Claude cloud chat 仍未解析。Extension 1.3.0 heartbeat 與 Claude.ai/Manus authenticated Browser capture receipts 尚未完成；整體仍非 release-ready，P5 autonomous executor 維持 blocked。"
+key_metrics: "P0-P2 可日常運行；P3-1 handoff、P3-2 semantic index 4,380/4,380、P3-3 omni ask、P3-4 Related History、P3-5 derived Session、SQLite schema 7/7、Windows Toast E2E、formal package+DB rollback 與 3-OS/2-Python CI 六個 jobs 已通過。Context Memory 以 24 小時 332 筆 observations 完成 session smoke，query 不保存且不 fallback 到 cloud。Claude Desktop Cowork/local-agent 已匯入 148 turns／125 responses；一般 Claude cloud chat 仍未解析。Extension 1.3.0 heartbeat 與 Claude.ai/Manus authenticated Browser capture receipts 尚未完成；整體仍非 release-ready，P5 autonomous executor 維持 blocked。"

@@ -160,6 +160,14 @@ semantic_index:
   default_top_k: 6
   allow_remote: false
 
+context_memory:
+  # Session 是 derived temporal grouping，不寫回原始事件，也不代表實際工時或專注度。
+  recent_hours: 72
+  session_gap_minutes: 45
+  max_sessions: 8
+  # 0.50 是目前 bge-m3 + 本機語料的 Alpha 實測起點，不是通用真實性門檻。
+  related_threshold: 0.50
+
 notifiers:
   desktop:
     enabled: true

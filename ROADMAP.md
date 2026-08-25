@@ -1,6 +1,6 @@
 # OmniContext 開發規劃與成果紀錄 — P0 ~ P6
 
-> 最新更新日期：2026-08-25　｜　目前狀態：**personal alpha / P2.6 + P3 semantic memory alpha**。P3-1、P3-2、P3-3、Windows Toast E2E 與 formal rollback 已完成；ChatGPT live selectors 已修復。Claude/Manus authenticated capture 與 Windows/macOS/Linux CI 真實 receipts 尚未完成，整體不具 release-ready 或 autonomous-ready 資格。
+> 最新更新日期：2026-08-25　｜　目前狀態：**personal alpha / P2.6 + P3 context memory alpha**。P3-1～P3-5、Windows Toast E2E、formal rollback 與 Windows/macOS/Linux CI receipts 已完成；ChatGPT live selectors 已修復。Claude/Manus authenticated capture 與 Extension live heartbeat 尚未完成，整體不具 release-ready 或 autonomous-ready 資格。
 > 本文件記錄 OmniContext 從 0 到 1 的缺陷修復歷程、已完成之架構改造與未來的維運與延伸規劃。
 
 ---
@@ -124,7 +124,7 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 
 > Architecture decision：在語意記憶與自主執行之前，先讓「來源、turn、回應、待辦、權限與執行平台」都有明確契約。P5 在本節所有 release blockers 關閉前維持 blocked。
 
-**2026-08-25 實作結果：**append-only SQLite registry 已擴充至 7/7；Windows WinRT milestone Toast E2E 與 `1.3.0a1/schema4 → 1.3.0a2/schema5 → rollback` rehearsal 通過。Extension `1.3.0` 採 shared capture core，加入 localized click、form submit 與 response baseline；ChatGPT live DOM probe 通過，Claude/Manus authenticated receipt 仍待完成。P3-2/P3-3 已進入 Alpha；跨平台 workflow 已建立，尚待推送後真實 CI。
+**2026-08-25 實作結果：**append-only SQLite registry 已擴充至 7/7；Windows WinRT milestone Toast E2E 與 `1.3.0a1/schema4 → 1.3.0a2/schema5 → rollback` rehearsal 通過。Extension `1.3.0` 採 shared capture core，加入 localized click、form submit 與 response baseline；ChatGPT live DOM probe 通過，Claude/Manus authenticated receipt 仍待完成。P3-2～P3-5 已進入 Alpha；跨平台 workflow run `32757498004` 的六個 jobs 已通過。
 
 ### P2.5-S1 本機 API 安全邊界
 
@@ -269,7 +269,7 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 ---
 
-## 4. P3：記憶層（P3-1 已完成；P3-2～P3-5 待 P2.5 gate）
+## 4. P3：記憶層（P3-1～P3-5 已完成 Alpha）
 
 > 目標：讓 236 萬字元從「存著」變成「用得到」。**不需要任何新的採集器。**
 
@@ -300,16 +300,18 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 - retrieval-only 與本機 `llama3.1:8b` synthesis 均已實測；回傳 `[S1]` 引用、SQLite source row、時間、專案、trust 與 similarity score。
 - loopback-only 預設 fail-closed；similarity 不作來源真實性、完整 coverage 或語意正確證明。
 
-### P3-4 重複工作偵測
+### ✅ P3-4 Related History（2026-08-25 完成 Alpha）
 
-- 新提問與歷史高相似度時主動提示「3 週前問過 Gemini 幾乎相同的問題」。
-- 價值在於避免重做已解決的事。
+- 新增 `omni recall`、`POST /api/v1/context/related` 與主頁 `RELATED HISTORY`；查詢只送到 loopback Ollama embedding endpoint 且不寫入 SQLite。
+- 每筆結果保留 `source_ref`、project、trust status 與 score；Ollama/index 不可用時明確降級，不 fallback 到 cloud。
+- `bge-m3` 本機校準中，相關工作約 0.50–0.59、明顯無關查詢約 0.33–0.35，因此 Alpha default threshold 設為 0.50。此值不是通用真實性門檻，也不能直接判定工作重複。
 
-### P3-5 Session 敘事層
+### ✅ P3-5 Derived Session 敘事層（2026-08-25 完成 Alpha）
 
-- 現行階層為 `event → project`，缺少中間的 `session`。
-- 人記憶工作的單位是「那天下午在弄時區那件事」，不是「23:47 修改了 file_watcher.py」。
-- 將 2 小時內同專案事件聚成 session 並生成一句話標題，提升整體可讀性。
+- 新增 `core/context_memory.py`、`omni sessions`、`GET /api/v1/context/sessions` 與主頁 `RECENT WORK SESSIONS`。
+- Session 是 derived view：同 project 事件依 configurable inactivity gap（預設 45 分鐘）分群，以首筆 `source_ref` 建立穩定 ID；不新增 schema、不複製或改寫原始事件。
+- 真實 24 小時 smoke 從 332 筆可歸戶事件產生近期 session，AI/Git/file 計數與來源可回查。Window focus 缺少 canonical project identity，因此明確排除。
+- Narrative 由 deterministic template 產生，不呼叫 LLM；時間 span 不代表實際工時、任務連續性、專注或成果品質。完整決策見 `docs/ADR-006-derived-context-sessions-and-related-history.md`。
 
 ---
 
@@ -404,7 +406,8 @@ P2.5-S1 API 安全邊界
   → ✅ P3-1 resume（已完成，並以新資料契約重新驗收）
   → ✅ P3-2 語意索引（4,380/4,380）
   → ✅ P3-3 omni ask（retrieval + local synthesis）
-  → P3-5 Session 敘事層
+  → ✅ P3-4 Related History（local advisory）
+  → ✅ P3-5 Derived Session 敘事層
   → P5-1 Proposal-only 主動建議（不執行修改）
   → P5 executor 獨立安全驗收
   → P4 收集層補完

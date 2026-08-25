@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **目前狀態：Personal Alpha。** Windows milestone WinRT Toast E2E、schema 7/7、formal package+DB rollback、P3-2/P3-3 與跨平台 CI 已通過；ChatGPT 真實 DOM selectors 已修復，Claude Desktop Cowork／local-agent transcript 已完成 Windows E2E。Claude.ai／Manus authenticated Browser capture 與 Extension live heartbeat 仍待真實 receipt，因此尚非 release-ready。
+> **目前狀態：Personal Alpha。** Windows milestone WinRT Toast E2E、schema 7/7、formal package+DB rollback、P3-2～P3-5 與跨平台 CI 已通過；ChatGPT 真實 DOM selectors 已修復，Claude Desktop Cowork／local-agent transcript 已完成 Windows E2E。Claude.ai／Manus authenticated Browser capture 與 Extension live heartbeat 仍待真實 receipt，因此尚非 release-ready。
 
 **文件入口：**[完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
 
@@ -110,6 +110,11 @@
 * `content_hash + embedding_model` 增量更新；每筆保留原始 SQLite `source_ref`、project、timestamp、trust status 與 embedding input 降級模式。
 * `omni ask` 可先 retrieval-only，也可由本機 Ollama 生成含 `[S1]` 引用的答案；similarity 不是來源真實性或 coverage 證明。
 
+### 9. 🧭 Related History 與 Work Sessions（P3-4 / P3-5 Alpha）
+* 主頁將已歸戶的 AI、Git 與檔案事件依 project + inactivity gap 整理為 derived work session；每段保留穩定 session ID、來源計數與 SQLite `source_ref`，不新增資料表、不改寫原始事件。
+* `omni recall` 與主頁 `RELATED HISTORY` 使用 loopback Ollama 尋找相似歷史；查詢不保存，Ollama 不可用時不 fallback 到 cloud。
+* Session 是 temporal inference，不代表實際工時、連續專注或成果品質；similarity 也不能證明工作重複、歷史答案正確或仍然適用。架構決策見 [ADR-006](docs/ADR-006-derived-context-sessions-and-related-history.md)。
+
 ---
 
 ## 🚀 快速開始
@@ -142,16 +147,18 @@ Wheel 尚未公開發布。Installed wheel 預設將 config、database 與 repor
 
 ### 2. 設定 LLM API 金鑰
 
-發布範本預設使用本機 `Ollama` 且關閉排程摘要。若主動選用 `Google Gemini`、Anthropic 或 OpenAI，請設定環境變數並在 `config.yaml` 指定 provider：
+發布範本預設使用本機 `Ollama` 且關閉排程摘要。若主動選用 `Google Gemini`、Anthropic 或 OpenAI，請把金鑰保存在作業系統環境變數；`config.yaml` 只保存 `api_key_env` 變數名稱，不保存明文金鑰。Dashboard「監控配置 → 摘要與排程」會顯示是否已偵測及來源，但不會把金鑰送到瀏覽器。
 
 ```bash
-# Windows PowerShell
-$env:GEMINI_API_KEY="your-gemini-api-key"
+# Windows PowerShell：持久保存於目前使用者環境
+[Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "your-gemini-api-key", "User")
 
 # 或若使用 Anthropic / OpenAI
-$env:ANTHROPIC_API_KEY="your-anthropic-api-key"
-$env:OPENAI_API_KEY="your-openai-api-key"
+[Environment]::SetEnvironmentVariable("ANTHROPIC_API_KEY", "your-anthropic-api-key", "User")
+[Environment]::SetEnvironmentVariable("OPENAI_API_KEY", "your-openai-api-key", "User")
 ```
+
+Windows 上即使 OmniContext 的父程序較早啟動，後端也會回讀 User／Machine environment；設定後可在配置頁按「重新檢查」。
 
 ### 3. 啟動 Web 儀表板與後台監控
 
@@ -190,6 +197,8 @@ OmniContext 支援完整的終端命令列操作：
 | `python main.py extension-path` | 顯示 Chrome/Edge Load unpacked 目錄 | `python main.py extension-path` |
 | `python main.py index` | 建立／增量更新本機 semantic index | `python main.py index --json` |
 | `python main.py ask` | 查詢自己的跨 AI／Repository 歷史並列出來源 | `python main.py ask "上次如何處理 rollback?" --project activityTracker` |
+| `python main.py sessions` | 將近期 evidence 整理為 derived work sessions | `python main.py sessions --project activityTracker --hours 72` |
+| `python main.py recall` | 查詢相似歷史工作，不保存 query | `python main.py recall "formal rollback rehearsal" --project activityTracker` |
 
 Installed wheel 可將表中的 `python main.py` 改為 `omnicontext` 或較短的 `omni`。
 
@@ -298,6 +307,7 @@ activityTracker/
 │   ├── data_lifecycle.py           # SQLite online backup 與 integrity receipt
 │   ├── project_engine.py           # 專案智能歸戶、多檔案聚合與未結事項引擎
 │   ├── semantic_index.py           # 本機 embeddings、provenance retrieval 與 omni ask
+│   ├── context_memory.py           # Related History 與 derived work-session grouping
 │   ├── fs_utils.py                 # 本機原生檔案總管/瀏覽對話框工具
 │   └── time_utils.py               # 統一本地時區解析工具
 │
@@ -365,7 +375,7 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 | 階段 | 內容 | 說明 |
 | :--- | :--- | :--- |
 | **P2.5** | 可信度與安全 hardening | API security boundary、ingestion provenance/finalization、Open Loop lifecycle、pytest 與跨平台基線 |
-| **P3** | 記憶層 | ✅ P3-1 Context Handoff；P3-2 本機語意檢索、P3-3 `omni ask`、重複工作偵測與 Session 敘事層待 P2.5 gate |
+| **P3** | 記憶層 | ✅ P3-1 Context Handoff、P3-2 本機語意檢索、P3-3 `omni ask`、P3-4 Related History、P3-5 derived Session 敘事層均完成 Alpha |
 | **P4** | 收集層補完 | 瀏覽器閱讀內容、行事曆與會議、終端機指令歷史、未 commit 的工作狀態 |
 | **P5** | 主動秘書 AI 與自主執行 | 主動情境推論與前瞻提案、三級安全守門員（L0/L1/L2）、Agent Dispatcher 調度自主執行、Telegram/Web 一鍵批准、晨間前瞻與晚間交接、`STATUS.yaml` 自動維護 |
 | **P6** | 開源整備 | `1.3.0a3` candidate、formal rollback，以及 Windows／Ubuntu／macOS × Python 3.10／3.12 GitHub Actions matrix 已通過；仍待 Extension live receipts 與發佈授權 |

@@ -29,9 +29,11 @@ from .security import (
 )
 from .extension_monitor import build_extension_status, record_extension_heartbeat
 from .capture_coverage import build_capture_coverage
+from .context_memory import build_recent_work_sessions, find_related_work
 from .usage_analytics import evaluate_daily_milestones, get_usage_summary
 from .time_utils import get_local_now
 from .runtime_paths import resolve_runtime_path, web_assets_dir
+from .secret_resolver import resolve_secret_env
 from .project_engine import (
     get_active_projects_list,
     get_open_loops_list,
@@ -207,6 +209,15 @@ class UsageMilestoneEvaluateRequest(BaseModel):
     dry_run: bool = Field(False, description="只回傳預覽，不發送通知或寫入 receipt")
 
 
+class RelatedMemoryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question: str = Field(..., min_length=2, max_length=4000)
+    project: Optional[str] = Field(None, max_length=255)
+    threshold: Optional[float] = Field(None, ge=0.0, le=1.0)
+    top_k: int = Field(8, ge=1, le=20)
+
+
 
 # =====================================================================
 # 1. 監控生命週期與控制 API
@@ -247,6 +258,40 @@ def get_today_usage(date_str: Optional[str] = Query(None, alias="date")):
 def get_capture_status():
     """分開回傳 focus、web 與 transcript coverage，避免以單一 ONLINE 誤導。"""
     return build_capture_coverage()
+
+
+@app.get("/api/v1/context/sessions")
+def get_context_sessions(
+    project: Optional[str] = Query(None, max_length=255),
+    hours: Optional[int] = Query(None, ge=1, le=2160),
+    gap_minutes: Optional[int] = Query(None, ge=5, le=1440),
+    limit: Optional[int] = Query(None, ge=1, le=50),
+):
+    return build_recent_work_sessions(
+        project=project,
+        hours=hours,
+        gap_minutes=gap_minutes,
+        limit=limit,
+    )
+
+
+@app.post("/api/v1/context/related")
+def get_related_context(payload: RelatedMemoryRequest):
+    try:
+        return find_related_work(
+            payload.question,
+            project=payload.project,
+            threshold=payload.threshold,
+            top_k=payload.top_k,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.warning("Local related-context retrieval unavailable: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=503,
+            detail="local_semantic_index_unavailable",
+        ) from exc
 
 
 @app.post("/api/v1/usage/milestones/evaluate")
@@ -405,6 +450,36 @@ def update_system_config(new_config: Dict[str, Any] = Body(...)):
         return {"status": "success", "message": "配置更新成功並已套用至監控引擎"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update config: {e}")
+
+
+@app.get("/api/v1/llm/status")
+def get_llm_secret_status():
+    """Report provider credential availability without returning secret values."""
+    cfg = get_config()
+    providers = {}
+    definitions = {
+        "gemini": ("GEMINI_API_KEY", ("GOOGLE_API_KEY",)),
+        "anthropic": ("ANTHROPIC_API_KEY", ()),
+        "openai": ("OPENAI_API_KEY", ()),
+    }
+    for provider, (default_env, aliases) in definitions.items():
+        env_name = str(
+            cfg.get(f"synthesizer.{provider}.api_key_env", default_env)
+            or default_env
+        )
+        providers[provider] = resolve_secret_env(env_name, aliases).public_status()
+
+    providers["ollama"] = {
+        "configured": True,
+        "source": "local_service",
+        "env_var": "",
+    }
+    selected = str(cfg.get("synthesizer.provider", "gemini") or "gemini").lower()
+    return {
+        "selected_provider": selected,
+        "providers": providers,
+        "secret_boundary": "status_only_no_secret_values",
+    }
 
 
 class OpenLoopCreate(BaseModel):

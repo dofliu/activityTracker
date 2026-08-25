@@ -1,10 +1,10 @@
 # OmniContext 使用說明
 
-> 適用版本：`1.3.0a3` Personal Alpha / P2.6 + P3 semantic memory + P6 cross-platform gate
+> 適用版本：`1.3.0a4` Personal Alpha / P2.6 + P3 context memory + P6 cross-platform gate
 >
 > 主要驗證平台：Windows 11、Python 3.12、Chrome/Edge MV3
 
-本文件提供可直接執行的安裝、啟動、Browser Extension 配對、每日使用、備份與故障排查流程。架構決策另見 [ADR-001](ADR-001-p2-5-trust-boundary.md)、[ADR-002](ADR-002-extension-monitor-and-usage-milestones.md)、[ADR-003](ADR-003-versioned-sqlite-migrations.md)、[ADR-004](ADR-004-packaged-runtime-layout.md) 與 [Release Checklist](RELEASE_CHECKLIST.md)。
+本文件提供可直接執行的安裝、啟動、Browser Extension 配對、每日使用、備份與故障排查流程。架構決策另見 [ADR-001](ADR-001-p2-5-trust-boundary.md)、[ADR-002](ADR-002-extension-monitor-and-usage-milestones.md)、[ADR-003](ADR-003-versioned-sqlite-migrations.md)、[ADR-004](ADR-004-packaged-runtime-layout.md)、[ADR-006](ADR-006-derived-context-sessions-and-related-history.md) 與 [Release Checklist](RELEASE_CHECKLIST.md)。
 
 ## 1. 安裝與初始化
 
@@ -49,6 +49,16 @@ Wheel 安裝可改用 `omnicontext init --watch "D:\Projects"`。
 - `config.yaml` 與 `omni_context.db` 包含本機路徑或私人資料，不應提交至 Git。
 
 ## 2. 啟動與確認服務
+
+### 2.1 LLM API key
+
+Cloud LLM key 應保存在作業系統環境變數，不放入 `config.yaml`。設定檔只記錄 `api_key_env` 名稱；Dashboard「監控配置 → 摘要與排程」只回報 `DETECTED / MISSING` 與來源，不會取得或顯示 secret value。
+
+```powershell
+[Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "your-gemini-api-key", "User")
+```
+
+Windows 上長時間執行的 launcher 可能持有較舊的 Process environment。OmniContext 會先讀 Process environment，找不到時再回讀 Windows User／Machine environment；設定後可按「重新檢查」，不需要把 key 貼到瀏覽器表單。
 
 ```powershell
 python main.py run
@@ -197,6 +207,20 @@ omni ask "activityTracker 最近有哪些可靠性改善？" --project activityT
 ```
 
 `semantic_index.allow_remote` 預設為 `false`，embedding 與 ask generation 只接受 loopback URL。Similarity 只做 evidence ranking；CLI 的 `source_ref`、trust status 與 `embedding_input_mode` 才是回查線索，不代表來源內容已被外部驗證。
+
+### 整理工作階段與查詢相似歷史
+
+```powershell
+# 依 project + inactivity gap 整理最近 72 小時 evidence
+omni sessions --project activityTracker --hours 72
+
+# 從本機 semantic index 查相似歷史；query 不會寫入 SQLite
+omni recall "formal rollback rehearsal" --project activityTracker
+```
+
+Dashboard「進行中工作」會同步顯示 `RECENT WORK SESSIONS` 與 `RELATED HISTORY`。Session 只納入能可靠歸戶的 AI、Git 與 file metadata；Window focus 尚未具備 canonical project identity，因此不混入 session。預設 gap 45 分鐘、related threshold 0.50，可在 `context_memory` 設定調整。0.50 是目前 `bge-m3` + 本機語料的 Alpha 起點，不是通用或真實性門檻。
+
+若本機 Ollama 或 semantic index 不可用，Related History 會明確顯示 unavailable，不改送 cloud。Session 的 span 只是首末事件時間差，不代表實際工時、專注度或任務連續性。
 
 ### 建立工作快照與摘要
 

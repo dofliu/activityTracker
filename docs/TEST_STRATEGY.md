@@ -85,6 +85,7 @@ python main.py extension-path
 - Interval clipping、exact dedupe、overlap resolution、跨午夜拆分與空集合。
 - AI interaction count 與 foreground duration 分離。
 - Milestone 門檻、quiet hours、disabled state 與 notification message tone。
+- Secret resolver 優先使用目前 Process 環境，Windows 才允許 fallback 到 User／Machine registry；無效的環境變數名稱必須 fail-closed。
 
 ### Integration tests
 
@@ -92,6 +93,7 @@ python main.py extension-path
 - `POST /api/v1/usage/milestones/evaluate` 在相同日期／門檻重送時不建立第二筆 receipt。
 - `GET /api/v1/extension/status` 不洩漏 token，並區分 configured、enabled、observed event。
 - `GET /api/v1/capture/status` 必須分開回傳 Desktop Focus、Web Capture、Transcript，且不得輸出 prompt、response、URL 或本機 path。
+- `GET /api/v1/llm/status` 只能回傳 configured、source 與環境變數名稱，不得回傳 API key；Windows 長時間執行的舊 Process 仍可安全偵測後來建立的 User／Machine key。
 - Extension origin 未帶或帶錯 token 時 pairing probe 為 403；正確 token 才可通過。
 - `POST /api/v1/extension/heartbeat` 即使沒有 Origin 也必須要求 token；payload 不得包含 URL、Prompt、Response 或 token。
 - Heartbeat receipt 必須區分 recent/stale；離開 SQLAlchemy session 後仍可安全產生 status snapshot。
@@ -104,16 +106,23 @@ python main.py extension-path
 - 主頁不得重複顯示完整 Extension Monitor；token、heartbeat 與逐站診斷只保留在 `/extension-monitor`。
 - popup 分開顯示 service health 與 token pairing status。
 - MV3 background 必須使用 `chrome.alarms`，每個 content script 回報 ready，console 不得輸出 Prompt preview。
+- 監控配置的通用欄位寬度規則不得套用到 checkbox；desktop、tablet 與窄螢幕都必須維持水平標籤且無水平 overflow。
 - Windows live API 與 dashboard render smoke；macOS/Linux 驗證 `unavailable` graceful degradation。
 
-## P3 Semantic Index / `omni ask` Matrix
+## P3 Semantic Index / `omni ask` / Context Memory Matrix
 
 - Fresh/legacy DB 必須到 schema 7/7；`semantic_documents` source identity 唯一且 embedding input mode 可追溯。
 - AI response 只有 `final_candidate` 可進入 response evidence；partial/legacy response 不得升格。
 - Incremental rerun 必須以 content hash/model 跳過未變來源；成功 batch 原子提交，中斷後可續跑。
 - Ollama URL 預設 loopback-only；remote URL 在 `allow_remote=false` 時 fail-closed。
 - Retrieval 每筆保留 SQLite `source_ref`、project、timestamp、trust、score；similarity 不作 truth/coverage claim。
+- Derived session 必須以 project + inactivity gap deterministic 分群；跨 project／超過 gap 必須切開，同一 session 成長時 ID 不變。
+- Session item 必須保留 `source_ref` 與 trust status；Window focus 無 canonical project 時明確排除，span 不得宣稱為工時或專注度。
+- Related History query 不持久化、不 fallback 到 cloud；結果保留 score/source/trust，門檻以下必須回報 `no_strong_match` 而不是「歷史不存在」。
+- API request 採 `extra=forbid`；Ollama/index unavailable 時回傳明確 503，Dashboard graceful degradation。
 - 真實 Windows Alpha receipt：`bge-m3` 1024 維、4,102/4,102、3 筆可見 `ascii_fallback`、第二次 `0 changed / 4102 unchanged`；`llama3.1:8b` 回答含 `[S1]` citations。
+- Context Memory live smoke：24 小時 332 筆可歸戶 observations；session view 正常。Related query top score 約 0.50–0.59，明顯無關 query 約 0.33–0.35；0.50 只作本 corpus Alpha 起點。
+- Dashboard E2E 必須以真實點擊觸發 Related History，確認來源／score／trust 可見且 console 無 error；窄螢幕需驗證 Context Memory 收成單欄、頂部操作列換行且整頁無水平 overflow。
 
 ## Platform CI Matrix
 

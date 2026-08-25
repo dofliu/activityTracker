@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **Current status: Personal Alpha.** Windows milestone WinRT Toast E2E, schema 7/7, formal package+database rollback, P3-2/P3-3, and the cross-platform CI matrix have passed. ChatGPT live DOM selectors were repaired, and Claude Desktop Cowork/local-agent transcript capture passed a Windows E2E. Authenticated Claude.ai/Manus Browser capture and a live Extension heartbeat still lack receipts, so this is not release-ready.
+> **Current status: Personal Alpha.** Windows milestone WinRT Toast E2E, schema 7/7, formal package+database rollback, P3-2 through P3-5 Context Memory Alpha, and the cross-platform CI matrix have passed. ChatGPT live DOM selectors were repaired, and Claude Desktop Cowork/local-agent transcript capture passed a Windows E2E. Authenticated Claude.ai/Manus Browser capture and a live Extension heartbeat still lack receipts, so this is not release-ready.
 
 **Documentation:** [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
 
@@ -103,6 +103,11 @@ It is purpose-built to answer three fundamental questions at any moment:
 * Incremental updates use content hashes and retain SQLite source references, project, time, trust status, and embedding-input degradation provenance.
 * `omni ask` supports retrieval-only mode or a local Ollama answer with `[S1]` citations. Similarity is not source validation or proof of coverage.
 
+### 9. 🔗 Related History and Derived Work Sessions (P3-4 / P3-5 Alpha)
+* `Recent Work Sessions` derives project-scoped clusters from AI turns, Git commits, and file events using a configurable inactivity gap. It is a read-only view and adds no new session table.
+* `Related History` searches the local semantic index from the dashboard or CLI, returns traceable source references and trust status, and does not persist the query.
+* Session grouping is not actual work time, focus, or productivity. Similarity is not proof that work is duplicated, correct, or reusable.
+
 ---
 
 ## 🚀 Getting Started
@@ -178,6 +183,8 @@ For Extension pairing, milestone configuration, backups, and troubleshooting, se
 | `python main.py extension-path` | Print the Chrome/Edge Load unpacked directory | `python main.py extension-path` |
 | `python main.py index` | Build or incrementally update the local semantic index | `python main.py index --json` |
 | `python main.py ask` | Ask cross-AI/repository history with traceable sources | `python main.py ask "How did rollback work?" --project activityTracker` |
+| `python main.py sessions` | Derive recent project work sessions from existing observations | `python main.py sessions --project activityTracker --hours 24` |
+| `python main.py recall` | Find related local history without storing the query | `python main.py recall "rollback rehearsal" --project activityTracker` |
 
 With an installed wheel, replace `python main.py` with `omnicontext` or `omni`.
 
@@ -281,6 +288,7 @@ activityTracker/
 │   ├── data_lifecycle.py           # SQLite online backup and integrity receipt
 │   ├── project_engine.py           # Canonical project resolver & open loop engine
 │   ├── semantic_index.py           # Local embeddings, provenance retrieval, and omni ask
+│   ├── context_memory.py            # Derived work sessions and related-history retrieval
 │   ├── fs_utils.py                 # Native Windows folder picker utilities
 │   └── time_utils.py               # Unified timezone helpers
 │
@@ -312,7 +320,8 @@ activityTracker/
 │   ├── install_autostart.ps1       # Windows startup scheduler installer
 │   └── uninstall_autostart.ps1     # Uninstaller script
 ├── tests/                          # Security/data/lifecycle/portability contracts
-├── docs/                           # ADR and test strategy
+├── docs/                           # ADR, usage, and test strategy
+│   └── ADR-006-derived-context-sessions-and-related-history.md
 │
 ├── logs/checkpoints/               # Periodic activity checkpoint logs
 └── reports/                        # Daily & range Markdown reports

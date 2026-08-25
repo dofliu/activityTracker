@@ -1,8 +1,7 @@
-import os
-import json
 import logging
 from typing import Optional
 from core.config import get_config
+from core.secret_resolver import resolve_secret_env
 
 logger = logging.getLogger("OmniContext.LLMClient")
 
@@ -36,7 +35,7 @@ class LLMClient:
 
     def _call_gemini(self, system_prompt: str, user_prompt: str) -> str:
         api_key_env = self.cfg.get("synthesizer.gemini.api_key_env", "GEMINI_API_KEY")
-        api_key = os.environ.get(api_key_env) or os.environ.get("GOOGLE_API_KEY")
+        api_key = resolve_secret_env(api_key_env, aliases=("GOOGLE_API_KEY",)).value
         model_name = self.cfg.get("synthesizer.gemini.model", "gemini-2.5-flash")
 
         if not api_key:
@@ -65,7 +64,7 @@ class LLMClient:
     def _call_anthropic(self, system_prompt: str, user_prompt: str) -> str:
         import anthropic
         api_key_env = self.cfg.get("synthesizer.anthropic.api_key_env", "ANTHROPIC_API_KEY")
-        api_key = os.environ.get(api_key_env)
+        api_key = resolve_secret_env(api_key_env).value
         model_name = self.cfg.get("synthesizer.anthropic.model", "claude-3-5-sonnet-20241022")
 
         if not api_key:
@@ -83,7 +82,7 @@ class LLMClient:
     def _call_openai(self, system_prompt: str, user_prompt: str) -> str:
         from openai import OpenAI
         api_key_env = self.cfg.get("synthesizer.openai.api_key_env", "OPENAI_API_KEY")
-        api_key = os.environ.get(api_key_env)
+        api_key = resolve_secret_env(api_key_env).value
         model_name = self.cfg.get("synthesizer.openai.model", "gpt-4o")
 
         if not api_key:
@@ -121,7 +120,7 @@ class LLMClient:
 
 > [!NOTE]
 > 偵測到尚未設定 LLM API 金鑰 (錯誤訊息: `{error_msg}`)。
-> 請在環境變數或 `config.yaml` 中設定對應金鑰以啟用完整的 AI 深度洞察。
+> 請在作業系統環境變數設定對應金鑰，並在 `config.yaml` 以 `api_key_env` 指定變數名稱。
 > 以下為基於本地數據庫的原始活動結構清單：
 
 ---

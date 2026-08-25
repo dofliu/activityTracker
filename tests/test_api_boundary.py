@@ -6,6 +6,7 @@ from core.server import (
     browser_response_status,
     get_system_config,
 )
+from core.secret_resolver import SecretResolution
 
 
 client = TestClient(app)
@@ -35,6 +36,28 @@ def test_empty_config_keeps_public_secret_field_contract(monkeypatch):
 
     assert payload["integrations"]["github"]["token"] == ""
     assert payload["security"]["browser_extension_ingest_token"] == ""
+
+
+def test_llm_status_exposes_source_but_never_secret(monkeypatch):
+    monkeypatch.setattr(
+        "core.server.resolve_secret_env",
+        lambda name, aliases=(): SecretResolution(
+            value="test-secret-never-returned",
+            source="windows_user",
+            env_var=name,
+        ),
+    )
+    response = client.get(
+        "/api/v1/llm/status",
+        headers={"Origin": "http://127.0.0.1:8765"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["providers"]["gemini"]["configured"] is True
+    assert payload["providers"]["gemini"]["source"] == "windows_user"
+    assert "test-secret-never-returned" not in response.text
+    assert "value" not in payload["providers"]["gemini"]
 
 
 def test_extension_ingest_without_token_is_denied():
@@ -163,6 +186,51 @@ def test_capture_status_api_exposes_separate_channels_without_sensitive_content(
     assert "source_path" not in response.text
 
 
+def test_context_sessions_api_keeps_temporal_inference_boundary(monkeypatch):
+    monkeypatch.setattr(
+        "core.server.build_recent_work_sessions",
+        lambda **_kwargs: {
+            "status": "observed",
+            "sessions": [{"session_id": "abc", "inference_status": "temporal_grouping"}],
+            "claim_boundary": "not productivity or task continuity",
+        },
+    )
+    response = client.get(
+        "/api/v1/context/sessions?hours=24&limit=4",
+        headers={"Origin": "http://127.0.0.1:8765"},
+    )
+    assert response.status_code == 200
+    assert response.json()["sessions"][0]["inference_status"] == "temporal_grouping"
+    assert "not productivity" in response.json()["claim_boundary"]
+
+
+def test_related_context_api_is_local_advisory_and_rejects_extra_fields(monkeypatch):
+    monkeypatch.setattr(
+        "core.server.find_related_work",
+        lambda question, **_kwargs: {
+            "status": "related_history_found",
+            "question": question,
+            "query_persisted": False,
+            "matches": [{"source_ref": "ai_prompt_events:7", "score": 0.91}],
+            "claim_boundary": "similarity is not truth",
+        },
+    )
+    response = client.post(
+        "/api/v1/context/related",
+        headers={"Origin": "http://127.0.0.1:8765"},
+        json={"question": "rollback rehearsal", "threshold": 0.8},
+    )
+    rejected = client.post(
+        "/api/v1/context/related",
+        headers={"Origin": "http://127.0.0.1:8765"},
+        json={"question": "rollback rehearsal", "secret": "must-not-be-accepted"},
+    )
+    assert response.status_code == 200
+    assert response.json()["query_persisted"] is False
+    assert response.json()["matches"][0]["source_ref"] == "ai_prompt_events:7"
+    assert rejected.status_code == 422
+
+
 def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     monitor = client.get(
         "/extension-monitor",
@@ -182,11 +250,18 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     assert dashboard.status_code == 200
     assert "usage-goal-value" in dashboard.text
     assert "capture-coverage-list" in dashboard.text
+    assert "llm-key-status-badge" in dashboard.text
+    assert "context-sessions-list" in dashboard.text
+    assert "input-related-question" in dashboard.text
     assert "DATA CAPTURE" in dashboard.text
     assert "extension-capture-badge" not in dashboard.text
-    assert "style.css?v=1.3.0a4-ui3" in dashboard.text
-    assert "app.js?v=1.3.0a4-ui3" in dashboard.text
+    assert "style.css?v=1.3.0a4-ui6" in dashboard.text
+    assert "app.js?v=1.3.0a4-ui6" in dashboard.text
     assert "/extension-monitor" in dashboard.text
+    stylesheet = client.get("/static/style.css")
+    assert stylesheet.status_code == 200
+    assert 'input:not([type="checkbox"])' in stylesheet.text
+    assert ".usage-toggle-row" in stylesheet.text
 
 
 def test_checkpoint_path_traversal_is_denied():
