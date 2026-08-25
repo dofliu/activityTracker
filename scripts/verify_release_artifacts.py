@@ -12,6 +12,8 @@ from pathlib import Path
 
 
 WHEEL_REQUIRED_SUFFIXES = (
+    "core/capture_coverage.py",
+    "core/desktop_sources.py",
     "core/runtime_paths.py",
     "core/semantic_index.py",
     "scripts/verify_installed_package.py",
@@ -31,6 +33,8 @@ WHEEL_REQUIRED_SUFFIXES = (
 SDIST_REQUIRED_SUFFIXES = (
     "/MANIFEST.in",
     "/config.example.yaml",
+    "/core/capture_coverage.py",
+    "/core/desktop_sources.py",
     "/core/runtime_paths.py",
     "/core/semantic_index.py",
     "/scripts/verify_installed_package.py",

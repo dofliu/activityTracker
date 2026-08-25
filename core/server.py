@@ -28,6 +28,7 @@ from .security import (
     redact_config,
 )
 from .extension_monitor import build_extension_status, record_extension_heartbeat
+from .capture_coverage import build_capture_coverage
 from .usage_analytics import evaluate_daily_milestones, get_usage_summary
 from .time_utils import get_local_now
 from .runtime_paths import resolve_runtime_path, web_assets_dir
@@ -240,6 +241,12 @@ def get_today_usage(date_str: Optional[str] = Query(None, alias="date")):
         return get_usage_summary(date_str, manager_status=manager_status)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="date must use YYYY-MM-DD") from exc
+
+
+@app.get("/api/v1/capture/status")
+def get_capture_status():
+    """分開回傳 focus、web 與 transcript coverage，避免以單一 ONLINE 誤導。"""
+    return build_capture_coverage()
 
 
 @app.post("/api/v1/usage/milestones/evaluate")

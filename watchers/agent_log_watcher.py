@@ -5,12 +5,16 @@ import time
 import hashlib
 import threading
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from typing import Set, Dict, Any, Optional, List, Tuple
 
 from core.config import get_config
 from core.database import get_db
+from core.desktop_sources import (
+    default_claude_desktop_logs_dir,
+    iter_claude_desktop_project_logs,
+)
 from core.models import AIPromptEvent, IngestionCheckpoint
 from core.time_utils import get_local_now
 
@@ -249,7 +253,7 @@ class AgentLogWatcherService:
         self._running = True
         self._thread = threading.Thread(target=self._scan_loop, daemon=True)
         self._thread.start()
-        logger.info("AgentLogWatcher service started (Claude Code, Codex sessions, Antigravity with Assistant response parsing).")
+        logger.info("AgentLogWatcher service started (Claude Desktop, Claude Code, Codex sessions, Antigravity with Assistant response parsing).")
 
     def stop(self):
         self._running = False
@@ -335,6 +339,11 @@ class AgentLogWatcherService:
         else:
             logger.debug("Claude Code watcher is disabled in config.")
 
+        if cfg.get("watchers.agent_log_watcher.claude_desktop", True):
+            self.scan_claude_desktop_logs(full_history=full_history)
+        else:
+            logger.debug("Claude Desktop watcher is disabled in config.")
+
         if cfg.get("watchers.agent_log_watcher.codex", True):
             self.scan_codex_logs(full_history=full_history)
         else:
@@ -356,7 +365,6 @@ class AgentLogWatcherService:
         if not claude_dir.exists():
             return
 
-        db = get_db()
         projects_dir = claude_dir / "projects"
         project_files = list(projects_dir.glob("**/*.jsonl")) if projects_dir.exists() else []
         has_project_logs = bool(project_files)
@@ -368,73 +376,7 @@ class AgentLogWatcherService:
                     continue
 
                 try:
-                    current_user_prompt = ""
-                    current_user_time = None
-                    current_cwd = None
-                    current_session_id = None
-                    current_user_position = None
-                    accumulated_responses: List[str] = []
-                    explicit_final_responses: List[str] = []
-
-                    for line_number, item in iter_jsonl_records(proj_jsonl):
-                        msg_type = item.get("type")
-                        ts = parse_timestamp_safe(item.get("timestamp") or item.get("createdAt"))
-
-                        if msg_type == "user":
-                            msg = item.get("message", {})
-                            content = msg.get("content") if isinstance(msg, dict) else item.get("content")
-                            user_text = extract_claude_user_text(content)
-
-                            if user_text and len(user_text) >= 2:
-                                if current_user_prompt and current_user_time:
-                                    explicit_final = select_last_assistant_message(explicit_final_responses)
-                                    full_resp = explicit_final or select_last_assistant_message(accumulated_responses) or None
-                                    self._upsert_ai_event(
-                                        db, platform="claude_code", conv_id=current_session_id,
-                                        prompt=current_user_prompt, response=full_resp,
-                                        cwd=current_cwd, timestamp=current_user_time,
-                                        turn_key=build_turn_key("claude_code", str(proj_jsonl), current_user_position or 0),
-                                        source_path=str(proj_jsonl.resolve()),
-                                        source_position=current_user_position,
-                                        response_status=classify_response_status(
-                                            full_resp,
-                                            explicit_final=bool(explicit_final),
-                                            boundary_closed=True,
-                                        ),
-                                    )
-                                current_user_prompt = user_text
-                                current_user_time = ts or get_local_now()
-                                current_cwd = item.get("cwd") or str(proj_jsonl.parent)
-                                current_session_id = item.get("sessionId")
-                                current_user_position = line_number
-                                accumulated_responses = []
-                                explicit_final_responses = []
-
-                        elif msg_type == "assistant":
-                            msg = item.get("message", {})
-                            content = msg.get("content") if isinstance(msg, dict) else item.get("content")
-                            assistant_text = extract_claude_assistant_text(content)
-                            if assistant_text and not assistant_text.startswith("["):
-                                accumulated_responses.append(assistant_text)
-                                if isinstance(msg, dict) and msg.get("stop_reason") == "end_turn":
-                                    explicit_final_responses.append(assistant_text)
-                    # 處理最後一筆
-                    if current_user_prompt and current_user_time:
-                        explicit_final = select_last_assistant_message(explicit_final_responses)
-                        full_resp = explicit_final or select_last_assistant_message(accumulated_responses) or None
-                        self._upsert_ai_event(
-                            db, platform="claude_code", conv_id=current_session_id,
-                            prompt=current_user_prompt, response=full_resp,
-                            cwd=current_cwd, timestamp=current_user_time,
-                            turn_key=build_turn_key("claude_code", str(proj_jsonl), current_user_position or 0),
-                            source_path=str(proj_jsonl.resolve()),
-                            source_position=current_user_position,
-                            response_status=classify_response_status(
-                                full_resp,
-                                explicit_final=bool(explicit_final),
-                                boundary_closed=False,
-                            ),
-                        )
+                    self._parse_claude_project_log(get_db(), proj_jsonl, platform="claude_code")
                     self._mark_file_scanned(proj_jsonl)
                 except Exception as e:
                     self._mark_file_scanned(proj_jsonl, str(e))
@@ -444,6 +386,7 @@ class AgentLogWatcherService:
         history_file = claude_dir / "history.jsonl"
         if not has_project_logs and history_file.exists() and self._should_scan_file(history_file, full_history):
             try:
+                db = get_db()
                 for line_number, item in iter_jsonl_records(history_file):
                     prompt_text = item.get("display") or item.get("text") or item.get("prompt")
                     if not prompt_text or len(prompt_text.strip()) < 2:
@@ -474,6 +417,98 @@ class AgentLogWatcherService:
             except Exception as e:
                 self._mark_file_scanned(history_file, str(e))
                 logger.debug(f"Error reading Claude history.jsonl: {e}")
+
+    def scan_claude_desktop_logs(self, full_history: bool = False):
+        """採集 Claude Desktop Cowork/local-agent transcript；不解析雲端聊天 LevelDB cache。"""
+        logs_dir = self.cfg.get_path(
+            "watchers.agent_log_watcher.claude_desktop_logs_path",
+            default_claude_desktop_logs_dir(),
+        )
+        if not logs_dir.exists():
+            return
+
+        db = get_db()
+        lookback_days = max(
+            1,
+            int(self.cfg.get("watchers.agent_log_watcher.claude_desktop_initial_lookback_days", 7)),
+        )
+        initial_cutoff = get_local_now() - timedelta(days=lookback_days)
+        for transcript in iter_claude_desktop_project_logs(logs_dir):
+            # 首次啟用只回補近期資料，避免啟動時一次讀取多年、數 GB 的 session 複本；
+            # full_history 仍提供明確、可稽核的全量回補途徑。
+            if not full_history:
+                try:
+                    if datetime.fromtimestamp(transcript.stat().st_mtime) < initial_cutoff:
+                        continue
+                except OSError:
+                    continue
+            if not self._should_scan_file(transcript, full_history):
+                continue
+            try:
+                self._parse_claude_project_log(db, transcript, platform="claude_desktop")
+                self._mark_file_scanned(transcript)
+            except Exception as exc:
+                self._mark_file_scanned(transcript, str(exc))
+                logger.debug(f"Error reading Claude Desktop project log {transcript}: {exc}")
+
+    def _parse_claude_project_log(self, db, project_log: Path, *, platform: str) -> None:
+        """將 Claude JSONL 依 user boundary 配對，供 CLI 與 Desktop 共用。"""
+        current_user_prompt = ""
+        current_user_time = None
+        current_cwd = None
+        current_session_id = None
+        current_user_position = None
+        accumulated_responses: List[str] = []
+        explicit_final_responses: List[str] = []
+
+        def flush_turn(*, boundary_closed: bool) -> None:
+            if not current_user_prompt or not current_user_time:
+                return
+            explicit_final = select_last_assistant_message(explicit_final_responses)
+            full_response = explicit_final or select_last_assistant_message(accumulated_responses) or None
+            self._upsert_ai_event(
+                db,
+                platform=platform,
+                conv_id=current_session_id,
+                prompt=current_user_prompt,
+                response=full_response,
+                cwd=current_cwd,
+                timestamp=current_user_time,
+                turn_key=build_turn_key(platform, str(project_log), current_user_position or 0),
+                source_path=str(project_log.resolve()),
+                source_position=current_user_position,
+                response_status=classify_response_status(
+                    full_response,
+                    explicit_final=bool(explicit_final),
+                    boundary_closed=boundary_closed,
+                ),
+            )
+
+        for line_number, item in iter_jsonl_records(project_log):
+            msg_type = item.get("type")
+            timestamp = parse_timestamp_safe(item.get("timestamp") or item.get("createdAt"))
+            message = item.get("message", {})
+            content = message.get("content") if isinstance(message, dict) else item.get("content")
+
+            if msg_type == "user":
+                user_text = extract_claude_user_text(content)
+                if user_text and len(user_text) >= 2:
+                    flush_turn(boundary_closed=True)
+                    current_user_prompt = user_text
+                    current_user_time = timestamp or get_local_now()
+                    current_cwd = item.get("cwd") or str(project_log.parent)
+                    current_session_id = item.get("sessionId")
+                    current_user_position = line_number
+                    accumulated_responses = []
+                    explicit_final_responses = []
+            elif msg_type == "assistant":
+                assistant_text = extract_claude_assistant_text(content)
+                if assistant_text and not assistant_text.startswith("["):
+                    accumulated_responses.append(assistant_text)
+                    if isinstance(message, dict) and message.get("stop_reason") == "end_turn":
+                        explicit_final_responses.append(assistant_text)
+
+        flush_turn(boundary_closed=False)
 
     # =========================================================================
     # 2. Codex 日誌與 Sessions 全量解析 (支援 2025/2026 所有 Session 與 Assistant 回應)

@@ -60,7 +60,11 @@ watchers:
     enabled: true
     antigravity_logs_path: ~/.gemini/antigravity/brain
     claude_code_logs_path: ~/.claude
+    # 留空時依 Windows/macOS/Linux 自動偵測 Claude Desktop local-agent-mode-sessions
+    # claude_desktop_logs_path: C:/Users/you/AppData/Roaming/Claude/local-agent-mode-sessions
+    claude_desktop_initial_lookback_days: 7
     claude_code: true
+    claude_desktop: true
     codex: true
     antigravity: true
   browser:

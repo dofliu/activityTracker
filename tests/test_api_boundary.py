@@ -136,6 +136,33 @@ def test_usage_api_exposes_claim_and_coverage_contract(monkeypatch):
     assert response.json()["metric_label"] == "foreground_active_time"
 
 
+def test_capture_status_api_exposes_separate_channels_without_sensitive_content(monkeypatch):
+    monkeypatch.setattr(
+        "core.server.build_capture_coverage",
+        lambda: {
+            "platforms": [
+                {
+                    "key": "claude",
+                    "desktop_focus": {"state": "observed"},
+                    "web_capture": {"state": "waiting"},
+                    "transcript_capture": {"state": "observed"},
+                }
+            ],
+            "claim_boundary": "separate channels",
+        },
+    )
+    response = client.get(
+        "/api/v1/capture/status",
+        headers={"Origin": "http://127.0.0.1:8765"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["platforms"][0]["desktop_focus"]["state"] == "observed"
+    assert payload["platforms"][0]["web_capture"]["state"] == "waiting"
+    assert "prompt_text" not in response.text
+    assert "source_path" not in response.text
+
+
 def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     monitor = client.get(
         "/extension-monitor",
@@ -154,6 +181,11 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     assert "/api/v1/extension/status" in monitor.text
     assert dashboard.status_code == 200
     assert "usage-goal-value" in dashboard.text
+    assert "capture-coverage-list" in dashboard.text
+    assert "DATA CAPTURE" in dashboard.text
+    assert "extension-capture-badge" not in dashboard.text
+    assert "style.css?v=1.3.0a4-ui3" in dashboard.text
+    assert "app.js?v=1.3.0a4-ui3" in dashboard.text
     assert "/extension-monitor" in dashboard.text
 
 

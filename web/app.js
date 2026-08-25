@@ -85,6 +85,8 @@ const I18N = {
     usage_goal_label: "AI 協作前景使用時間",
     extension_monitor_title: "EXTENSION MONITOR",
     btn_open_monitor: "開啟完整監控",
+    capture_status_title: "DATA CAPTURE",
+    btn_extension_details: "診斷",
     extension_pairing_boundary: "localhost 可觀察採集狀態；ingest token 仍由 Extension popup 安全保存。",
     settings_usage_title: "每日使用時間與里程碑",
     settings_usage_note: "前景時間，不代表生產力或實際工時",
@@ -210,6 +212,8 @@ const I18N = {
     usage_goal_label: "AI collaboration foreground time",
     extension_monitor_title: "EXTENSION MONITOR",
     btn_open_monitor: "Open Full Monitor",
+    capture_status_title: "DATA CAPTURE",
+    btn_extension_details: "Details",
     extension_pairing_boundary: "localhost can observe capture state; the ingest token remains in the Extension popup.",
     settings_usage_title: "Daily Usage & Milestones",
     settings_usage_note: "Foreground time, not productivity or actual work hours",
@@ -453,14 +457,18 @@ function formatUsageDuration(seconds) {
 }
 
 async function loadUsagePanels() {
-  const [usageResult, extensionResult] = await Promise.allSettled([
+  const [usageResult, extensionResult, captureResult] = await Promise.allSettled([
     getJSON("/api/v1/usage/today"),
-    getJSON("/api/v1/extension/status")
+    getJSON("/api/v1/extension/status"),
+    getJSON("/api/v1/capture/status")
   ]);
   if (usageResult.status === "fulfilled") renderUsagePanel(usageResult.value);
   else renderUsagePanelError();
-  if (extensionResult.status === "fulfilled") renderExtensionPanel(extensionResult.value);
-  else renderExtensionPanelError();
+  if (captureResult.status === "fulfilled") renderCaptureCoverage(
+    captureResult.value,
+    extensionResult.status === "fulfilled" ? extensionResult.value : null
+  );
+  else renderCaptureCoverageError();
 }
 
 function renderUsagePanel(data) {
@@ -499,31 +507,54 @@ function renderUsagePanelError() {
   $("usage-interface-list").innerHTML = `<div class="placeholder">${currentLang === "zh-TW" ? "無法載入使用時間。" : "Unable to load usage data."}</div>`;
 }
 
-function renderExtensionPanel(data) {
-  const extension = data.extension || {};
-  const observed = extension.capture_status === "observed";
-  const paired = extension.heartbeat_verified === true;
-  const badge = $("extension-capture-badge");
-  badge.className = "trust " + (observed || paired ? "ok" : "noisy");
-  badge.textContent = observed ? "OBSERVED" : paired ? "PAIRED" : "UNVERIFIED";
-  const last = extension.last_capture_at ? new Date(extension.last_capture_at).toLocaleString() : "—";
-  const heartbeat = extension.last_heartbeat_at ? new Date(extension.last_heartbeat_at).toLocaleString() : "—";
-  $("extension-summary-text").textContent = currentLang === "zh-TW"
-    ? `Server token：${extension.token_configured ? "已設定" : "未設定"}；Heartbeat：${heartbeat}；今日 Browser events：${extension.events_today || 0}；最後採集：${last}`
-    : `Server token: ${extension.token_configured ? "configured" : "missing"}; heartbeat: ${heartbeat}; browser events today: ${extension.events_today || 0}; last capture: ${last}`;
-  $("extension-platform-list").innerHTML = (data.platforms || []).map(item => {
-    const state = !item.enabled ? "OFF" : item.observation_status === "observed" ? "OBSERVED" : item.content_script_seen ? "CONTENT READY" : "WAITING";
-    return `<div class="extension-platform">
-      <div class="extension-platform-top"><span>${esc(item.label)}</span><span class="${state === "OBSERVED" ? "accent" : "muted"}">${state}</span></div>
-      <div class="extension-platform-sub">today ${Number(item.events_today || 0)} · total ${Number(item.events_total || 0)}</div>
-    </div>`;
-  }).join("");
+function captureStateLabel(state) {
+  const labels = currentLang === "zh-TW" ? {
+    observed: "已觀察", waiting: "等待資料", available_waiting: "可讀取／待掃描",
+    cache_detected_unparsed: "快取存在／未解析", unsupported: "目前不支援", not_applicable: "不適用"
+  } : {
+    observed: "OBSERVED", waiting: "WAITING", available_waiting: "READY TO SCAN",
+    cache_detected_unparsed: "CACHE / UNPARSED", unsupported: "UNSUPPORTED", not_applicable: "N/A"
+  };
+  return labels[state] || String(state || "UNKNOWN").toUpperCase();
 }
 
-function renderExtensionPanelError() {
-  $("extension-capture-badge").className = "trust broken";
-  $("extension-capture-badge").textContent = "OFFLINE";
-  $("extension-summary-text").textContent = currentLang === "zh-TW" ? "無法取得 Extension Monitor 狀態。" : "Extension Monitor is unavailable.";
+function renderCaptureCoverage(data, extensionData) {
+  const platforms = data.platforms || [];
+  const observed = platforms.reduce((total, item) => total + [item.desktop_focus, item.web_capture, item.transcript_capture].filter(channel => channel.state === "observed").length, 0);
+  const badge = $("capture-coverage-badge");
+  badge.className = "trust " + (observed > 0 ? "ok" : "noisy");
+  badge.textContent = `${observed} OBSERVED`;
+  const extension = (extensionData && extensionData.extension) || null;
+  $("capture-extension-summary").textContent = extension
+    ? (currentLang === "zh-TW"
+      ? `Browser Extension：今日 ${Number(extension.events_today || 0)} events · ${extension.heartbeat_verified ? "近期已連線" : "尚無近期 heartbeat"}`
+      : `Browser Extension: ${Number(extension.events_today || 0)} events today · ${extension.heartbeat_verified ? "recent heartbeat" : "no recent heartbeat"}`)
+    : (currentLang === "zh-TW" ? "Browser Extension 狀態目前無法取得。" : "Browser Extension status is unavailable.");
+  const signal = (label, item, detail) => `<div class="capture-signal ${esc(item.state || "waiting")}" title="${esc(captureStateLabel(item.state))}">
+    <span class="capture-signal-label">${label}</span>
+    <span class="capture-signal-value">${detail}</span>
+  </div>`;
+  $("capture-coverage-list").innerHTML = platforms.map(item => {
+    const focus = item.desktop_focus || {};
+    const web = item.web_capture || {};
+    const transcript = item.transcript_capture || {};
+    return `<div class="capture-coverage-row">
+      <div class="capture-platform-name">${esc(item.label)}</div>
+      ${signal("FOCUS", focus, focus.state === "observed" ? formatUsageDuration(focus.foreground_seconds_today || 0) : "—")}
+      ${signal("WEB", web, web.state === "observed" ? `${Number(web.turns_today || 0)} / ${Number(web.responses_today || 0)}` : "—")}
+      ${signal("LOG", transcript, transcript.state === "observed" ? `${Number(transcript.turns_today || 0)} / ${Number(transcript.responses_today || 0)}` : "—")}
+    </div>`;
+  }).join("");
+  $("capture-coverage-boundary").textContent = currentLang === "zh-TW"
+    ? "FOCUS 只記前景時間；WEB 為 Extension turns／responses；LOG 為本機 transcript turns／responses。三者不能互相替代。"
+    : "FOCUS is foreground time; WEB is Extension turns/responses; LOG is local transcript turns/responses. These signals are independent.";
+}
+
+function renderCaptureCoverageError() {
+  $("capture-coverage-badge").className = "trust broken";
+  $("capture-coverage-badge").textContent = "UNAVAILABLE";
+  $("capture-extension-summary").textContent = currentLang === "zh-TW" ? "採集狀態暫時無法取得。" : "Capture status is unavailable.";
+  $("capture-coverage-list").innerHTML = `<div class="placeholder">${currentLang === "zh-TW" ? "無法取得採集 coverage。" : "Capture coverage is unavailable."}</div>`;
 }
 
 function renderStats(m) {
@@ -1177,6 +1208,7 @@ async function loadConfig() {
     const agent = w.agent_log_watcher || {};
     const browser = w.browser || {};
     $("toggle-claude-code").checked = agent.claude_code !== false;
+    $("toggle-claude-desktop").checked = agent.claude_desktop !== false;
     $("toggle-codex").checked = agent.codex !== false;
     $("toggle-antigravity").checked = agent.antigravity !== false;
     $("toggle-gemini").checked = browser.gemini !== false;
@@ -1212,6 +1244,7 @@ async function saveSettings() {
 
   cfg.watchers.agent_log_watcher = cfg.watchers.agent_log_watcher || { enabled: true };
   cfg.watchers.agent_log_watcher.claude_code = $("toggle-claude-code").checked;
+  cfg.watchers.agent_log_watcher.claude_desktop = $("toggle-claude-desktop").checked;
   cfg.watchers.agent_log_watcher.codex = $("toggle-codex").checked;
   cfg.watchers.agent_log_watcher.antigravity = $("toggle-antigravity").checked;
 

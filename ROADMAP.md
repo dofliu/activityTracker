@@ -50,6 +50,7 @@ ChatGPT、Gemini、Claude、Grok 等產品正在強化各自平台內的 memory�
    - **Codex CLI**：解析 `rollout-*.jsonl`，以新 user turn／EOF 建立 turn boundary，保留最後有效 assistant message。
    - **Antigravity**：解析 `transcript.jsonl` 的 USER_INPUT／PLANNER_RESPONSE，保存來源位置與 final-candidate 狀態。
    - **Claude Code**：優先解析 `projects/**/*.jsonl`；只有來源本身缺回答時才保留 missing 狀態。
+   - **Claude Desktop Cowork／local-agent**：自動偵測 application data 內嵌 `.claude/projects/**/*.jsonl`，支援 Windows extended path、7 天首次回補與獨立 `claude_desktop` provenance；一般 cloud-chat LevelDB 保持 detected/unparsed。
    - **佔位符過濾**：Prompt 組裝排除 `[external_agent_tool_call]`、`[Codex CLI Session]` 等非人類回應；不再以舊配對率作 release 指標。
 2. **專案狀態收斂引擎 (`core/project_engine.py`)**：
    - 實作 Top-Down Canonical Project Resolver，將 `response_final`、`closure_qa`、`word_pdf_v7` 等論文修訂版子目錄正確歸戶至所屬主論文（如 `1150820-opcuaPaperManus`、`09.agentSkill`）。
@@ -113,6 +114,9 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
    - 註冊 Windows Task Scheduler 工作排程，支援背景靜默啟動（`pythonw.exe`）。
 3. **視窗採集器持續觀察**：
    - 2026-08-23 重啟服務後恢復正常（當日 27 筆）。心跳日誌已就位，若再次靜默可從日誌判斷是讀取端或寫入端。
+4. **Desktop／Web／Transcript coverage 分流**：
+   - 2026-08-25 主頁與 `/api/v1/capture/status` 已將三種訊號分開；Claude Desktop incremental E2E 新增 148 turns／125 responses／117 final candidates。
+   - 待完成：一般 Claude 雲端聊天仍不解析 cache；Claude.ai／Manus 仍需 authenticated Browser Extension receipt。
 
 ---
 
@@ -288,7 +292,7 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 - 新增 schema 6/7 `semantic_documents`，使用 loopback Ollama `bge-m3:latest` 建立 1024 維索引，涵蓋 AI turns、Git commits、file activity metadata、Open Loops 與 Project State；不額外讀取檔案正文。
 - 每筆保存 `source_ref`、project、timestamp、trust status、content hash、model、float32 BLOB 與 `embedding_input_mode`。partial/legacy response 不會升格為可信結論。
-- 每個成功 batch 原子提交並可依 content hash 續跑。真實全量驗收：4,102/4,102、failure=0；3 筆 Ollama Unicode NaN 來源以可追溯 `ascii_fallback` 降級；第二次執行 `indexed=0 / unchanged=4102`。
+- 每個成功 batch 原子提交並可依 content hash 續跑。初始全量驗收為 4,102/4,102、failure=0；Claude Desktop 修正後 incremental 更新為 4,380/4,380（`indexed=285 / unchanged=4095`）。
 
 ### ✅ P3-3 `omni ask`：問自己的歷史（2026-08-25 完成 Alpha）
 
@@ -398,7 +402,7 @@ P2.5-S1 API 安全邊界
   → P2.5-L1 Open Loop lifecycle
   → P2.5-P1 pytest / platform abstraction / generic config
   → ✅ P3-1 resume（已完成，並以新資料契約重新驗收）
-  → ✅ P3-2 語意索引（4,102/4,102）
+  → ✅ P3-2 語意索引（4,380/4,380）
   → ✅ P3-3 omni ask（retrieval + local synthesis）
   → P3-5 Session 敘事層
   → P5-1 Proposal-only 主動建議（不執行修改）

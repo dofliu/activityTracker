@@ -109,6 +109,24 @@ python main.py init --rotate-token --show-token
 
 旋轉後必須重新貼入 Extension popup。
 
+### 3.1 Claude Desktop 對話採集範圍
+
+Claude Desktop 有兩種不同資料面：
+
+- **Cowork／local-agent session**：OmniContext 可讀取 application data 內的 `.claude/projects/**/*.jsonl`，保存 user/assistant turn、來源位置與 `response_status`。
+- **一般 Claude 雲端聊天**：目前只有 Chromium IndexedDB/LevelDB cache 可被偵測；OmniContext 不直接讀取執行中的二進位 cache，因此顯示 `快取存在／未解析`，不宣稱已取得對話。
+
+Windows 上 Claude session 路徑常超過 `MAX_PATH`，`1.3.0a4` 起已使用 extended path。首次自動掃描預設只回補最近 7 天，可在 `config.yaml` 調整：
+
+```yaml
+watchers:
+  agent_log_watcher:
+    claude_desktop: true
+    claude_desktop_initial_lookback_days: 7
+```
+
+主頁 `DATA CAPTURE` 是日常快速檢視：`FOCUS` 只代表前景時間，`WEB` 只代表 Extension 事件，`LOG` 才代表結構化本機對話來源，三者必須分開解讀。需要檢查 token、heartbeat 或逐站 enabled／observed 狀態時，再開啟 `/extension-monitor` 進階診斷頁。
+
 ## 4. 每日介面使用時間與里程碑
 
 主頁的「今日前景使用與里程碑」依 `WindowEvent` 計算已觀察到的 foreground active time，並以 canonical AI turns 顯示互動次數。

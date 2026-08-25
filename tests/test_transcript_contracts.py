@@ -110,3 +110,39 @@ def test_malformed_jsonl_is_not_silently_accepted(tmp_path):
     assert next(iterator)[1] == {"ok": 1}
     with pytest.raises(ValueError, match="Malformed JSONL"):
         list(iterator)
+
+
+def test_claude_desktop_project_log_preserves_provenance_and_is_idempotent(tmp_path):
+    source = tmp_path / "local-agent-mode-sessions" / "w" / "s" / "local_test" / ".claude" / "projects" / "demo" / "session.jsonl"
+    source.parent.mkdir(parents=True)
+    rows = [
+        {
+            "type": "user",
+            "timestamp": "2026-08-25T01:00:00Z",
+            "sessionId": "desktop-session",
+            "cwd": str(tmp_path / "project"),
+            "message": {"content": "請檢查桌面專案"},
+        },
+        {
+            "type": "assistant",
+            "message": {"content": [{"type": "text", "text": "已完成桌面檢查"}], "stop_reason": "end_turn"},
+        },
+    ]
+    source.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+    database = TempDB()
+    service = AgentLogWatcherService()
+    service._parse_claude_project_log(database, source, platform="claude_desktop")
+    service._parse_claude_project_log(database, source, platform="claude_desktop")
+
+    with database.session_scope() as session:
+        events = session.query(AIPromptEvent).all()
+        assert len(events) == 1
+        event = events[0]
+        assert event.platform == "claude_desktop"
+        assert event.conversation_id == "desktop-session"
+        assert event.prompt_text == "請檢查桌面專案"
+        assert event.response_text == "已完成桌面檢查"
+        assert event.response_status == "final_candidate"
+        assert event.source_path == str(source.resolve())
+        assert event.source_position == 1

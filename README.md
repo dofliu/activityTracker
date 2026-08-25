@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **目前狀態：Personal Alpha。** Windows milestone WinRT Toast E2E、schema 7/7、formal package+DB rollback、P3-2 全量本機 semantic index（4,102/4,102）與 P3-3 `omni ask` 已通過；ChatGPT 真實 DOM selectors 已修復。Claude/Manus authenticated capture 與推送後的 macOS/Linux CI matrix 仍待真實 receipt，因此尚非 release-ready。
+> **目前狀態：Personal Alpha。** Windows milestone WinRT Toast E2E、schema 7/7、formal package+DB rollback、P3-2/P3-3 與跨平台 CI 已通過；ChatGPT 真實 DOM selectors 已修復，Claude Desktop Cowork／local-agent transcript 已完成 Windows E2E。Claude.ai／Manus authenticated Browser capture 與 Extension live heartbeat 仍待真實 receipt，因此尚非 release-ready。
 
 **文件入口：**[完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
 
@@ -70,11 +70,13 @@
 ### 3. 🤖 跨平台 AI 對話全景記錄（來源可追溯；P2.5 強化中）
 * **本機 CLI / IDE Agent**：
   * **Claude Code**（`~/.claude/projects/`）：完整記錄命令、提問與對話細節。
+  * **Claude Desktop Cowork／local-agent**：自動偵測 application data 中的結構化 project JSONL；Windows extended-path 與最近 7 天首次回補已支援。
   * **Codex**（`~/.codex/sessions/**`）：解析 Rollout JSONL 與 Assistant 訊息回覆。
   * **Antigravity**（`.gemini/brain/**`）：即時擷取對話與執行工具。
 * **瀏覽器擴充套件（Chrome Extension MV3）**：
   * 支援 **ChatGPT**、**Gemini**、**Claude.ai**、**Manus**。
   * 以獨立 ingest token 實施 write-only capability boundary，並以穩定 turn key Upsert。
+* **明確邊界**：一般 Claude Desktop 雲端聊天目前只偵測 cache 存在，不解析 Chromium LevelDB，也不宣稱已取得對話內容。
 
 ### 4. ⚡ 自訂日期區間 AI 工作回顧（LLM Synthesis Engine）
 * **任意日期範圍報告**：支援從 Web UI 選擇起訖日期（`FROM ~ TO`）或使用 `今日`、`昨日`、`本週`、`近 7 天`、`近 30 天` 快捷標籤，一鍵產出多日全景回顧。
@@ -100,7 +102,8 @@
 * 主頁顯示 Claude、Codex、ChatGPT、Gemini、Manus、Antigravity、VS Code 等介面的每日 **foreground active time** 與 AI turns。
 * 使用者可設定每日目標、里程碑、通知語氣、quiet hours 與 cooldown；SQLite receipt 防止重啟後重複通知。
 * 數值只代表已觀察到的前景時間，不等於生產力或實際工時；coverage ledger 尚未完成前一律標示 `partial`。
-* `http://127.0.0.1:8765/extension-monitor` 可觀察 Browser Extension 的 enabled／observed 狀態，但 token pairing 仍只能在 Extension popup 完成。
+* 主頁 `DATA CAPTURE` 將 `FOCUS`、`WEB`、`LOG` 三種獨立訊號濃縮在同一區塊；任何一欄 `OBSERVED` 都不能替代另外兩欄。
+* `http://127.0.0.1:8765/extension-monitor` 是 Browser Extension 的進階診斷頁，負責 enabled／observed、heartbeat 與逐站狀態；token pairing 仍只能在 Extension popup 完成。
 
 ### 8. 🧠 本機 Semantic Index 與 `omni ask`（P3-2 / P3-3 Alpha）
 * 以 loopback Ollama `bge-m3` 將 AI turns、Git commits、file activity metadata、Open Loops 與 Project State 建立 1024 維本機索引，資料不送至 cloud provider。
@@ -130,7 +133,7 @@ python main.py init --watch "/your/project/root"
 若使用已建置的 Alpha wheel：
 
 ```console
-python -m pip install omnicontext-1.3.0a3-py3-none-any.whl
+python -m pip install omnicontext-1.3.0a4-py3-none-any.whl
 omnicontext init --watch "/your/project/root"
 omnicontext assets-status
 ```

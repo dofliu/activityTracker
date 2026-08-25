@@ -10,6 +10,8 @@
 
 - Origin allowlist、secret redaction、URL/path validation。
 - Codex 同一 turn 多個 assistant messages 選擇最後有效回應。
+- Claude Code 與 Claude Desktop 共用 user/assistant boundary parser，但 platform provenance 與 stable turn key 必須分離。
+- Windows 超長 Claude Desktop session path 必須以 extended path 可讀；一般 cloud-chat cache 只能標示 detected/unparsed。
 - 同 conversation 重複 prompt 以 stable `turn_key` 分開。
 - Open Loop title normalization、fingerprint 與狀態轉換。
 - Windows/macOS/Linux platform command 組裝不得使用 shell string。
@@ -89,6 +91,7 @@ python main.py extension-path
 - `GET /api/v1/usage/today` 回傳 interface rows、coverage、goal 與 milestone state。
 - `POST /api/v1/usage/milestones/evaluate` 在相同日期／門檻重送時不建立第二筆 receipt。
 - `GET /api/v1/extension/status` 不洩漏 token，並區分 configured、enabled、observed event。
+- `GET /api/v1/capture/status` 必須分開回傳 Desktop Focus、Web Capture、Transcript，且不得輸出 prompt、response、URL 或本機 path。
 - Extension origin 未帶或帶錯 token 時 pairing probe 為 403；正確 token 才可通過。
 - `POST /api/v1/extension/heartbeat` 即使沒有 Origin 也必須要求 token；payload 不得包含 URL、Prompt、Response 或 token。
 - Heartbeat receipt 必須區分 recent/stale；離開 SQLAlchemy session 後仍可安全產生 status snapshot。
@@ -97,6 +100,8 @@ python main.py extension-path
 
 - localhost `/extension-monitor` 不依賴 `chrome.storage`。
 - 主頁顯示「前景使用時間」與 `partial / unavailable`，不使用「工時／生產力」措辭。
+- 主頁 `DATA CAPTURE` 必須以緊湊的 `FOCUS / WEB / LOG` 矩陣顯示，不得以 Desktop Focus 的 observed 狀態冒充 conversation transcript coverage。
+- 主頁不得重複顯示完整 Extension Monitor；token、heartbeat 與逐站診斷只保留在 `/extension-monitor`。
 - popup 分開顯示 service health 與 token pairing status。
 - MV3 background 必須使用 `chrome.alarms`，每個 content script 回報 ready，console 不得輸出 Prompt preview。
 - Windows live API 與 dashboard render smoke；macOS/Linux 驗證 `unavailable` graceful degradation。
@@ -113,3 +118,7 @@ python main.py extension-path
 ## Platform CI Matrix
 
 `.github/workflows/platform-matrix.yml` 在 Windows、Ubuntu、macOS 的 Python 3.10/3.12 執行 pytest、compileall、Extension JS syntax、build、artifact privacy/content 與 installed writable-home/API/assets smoke。2026-08-25 GitHub Actions run `32757498004` 的六個 jobs 全數通過；未來 commit 仍須以各自 run receipt 判定，不沿用本次結果。
+
+2026-08-25 Claude Desktop 修正後本機 `pytest` 為 **64/64**；Windows live incremental scan 新增 148 turns、125 筆非空 response、117 筆 `final_candidate`，stable parser 重跑不新增重複 turn。這是本機 Cowork／local-agent receipt，不外推為一般 Claude 雲端聊天 coverage。
+
+同批資料完成 incremental semantic index：來源與索引均為 4,380，`indexed=285 / unchanged=4095 / failures=0`；新增數包含掃描期間其他合法來源，不等同全部來自 Claude Desktop。

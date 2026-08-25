@@ -73,6 +73,7 @@ DEFAULT_GOAL_INTERFACES = (
 PLATFORM_INTERFACE_MAP = {
     "codex": "Codex",
     "claude_code": "Claude Code",
+    "claude_desktop": "Claude",
     "claude": "Claude",
     "claude_web": "Claude",
     "chatgpt": "ChatGPT",

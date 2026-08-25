@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **Current status: Personal Alpha.** A real Windows milestone WinRT Toast E2E, schema 7/7, formal package+database rollback, a full local semantic index (4,102/4,102), P3-3 `omni ask`, and the Windows/Ubuntu/macOS × Python 3.10/3.12 CI matrix have passed. ChatGPT's live DOM selectors were repaired; authenticated Extension-backed ChatGPT/Claude/Manus capture receipts remain outstanding, so this is not release-ready.
+> **Current status: Personal Alpha.** Windows milestone WinRT Toast E2E, schema 7/7, formal package+database rollback, P3-2/P3-3, and the cross-platform CI matrix have passed. ChatGPT live DOM selectors were repaired, and Claude Desktop Cowork/local-agent transcript capture passed a Windows E2E. Authenticated Claude.ai/Manus Browser capture and a live Extension heartbeat still lack receipts, so this is not release-ready.
 
 **Documentation:** [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
 
@@ -70,11 +70,13 @@ It is purpose-built to answer three fundamental questions at any moment:
 ### 3. 🤖 Cross-Platform AI Conversation Capture (Full Prompts & Responses)
 * **Local CLI / IDE Agents**:
   * **Claude Code** (`~/.claude/projects/`): Logs bash executions, tool calls, and user prompts.
+  * **Claude Desktop Cowork/local-agent**: Auto-detects structured project JSONL under application data, with Windows extended-path support and a seven-day initial backfill.
   * **Codex** (`~/.codex/sessions/**`): Parses rollout JSONL records and complete assistant message turns.
   * **Antigravity** (`.gemini/brain/**`): Captures real-time sessions and tool outputs.
 * **Browser Extension (Chrome MV3)**:
   * Supports **ChatGPT**, **Google Gemini**, **Claude.ai**, and **Manus**.
   * Uses a dedicated ingest token, stable turn key, and write-only capability boundary.
+* **Boundary**: normal Claude Desktop cloud-chat Chromium LevelDB cache is detected but not parsed and is never claimed as captured transcript content.
 
 ### 4. ⚡ Custom Date-Range AI Synthesis Engine
 * **Flexible Date Ranges**: Choose any start and end dates (`FROM ~ TO`) or use quick chips (`Today`, `Yesterday`, `This Week`, `Last 7 Days`, `Last 30 Days`) to synthesize executive multi-day review reports.
@@ -93,7 +95,8 @@ It is purpose-built to answer three fundamental questions at any moment:
 * The dashboard shows observed foreground time and AI turns for Claude, Codex, ChatGPT, Gemini, Manus, Antigravity, VS Code, and other configured interfaces.
 * Daily goals, milestones, notification tone, quiet hours, and cooldown are configurable; SQLite receipts prevent duplicate notifications after restart.
 * Foreground time is not productivity or actual work time. Coverage remains `partial` until a continuous coverage ledger exists.
-* `http://127.0.0.1:8765/extension-monitor` exposes enabled/observed ingestion state, while token pairing remains inside the Extension popup.
+* The dashboard `DATA CAPTURE` panel condenses three independent signals—`FOCUS`, `WEB`, and `LOG`—without treating one observed channel as proof of another.
+* `http://127.0.0.1:8765/extension-monitor` is the advanced Browser Extension diagnostic page for enabled/observed, heartbeat, and per-site state; token pairing remains inside the Extension popup.
 
 ### 8. 🧠 Local Semantic Index and `omni ask` (P3-2 / P3-3 Alpha)
 * Loopback Ollama `bge-m3` indexes AI turns, Git commits, file-activity metadata, Open Loops, and Project State without sending the index to a cloud provider.
@@ -123,7 +126,7 @@ python main.py init --watch "/your/project/root"
 For a locally built Alpha wheel:
 
 ```bash
-python -m pip install omnicontext-1.3.0a3-py3-none-any.whl
+python -m pip install omnicontext-1.3.0a4-py3-none-any.whl
 omnicontext init --watch "/your/project/root"
 omnicontext assets-status
 ```
