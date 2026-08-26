@@ -70,10 +70,15 @@ async function buildHeartbeatPayload() {
     .filter(([platform, seenAt]) => safePlatform(platform) && Number(seenAt) >= cutoff)
     .map(([platform]) => platform)
     .sort();
+  const readyPlatformReceipts = readyPlatforms.map(platform => ({
+    platform,
+    seen_at: new Date(Number(diagnostics.content_script_last_seen[platform])).toISOString()
+  }));
   return {
     instance_id: await getOrCreateInstanceId(),
     extension_version: chrome.runtime.getManifest().version,
     ready_platforms: readyPlatforms,
+    ready_platform_receipts: readyPlatformReceipts,
     last_capture_status: diagnostics.last_capture_status || "none",
     last_capture_at: diagnostics.last_capture_at || null,
     last_error_code: diagnostics.last_error_code || null,

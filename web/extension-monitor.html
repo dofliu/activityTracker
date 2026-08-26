@@ -28,7 +28,17 @@
     .boundary { color:var(--muted); font-size:12px; line-height:1.7; margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
     button { border:1px solid var(--line); background:transparent; color:var(--text); padding:8px 12px; cursor:pointer; font-weight:700; }
     button:hover { border-color:var(--orange); }
-    @media(max-width:700px){.grid,.platforms{grid-template-columns:1fr 1fr}header{display:block}header nav{margin-top:12px}}
+    button:disabled { opacity:.45; cursor:not-allowed; }
+    .verification-controls { display:flex; flex-wrap:wrap; align-items:center; gap:9px; margin-top:13px; }
+    .platform-option { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line); padding:7px 9px; font-size:12px; }
+    .platform-option input { accent-color:var(--orange); }
+    .verification-status { margin-top:13px; padding:12px; border:1px solid var(--line); background:#101012; }
+    .verification-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .verification-platforms { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:10px; }
+    .verification-platform { border:1px solid var(--line); padding:9px; font-size:12px; line-height:1.6; }
+    .steps { margin:10px 0 0; padding-left:20px; color:var(--muted); font-size:12px; line-height:1.7; }
+    @media(max-width:700px){.grid,.platforms,.verification-platforms{grid-template-columns:1fr 1fr}header{display:block}header nav{margin-top:12px}}
+    @media(max-width:480px){.grid,.platforms,.verification-platforms{grid-template-columns:1fr}.verification-controls>*{width:100%}}
   </style>
 </head>
 <body>
@@ -62,11 +72,38 @@
           <strong>判讀方式：</strong>ONLINE 只代表 Dashboard/API 正常；RECENT HEARTBEAT 代表 Extension 曾以正確 token 抵達本機服務；CONTENT READY 代表支援網站載入過 content script；只有 OBSERVED 才代表資料庫已有 Browser event。上述狀態都不等於完整 coverage。
         </div>
       </section>
+      <section class="panel wide">
+        <div class="label">LIVE VERIFICATION · 本輪真實採集驗證</div>
+        <div class="boundary" style="margin-top:8px;padding-top:0;border-top:0">
+          只接受開始後的新證據。請先選平台並開始，再 Reload Extension、重新載入目標網站，完成一輪新的 Prompt 與 assistant response。歷史 OBSERVED 不會讓本輪通過。
+        </div>
+        <div class="verification-controls" id="verification-options">
+          <label class="platform-option"><input type="checkbox" value="chatgpt"> ChatGPT</label>
+          <label class="platform-option"><input type="checkbox" value="gemini"> Gemini</label>
+          <label class="platform-option"><input type="checkbox" value="claude" checked> Claude.ai</label>
+          <label class="platform-option"><input type="checkbox" value="manus" checked> Manus</label>
+          <button id="start-verification">開始 10 分鐘驗證</button>
+          <button id="download-verification" disabled>下載 JSON receipt</button>
+        </div>
+        <ol class="steps">
+          <li>在 Chrome Extension Manager 對 OmniContext 按 Reload，開啟 popup 確認 token。</li>
+          <li>重新載入勾選的平台分頁，讓 Content Ready timestamp 在本輪之後產生。</li>
+          <li>每站送出一個新 Prompt，等待完整 assistant response；本頁每 5 秒自動判定。</li>
+        </ol>
+        <div id="verification-status" class="verification-status">
+          <div class="verification-head"><strong>尚未開始</strong><span class="badge warn">IDLE</span></div>
+          <div class="meta">Verification baseline 只保存在目前 service process，不寫入資料庫。</div>
+          <div id="verification-platforms" class="verification-platforms"></div>
+        </div>
+      </section>
     </div>
   </main>
   <script>
     const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[char]));
     const formatTime = value => value ? new Date(value).toLocaleString() : "—";
+    let activeVerificationId = null;
+    let verificationTimer = null;
+    let latestVerificationReceipt = null;
     async function refresh() {
       const service = document.getElementById("service-value");
       const badge = document.getElementById("service-badge");
@@ -109,7 +146,7 @@
                 ? "CONTENT_READY"
                 : "WAITING";
           const stateLabel = state === "WAITING" ? "WAITING EVENT" : state === "CONTENT_READY" ? "CONTENT READY" : state;
-          return `<div class="platform"><div class="platform-top"><span>${escapeHtml(item.label)}</span><span class="${state === "OBSERVED" ? "ok" : "warn"}">${stateLabel}</span></div><div class="meta">today ${item.events_today || 0}<br>total ${item.events_total || 0}<br>last ${formatTime(item.last_capture_at)}</div></div>`;
+          return `<div class="platform"><div class="platform-top"><span>${escapeHtml(item.label)}</span><span class="${state === "OBSERVED" ? "ok" : "warn"}">${stateLabel}</span></div><div class="meta">today ${item.events_today || 0} events / ${item.responses_today || 0} responses<br>total ${item.events_total || 0} / ${item.responses_total || 0}<br>last ${formatTime(item.last_capture_at)}</div></div>`;
         }).join("");
       } catch (error) {
         service.textContent = "本機服務無法連線";
@@ -117,7 +154,94 @@
         document.getElementById("events-meta").textContent = error.message;
       }
     }
+    const actionLabels = {
+      configure_extension_token: "請在 Extension popup 儲存 token",
+      open_extension_popup_or_reload: "請開啟 Extension popup 或 Reload Extension"
+    };
+    function actionLabel(value) {
+      if (actionLabels[value]) return actionLabels[value];
+      const [action, platform] = String(value).split(":");
+      const labels = {
+        enable_platform: "請啟用平台",
+        reload_target_tab: "請重新載入平台分頁",
+        send_new_prompt: "請送出新的 Prompt",
+        wait_for_assistant_response: "請等待並擷取 assistant response"
+      };
+      return `${labels[action] || action}${platform ? ` · ${platform}` : ""}`;
+    }
+    function renderVerification(receipt) {
+      latestVerificationReceipt = receipt;
+      document.getElementById("download-verification").disabled = false;
+      const passed = receipt.status === "passed";
+      const failed = receipt.status === "failed";
+      const badgeClass = passed ? "ok" : "warn";
+      const statusLabel = passed ? "PASS" : failed ? "FAILED" : "RUNNING";
+      const heartbeat = receipt.checks?.heartbeat_after_start ? "PASS" : "WAITING";
+      const actions = (receipt.next_actions || []).map(actionLabel).join("；") || "本輪必要證據均已取得。";
+      document.getElementById("verification-status").innerHTML = `
+        <div class="verification-head"><strong>${passed ? "本輪真實採集驗證通過" : failed ? "本輪驗證逾時，未通過" : "正在等待本輪新證據"}</strong><span class="badge ${badgeClass}">${statusLabel}</span></div>
+        <div class="meta">heartbeat ${heartbeat} · remaining ${receipt.remaining_seconds || 0}s · ${escapeHtml(actions)}</div>
+        <div id="verification-platforms" class="verification-platforms">${(receipt.checks?.platforms || []).map(item => `
+          <div class="verification-platform">
+            <strong>${escapeHtml(item.key)}</strong> · <span class="${item.passed ? "ok" : "warn"}">${item.passed ? "PASS" : "WAITING"}</span><br>
+            Content Ready ${item.content_ready_after_start ? "✓" : "—"} · Event +${item.event_delta || 0} · Response +${item.response_delta || 0}<br>
+            <span class="meta">ready ${formatTime(item.content_script_last_seen_at)}<br>capture ${formatTime(item.last_capture_at)}</span>
+          </div>`).join("")}</div>`;
+    }
+    async function pollVerification() {
+      if (!activeVerificationId) return;
+      try {
+        const response = await fetch(`/api/v1/extension/verification/${encodeURIComponent(activeVerificationId)}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const receipt = await response.json();
+        renderVerification(receipt);
+        if (receipt.status !== "running" && verificationTimer) {
+          clearInterval(verificationTimer);
+          verificationTimer = null;
+        }
+      } catch (error) {
+        document.getElementById("verification-status").innerHTML = `<div class="verification-head"><strong>驗證狀態無法讀取</strong><span class="badge warn">ERROR</span></div><div class="meta">${escapeHtml(error.message)}</div>`;
+      }
+    }
+    async function startVerification() {
+      const platforms = [...document.querySelectorAll('#verification-options input[type="checkbox"]:checked')].map(item => item.value);
+      if (!platforms.length) {
+        document.getElementById("verification-status").innerHTML = '<div class="verification-head"><strong>請至少選擇一個平台</strong><span class="badge warn">WAITING</span></div>';
+        return;
+      }
+      const button = document.getElementById("start-verification");
+      button.disabled = true;
+      try {
+        const response = await fetch("/api/v1/extension/verification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ platforms, timeout_seconds: 600 })
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const receipt = await response.json();
+        activeVerificationId = receipt.verification_id;
+        renderVerification(receipt);
+        if (verificationTimer) clearInterval(verificationTimer);
+        verificationTimer = setInterval(pollVerification, 5000);
+      } catch (error) {
+        document.getElementById("verification-status").innerHTML = `<div class="verification-head"><strong>無法開始驗證</strong><span class="badge warn">ERROR</span></div><div class="meta">${escapeHtml(error.message)}</div>`;
+      } finally {
+        button.disabled = false;
+      }
+    }
+    function downloadVerification() {
+      if (!latestVerificationReceipt) return;
+      const blob = new Blob([JSON.stringify(latestVerificationReceipt, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `omnicontext-extension-verification-${latestVerificationReceipt.verification_id}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
     document.getElementById("refresh").addEventListener("click", refresh);
+    document.getElementById("start-verification").addEventListener("click", startVerification);
+    document.getElementById("download-verification").addEventListener("click", downloadVerification);
     refresh();
     setInterval(refresh, 15000);
   </script>

@@ -60,6 +60,15 @@ def record_extension_heartbeat(
         for item in payload.get("ready_platforms", [])
         if str(item).strip().lower() in SUPPORTED_BROWSER_KEYS
     })
+    ready_platform_receipts: dict[str, str] = {}
+    for item in payload.get("ready_platform_receipts", []):
+        if not isinstance(item, dict):
+            continue
+        platform = str(item.get("platform") or "").strip().lower()
+        seen_at = _local_naive(item.get("seen_at"))
+        if platform in SUPPORTED_BROWSER_KEYS and seen_at is not None:
+            ready_platform_receipts[platform] = seen_at.isoformat(timespec="seconds")
+    ready_platforms = sorted(set(ready_platforms) | set(ready_platform_receipts))
     capture_status = str(payload.get("last_capture_status") or "none").strip().lower()
     if capture_status not in ALLOWED_CAPTURE_STATUSES:
         capture_status = "error"
@@ -84,7 +93,15 @@ def record_extension_heartbeat(
             )
             session.add(heartbeat)
         heartbeat.extension_version = extension_version
-        heartbeat.ready_platforms_json = json.dumps(ready_platforms, ensure_ascii=False)
+        # 沿用既有 TEXT 欄位保存向後相容的非敏感 content-ready receipt，避免為
+        # timestamp metadata 破壞 schema 7 或要求額外 migration。
+        heartbeat.ready_platforms_json = json.dumps(
+            {
+                "platforms": ready_platforms,
+                "last_seen": ready_platform_receipts,
+            },
+            ensure_ascii=False,
+        )
         heartbeat.last_capture_status = capture_status
         heartbeat.last_capture_at = last_capture_at
         heartbeat.last_error_code = error_code
@@ -118,7 +135,12 @@ def build_extension_status(
 
     with database.session_scope() as session:
         rows = (
-            session.query(AIPromptEvent.platform, AIPromptEvent.timestamp)
+            session.query(
+                AIPromptEvent.platform,
+                AIPromptEvent.timestamp,
+                AIPromptEvent.response_text,
+                AIPromptEvent.response_status,
+            )
             .filter(
                 AIPromptEvent.platform.in_(aliases),
                 AIPromptEvent.url.isnot(None),
@@ -126,7 +148,10 @@ def build_extension_status(
             )
             .all()
         )
-        captured = [(str(row[0]).lower(), row[1]) for row in rows]
+        captured = [
+            (str(row[0]).lower(), row[1], row[2], str(row[3] or "").lower())
+            for row in rows
+        ]
         heartbeat_row = (
             session.query(BrowserExtensionHeartbeat)
             .order_by(BrowserExtensionHeartbeat.last_seen_at.desc())
@@ -153,28 +178,58 @@ def build_extension_status(
     heartbeat_age_seconds = None
     heartbeat_recent = False
     ready_platforms: set[str] = set()
+    ready_platform_receipts: dict[str, datetime] = {}
     if heartbeat is not None:
         last_seen = _local_naive(heartbeat["last_seen_at"])
         heartbeat_age_seconds = max(0, int((now - last_seen).total_seconds()))
         heartbeat_recent = heartbeat_age_seconds <= heartbeat_stale_minutes * 60
         try:
+            ready_payload = json.loads(heartbeat["ready_platforms_json"] or "[]")
+            if isinstance(ready_payload, dict):
+                ready_items = ready_payload.get("platforms", [])
+                receipt_items = ready_payload.get("last_seen", {})
+            else:
+                # 1.3.0 舊 receipt 僅存平台陣列，仍保留可讀性但不升格為
+                # after-start timestamp evidence。
+                ready_items = ready_payload
+                receipt_items = {}
             ready_platforms = {
                 str(item).lower()
-                for item in json.loads(heartbeat["ready_platforms_json"] or "[]")
+                for item in ready_items
                 if str(item).lower() in SUPPORTED_BROWSER_KEYS
             }
+            if isinstance(receipt_items, dict):
+                for platform, seen_at in receipt_items.items():
+                    key = str(platform).lower()
+                    try:
+                        parsed = _local_naive(datetime.fromisoformat(str(seen_at)))
+                    except (TypeError, ValueError):
+                        continue
+                    if key in SUPPORTED_BROWSER_KEYS and parsed is not None:
+                        ready_platform_receipts[key] = parsed
         except (TypeError, ValueError, json.JSONDecodeError):
             ready_platforms = set()
 
     platform_rows = []
     all_last_times = []
     for key, label, config_key, platform_aliases in SUPPORTED_BROWSER_PLATFORMS:
-        event_times = [timestamp for platform, timestamp in captured if platform in platform_aliases]
+        platform_events = [row for row in captured if row[0] in platform_aliases]
+        event_times = [row[1] for row in platform_events]
+        response_times = [row[1] for row in platform_events if str(row[2] or "").strip()]
+        final_candidate_times = [
+            row[1] for row in platform_events if row[3] == "final_candidate"
+        ]
         today_times = [
             timestamp
             for timestamp in event_times
             if today_start <= timestamp < tomorrow_start
         ]
+        today_response_times = [
+            timestamp
+            for timestamp in response_times
+            if today_start <= timestamp < tomorrow_start
+        ]
+        content_ready_at = ready_platform_receipts.get(key)
         all_last_times.extend(event_times)
         platform_rows.append(
             {
@@ -183,11 +238,24 @@ def build_extension_status(
                 "enabled": bool(cfg.get(config_key, True)),
                 "events_total": len(event_times),
                 "events_today": len(today_times),
+                "responses_total": len(response_times),
+                "responses_today": len(today_response_times),
+                "final_candidates_total": len(final_candidate_times),
                 "last_capture_at": (
                     max(event_times).isoformat(timespec="seconds") if event_times else None
                 ),
+                "last_response_at": (
+                    max(response_times).isoformat(timespec="seconds")
+                    if response_times
+                    else None
+                ),
                 "observation_status": "observed" if event_times else "not_observed",
                 "content_script_seen": key in ready_platforms,
+                "content_script_last_seen_at": (
+                    content_ready_at.isoformat(timespec="seconds")
+                    if content_ready_at is not None
+                    else None
+                ),
             }
         )
 
@@ -254,6 +322,8 @@ def build_extension_status(
             "offline_queue_size": heartbeat["offline_queue_size"] if heartbeat else 0,
             "events_total": total,
             "events_today": sum(item["events_today"] for item in platform_rows),
+            "responses_total": sum(item["responses_total"] for item in platform_rows),
+            "responses_today": sum(item["responses_today"] for item in platform_rows),
             "last_capture_at": (
                 max(all_last_times).isoformat(timespec="seconds") if all_last_times else None
             ),

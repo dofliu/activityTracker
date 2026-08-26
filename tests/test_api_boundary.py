@@ -135,6 +135,51 @@ def test_extension_heartbeat_requires_token_even_without_origin(monkeypatch):
     assert rejected_sensitive_extra.status_code == 422
 
 
+def test_extension_verification_api_is_local_only_and_forbids_extra_fields(monkeypatch):
+    class FakeRegistry:
+        def start(self, platforms, *, timeout_seconds):
+            assert platforms == ["claude", "manus"]
+            assert timeout_seconds == 300
+            return {
+                "verification_id": "verification-1",
+                "status": "running",
+                "persisted": False,
+            }
+
+        def get(self, verification_id):
+            assert verification_id == "verification-1"
+            return {
+                "verification_id": verification_id,
+                "status": "passed",
+                "persisted": False,
+            }
+
+    monkeypatch.setattr("core.server.extension_verification_registry", FakeRegistry())
+    started = client.post(
+        "/api/v1/extension/verification",
+        json={"platforms": ["claude", "manus"], "timeout_seconds": 300},
+    )
+    checked = client.get("/api/v1/extension/verification/verification-1")
+    rejected_extra = client.post(
+        "/api/v1/extension/verification",
+        json={
+            "platforms": ["claude"],
+            "timeout_seconds": 300,
+            "token": "must-not-be-accepted",
+        },
+    )
+    hostile_origin = client.post(
+        "/api/v1/extension/verification",
+        headers={"Origin": "https://example.com"},
+        json={"platforms": ["claude"], "timeout_seconds": 300},
+    )
+
+    assert started.status_code == 201
+    assert checked.status_code == 200 and checked.json()["status"] == "passed"
+    assert rejected_extra.status_code == 422
+    assert hostile_origin.status_code == 403
+
+
 def test_usage_api_exposes_claim_and_coverage_contract(monkeypatch):
     class FakeManager:
         def get_status(self):
@@ -277,6 +322,9 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     assert "尚未驗證 Extension" in monitor.text
     assert "RECENT HEARTBEAT" in monitor.text
     assert "CONTENT READY" in monitor.text
+    assert "LIVE VERIFICATION" in monitor.text
+    assert "start-verification" in monitor.text
+    assert "/api/v1/extension/verification" in monitor.text
     assert "chrome.storage" not in monitor.text
     assert "/api/v1/extension/status" in monitor.text
     assert dashboard.status_code == 200

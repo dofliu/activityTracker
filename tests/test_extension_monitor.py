@@ -63,8 +63,9 @@ def test_extension_status_separates_enabled_observed_and_pairing(tmp_path):
                 platform="chatgpt",
                 url="https://chatgpt.com/c/example",
                 prompt_text="test",
+                response_text="captured answer",
                 turn_key="browser-turn",
-                response_status="partial",
+                response_status="final_candidate",
             )
         )
         # CLI source 不得被誤算成 Browser Extension event。
@@ -92,7 +93,10 @@ def test_extension_status_separates_enabled_observed_and_pairing(tmp_path):
     assert unpaired["extension"]["pairing_verified"] is False
     assert paired["extension"]["pairing_verified"] is True
     assert paired["extension"]["events_total"] == 1
+    assert paired["extension"]["responses_total"] == 1
     assert chatgpt["enabled"] is True and chatgpt["events_total"] == 1
+    assert chatgpt["responses_total"] == 1
+    assert chatgpt["final_candidates_total"] == 1
     assert gemini["enabled"] is False and gemini["events_total"] == 0
     assert "secret-token" not in str(paired)
 
@@ -119,6 +123,10 @@ def test_verified_heartbeat_is_persisted_without_sensitive_content(tmp_path):
             "instance_id": "extension-instance-1",
             "extension_version": "1.2.0",
             "ready_platforms": ["chatgpt", "unsupported"],
+            "ready_platform_receipts": [
+                {"platform": "chatgpt", "seen_at": datetime(2026, 8, 25, 9, 59)},
+                {"platform": "unsupported", "seen_at": datetime(2026, 8, 25, 9, 59)},
+            ],
             "last_capture_status": "content_ready",
             "last_capture_at": datetime(2026, 8, 25, 9, 58),
             "last_error_code": None,
@@ -143,6 +151,7 @@ def test_verified_heartbeat_is_persisted_without_sensitive_content(tmp_path):
     assert status["extension"]["capture_status"] == "paired_waiting_event"
     assert status["extension"]["ready_platforms"] == ["chatgpt"]
     assert chatgpt["content_script_seen"] is True
+    assert chatgpt["content_script_last_seen_at"] == "2026-08-25T09:59:00"
     assert "secret-token" not in str(status)
     assert "must never be stored" not in str(status)
 

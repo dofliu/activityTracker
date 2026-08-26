@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **Current status: Personal Alpha.** Windows milestone WinRT Toast E2E, schema 7/7, formal package+database rollback, P3-2 through P3-5 Context Memory Alpha, P5-1 proposal-only Alpha, a collector restart E2E, runtime degraded diagnostics, and the cross-platform CI matrix have passed. ChatGPT live DOM selectors were repaired, and Claude Desktop Cowork/local-agent transcript capture passed a Windows E2E. Authenticated Claude.ai/Manus Browser capture and a live Extension heartbeat still lack receipts, so this is not release-ready.
+> **Current status: Personal Alpha.** Windows milestone WinRT Toast E2E, schema 7/7, formal package+database rollback, P3-2 through P3-5 Context Memory Alpha, P5-1 proposal-only Alpha, collector runtime diagnostics, the Extension 1.3.1 live-verification harness, and the cross-platform CI matrix have passed. ChatGPT live DOM selectors were repaired, and Claude Desktop Cowork/local-agent transcript capture passed a Windows E2E. Claude.ai/Manus still lack a current-run PASS receipt, and a live Extension heartbeat still requires logged-in Chrome verification, so this is not release-ready.
 
 **Documentation:** [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
 

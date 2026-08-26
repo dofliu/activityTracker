@@ -1,6 +1,6 @@
 # OmniContext 開發規劃與成果紀錄 — P0 ~ P6
 
-> 最新更新日期：2026-08-26　｜　目前狀態：**personal alpha / P2.6 + P3 context memory + P5-1 proposal-only alpha**。P3-1～P3-5、Windows Toast E2E、formal rollback、Windows/macOS/Linux CI、P5-1 localhost receipts 與 collector runtime degraded diagnostics 已完成；ChatGPT live selectors 已修復。Claude/Manus authenticated capture 與 Extension live heartbeat 尚未完成，整體不具 release-ready 或 autonomous-ready 資格。
+> 最新更新日期：2026-08-26　｜　目前狀態：**personal alpha / P2.6 + P3 context memory + P5-1 proposal-only alpha**。P3-1～P3-5、Windows Toast E2E、formal rollback、Windows/macOS/Linux CI、P5-1、collector runtime diagnostics 與 Extension 1.3.1 live-verification harness 已完成；ChatGPT live selectors 已修復。Claude/Manus 本輪 PASS receipt 與 Extension live heartbeat 尚未完成，整體不具 release-ready 或 autonomous-ready 資格。
 > 本文件記錄 OmniContext 從 0 到 1 的缺陷修復歷程、已完成之架構改造與未來的維運與延伸規劃。
 
 ---
@@ -109,7 +109,7 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 
 1. **Chrome MV3 擴充套件實機載入**：
    - Gemini 已有 3 筆 Browser events／2 筆 response；ChatGPT 已完成 2026-08-25 真實 DOM prompt/response selector probe 並修復繁中 send click。
-   - Claude.ai／Manus authenticated capture 與 Extension 1.3.0 live heartbeat 仍待瀏覽器登入、Reload 與逐站 receipt。
+   - Extension 1.3.1 已加入 start baseline、Content Ready timestamp、event/response delta 與 JSON receipt；Claude.ai／Manus 本輪 PASS 與 live heartbeat 仍待已登入 Chrome Reload 後取得。
 2. **自動開機排程佈署 (`scripts/install_autostart.ps1`)**：
    - 註冊 Windows Task Scheduler 工作排程，支援背景靜默啟動（`pythonw.exe`）。
 3. **視窗採集器持續觀察**：
@@ -124,7 +124,14 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 
 > Architecture decision：在語意記憶與自主執行之前，先讓「來源、turn、回應、待辦、權限與執行平台」都有明確契約。P5 在本節所有 release blockers 關閉前維持 blocked。
 
-**2026-08-25 實作結果：**append-only SQLite registry 已擴充至 7/7；Windows WinRT milestone Toast E2E 與 `1.3.0a1/schema4 → 1.3.0a2/schema5 → rollback` rehearsal 通過。Extension `1.3.0` 採 shared capture core，加入 localized click、form submit 與 response baseline；ChatGPT live DOM probe 通過，Claude/Manus authenticated receipt 仍待完成。P3-2～P3-5 已進入 Alpha；跨平台 workflow run `32757498004` 的六個 jobs 已通過。
+**2026-08-26 實作結果：**append-only SQLite registry 維持 7/7；Windows WinRT milestone Toast E2E 與 `1.3.0a1/schema4 → 1.3.0a2/schema5 → rollback` rehearsal 通過。Extension `1.3.1` 在 shared capture core 上新增 timestamped Content Ready receipt 與 fail-closed live verifier；ChatGPT live DOM probe 通過，Claude/Manus 本輪 PASS receipt 仍待完成。P3-2～P3-5 已進入 Alpha；跨平台 workflow run `32757498004` 的六個 jobs 已通過。
+
+### P2.5-B2 Extension live-verification harness
+
+- `POST /api/v1/extension/verification` 建立 process-local baseline；`GET /api/v1/extension/verification/{id}` 每次以目前 heartbeat 與資料庫 counts 重新判定。
+- PASS 必須同時具備開始後的新 token-authenticated heartbeat、每站新的 Content Ready timestamp、新 Browser event 與非空 assistant response；歷史 `OBSERVED`、單獨 heartbeat 或只有 prompt 都不能通過。
+- Receipt 僅含平台、counts、timestamps 與 stable state，不含 token、URL、Prompt、Response 或本機 path；baseline 不寫入 SQLite，service restart 後失效。
+- **Localhost receipt（2026-08-26）**：Claude/Manus run 可由 UI 建立並進入 RUNNING；因本工作階段無法接管使用者已登入 Chrome，heartbeat、Content Ready、event 與 response delta 均維持 0，正確未升格為 PASS。494px 無頁面水平 overflow，console 無錯誤；完整測試 85/85。
 
 ### P2.5-S1 本機 API 安全邊界
 

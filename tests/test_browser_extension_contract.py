@@ -14,6 +14,7 @@ def test_mv3_background_uses_alarm_heartbeat_and_never_logs_prompt_preview():
     assert "/api/v1/extension/heartbeat" in background
     assert "chrome.alarms.create" in background
     assert "OMNICONTEXT_HEARTBEAT_NOW" in background
+    assert "ready_platform_receipts" in background
     assert "setInterval" not in background
     assert "prompt_text" not in " ".join(
         line for line in background.splitlines() if "console." in line

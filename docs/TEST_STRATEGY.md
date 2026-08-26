@@ -102,6 +102,9 @@ python main.py extension-path
 - Extension origin 未帶或帶錯 token 時 pairing probe 為 403；正確 token 才可通過。
 - `POST /api/v1/extension/heartbeat` 即使沒有 Origin 也必須要求 token；payload 不得包含 URL、Prompt、Response 或 token。
 - Heartbeat receipt 必須區分 recent/stale；離開 SQLAlchemy session 後仍可安全產生 status snapshot。
+- Live verification baseline 只保留在目前 server process，不寫入 SQLite；server restart 後舊 verification ID 必須失效。
+- 歷史 event、response、Content Ready 與 heartbeat 不得使新 verification run 通過；每個選定平台都必須在開始後新增 Content Ready timestamp、event 與非空 response。
+- Verification timeout 必須 fail-closed；API request 採 `extra=forbid`、只允許 localhost dashboard，且 receipt 不得輸出 token、URL、Prompt、Response 或本機 path。
 
 ### Frontend / smoke tests
 
@@ -111,7 +114,9 @@ python main.py extension-path
 - 主頁不得重複顯示完整 Extension Monitor；token、heartbeat 與逐站診斷只保留在 `/extension-monitor`。
 - popup 分開顯示 service health 與 token pairing status。
 - MV3 background 必須使用 `chrome.alarms`，每個 content script 回報 ready，console 不得輸出 Prompt preview。
+- Extension Monitor 必須支援逐站選擇、5 秒 polling、RUNNING／PASS／FAILED、event／response delta 與 JSON receipt 下載。
 - 監控配置的通用欄位寬度規則不得套用到 checkbox；desktop、tablet 與窄螢幕都必須維持水平標籤且無水平 overflow。
+- 494px live-verification smoke 必須維持單欄、無頁面水平 overflow，且 console 無 error／warning。
 - Windows live API 與 dashboard render smoke；macOS/Linux 驗證 `unavailable` graceful degradation。
 
 ## P3 Semantic Index / `omni ask` / Context Memory Matrix
@@ -142,7 +147,7 @@ python main.py extension-path
 
 `.github/workflows/platform-matrix.yml` 在 Windows、Ubuntu、macOS 的 Python 3.10/3.12 執行 pytest、compileall、Extension JS syntax、build、artifact privacy/content 與 installed writable-home/API/assets smoke。2026-08-25 GitHub Actions run `32757498004` 的六個 jobs 全數通過；未來 commit 仍須以各自 run receipt 判定，不沿用本次結果。
 
-2026-08-26 本機完整 `pytest` 為 **81/81**。Collector recovery E2E 曾將 window events 從 2281 推進至 2289、AI events 從 2722 推進至 2800；本輪 runtime diagnostics 重啟又將 window events `2323 → 2324`、AI events `2894 → 2895`，live API 回報 `monitoring_state=healthy` 且 Window／四個 Agent sources 均 healthy。494px degraded DOM smoke 正確顯示 `2 DEGRADED`、`claude_desktop` source error，無頁面水平 overflow 或 console error。這些 receipt 證明 diagnostics 與單次資料推進，不代表全天 continuous coverage，也不代表 Extension 已連線。
+2026-08-26 本機完整 `pytest` 為 **85/85**。Collector runtime diagnostics、Extension timestamped Content Ready、response counts 與 fail-closed live verifier contracts 均通過。localhost Claude／Manus run 可建立 baseline 並正確維持 RUNNING：歷史 `10 events / 6 responses`、今日 0、heartbeat 0 不會升格為 PASS；487px Monitor 無頁面水平 overflow且 console 無錯誤。這證明 verifier 與 UI 行為，不代表 Extension 已在使用者 Chrome 連線，也不代表全天 continuous coverage。
 
 Claude Desktop Cowork／local-agent Windows incremental scan曾新增 148 turns、125 筆非空 response、117 筆 `final_candidate`，stable parser 重跑不新增重複 turn。這是本機 Cowork／local-agent receipt，不外推為一般 Claude 雲端聊天 coverage。
 

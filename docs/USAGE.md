@@ -109,7 +109,7 @@ python main.py init --show-token
 ```
 
 6. 將 token 貼入 Extension popup 並儲存。
-7. 在 `chrome://extensions/`／`edge://extensions/` 按一次 Reload，讓 Extension `1.3.0` background、shared capture core 與 content scripts 生效。
+7. 在 `chrome://extensions/`／`edge://extensions/` 按一次 Reload，讓 Extension `1.3.1` background、timestamped Content Ready receipt、shared capture core 與 content scripts 生效。
 8. popup 顯示 pairing 成功與近期 Heartbeat 後，開啟支援網站並完成一輪對話，再到 Extension Monitor 查看 `OBSERVED` 狀態。
 
 目前支援 ChatGPT、Claude.ai、Gemini 與 Manus。Monitor 顯示 ONLINE 只證明 localhost service 正常；RECENT HEARTBEAT 代表 Extension 曾以正確 token 抵達 server；CONTENT READY 代表支援網站載入過 content script；只有 OBSERVED 才代表資料庫已有真實 Browser event。任何單一狀態都不代表完整 coverage。請勿把 token 放入截圖、issue、commit 或公開日誌。
@@ -122,7 +122,29 @@ python main.py init --rotate-token --show-token
 
 旋轉後必須重新貼入 Extension popup。
 
-### 3.1 Claude Desktop 對話採集範圍
+### 3.1 執行本輪 Extension Live Verification
+
+在 <http://127.0.0.1:8765/extension-monitor> 的 `LIVE VERIFICATION` 勾選要驗證的平台並按「開始 10 分鐘驗證」。開始後依序：
+
+1. Reload OmniContext Extension 並開啟 popup，產生新的 token-authenticated heartbeat。
+2. 重新載入每個勾選的平台分頁，產生開始後的 Content Ready timestamp。
+3. 每站使用一個新 Prompt，等待完整 assistant response。
+4. Monitor 每 5 秒檢查；全部通過後下載 JSON receipt。
+
+PASS 同時要求本輪的新 heartbeat、Content Ready、Browser event 與非空 response。歷史 `OBSERVED`、單獨 heartbeat、只有 Prompt 或桌面前景時間都不能通過。Receipt 不包含 token、URL、Prompt、Response 或本機 path；verification baseline 只存在目前 service process，重啟後失效。
+
+也可用 API 建立與查詢：
+
+```powershell
+$run = Invoke-RestMethod -Method Post `
+  -Uri http://127.0.0.1:8765/api/v1/extension/verification `
+  -ContentType application/json `
+  -Body '{"platforms":["claude","manus"],"timeout_seconds":600}'
+
+Invoke-RestMethod "http://127.0.0.1:8765/api/v1/extension/verification/$($run.verification_id)"
+```
+
+### 3.2 Claude Desktop 對話採集範圍
 
 Claude Desktop 有兩種不同資料面：
 

@@ -6,7 +6,7 @@
 
 ## Pre-Deploy
 
-- [x] 60 個 contract tests 通過；Python compile、Extension JS syntax、TOML/YAML parse 與 diff check 通過。
+- [x] 85 個 contract tests 通過；Python compile、Extension JS syntax、TOML/YAML parse 與 diff check 通過。
 - [x] SQLite migration fresh/legacy/live upgrade 為 `7/7`。
 - [x] Wheel/sdist build 在隔離 PEP 517 environment 通過。
 - [x] Artifact receipt 確認 config template、Dashboard、Extension assets 與 CLI entry point 均存在。
@@ -16,7 +16,7 @@
 - [x] `1.3.0a3` wheel/sdist content/privacy receipt、fresh installed writable-home、schema 7/7 與 HTTP assets smoke 通過。
 - [x] Windows／Ubuntu／macOS × Python 3.10／3.12 GitHub Actions matrix 六個 jobs 通過（run `32757498004`）。
 - [x] Gemini Browser ingestion 已觀察 3 筆 event，其中 2 筆有 response。
-- [ ] Extension `1.3.0` 重新載入後的 recent verified heartbeat receipt 通過。
+- [ ] Extension `1.3.1` 重新載入後的 Claude／Manus live verification PASS receipt 通過；需同時具備開始後 heartbeat、Content Ready、event 與非空 response delta。
 - [x] ChatGPT 真實 DOM prompt/response selector probe 與繁中 send click 修復通過；該測試瀏覽器未載入 Extension，因此不等於 DB capture receipt。
 - [ ] Claude、Manus authenticated real-browser ingestion 尚未逐站驗證。
 - [x] 真實 Windows WinRT milestone Toast E2E、DB receipt 與 duplicate suppression 通過。

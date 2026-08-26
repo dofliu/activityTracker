@@ -28,6 +28,7 @@ from .security import (
     redact_config,
 )
 from .extension_monitor import build_extension_status, record_extension_heartbeat
+from .extension_verification import extension_verification_registry
 from .capture_coverage import build_capture_coverage
 from .context_memory import build_recent_work_sessions, find_related_work
 from .proactive_secretary import build_action_proposals
@@ -146,16 +147,34 @@ class AIPromptCreate(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
 
 
+class ExtensionContentReadyReceipt(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    platform: str = Field(..., min_length=1, max_length=20)
+    seen_at: datetime
+
+
 class ExtensionHeartbeatCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     instance_id: str = Field(..., min_length=1, max_length=64)
     extension_version: str = Field(..., min_length=1, max_length=32)
     ready_platforms: list[str] = Field(default_factory=list, max_length=4)
+    ready_platform_receipts: list[ExtensionContentReadyReceipt] = Field(
+        default_factory=list,
+        max_length=4,
+    )
     last_capture_status: str = Field("none", max_length=40)
     last_capture_at: Optional[datetime] = None
     last_error_code: Optional[str] = Field(None, max_length=80)
     offline_queue_size: int = Field(0, ge=0, le=100)
+
+
+class ExtensionVerificationStart(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    platforms: list[str] = Field(..., min_length=1, max_length=4)
+    timeout_seconds: int = Field(600, ge=60, le=1800)
 
 
 class FileActivityCreate(BaseModel):
@@ -244,6 +263,26 @@ def receive_extension_heartbeat(payload: ExtensionHeartbeatCreate, request: Requ
     if not extension_ingest_authorized(token, cfg):
         raise HTTPException(status_code=401, detail="Extension ingest token is invalid")
     return record_extension_heartbeat(payload.model_dump())
+
+
+@app.post("/api/v1/extension/verification", status_code=201)
+def start_extension_verification(payload: ExtensionVerificationStart):
+    """建立 process-local baseline；不保存 token、對話內容或 verification run。"""
+    try:
+        return extension_verification_registry.start(
+            payload.platforms,
+            timeout_seconds=payload.timeout_seconds,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/extension/verification/{verification_id}")
+def get_extension_verification(verification_id: str):
+    try:
+        return extension_verification_registry.get(verification_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Verification run not found") from exc
 
 
 @app.get("/api/v1/usage/today")
