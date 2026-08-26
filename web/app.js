@@ -46,9 +46,10 @@ const I18N = {
     btn_quick_summary: "⚡ 生成今日摘要",
     tab_projects: "01 · 進行中工作",
     tab_dashboard: "02 · 即時情報流",
-    tab_settings: "03 · 監控配置",
-    tab_summaries: "04 · 每日摘要",
-    tab_checkpoints: "05 · 活動快照",
+    tab_rag: "03 · 📚 知識庫與 RAG",
+    tab_settings: "04 · 監控配置",
+    tab_summaries: "05 · 每日摘要",
+    tab_checkpoints: "06 · 活動快照",
     resume_head: "RESUME HERE",
     resume_sub: "上次做到哪",
     context_sessions_title: "RECENT WORK SESSIONS",
@@ -191,9 +192,10 @@ const I18N = {
     btn_quick_summary: "⚡ Today's Summary",
     tab_projects: "01 · Active Workstreams",
     tab_dashboard: "02 · Live Feed",
-    tab_settings: "03 · Settings",
-    tab_summaries: "04 · Daily Summaries",
-    tab_checkpoints: "05 · Checkpoints",
+    tab_rag: "03 · 📚 Knowledge & RAG",
+    tab_settings: "04 · Settings",
+    tab_summaries: "05 · Daily Summaries",
+    tab_checkpoints: "06 · Checkpoints",
     resume_head: "RESUME HERE",
     resume_sub: "Where You Left Off",
     context_sessions_title: "RECENT WORK SESSIONS",
@@ -399,6 +401,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initGitHubSection();
   initSummariesTab();
   initCheckpointsTab();
+  initRAGTab();
 
   refreshStatus();
   refreshFeed();
@@ -411,6 +414,9 @@ document.addEventListener("DOMContentLoaded", () => {
   loadUsagePanels();
   loadContextSessions();
   loadSecretaryProposals();
+  loadRAGFolders();
+  loadRAGSessions();
+  loadRAGStrategies();
 
   setInterval(() => { refreshStatus(); refreshFeed(); }, POLL_MS);
   setInterval(loadUsagePanels, 30000);
@@ -443,6 +449,7 @@ function initTabs() {
       const id = tab.dataset.tab;
       $(id).classList.add("active");
       if (id === "tab-projects") { loadProjects(); loadUsagePanels(); loadContextSessions(); loadSecretaryProposals(); }
+      if (id === "tab-rag") { loadRAGFolders(); loadRAGFiles(); loadRAGSessions(); loadRAGProgress(); loadRAGStrategies(); }
       if (id === "tab-settings") loadConfig();
       if (id === "tab-summaries") loadSummaries();
       if (id === "tab-checkpoints") loadCheckpoints();
@@ -1993,5 +2000,522 @@ async function triggerCheckpoint() {
     btn.textContent = "產出失敗";
   } finally {
     setTimeout(() => { btn.disabled = false; btn.textContent = label; }, 1400);
+  }
+}
+
+// ---------------------------------------------------------------- DeskRAG Knowledge & Chat
+let ragSessionsCache = [];
+let currentRagSessionId = "";
+let ragChatHistory = [];
+let isRagStreaming = false;
+
+function initRAGTab() {
+  // 新增目錄
+  const addBtn = $("btn-rag-add-folder");
+  if (addBtn) {
+    addBtn.addEventListener("click", async () => {
+      const pathInput = $("input-rag-folder-path");
+      const nameInput = $("input-rag-folder-name");
+      const path = (pathInput.value || "").trim();
+      const name = (nameInput.value || "").trim();
+      if (!path) {
+        alert("請輸入有效的本機目錄絕對路徑！");
+        return;
+      }
+      try {
+        addBtn.disabled = true;
+        addBtn.textContent = "⏳ 加入中…";
+        await postJSON("/api/v1/rag/folders", { path, name: name || undefined });
+        pathInput.value = "";
+        nameInput.value = "";
+        loadRAGFolders();
+        startRAGProgressPolling();
+      } catch (e) {
+        alert("加入目錄失敗: " + e.message);
+      } finally {
+        addBtn.disabled = false;
+        addBtn.textContent = "+ 加入";
+      }
+    });
+  }
+
+  // 立即全量掃描
+  const scanBtn = $("btn-rag-scan-now");
+  if (scanBtn) {
+    scanBtn.addEventListener("click", async () => {
+      try {
+        scanBtn.disabled = true;
+        scanBtn.textContent = "⏳ 啟動中…";
+        await postJSON("/api/v1/rag/scan", {});
+        startRAGProgressPolling();
+      } catch (e) {
+        alert("啟動掃描失敗: " + e.message);
+      } finally {
+        setTimeout(() => { scanBtn.disabled = false; scanBtn.textContent = "⚡ 掃描索引"; }, 1500);
+      }
+    });
+  }
+
+  // 搜尋檔案
+  const fileSearchInput = $("input-rag-file-search");
+  if (fileSearchInput) {
+    let debounceTimer = null;
+    fileSearchInput.addEventListener("input", (e) => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        loadRAGFiles(e.target.value.trim());
+      }, 300);
+    });
+  }
+
+  // 切換對話 Session
+  const sessionSelect = $("select-rag-session");
+  if (sessionSelect) {
+    sessionSelect.addEventListener("change", (e) => {
+      const sId = e.target.value;
+      currentRagSessionId = sId;
+      if (sId) {
+        loadRAGMessages(sId);
+      } else {
+        ragChatHistory = [];
+        renderRAGMessages();
+      }
+    });
+  }
+
+  // 開新對話
+  const newChatBtn = $("btn-rag-new-chat");
+  if (newChatBtn) {
+    newChatBtn.addEventListener("click", () => {
+      currentRagSessionId = "";
+      if (sessionSelect) sessionSelect.value = "";
+      ragChatHistory = [];
+      renderRAGMessages();
+      $("input-rag-prompt").focus();
+    });
+  }
+
+  // 刪除對話
+  const delChatBtn = $("btn-rag-del-chat");
+  if (delChatBtn) {
+    delChatBtn.addEventListener("click", async () => {
+      if (!currentRagSessionId) return;
+      if (!confirm("確定要刪除此對話紀錄嗎？")) return;
+      try {
+        await fetch(API + `/api/v1/rag/chat/sessions/${encodeURIComponent(currentRagSessionId)}`, { method: "DELETE" });
+        currentRagSessionId = "";
+        ragChatHistory = [];
+        renderRAGMessages();
+        loadRAGSessions();
+      } catch (e) {
+        alert("刪除失敗: " + e.message);
+      }
+    });
+  }
+
+  // 切換提供者自動帶出預設模型
+  const providerSelect = $("select-rag-provider");
+  if (providerSelect) {
+    providerSelect.addEventListener("change", (e) => {
+      const prov = e.target.value;
+      const modelInput = $("input-rag-model");
+      if (!modelInput) return;
+      if (prov === "gemini") modelInput.value = "gemini-3.7-flash";
+      else if (prov === "claude") modelInput.value = "claude-3-5-sonnet-20241022";
+      else if (prov === "openai") modelInput.value = "gpt-4o";
+      else if (prov === "ollama") modelInput.value = "llama3.2:latest";
+    });
+  }
+
+  // 發送訊息
+  const sendBtn = $("btn-rag-send");
+  const promptInput = $("input-rag-prompt");
+  if (sendBtn && promptInput) {
+    sendBtn.addEventListener("click", sendRAGChatMessage);
+    promptInput.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        sendRAGChatMessage();
+      }
+    });
+  }
+
+  // 清空視窗
+  const clearBtn = $("btn-rag-clear");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      ragChatHistory = [];
+      renderRAGMessages();
+    });
+  }
+}
+
+async function loadRAGFolders() {
+  try {
+    const folders = await getJSON("/api/v1/rag/folders");
+    const container = $("rag-folders-list");
+    if (!container) return;
+    if (!folders.length) {
+      container.innerHTML = '<div class="placeholder">尚未加入任何目錄。請在上方輸入目錄路徑以建立知識庫。</div>';
+      return;
+    }
+    container.innerHTML = folders.map(f => `
+      <div class="rag-folder-card">
+        <div class="rag-folder-info">
+          <div class="rag-folder-name">${esc(f.name || Path_basename(f.path))} <span class="mono-mini muted">(${f.file_count || 0} 檔案)</span></div>
+          <div class="rag-folder-path" title="${esc(f.path)}">${esc(f.path)}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="deleteRAGFolder(${f.id})" style="color:var(--danger); padding:2px 6px;">✕</button>
+      </div>
+    `).join("");
+  } catch (e) {
+    console.error("loadRAGFolders error:", e);
+  }
+}
+
+function Path_basename(p) {
+  if (!p) return "";
+  const parts = p.replace(/[\\/]+$/, "").split(/[\\/]/);
+  return parts[parts.length - 1] || p;
+}
+
+async function deleteRAGFolder(id) {
+  if (!confirm("確定要移除此目錄及其向量索引嗎？")) return;
+  try {
+    await fetch(API + `/api/v1/rag/folders/${id}`, { method: "DELETE" });
+    loadRAGFolders();
+    loadRAGFiles();
+  } catch (e) {
+    alert("刪除失敗: " + e.message);
+  }
+}
+
+let ragProgressPollTimer = null;
+function startRAGProgressPolling() {
+  const box = $("rag-progress-box");
+  if (box) box.style.display = "block";
+  if (ragProgressPollTimer) clearInterval(ragProgressPollTimer);
+
+  ragProgressPollTimer = setInterval(async () => {
+    try {
+      const data = await getJSON("/api/v1/rag/progress");
+      const bar = $("rag-progress-bar");
+      const percentText = $("rag-progress-percent");
+      const statusText = $("rag-progress-status");
+      const detailText = $("rag-progress-detail");
+      const totalChunks = $("rag-total-chunks-count");
+
+      if (totalChunks) totalChunks.textContent = `${data.total_indexed_chunks || 0} 切片`;
+
+      if (data.is_running) {
+        if (box) box.style.display = "block";
+        if (bar) bar.style.width = `${data.progress_percent || 0}%`;
+        if (percentText) percentText.textContent = `${data.progress_percent || 0}%`;
+        if (statusText) statusText.textContent = data.status === "scanning" ? "掃描目錄中…" : "正在建立切片向量…";
+        if (detailText) detailText.textContent = `處理中: ${esc(data.current_file || "")} (${data.processed_files}/${data.total_files})`;
+      } else {
+        if (bar) bar.style.width = `100%`;
+        if (percentText) percentText.textContent = `100%`;
+        if (statusText) statusText.textContent = "✅ 索引完成";
+        if (detailText) detailText.textContent = `共完成 ${data.processed_files || 0} 個檔案，耗時 ${data.elapsed_seconds || 0} 秒`;
+        clearInterval(ragProgressPollTimer);
+        ragProgressPollTimer = null;
+        loadRAGFolders();
+        loadRAGFiles();
+        setTimeout(() => { if (box && !progress.is_running) box.style.display = "none"; }, 5000);
+      }
+    } catch (e) {
+      clearInterval(ragProgressPollTimer);
+      ragProgressPollTimer = null;
+    }
+  }, 1000);
+}
+
+async function loadRAGProgress() {
+  try {
+    const data = await getJSON("/api/v1/rag/progress");
+    const totalChunks = $("rag-total-chunks-count");
+    if (totalChunks) totalChunks.textContent = `${data.total_indexed_chunks || 0} 切片`;
+    if (data.is_running) startRAGProgressPolling();
+  } catch (e) {}
+}
+
+async function loadRAGFiles(search = "") {
+  try {
+    const url = `/api/v1/rag/files?page=1&page_size=50${search ? `&search=${encodeURIComponent(search)}` : ""}`;
+    const res = await getJSON(url);
+    const container = $("rag-files-list");
+    const countSpan = $("rag-total-files-count");
+    if (countSpan) countSpan.textContent = res.total || 0;
+    if (!container) return;
+
+    if (!res.items || !res.items.length) {
+      container.innerHTML = '<div class="placeholder">目前無符合條件的檔案。</div>';
+      return;
+    }
+
+    container.innerHTML = res.items.map(file => `
+      <div class="rag-file-item" onclick="openRAGFileInExplorer('${esc(file.path).replace(/'/g, "\\'")}')" title="點擊在 Windows 總管開啟: ${esc(file.path)}">
+        <div class="rag-file-name">📄 ${esc(file.filename)}</div>
+        <div style="display:flex; gap:4px; align-items:center;">
+          <span class="mono-mini muted">${file.chunk_count || 0} 切片</span>
+          <span class="rag-file-badge ${file.status === "indexed" ? "indexed" : "failed"}">${file.status === "indexed" ? "OK" : "ERR"}</span>
+        </div>
+      </div>
+    `).join("");
+  } catch (e) {
+    console.error("loadRAGFiles error:", e);
+  }
+}
+
+async function openRAGFileInExplorer(path) {
+  try {
+    await postJSON("/api/v1/rag/open-file", { path });
+  } catch (e) {
+    alert("無法開啟總管: " + e.message);
+  }
+}
+
+async function loadRAGSessions() {
+  try {
+    const sessions = await getJSON("/api/v1/rag/chat/sessions");
+    ragSessionsCache = sessions;
+    const select = $("select-rag-session");
+    if (!select) return;
+
+    select.innerHTML = '<option value="">新對話</option>' + sessions.map(s => `
+      <option value="${esc(s.id)}" ${s.id === currentRagSessionId ? "selected" : ""}>${esc(s.title)}</option>
+    `).join("");
+  } catch (e) {}
+}
+
+async function loadRAGStrategies() {
+  try {
+    const data = await getJSON("/api/v1/rag/strategies");
+    const select = $("select-rag-strategy");
+    if (!select || !data.strategies) return;
+    select.innerHTML = data.strategies.map(st => `
+      <option value="${esc(st.name)}" ${st.name === data.default ? "selected" : ""}>${esc(st.display_name)}</option>
+    `).join("");
+  } catch (e) {}
+}
+
+async function loadRAGMessages(sessionId) {
+  try {
+    const messages = await getJSON(`/api/v1/rag/chat/messages/${encodeURIComponent(sessionId)}`);
+    ragChatHistory = messages.map(m => ({
+      role: m.role,
+      content: m.content,
+      citations: m.citations || [],
+      provider: m.provider,
+      model: m.model,
+      time: m.created_at
+    }));
+    renderRAGMessages();
+  } catch (e) {
+    console.error("loadRAGMessages error:", e);
+  }
+}
+
+function renderRAGMessages() {
+  const container = $("rag-chat-messages");
+  if (!container) return;
+
+  if (!ragChatHistory.length) {
+    container.innerHTML = `
+      <div class="placeholder" style="margin: auto; text-align: center;">
+        <div style="font-size: 28px; margin-bottom: 8px;">📚</div>
+        <div style="font-weight: 600; margin-bottom: 4px;">DeskRAG 本地文件智慧助手</div>
+        <div class="muted small">請在下方輸入問題，系統將結合本地知識庫與活動記錄進行精準問答與引文標註。</div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = ragChatHistory.map((msg, idx) => {
+    const isUser = msg.role === "user";
+    const renderedContent = isUser
+      ? esc(msg.content).replace(/\n/g, "<br>")
+      : (window.marked ? marked.parse(msg.content) : esc(msg.content).replace(/\n/g, "<br>"));
+
+    let citationsHtml = "";
+    if (!isUser && msg.citations && msg.citations.length) {
+      citationsHtml = `
+        <div class="rag-citations-box">
+          <div class="rag-citations-title">📌 參考文檔來源 (${msg.citations.length} 個切片)：</div>
+          ${msg.citations.map(c => `
+            <div class="rag-citation-card">
+              <div class="rag-citation-head">
+                <div class="rag-citation-filename">《${esc(c.filename || c.title || "文件")}》</div>
+                <div class="rag-citation-tags">
+                  ${c.page ? `<span class="rag-citation-tag">第 ${c.page} 頁</span>` : ""}
+                  ${c.slide ? `<span class="rag-citation-tag">第 ${c.slide} 投影片</span>` : ""}
+                  ${c.sheet ? `<span class="rag-citation-tag">工作表 ${esc(c.sheet)}</span>` : ""}
+                  <span class="rag-citation-tag score">相關度 ${c.score}</span>
+                  <button class="rag-btn-open" onclick="openRAGFileInExplorer('${esc(c.file_path).replace(/'/g, "\\'")}')" title="在 Windows 總管開啟並選中">📂 在總管開啟</button>
+                </div>
+              </div>
+              <div class="rag-citation-content">${esc(c.content || "")}</div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    return `
+      <div class="rag-msg ${isUser ? "user" : "assistant"}">
+        <div class="rag-msg-bubble markdown">${renderedContent}${citationsHtml}</div>
+        <div class="rag-msg-meta">
+          <span>${isUser ? "YOU" : `AI (${esc(msg.provider || "ollama")} · ${esc(msg.model || "")})`}</span>
+          ${msg.time ? `<span>${esc(msg.time)}</span>` : ""}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  container.scrollTop = container.scrollHeight;
+}
+
+async function sendRAGChatMessage() {
+  if (isRagStreaming) return;
+  const promptInput = $("input-rag-prompt");
+  const prompt = (promptInput.value || "").trim();
+  if (!prompt) return;
+
+  promptInput.value = "";
+  const provider = $("select-rag-provider").value;
+  const model = $("input-rag-model").value;
+  const strategy = $("select-rag-strategy").value;
+  const enableRag = $("toggle-enable-rag").checked;
+
+  // 1. 建立或確保 Session
+  if (!currentRagSessionId) {
+    try {
+      const sTitle = prompt.slice(0, 24);
+      const sRes = await postJSON("/api/v1/rag/chat/sessions", { title: sTitle });
+      currentRagSessionId = sRes.session_id;
+      loadRAGSessions();
+    } catch (e) {
+      currentRagSessionId = "session_" + Date.now();
+    }
+  }
+
+  // 2. 加入 User 訊息
+  const userMsg = {
+    role: "user",
+    content: prompt,
+    provider,
+    model,
+    time: new Date().toLocaleTimeString()
+  };
+  ragChatHistory.push(userMsg);
+
+  // 儲存 User Message 到後端
+  postJSON("/api/v1/rag/chat/messages", {
+    session_id: currentRagSessionId,
+    role: "user",
+    content: prompt,
+    provider,
+    model
+  }).catch(() => {});
+
+  // 3. 準備 Assistant 訊息佔位
+  const assistantMsg = {
+    role: "assistant",
+    content: "",
+    citations: [],
+    provider,
+    model,
+    time: new Date().toLocaleTimeString()
+  };
+  ragChatHistory.push(assistantMsg);
+  renderRAGMessages();
+
+  // 4. 開始 SSE 串流
+  isRagStreaming = true;
+  const sendBtn = $("btn-rag-send");
+  if (sendBtn) {
+    sendBtn.disabled = true;
+    sendBtn.textContent = "串流中…";
+  }
+
+  try {
+    const apiMessages = ragChatHistory.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
+    const response = await fetch(API + "/api/v1/rag/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: currentRagSessionId,
+        messages: apiMessages,
+        provider,
+        model,
+        enable_rag: enableRag,
+        retrieval_strategy: strategy
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n\n");
+      buffer = lines.pop(); // keep remainder
+
+      for (const block of lines) {
+        if (!block.trim()) continue;
+        const lineParts = block.split("\n");
+        let eventType = "";
+        let eventData = "";
+
+        for (const lp of lineParts) {
+          if (lp.startsWith("event: ")) eventType = lp.replace("event: ", "").trim();
+          if (lp.startsWith("data: ")) eventData = lp.replace("data: ", "").trim();
+        }
+
+        if (eventType === "citations" && eventData) {
+          try {
+            assistantMsg.citations = JSON.parse(eventData);
+            renderRAGMessages();
+          } catch (e) {}
+        } else if (eventType === "message" && eventData) {
+          try {
+            const tokenObj = JSON.parse(eventData);
+            assistantMsg.content += tokenObj.token || "";
+            renderRAGMessages();
+          } catch (e) {}
+        } else if (eventType === "done") {
+          break;
+        }
+      }
+    }
+
+    // 儲存 Assistant Message 到後端
+    postJSON("/api/v1/rag/chat/messages", {
+      session_id: currentRagSessionId,
+      role: "assistant",
+      content: assistantMsg.content,
+      citations: assistantMsg.citations,
+      provider,
+      model
+    }).catch(() => {});
+
+  } catch (e) {
+    assistantMsg.content += `\n\n[串流發生錯誤: ${e.message}]`;
+    renderRAGMessages();
+  } finally {
+    isRagStreaming = false;
+    if (sendBtn) {
+      sendBtn.disabled = false;
+      sendBtn.textContent = "發送 ⚡";
+    }
   }
 }

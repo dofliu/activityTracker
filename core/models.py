@@ -266,3 +266,59 @@ class GitHubPREvent(Base):
     __table_args__ = (
         Index("ix_gh_repo_pr", "repo_name", "pr_number", unique=True),
     )
+
+
+class RAGIndexedFolder(Base):
+    """DeskRAG 已加入索引的本地目錄"""
+    __tablename__ = "rag_indexed_folders"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    path = Column(String(1000), unique=True, nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    is_active = Column(Integer, default=1)
+    created_at = Column(DateTime, default=get_local_now)
+    last_scanned_at = Column(DateTime, nullable=True)
+    file_count = Column(Integer, default=0)
+    total_size = Column(Integer, default=0)
+
+
+class RAGIndexedFile(Base):
+    """DeskRAG 已掃描與索引的檔案狀態"""
+    __tablename__ = "rag_indexed_files"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    folder_id = Column(Integer, nullable=True, index=True)
+    path = Column(String(1000), unique=True, nullable=False, index=True)
+    filename = Column(String(255), nullable=False)
+    extension = Column(String(50), nullable=False, index=True)
+    file_size = Column(Integer, default=0)
+    last_modified = Column(Float, default=0.0)
+    file_hash = Column(String(64), default="")
+    chunk_count = Column(Integer, default=0)
+    status = Column(String(50), default="pending", index=True)  # pending, indexed, error
+    error_message = Column(Text, nullable=True)
+    indexed_at = Column(DateTime, nullable=True)
+
+
+class RAGChatSession(Base):
+    """DeskRAG 對話工作階段"""
+    __tablename__ = "rag_chat_sessions"
+
+    id = Column(String(100), primary_key=True)
+    title = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=get_local_now)
+    updated_at = Column(DateTime, default=get_local_now, onupdate=get_local_now)
+
+
+class RAGChatMessage(Base):
+    """DeskRAG 對話歷史與引文記錄"""
+    __tablename__ = "rag_chat_messages"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String(100), nullable=False, index=True)
+    role = Column(String(50), nullable=False)
+    content = Column(Text, nullable=False)
+    citations = Column(Text, nullable=True)  # JSON 字串
+    provider = Column(String(50), nullable=True)
+    model = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=get_local_now)

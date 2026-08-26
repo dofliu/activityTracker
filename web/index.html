@@ -40,9 +40,10 @@
     <nav class="tabs">
       <button class="tab active" data-tab="tab-projects" data-i18n="tab_projects">01 · 進行中工作</button>
       <button class="tab" data-tab="tab-dashboard" data-i18n="tab_dashboard">02 · 即時情報流</button>
-      <button class="tab" data-tab="tab-settings" data-i18n="tab_settings">03 · 監控配置</button>
-      <button class="tab" data-tab="tab-summaries" data-i18n="tab_summaries">04 · 每日摘要</button>
-      <button class="tab" data-tab="tab-checkpoints" data-i18n="tab_checkpoints">05 · 活動快照</button>
+      <button class="tab" data-tab="tab-rag" data-i18n="tab_rag">03 · 📚 知識庫與 RAG</button>
+      <button class="tab" data-tab="tab-settings" data-i18n="tab_settings">04 · 監控配置</button>
+      <button class="tab" data-tab="tab-summaries" data-i18n="tab_summaries">05 · 每日摘要</button>
+      <button class="tab" data-tab="tab-checkpoints" data-i18n="tab_checkpoints">06 · 活動快照</button>
     </nav>
   </div>
 
@@ -157,7 +158,117 @@
         </div>
       </section>
 
-      <!-- 03 監控配置 -->
+      <!-- 03 知識庫與文件 RAG -->
+      <section id="tab-rag" class="pane">
+        <div class="two-col" style="grid-template-columns: 340px 1fr; gap: 14px;">
+          
+          <!-- 左欄：資料夾管理與掃描進度 -->
+          <div class="side" style="display: flex; flex-direction: column; gap: 12px;">
+            <div class="panel" style="padding: 12px;">
+              <div class="panel-head mb-8" style="padding: 0 0 6px 0; border-bottom: 1px solid var(--bd);">
+                <span class="mono-label accent">📂 知識庫目錄</span>
+                <button class="btn btn-primary btn-sm" id="btn-rag-scan-now" title="立即對所有目錄進行增量掃描">⚡ 掃描索引</button>
+              </div>
+              
+              <div class="input-row mb-8" style="flex-direction: column; gap: 6px;">
+                <input type="text" id="input-rag-folder-path" placeholder="輸入要索引的本機目錄路徑…" style="width: 100%; font-size: 11px;">
+                <div style="display: flex; gap: 6px;">
+                  <input type="text" id="input-rag-folder-name" placeholder="目錄別名 (選填)" style="flex: 1; font-size: 11px;">
+                  <button class="btn btn-ghost btn-sm" id="btn-rag-add-folder">+ 加入</button>
+                </div>
+              </div>
+
+              <!-- 即時索引進度條 -->
+              <div id="rag-progress-box" class="rag-progress-card mb-8" style="display: none; padding: 8px; background: var(--bg-hover); border-radius: 4px; border: 1px solid var(--bd);">
+                <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                  <span id="rag-progress-status" class="mono-mini accent">掃描中…</span>
+                  <span id="rag-progress-percent" class="mono-mini">0%</span>
+                </div>
+                <div class="usage-progress" style="height: 6px; margin-bottom: 4px;"><span id="rag-progress-bar" style="width: 0%;"></span></div>
+                <div id="rag-progress-detail" class="muted small" style="font-size: 10px;">準備中…</div>
+              </div>
+
+              <div id="rag-folders-list" class="taglist" style="max-height: 180px; overflow-y: auto;">
+                <div class="placeholder">載入知識庫目錄…</div>
+              </div>
+            </div>
+
+            <!-- 已索引檔案清單 -->
+            <div class="panel" style="padding: 12px; flex: 1;">
+              <div class="panel-head mb-8" style="padding: 0 0 6px 0; border-bottom: 1px solid var(--bd);">
+                <span class="mono-label">📑 已索引檔案 (<span id="rag-total-files-count">0</span>)</span>
+                <span id="rag-total-chunks-count" class="mono-mini muted">0 切片</span>
+              </div>
+              <input type="text" id="input-rag-file-search" placeholder="搜尋檔案名稱或路徑…" style="width: 100%; font-size: 11px; margin-bottom: 8px;">
+              <div id="rag-files-list" class="sidelist" style="max-height: 240px; overflow-y: auto;">
+                <div class="placeholder">載入已索引檔案…</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右欄：多模型 RAG 對話與引文 -->
+          <article class="panel" style="display: flex; flex-direction: column; height: calc(100vh - 150px); min-height: 540px;">
+            <!-- 對話頂部控制列 -->
+            <div class="panel-head" style="flex-wrap: wrap; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--bd); background: var(--bg-head);">
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <select id="select-rag-session" style="font-size: 12px; padding: 3px 8px; max-width: 160px;">
+                  <option value="">新對話</option>
+                </select>
+                <button class="btn btn-ghost btn-sm" id="btn-rag-new-chat" title="開新對話">+ 新對話</button>
+                <button class="btn btn-ghost btn-sm" id="btn-rag-del-chat" title="刪除當前對話" style="color: var(--danger);">🗑</button>
+              </div>
+
+              <div style="display: flex; gap: 8px; align-items: center; margin-left: auto; flex-wrap: wrap;">
+                <!-- 提供者選擇 -->
+                <select id="select-rag-provider" style="font-size: 12px; padding: 3px 8px;">
+                  <option value="ollama">Ollama (本機離線)</option>
+                  <option value="gemini">Google Gemini</option>
+                  <option value="claude">Anthropic Claude</option>
+                  <option value="openai">OpenAI</option>
+                </select>
+
+                <!-- 模型名稱 -->
+                <input type="text" id="input-rag-model" placeholder="模型名稱" value="llama3.2:latest" style="width: 120px; font-size: 11px; padding: 3px 6px;">
+
+                <!-- 檢索策略 -->
+                <select id="select-rag-strategy" style="font-size: 12px; padding: 3px 8px;" title="選擇檢索融合演算法">
+                  <option value="hybrid_rrf">Hybrid RRF (向量 + BM25)</option>
+                  <option value="weighted_fusion">Weighted Fusion (線性加權)</option>
+                  <option value="vector_only">Vector Only (純向量)</option>
+                  <option value="bm25_only">BM25 Only (純關鍵字)</option>
+                </select>
+
+                <label class="setting-check" style="font-size: 12px;" title="開啟文件檢索增強生成">
+                  <input type="checkbox" id="toggle-enable-rag" checked>
+                  <span>啟用 RAG</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- 對話歷史訊息流 -->
+            <div id="rag-chat-messages" class="rag-chat-stream" style="flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px;">
+              <div class="placeholder" style="margin: auto; text-align: center;">
+                <div style="font-size: 28px; margin-bottom: 8px;">📚</div>
+                <div style="font-weight: 600; margin-bottom: 4px;">DeskRAG 本地文件智慧助手</div>
+                <div class="muted small">請在下方輸入問題，系統將結合本地知識庫與活動記錄進行精準問答與引文標註。</div>
+              </div>
+            </div>
+
+            <!-- 對話輸入列 -->
+            <div class="rag-input-box" style="padding: 10px 14px; border-top: 1px solid var(--bd); background: var(--bg-head);">
+              <div style="display: flex; gap: 8px; align-items: flex-end;">
+                <textarea id="input-rag-prompt" rows="2" placeholder="問問你的本機文件與專案程式碼… (Ctrl + Enter 發送)" style="flex: 1; resize: none; font-size: 13px; padding: 8px 10px; border-radius: 6px;"></textarea>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <button class="btn btn-primary" id="btn-rag-send" style="padding: 8px 16px;">發送 ⚡</button>
+                  <button class="btn btn-ghost btn-sm" id="btn-rag-clear" title="清空對話視窗">清空</button>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- 04 監控配置 -->
       <section id="tab-settings" class="pane">
         <div class="panel mb-14">
           <div class="panel-head"><span class="mono-label accent">01</span><span class="panel-title" data-i18n="settings_p1_title">監控路徑</span></div>

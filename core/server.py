@@ -47,6 +47,7 @@ from synthesizer.aggregator import (
     generate_periodic_checkpoint,
     list_periodic_checkpoints
 )
+from rag.router import router as rag_router
 
 logger = logging.getLogger("OmniContext.Server")
 _startup_cfg = get_config()
@@ -72,6 +73,9 @@ app = FastAPI(
     description="個人全景上下文與活動記憶核心 API 與 Web 儀表板",
     version=__version__
 )
+
+# 掛載 DeskRAG 本地知識庫子系統路由
+app.include_router(rag_router)
 
 # 僅允許本機 dashboard origins；browser extension 走獨立 write-only token boundary。
 app.add_middleware(

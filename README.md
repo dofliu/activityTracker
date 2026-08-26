@@ -121,6 +121,20 @@
 * 不呼叫 cloud LLM、不寫入 SQLite、不修改檔案、不執行 command，也不提供批准執行；完整安全契約見 [ADR-007](docs/ADR-007-proposal-only-secretary.md)。
 * 正式 localhost 已產生 2 張建議與 3 個 evidence refs，惡意 Origin 為 403；桌面與 494px 介面 smoke 通過。此 receipt 不授權後續 executor。
 
+### 11. 📚 DeskRAG 本地知識庫與文件智慧問答系統（Single Server 整合版）
+* **單一伺服器無縫整併**：將 `deskRAG` 完整本機知識庫系統整併進 OmniContext，不需啟動兩個伺服器，統一於 `http://127.0.0.1:8765` 提供服務。
+* **全方位檔案解析器（Parser Hub）**：
+  * **PDF**：以 PyMuPDF 擷取文字並保留頁碼（Page Number）。
+  * **Office 文件**：支援 Word（`.docx` 段落與標題）、PowerPoint（`.pptx` 投影片）、Excel（`.xlsx` 工作表數據）。
+  * **文字與程式碼**：Markdown、`.py`、`.js`、`.json` 等，支援多種編碼自動探測。
+* **階層滑動切分器（Sliding Window Chunker）**：提供可配置大小與重疊長度的切分機制，完整保留段落標題、頁碼、投影片與工作表中繼資料。
+* **混合檢索引掣（Hybrid Retrieval Engine）**：
+  * **語意向量**：採用 FastEmbed（ONNX 本地極速推論）+ 本地 ChromaDB 向量庫。
+  * **關鍵字匹配**：採用 Jieba 繁簡中文分詞 + BM25Okapi 演算法與 Pickle 持久化。
+  * **融合演算法**：支援 **Hybrid RRF（倒數排名融合）** 與 **Weighted Fusion（線性加權融合）**。
+* **多模型問答與 SSE 串流**：支援 Ollama 本機離線模型、Google Gemini、Anthropic Claude、OpenAI，提供 SSE 逐字串流輸出與來源引文卡片。
+* **Windows 原生檔案總管喚起**：引文卡片點擊「📂 在總管開啟」即可在 Windows 檔案總管精準定位並選中該檔案。
+
 ---
 
 ## 🚀 快速開始

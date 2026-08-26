@@ -13,3 +13,14 @@ pywin32>=306; sys_platform == 'win32'
 psutil>=5.9.0
 apscheduler>=3.10.4
 python-dotenv>=1.0.1
+chromadb>=0.4.24
+fastembed>=0.2.7
+rank-bm25>=0.2.2
+jieba>=0.42.1
+pymupdf>=1.24.0
+python-docx>=1.1.0
+python-pptx>=0.6.23
+openpyxl>=3.1.2
+pandas>=2.2.0
+pillow>=10.2.0
+sse-starlette>=2.0.0

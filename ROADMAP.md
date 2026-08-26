@@ -409,7 +409,34 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 ---
 
-## 8. 建議執行順序
+
+---
+
+## 8. ✅ P7：DeskRAG 本地知識庫與文件智慧問答系統深度整合 (Completed)
+
+> 完成日期：2026-08-27 | 狀態：**✅ 已完成並通過 100/100 自動化測試驗證**
+
+已將 deskRAG 本地知識庫系統無縫整併進 activityTracker，徹底實現單一伺服器（Single Server）運作架構，無須啟動雙伺服器：
+
+1. **多格式文件解析中樞 (rag/parsers/)**：
+   - PDF（PyMuPDF 高精度擷取與頁碼保留）、Office（Word .docx、PowerPoint .pptx、Excel .xlsx）、Markdown 與多編碼程式原始碼。
+2. **階層滑動切分器 (rag/chunker.py)**：
+   - 實現重疊窗口切分（Sliding Window with Overlap），保留標題、頁碼、投影片與工作表中繼資料。
+3. **混合檢索引擎 (rag/retrieval/)**：
+   - 整合 FastEmbed（ONNX 本地極速推論）+ ChromaDB 向量庫。
+   - 整合 Jieba 繁簡中文分詞 + BM25Okapi 關鍵字索引與 Pickle 持久化。
+   - 實作 Hybrid RRF（倒數排名融合）與 Weighted Fusion（線性加權融合）。
+4. **多模型 LLM 網關與 SSE 串流 (rag/llm_gateway.py, rag/router.py)**：
+   - 統一調度 Ollama 本機離線模型、Google Gemini、Anthropic Claude、OpenAI，支援逐字 SSE Token 串流與來源引文卡片。
+5. **Web 儀表板與 Windows 檔案總管深度整合 (web/)**：
+   - 新增 `03 · 知識庫與 RAG` 專屬操作介面。
+   - 引文卡片點擊「在總管開啟」即可在 Windows 檔案總管精準定位並選中該檔案。
+6. **資料庫遷移與完整測試**：
+   - 完成 Migration 008 資料庫結構升級，全專案通過 100/100 單元與整合測試。
+
+---
+
+## 9. 建議執行順序
 
 ```
 P2.5-S1 API 安全邊界

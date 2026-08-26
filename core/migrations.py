@@ -225,6 +225,85 @@ def _migration_007_embedding_input_provenance(connection: Connection) -> None:
         ))
 
 
+def _migration_008_rag_tables(connection: Connection) -> None:
+    connection.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS rag_indexed_folders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            path VARCHAR(1000) UNIQUE NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            is_active INTEGER DEFAULT 1,
+            created_at DATETIME,
+            last_scanned_at DATETIME,
+            file_count INTEGER DEFAULT 0,
+            total_size INTEGER DEFAULT 0
+        );
+        """
+    ))
+    connection.execute(text(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_rag_folders_path "
+        "ON rag_indexed_folders(path);"
+    ))
+    connection.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS rag_indexed_files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            folder_id INTEGER,
+            path VARCHAR(1000) UNIQUE NOT NULL,
+            filename VARCHAR(255) NOT NULL,
+            extension VARCHAR(50) NOT NULL,
+            file_size INTEGER DEFAULT 0,
+            last_modified REAL DEFAULT 0.0,
+            file_hash VARCHAR(64) DEFAULT '',
+            chunk_count INTEGER DEFAULT 0,
+            status VARCHAR(50) DEFAULT 'pending',
+            error_message TEXT,
+            indexed_at DATETIME
+        );
+        """
+    ))
+    connection.execute(text(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_rag_files_path "
+        "ON rag_indexed_files(path);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_rag_files_folder_id "
+        "ON rag_indexed_files(folder_id);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_rag_files_status "
+        "ON rag_indexed_files(status);"
+    ))
+    connection.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS rag_chat_sessions (
+            id VARCHAR(100) PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            created_at DATETIME,
+            updated_at DATETIME
+        );
+        """
+    ))
+    connection.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS rag_chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id VARCHAR(100) NOT NULL,
+            role VARCHAR(50) NOT NULL,
+            content TEXT NOT NULL,
+            citations TEXT,
+            provider VARCHAR(50),
+            model VARCHAR(100),
+            created_at DATETIME
+        );
+        """
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_rag_chat_messages_session "
+        "ON rag_chat_messages(session_id);"
+    ))
+
+
 MIGRATIONS: tuple[MigrationDefinition, ...] = (
     MigrationDefinition(
         1,
@@ -272,6 +351,13 @@ MIGRATIONS: tuple[MigrationDefinition, ...] = (
         "semantic_documents:add:embedding_input_mode;"
         "values:normalized_full,normalized_truncated,ascii_fallback,metadata_only,legacy_raw",
         _migration_007_embedding_input_provenance,
+    ),
+    MigrationDefinition(
+        8,
+        "rag_knowledge_tables",
+        "rag_indexed_folders:create;rag_indexed_files:create;rag_chat_sessions:create;rag_chat_messages:create;"
+        "indexes:path,folder_id,status,session_id",
+        _migration_008_rag_tables,
     ),
 )
 

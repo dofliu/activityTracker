@@ -25,6 +25,9 @@ dist/
 *.db-wal
 *.sqlite
 *.sqlite3
+*.pkl
+data/*
+!data/.gitkeep
 
 # Local Generated Reports & Checkpoints
 reports/*.md

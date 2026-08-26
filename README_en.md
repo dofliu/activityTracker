@@ -42,15 +42,16 @@ It is purpose-built to answer three fundamental questions at any moment:
 │                      [ Local SQLite Database ]                           │
 │               (omni_context.db · local; cloud LLM is opt-in)            │
 │                                  │                                       │
-│          ┌───────────────────────┴───────────────────────┐               │
-│          ▼                                               ▼               │
-│  [ Web Dashboard UI ]                        [ AI Synthesis Engine ]     │
-│  • 01 · Active Workstreams                   • Custom Multi-Day Reviews  │
-│  • 02 · Live Intel Feed                      • Periodic Activity Logs    │
-│  • 03 · Settings & Hot Reload                • Telegram Push Briefings   │
-│  • 04 · Daily & Range Summaries              • Multi-LLM (Gemini 3.7 /   │
-│  • 05 · Checkpoint Logs                        Claude / GPT-4o / Ollama) │
-│  • 🌐 Bilingual i18n Switch (EN/ZH) & Dark/Light Theme                   │
+│          ┌───────────────────────┼───────────────────────┐               │
+│          ▼                       ▼                       ▼               │
+│  [ Web Dashboard UI ]    [ DeskRAG Subsystem ]     [ AI Synthesis ]      │
+│  • 01 · Workstreams      • PDF/Docx/Pptx/Xlsx/Md   • Multi-Day Reviews   │
+│  • 02 · Live Feed        • FastEmbed + ChromaDB    • Periodic Snapshots  │
+│  • 03 · Knowledge & RAG  • Jieba + BM25 Keyword    • Telegram Push       │
+│  • 04 · Settings         • Hybrid RRF Retrieval    • Multi-LLM (Gemini/  │
+│  • 05 · Summaries        • Multi-LLM SSE Chat        Claude/OpenAI/Ollama│
+│  • 06 · Checkpoints      • Native Explorer Reveal                        │
+│  • 🌐 Bilingual (EN/ZH)                                                  │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -113,6 +114,14 @@ It is purpose-built to answer three fundamental questions at any moment:
 * The first Alpha derives traceable next-step suggestions from local Project State, actionable Open Loops, and non-sensitive Extension diagnostics.
 * It does not call a cloud LLM, persist proposals, modify files, execute commands, or expose an approval action. See [ADR-007](docs/ADR-007-proposal-only-secretary.md) for the safety contract.
 * The localhost smoke produced two suggestions with three evidence references, blocked a hostile Origin with 403, and passed desktop plus 494px responsive rendering. This receipt does not authorize an executor.
+
+### 11. 📚 DeskRAG Local Knowledge Base & Document Chat (Single-Server Embedded)
+* **Single Server Integration**: Seamlessly integrated into the single OmniContext daemon (`http://127.0.0.1:8765`), eliminating dual-server operational overhead.
+* **Universal Parser Hub**: High-precision text extraction with page/slide/sheet metadata for PDF (PyMuPDF), Word (`.docx`), PowerPoint (`.pptx`), Excel (`.xlsx`), and source/markdown text files.
+* **Sliding Window Hierarchical Chunker**: Preserves paragraph headers, page numbers, slide titles, and sheet names.
+* **Hybrid Retrieval Engine**: Combines FastEmbed (ONNX) + ChromaDB vector embeddings with Jieba + BM25 keyword matching using Reciprocal Rank Fusion (RRF) and Weighted Fusion.
+* **Multi-LLM SSE Streaming Chat**: Interactive chat with token-level SSE streams and interactive citation source cards (with page/sheet badges).
+* **Native Windows Explorer Reveal**: One-click opening and highlighting of cited source documents in Windows File Explorer.
 
 ---
 
