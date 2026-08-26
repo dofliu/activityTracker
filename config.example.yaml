@@ -51,6 +51,8 @@ watchers:
     enabled: true
     heartbeat_minutes: 5
     interval_seconds: 5
+    # 前景 probe 連續不可用超過此秒數時，runtime 顯示 degraded；鎖定畫面也可能觸發。
+    probe_degraded_after_seconds: 30
     idle_threshold_seconds: 180
     ignore_titles:
     - Program Manager

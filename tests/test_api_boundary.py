@@ -289,13 +289,17 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     assert "PROPOSAL ONLY" in dashboard.text
     assert "DATA CAPTURE" in dashboard.text
     assert "extension-capture-badge" not in dashboard.text
-    assert "style.css?v=1.3.0a4-ui7" in dashboard.text
-    assert "app.js?v=1.3.0a4-ui7" in dashboard.text
+    assert "style.css?v=1.3.0a4-ui9" in dashboard.text
+    assert "app.js?v=1.3.0a4-ui9" in dashboard.text
+    assert "data-trust-runtime-badge" in dashboard.text
     assert "/extension-monitor" in dashboard.text
     stylesheet = client.get("/static/style.css")
     assert stylesheet.status_code == 200
     assert 'input:not([type="checkbox"])' in stylesheet.text
     assert ".usage-toggle-row" in stylesheet.text
+    assert ".pill-warn" in stylesheet.text
+    assert ".collector-diagnostic" in stylesheet.text
+    assert "grid-template-columns: repeat(5, minmax(0, 1fr))" in stylesheet.text
     assert ".split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }" in stylesheet.text
     assert ".split-col { min-width: 0;" in stylesheet.text
 

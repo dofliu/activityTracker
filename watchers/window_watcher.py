@@ -89,6 +89,54 @@ class WindowWatcherService:
         self._current_title: str = ""
         self._current_start_time: datetime = get_local_now()
         self.last_written_at: Optional[datetime] = None
+        self._probe_lock = threading.Lock()
+        self._probe_state = "not_started"
+        self._last_probe_at: Optional[datetime] = None
+        self._last_probe_success_at: Optional[datetime] = None
+        self._consecutive_unavailable = 0
+        self._last_probe_error_code: Optional[str] = None
+
+    def _record_probe(self, app_name: Optional[str], title: Optional[str]) -> None:
+        now = get_local_now()
+        with self._probe_lock:
+            self._last_probe_at = now
+            if app_name and title:
+                self._probe_state = "healthy"
+                self._last_probe_success_at = now
+                self._consecutive_unavailable = 0
+                self._last_probe_error_code = None
+                return
+            self._probe_state = "unavailable"
+            self._consecutive_unavailable += 1
+            self._last_probe_error_code = "foreground_unavailable"
+
+    def _record_probe_error(self, exc: Exception) -> None:
+        with self._probe_lock:
+            self._last_probe_at = get_local_now()
+            self._probe_state = "error"
+            self._consecutive_unavailable += 1
+            self._last_probe_error_code = (
+                "permission_denied" if isinstance(exc, PermissionError) else "probe_error"
+            )
+
+    def get_diagnostics(self) -> dict:
+        """回傳不含視窗標題／應用名稱的 probe health snapshot。"""
+        with self._probe_lock:
+            return {
+                "state": self._probe_state,
+                "last_probe_at": (
+                    self._last_probe_at.isoformat(timespec="seconds")
+                    if self._last_probe_at
+                    else None
+                ),
+                "last_success_at": (
+                    self._last_probe_success_at.isoformat(timespec="seconds")
+                    if self._last_probe_success_at
+                    else None
+                ),
+                "consecutive_unavailable": self._consecutive_unavailable,
+                "last_error_code": self._last_probe_error_code,
+            }
 
     def start(self):
         enabled = self.cfg.get("watchers.window_watcher.enabled", True)
@@ -161,6 +209,7 @@ class WindowWatcherService:
         while self._running:
             try:
                 app_name, title = get_active_window_info()
+                self._record_probe(app_name, title)
 
                 if time.time() - last_heartbeat >= heartbeat_seconds:
                     last_heartbeat = time.time()
@@ -189,6 +238,7 @@ class WindowWatcherService:
                                 self._current_title = title
                                 self._current_start_time = now
             except Exception as e:
+                self._record_probe_error(e)
                 logger.error(f"Error in window monitor loop: {e}", exc_info=True)
 
             time.sleep(interval)

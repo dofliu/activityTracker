@@ -81,6 +81,8 @@ python main.py status
 
 應確認 `file_watcher`、`window_watcher`、`agent_log_watcher` 與 scheduler 的 runtime 狀態；`idle` 表示近期沒有新事件，不等於採集器故障。若使用者確實切換視窗或產生 Agent log，還要確認 `last_events` 與 event count 是否向前推進；thread 顯示 `running` 不能單獨證明採集成功。
 
+`GET /api/v1/control/status` 的 `monitoring_state` 會彙整為 `healthy / degraded / stopped`，`degraded_collectors` 列出異常來源。`collector_diagnostics` 只回傳 probe 時間、連續失敗次數、來源名稱與 `permission_denied`、`probe_error` 等穩定診斷碼，不回傳 window title、本機 path、原始 exception message 或 secret。Windows 鎖定畫面可能短暫讀不到 foreground window；預設持續 30 秒才標成 degraded，下一次成功 probe 會恢復 healthy。
+
 ## 3. Browser Extension 安裝與配對
 
 Extension popup 與 localhost Monitor 是兩個不同入口：
@@ -345,6 +347,8 @@ Invoke-RestMethod http://127.0.0.1:8765/api/v1/usage/today
 若前景視窗確實持續切換，但 `last_events.window_watcher` 與 `data_updated_at` 仍不前進，可先呼叫 `POST /api/v1/control/stop` 讓 collectors flush，再確認 8765 的 OwningProcess 確實是 OmniContext，停止該 PID 後使用 `python main.py run` 整合重啟。不要終止未確認的 Python 程序。
 
 Agent log 採 source-level fault isolation：Claude Desktop 某個目錄無權限時會跳過該來源，Codex、Claude Code 與 Antigravity 仍應繼續更新。Extension heartbeat 是獨立通道；重啟 localhost service 不等於 Extension 已重新配對。
+
+主頁頂端的 `MONITORING 部分採集異常` 與 `DATA TRUST · N DEGRADED` 代表 runtime probe 已偵測異常；`8/8 CONTRACT` 只表示靜態契約測試通過，不等同 runtime 健康。請展開即時情報流的 collector 卡片查看非敏感錯誤來源，再以事件時間是否前進判定是否恢復。
 
 ### Scheduler 顯示 `builtin_timer`
 

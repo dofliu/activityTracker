@@ -178,3 +178,10 @@ def test_agent_source_failure_does_not_block_remaining_sources(monkeypatch):
     service.scan_all_agents(full_history=False)
 
     assert calls == ["claude_code", "claude_desktop", "codex", "antigravity"]
+    diagnostics = service.get_diagnostics()
+    assert diagnostics["state"] == "degraded"
+    assert diagnostics["sources"]["claude_desktop"]["state"] == "error"
+    assert diagnostics["sources"]["claude_desktop"]["last_error_code"] == "permission_denied"
+    assert diagnostics["sources"]["claude_desktop"]["consecutive_errors"] == 1
+    assert diagnostics["sources"]["codex"]["state"] == "healthy"
+    assert "access denied" not in str(diagnostics).lower()

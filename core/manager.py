@@ -23,6 +23,46 @@ from synthesizer.scheduler import SynthesisScheduler
 logger = logging.getLogger("OmniContext.Manager")
 
 
+def derive_monitoring_state(
+    is_running: bool,
+    watchers: Dict[str, bool],
+    collector_runtime: Dict[str, str],
+    collector_health: Dict[str, str],
+) -> tuple[str, list[str]]:
+    """區分 service process 存活與 collectors 實際可採集狀態。"""
+    if not is_running:
+        return "stopped", []
+    degraded = sorted(
+        key
+        for key, enabled in watchers.items()
+        if enabled
+        and (
+            collector_runtime.get(key) == "stopped"
+            or collector_health.get(key) == "degraded"
+        )
+    )
+    return ("degraded" if degraded else "healthy"), degraded
+
+
+def window_probe_is_degraded(
+    diagnostics: Dict[str, Any],
+    *,
+    interval_seconds: int,
+    degraded_after_seconds: int,
+) -> bool:
+    """前景 probe 長時間不可用才降級；單次 lock-screen 空值不立即報錯。"""
+    state = diagnostics.get("state")
+    if state == "error":
+        return True
+    unavailable_seconds = (
+        int(diagnostics.get("consecutive_unavailable", 0))
+        * max(1, int(interval_seconds))
+    )
+    return state == "unavailable" and unavailable_seconds >= max(
+        1, int(degraded_after_seconds)
+    )
+
+
 class WatcherManager:
     _instance = None
 
@@ -187,8 +227,46 @@ class WatcherManager:
             "git_watcher": _calc_health(watchers_cfg["git_watcher"], last_git),
             "window_watcher": _calc_health(watchers_cfg["window_watcher"], last_win),
             "agent_log_watcher": _calc_health(watchers_cfg["agent_log_watcher"], last_ai),
-            "scheduler": "healthy" if watchers_cfg["scheduler"] else "disabled",
+            "scheduler": (
+                "disabled" if not watchers_cfg["scheduler"]
+                else "healthy" if collector_runtime["scheduler"] == "running"
+                else "stopped"
+            ),
         }
+
+        window_diagnostics = self.window_watcher.get_diagnostics()
+        agent_diagnostics = self.agent_log_watcher.get_diagnostics()
+        window_interval = max(
+            1, int(cfg.get("watchers.window_watcher.interval_seconds", 5))
+        )
+        window_degraded_after = max(
+            window_interval,
+            int(cfg.get("watchers.window_watcher.probe_degraded_after_seconds", 30)),
+        )
+        window_unavailable_seconds = (
+            int(window_diagnostics.get("consecutive_unavailable", 0))
+            * window_interval
+        )
+        window_diagnostics["degraded_after_seconds"] = window_degraded_after
+        window_diagnostics["unavailable_seconds"] = window_unavailable_seconds
+        if collector_runtime["window_watcher"] == "running" and window_probe_is_degraded(
+            window_diagnostics,
+            interval_seconds=window_interval,
+            degraded_after_seconds=window_degraded_after,
+        ):
+            collector_health["window_watcher"] = "degraded"
+        if (
+            collector_runtime["agent_log_watcher"] == "running"
+            and agent_diagnostics.get("state") == "degraded"
+        ):
+            collector_health["agent_log_watcher"] = "degraded"
+
+        monitoring_state, degraded_collectors = derive_monitoring_state(
+            self._is_running,
+            watchers_cfg,
+            collector_runtime,
+            collector_health,
+        )
 
         try:
             scheduled_jobs = self.scheduler.active_job_ids()
@@ -209,9 +287,15 @@ class WatcherManager:
 
         return {
             "is_running": self._is_running,
+            "monitoring_state": monitoring_state,
+            "degraded_collectors": degraded_collectors,
             "watchers": watchers_cfg,
             "collector_runtime": collector_runtime,
             "collector_health": collector_health,
+            "collector_diagnostics": {
+                "window_watcher": window_diagnostics,
+                "agent_log_watcher": agent_diagnostics,
+            },
             "scheduled_jobs": scheduled_jobs,
             "scheduler_backend": scheduler_backend,
             "database_migration": database_migration,

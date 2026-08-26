@@ -1,6 +1,6 @@
 # OmniContext 開發規劃與成果紀錄 — P0 ~ P6
 
-> 最新更新日期：2026-08-26　｜　目前狀態：**personal alpha / P2.6 + P3 context memory + P5-1 proposal-only alpha**。P3-1～P3-5、Windows Toast E2E、formal rollback、Windows/macOS/Linux CI 與 P5-1 localhost receipts 已完成；ChatGPT live selectors 已修復。Claude/Manus authenticated capture 與 Extension live heartbeat 尚未完成，整體不具 release-ready 或 autonomous-ready 資格。
+> 最新更新日期：2026-08-26　｜　目前狀態：**personal alpha / P2.6 + P3 context memory + P5-1 proposal-only alpha**。P3-1～P3-5、Windows Toast E2E、formal rollback、Windows/macOS/Linux CI、P5-1 localhost receipts 與 collector runtime degraded diagnostics 已完成；ChatGPT live selectors 已修復。Claude/Manus authenticated capture 與 Extension live heartbeat 尚未完成，整體不具 release-ready 或 autonomous-ready 資格。
 > 本文件記錄 OmniContext 從 0 到 1 的缺陷修復歷程、已完成之架構改造與未來的維運與延伸規劃。
 
 ---
@@ -149,6 +149,7 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 - `status` CLI 優先讀取 live service status，無服務時才使用 local fallback。
 - 專案數分列 active / idle / stale，不再把全部 ProjectState 稱為「進行中」。
 - 健康度除了最後事件時間，也記錄 checkpoint/error；「沒有活動」與「collector 故障」不得混為一談。
+- **Runtime diagnostics receipt（2026-08-26）**：`GET /api/v1/control/status` 新增全域 `monitoring_state`、`degraded_collectors` 與 sanitized `collector_diagnostics`。Window probe 經 30 秒持續 unavailable 才降級，成功 probe 立即恢復；Agent log 逐來源隔離錯誤。整合重啟後 window events `2323 → 2324`、AI events `2894 → 2895`，四個 Agent sources 與 Window probe 均為 healthy。degraded DOM smoke 顯示來源錯誤但不含 path／exception message，494px 即時情報流與採集卡無頁面水平 overflow、console 無錯誤；完整測試 81/81。
 
 ### P2.5-L1 Open Loop 生命週期
 

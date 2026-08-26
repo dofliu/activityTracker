@@ -7,7 +7,7 @@ status: active_hardening
 release_ready: false
 last_updated: "2026-08-26"
 current_phase: "P2.6 Capture Hardening + P3 Context Memory Alpha + P5-1 Proposal-only implementation + P6 Cross-platform Gate"
-next_milestone: "取得 Extension 1.3.0 live heartbeat 與 Claude.ai/Manus authenticated Browser capture receipts，並把 collector probe/error 狀態納入主頁 degraded 診斷"
+next_milestone: "取得 Extension 1.3.0 live heartbeat 與 Claude.ai/Manus authenticated Browser capture receipts；collector probe/error degraded 診斷已完成"
 planned_features:
   - id: FEATURE-001
     name: "每日主要介面使用時間與里程碑教練"
@@ -114,6 +114,7 @@ evidence_snapshot:
     superseded: 1
   runtime_findings:
     - "重啟後 file/git/window/agent_log collectors 均回報 healthy"
+    - "control/status 現在分開回報 monitoring_state、degraded_collectors 與 sanitized collector_diagnostics；thread running 不再等同資料採集正常"
     - "runtime file watcher 已同時納入 Project_CodingSimulation 與學術目錄"
     - "Gemini Browser extension 已觀察 3 筆 event／2 筆 response；ChatGPT 已完成 live DOM selector probe，但該測試瀏覽器未載入 OmniContext Extension，不能等同 DB capture receipt"
     - "ChatGPT 真實繁中 DOM prompt/response selector 已驗證並修復 send click；Claude/Manus 測試瀏覽器停在登入頁，不能宣稱 authenticated capture"
@@ -240,6 +241,29 @@ evidence_snapshot:
     extension_heartbeat_verified: false
     extension_events_today: 0
     claim_boundary: "This receipt proves one successful recovery and post-restart data progression; it does not prove continuous coverage or Extension connectivity."
+  collector_runtime_diagnostics_e2e:
+    captured_at: "2026-08-26 01:51 Asia/Taipei"
+    status: passed_runtime_health_contract
+    service_pid_at_receipt: 57868
+    monitoring_state: healthy
+    degraded_collectors: []
+    window_probe_state: healthy
+    agent_source_states:
+      claude_code: healthy
+      claude_desktop: healthy
+      codex: healthy
+      antigravity: healthy
+    window_events_before_restart: 2323
+    window_events_after_restart: 2324
+    ai_events_before_restart: 2894
+    ai_events_after_restart: 2895
+    degraded_contract_test: passed_window_threshold_recovery_and_agent_source_isolation
+    dashboard_degraded_smoke: passed_synthetic_dom_only_no_database_write
+    narrow_dashboard_smoke: passed_494px_no_page_horizontal_overflow_no_console_error
+    extension_events_today: 0
+    extension_heartbeat_verified: false
+    diagnostic_privacy_boundary: "Error details are reduced to stable codes and source names; local paths, window titles, exception messages and secrets are not returned."
+    claim_boundary: "This receipt proves runtime health/degraded visibility and one post-restart progression sample; it does not prove continuous coverage or Extension connectivity."
   formal_rollback_evidence:
     status: passed
     path: "1.3.0a1/schema4 -> 1.3.0a2/schema5 -> 1.3.0a1/schema4"
@@ -273,7 +297,7 @@ quality_gates:
   ingestion_provenance: passed_local_rescan_601_sources
   response_finalization: passed_as_final_candidate_contract_not_semantic_correctness
   open_loop_lifecycle: passed_local_db_reconciliation
-  automated_tests: passed_79_contract_tests
+  automated_tests: passed_81_contract_tests
   usage_milestone_alpha: passed_contract_and_windows_dashboard_api_smoke
   documentation_current: passed_readme_usage_roadmap_status_sync
   backup_lifecycle: passed_online_backup_and_isolated_restore_drill
@@ -284,13 +308,14 @@ quality_gates:
   context_memory: passed_related_history_and_derived_sessions_alpha
   proposal_only_secretary: passed_local_read_only_alpha
   collector_source_fault_isolation: passed_contract_and_windows_recovery_e2e
+  collector_runtime_diagnostics: passed_contract_live_api_and_responsive_dashboard_smoke
   autonomous_execution: blocked_by_p2_5
 known_blockers:
-  - "Extension 歷史 events_total=10，但 2026-08-26 recovery receipt 的 events_today=0、pairing_verified=false、heartbeat_verified=false；歷史事件不得代表目前在線，Claude.ai/Manus authenticated Browser capture 仍未完成"
+  - "Extension 歷史 events_total=10，但 2026-08-26 runtime receipt 的 events_today=0、pairing_verified=false、heartbeat_verified=false；歷史事件不得代表目前在線，Claude.ai/Manus authenticated Browser capture 仍未完成"
   - "P2.6 尚無 continuous coverage ledger，coverage 維持 partial；Windows milestone Toast E2E 已通過但不代表全天 coverage"
   - "337 筆 legacy AI rows 無 response_status，僅保留為歷史資料，不進入 canonical synthesis/handoff 結論"
   - "Windows wheel/sdist install/upgrade/assets、formal rollback 與 1.3.0a4 candidate packaging 已驗證；public publish/tag 尚未執行"
   - "Windows/Ubuntu/macOS × Python 3.10/3.12 CI run 32757498004 已通過；window/notification 實機能力仍限 Windows，其他平台採明確降級"
   - "project_engine 仍含個人根路徑 fallback，尚未完全 config-driven"
   - "P5-1 僅完成 proposal-only derived view；approve/execute、Agent Dispatcher、任何檔案/Git/外部 API mutation 仍未授權也未實作"
-key_metrics: "P0-P2 可日常運行；P3-1 handoff、P3-2 semantic index 4,380/4,380、P3-3 omni ask、P3-4 Related History、P3-5 derived Session、SQLite schema 7/7、Windows Toast E2E、formal package+DB rollback 與 3-OS/2-Python CI 六個 jobs 已通過。P5-1 proposal-only Alpha 以 2 張 live proposal／3 個 evidence refs 完成 localhost UI/API smoke，無保存、無 cloud LLM、無 execution。2026-08-26 collector restart E2E 將 window events 2281→2289、AI events 2722→2800，並新增 Agent source-level fault isolation；完整測試 79/79。Extension live heartbeat 與 Claude.ai/Manus authenticated Browser capture receipts 尚未完成；整體仍非 release-ready，P5 autonomous executor 維持 blocked。"
+key_metrics: "P0-P2 可日常運行；P3-1 handoff、P3-2 semantic index 4,380/4,380、P3-3 omni ask、P3-4 Related History、P3-5 derived Session、SQLite schema 7/7、Windows Toast E2E、formal package+DB rollback 與 3-OS/2-Python CI 六個 jobs 已通過。P5-1 proposal-only Alpha 以 2 張 live proposal／3 個 evidence refs 完成 localhost UI/API smoke，無保存、無 cloud LLM、無 execution。2026-08-26 新增 monitoring_state、degraded_collectors 與 sanitized source diagnostics；整合重啟後 window events 2323→2324、AI events 2894→2895，完整測試 81/81。Extension live heartbeat 與 Claude.ai/Manus authenticated Browser capture receipts 尚未完成；整體仍非 release-ready，P5 autonomous executor 維持 blocked。"

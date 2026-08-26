@@ -243,6 +243,85 @@ class AgentLogWatcherService:
         self._processed_hashes: Set[str] = set()
         # Process cache 只是加速；SQLite checkpoint 才是跨重啟的可信狀態。
         self._file_states: Dict[str, Tuple[int, int]] = {}
+        self._diagnostics_lock = threading.Lock()
+        self._source_diagnostics: Dict[str, Dict[str, Any]] = {
+            source: {
+                "state": "not_started",
+                "last_attempt_at": None,
+                "last_success_at": None,
+                "consecutive_errors": 0,
+                "last_error_code": None,
+            }
+            for source in ("claude_code", "claude_desktop", "codex", "antigravity")
+        }
+
+    @staticmethod
+    def _diagnostic_error_code(exc: Exception) -> str:
+        """只輸出非敏感錯誤類型，不回傳 path 或 exception message。"""
+        if isinstance(exc, PermissionError):
+            return "permission_denied"
+        if isinstance(exc, OSError):
+            return "os_error"
+        name = exc.__class__.__name__
+        return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower() or "unknown_error"
+
+    def _set_source_disabled(self, source: str) -> None:
+        with self._diagnostics_lock:
+            item = self._source_diagnostics[source]
+            item["state"] = "disabled"
+            item["consecutive_errors"] = 0
+            item["last_error_code"] = None
+
+    def _mark_source_attempt(self, source: str) -> None:
+        with self._diagnostics_lock:
+            item = self._source_diagnostics[source]
+            item["state"] = "scanning"
+            item["last_attempt_at"] = get_local_now()
+
+    def _mark_source_result(self, source: str, error: Exception | None = None) -> None:
+        with self._diagnostics_lock:
+            item = self._source_diagnostics[source]
+            if error is None:
+                item["state"] = "healthy"
+                item["last_success_at"] = get_local_now()
+                item["consecutive_errors"] = 0
+                item["last_error_code"] = None
+                return
+            item["state"] = "error"
+            item["consecutive_errors"] = int(item["consecutive_errors"]) + 1
+            item["last_error_code"] = self._diagnostic_error_code(error)
+
+    def get_diagnostics(self) -> Dict[str, Any]:
+        """供 localhost status API 使用的非敏感 source probe snapshot。"""
+        with self._diagnostics_lock:
+            sources = {
+                source: {
+                    **item,
+                    "last_attempt_at": (
+                        item["last_attempt_at"].isoformat(timespec="seconds")
+                        if item["last_attempt_at"]
+                        else None
+                    ),
+                    "last_success_at": (
+                        item["last_success_at"].isoformat(timespec="seconds")
+                        if item["last_success_at"]
+                        else None
+                    ),
+                }
+                for source, item in self._source_diagnostics.items()
+            }
+        states = [item["state"] for item in sources.values()]
+        if "error" in states:
+            state = "degraded"
+        elif "scanning" in states:
+            state = "scanning"
+        elif "healthy" in states:
+            state = "healthy"
+        elif states and all(value == "disabled" for value in states):
+            state = "disabled"
+        else:
+            state = "not_started"
+        return {"state": state, "sources": sources}
 
     def start(self):
         enabled = self.cfg.get("watchers.agent_log_watcher.enabled", True)
@@ -342,16 +421,21 @@ class AgentLogWatcherService:
         # 每個來源都是獨立的故障邊界；單一目錄權限或壞檔不可中止其他來源的採集。
         for config_key, source_label, scan_source in sources:
             if not cfg.get(f"watchers.agent_log_watcher.{config_key}", True):
+                self._set_source_disabled(config_key)
                 logger.debug("%s watcher is disabled in config.", source_label)
                 continue
+            self._mark_source_attempt(config_key)
             try:
                 scan_source(full_history=full_history)
             except Exception as exc:
+                self._mark_source_result(config_key, exc)
                 logger.error(
                     "%s source scan skipped; remaining agent sources will continue: %s",
                     source_label,
                     exc,
                 )
+            else:
+                self._mark_source_result(config_key)
 
     # =========================================================================
     # 1. Claude Code 日誌解析 (以 projects/**/*.jsonl 為核心成對提取 User 與 Assistant 回應)

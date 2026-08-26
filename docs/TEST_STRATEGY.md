@@ -12,6 +12,8 @@
 - Codex 同一 turn 多個 assistant messages 選擇最後有效回應。
 - Claude Code 與 Claude Desktop 共用 user/assistant boundary parser，但 platform provenance 與 stable turn key 必須分離。
 - 每個 Agent source 都是獨立 fault boundary；Claude Desktop `PermissionError` 不得阻止同輪 Codex、Claude Code 與 Antigravity scan。
+- Window probe 持續 unavailable 達設定門檻後才降級，成功 probe 必須恢復 healthy；diagnostics 不得含 window title 或 exception message。
+- Agent source diagnostics 必須保留成功／失敗狀態與 sanitized error code，不得洩漏本機 path。
 - Windows 超長 Claude Desktop session path 必須以 extended path 可讀；一般 cloud-chat cache 只能標示 detected/unparsed。
 - 同 conversation 重複 prompt 以 stable `turn_key` 分開。
 - Open Loop title normalization、fingerprint 與狀態轉換。
@@ -33,6 +35,7 @@
 - `python main.py now` 與 `python main.py resume activityTracker --json` 可讀取既有資料。
 - Windows 實機 watcher 啟動、停止與單一實例；macOS/Linux 先驗證 import 與 unsupported feature graceful degradation。
 - Restart E2E 必須比較重啟前後 `last_events`、event count、usage `data_updated_at` 與 Dashboard render；thread `running` 或 Health API 200 不能替代資料實際前進。
+- Dashboard 必須區分 `8/8 CONTRACT` 與 `RUNTIME OK / N DEGRADED`；degraded 模擬只操作 DOM，不寫正式資料庫，並在 494px 驗證無 page-level horizontal overflow 與 console error。
 
 ## Data Integrity Gates
 
@@ -139,7 +142,7 @@ python main.py extension-path
 
 `.github/workflows/platform-matrix.yml` 在 Windows、Ubuntu、macOS 的 Python 3.10/3.12 執行 pytest、compileall、Extension JS syntax、build、artifact privacy/content 與 installed writable-home/API/assets smoke。2026-08-25 GitHub Actions run `32757498004` 的六個 jobs 全數通過；未來 commit 仍須以各自 run receipt 判定，不沿用本次結果。
 
-2026-08-26 本機完整 `pytest` 為 **79/79**。Collector recovery E2E 將 window events 從 2281 推進至 2289、AI events 從 2722 推進至 2800，Dashboard `data_updated_at` 同步前進；這證明該次 collector → SQLite → API → UI 路徑恢復，不代表全天 continuous coverage。
+2026-08-26 本機完整 `pytest` 為 **81/81**。Collector recovery E2E 曾將 window events 從 2281 推進至 2289、AI events 從 2722 推進至 2800；本輪 runtime diagnostics 重啟又將 window events `2323 → 2324`、AI events `2894 → 2895`，live API 回報 `monitoring_state=healthy` 且 Window／四個 Agent sources 均 healthy。494px degraded DOM smoke 正確顯示 `2 DEGRADED`、`claude_desktop` source error，無頁面水平 overflow 或 console error。這些 receipt 證明 diagnostics 與單次資料推進，不代表全天 continuous coverage，也不代表 Extension 已連線。
 
 Claude Desktop Cowork／local-agent Windows incremental scan曾新增 148 turns、125 筆非空 response、117 筆 `final_candidate`，stable parser 重跑不新增重複 turn。這是本機 Cowork／local-agent receipt，不外推為一般 Claude 雲端聊天 coverage。
 

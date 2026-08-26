@@ -36,6 +36,7 @@ const I18N = {
     status_connected: "已連線",
     status_disconnected: "未連線",
     status_monitoring: "MONITORING 監控中",
+    status_degraded: "MONITORING 部分採集異常",
     status_paused: "PAUSED 已暫停",
     btn_start_monitor: "開始監控",
     btn_pause_monitor: "暫停監控",
@@ -150,7 +151,7 @@ const I18N = {
     ph_loading_loops: "載入未結事項…",
     ph_no_loops: "無未結事項。",
     data_trust_title: "DATA TRUST",
-    data_trust_desc: "所有採集器與資料模型均通過正確性驗收，產出高信度真實紀錄。",
+    data_trust_desc: "8 項 contract gates 已通過；runtime 仍以 collector probes 判定，coverage 不完整時不得升格。",
     trust_d1: "統一時區 (Local Timezone)",
     trust_d2: "檔案防手震與噪音過濾 (Debounce)",
     trust_d3: "Git 遞迴多倉庫掃描 (64 Repos)",
@@ -180,6 +181,7 @@ const I18N = {
     status_connected: "Connected",
     status_disconnected: "Disconnected",
     status_monitoring: "MONITORING",
+    status_degraded: "MONITORING DEGRADED",
     status_paused: "PAUSED",
     btn_start_monitor: "Start Monitoring",
     btn_pause_monitor: "Pause Monitoring",
@@ -294,7 +296,7 @@ const I18N = {
     ph_loading_loops: "Loading open loops…",
     ph_no_loops: "No open loops.",
     data_trust_title: "DATA TRUST",
-    data_trust_desc: "All collectors and data models verified for high-fidelity activity intelligence.",
+    data_trust_desc: "Eight contract gates passed; runtime still depends on collector probes and incomplete coverage is never promoted.",
     trust_d1: "Unified Timezone (Local TZ)",
     trust_d2: "File Debounce & Noise Filter",
     trust_d3: "Git Recursive Multi-Repo Scan (64 Repos)",
@@ -483,18 +485,38 @@ async function refreshStatus() {
   try {
     const data = await getJSON("/api/v1/control/status");
     isMonitoring = data.is_running;
+    const monitoringState = data.monitoring_state || (isMonitoring ? "healthy" : "stopped");
 
     const pill = $("status-pill");
-    pill.className = "pill " + (isMonitoring ? "pill-on" : "pill-off");
-    $("status-text").textContent = isMonitoring ? t("status_monitoring") : t("status_paused");
+    pill.className = "pill " + (monitoringState === "degraded" ? "pill-warn" : isMonitoring ? "pill-on" : "pill-off");
+    $("status-text").textContent = monitoringState === "degraded"
+      ? t("status_degraded")
+      : isMonitoring ? t("status_monitoring") : t("status_paused");
     $("btn-toggle-monitor").textContent = isMonitoring ? t("btn_pause_monitor") : t("btn_start_monitor");
 
     renderStats(data.metrics);
-    renderCollectors(data.watchers, data.last_events || {}, data.collector_health || {});
+    renderCollectors(data.watchers, data.last_events || {}, data.collector_health || {}, data.collector_diagnostics || {});
+    renderRuntimeTrust(monitoringState, data.degraded_collectors || []);
     $("last-refresh").textContent = "updated " + new Date().toLocaleTimeString();
   } catch (e) {
     $("status-text").textContent = t("status_disconnected");
     $("status-pill").className = "pill pill-off";
+    renderRuntimeTrust("disconnected", []);
+  }
+}
+
+function renderRuntimeTrust(state, degradedCollectors) {
+  const badge = $("data-trust-runtime-badge");
+  if (!badge) return;
+  const degraded = state === "degraded";
+  const healthy = state === "healthy";
+  badge.className = `mono-mini runtime-trust-badge ${healthy ? "runtime-ok" : degraded ? "runtime-degraded" : "runtime-stopped"}`;
+  if (healthy) {
+    badge.textContent = "8/8 CONTRACT · RUNTIME OK ▾";
+  } else if (degraded) {
+    badge.textContent = `8/8 CONTRACT · ${degradedCollectors.length} DEGRADED ▾`;
+  } else {
+    badge.textContent = `8/8 CONTRACT · ${state === "stopped" ? "STOPPED" : "DISCONNECTED"} ▾`;
   }
 }
 
@@ -627,18 +649,20 @@ function renderStats(m) {
     </div>`).join("");
 }
 
-function renderCollectors(w, lastEvents = {}, health = {}) {
+function renderCollectors(w, lastEvents = {}, health = {}, diagnostics = {}) {
   const items = [
-    { key: "file_watcher", name: t("collector_file"), on: w.file_watcher, last: lastEvents.file_watcher, h: health.file_watcher || "stale" },
-    { key: "git_watcher", name: t("collector_git"), on: w.git_watcher, last: lastEvents.git_watcher, h: health.git_watcher || "stale" },
-    { key: "window_watcher", name: t("collector_window"), on: w.window_watcher, last: lastEvents.window_watcher, h: health.window_watcher || "stale" },
-    { key: "agent_log_watcher", name: t("collector_agent"), on: w.agent_log_watcher, last: lastEvents.agent_log_watcher, h: health.agent_log_watcher || "stale" },
-    { key: "scheduler", name: t("collector_scheduler"), on: w.scheduler, last: null, h: health.scheduler || "healthy" }
+    { key: "file_watcher", name: t("collector_file"), on: w.file_watcher, last: lastEvents.file_watcher, h: health.file_watcher || "stale", d: diagnostics.file_watcher },
+    { key: "git_watcher", name: t("collector_git"), on: w.git_watcher, last: lastEvents.git_watcher, h: health.git_watcher || "stale", d: diagnostics.git_watcher },
+    { key: "window_watcher", name: t("collector_window"), on: w.window_watcher, last: lastEvents.window_watcher, h: health.window_watcher || "stale", d: diagnostics.window_watcher },
+    { key: "agent_log_watcher", name: t("collector_agent"), on: w.agent_log_watcher, last: lastEvents.agent_log_watcher, h: health.agent_log_watcher || "stale", d: diagnostics.agent_log_watcher },
+    { key: "scheduler", name: t("collector_scheduler"), on: w.scheduler, last: null, h: health.scheduler || "healthy", d: diagnostics.scheduler }
   ];
 
   const colorMap = {
     healthy: "var(--success, #22c55e)",
     idle: "var(--warn, #eab308)",
+    degraded: "var(--danger, #ef4444)",
+    stopped: "var(--danger, #ef4444)",
     stale: "var(--danger, #ef4444)",
     disabled: "var(--mu, #888)"
   };
@@ -646,6 +670,8 @@ function renderCollectors(w, lastEvents = {}, health = {}) {
   const labelMap = {
     healthy: currentLang === "zh-TW" ? "運作中" : "Active",
     idle: currentLang === "zh-TW" ? "待命中" : "Idle",
+    degraded: currentLang === "zh-TW" ? "部分採集異常" : "Degraded",
+    stopped: currentLang === "zh-TW" ? "已停止" : "Stopped",
     stale: currentLang === "zh-TW" ? "無有效資料" : "Stale",
     disabled: currentLang === "zh-TW" ? "已停用" : "Disabled"
   };
@@ -660,6 +686,16 @@ function renderCollectors(w, lastEvents = {}, health = {}) {
     }
     const dotColor = colorMap[it.h] || "var(--mu)";
     const statusText = labelMap[it.h] || (it.on ? t("collector_enabled") : t("collector_disabled"));
+    let diagnosticText = "";
+    if (it.key === "window_watcher" && it.d && ["unavailable", "error"].includes(it.d.state)) {
+      diagnosticText = currentLang === "zh-TW"
+        ? `前景 probe 不可用 · ${Number(it.d.unavailable_seconds || 0)}s`
+        : `Foreground probe unavailable · ${Number(it.d.unavailable_seconds || 0)}s`;
+    }
+    if (it.key === "agent_log_watcher" && it.d && it.d.sources) {
+      const failed = Object.entries(it.d.sources).filter(([, value]) => value.state === "error").map(([key]) => key);
+      if (failed.length) diagnosticText = `${currentLang === "zh-TW" ? "來源錯誤" : "Source error"}: ${failed.join(", ")}`;
+    }
 
     return `
     <div class="collector">
@@ -670,6 +706,7 @@ function renderCollectors(w, lastEvents = {}, health = {}) {
       <div class="collector-state" style="color:${dotColor}">
         ${statusText}
         ${lastTimeStr}
+        ${diagnosticText ? `<span class="collector-diagnostic">${esc(diagnosticText)}</span>` : ""}
       </div>
     </div>`;
   }).join("");

@@ -77,6 +77,7 @@ input, select, button { font-family: inherit; }
 .pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; border: 1px solid; }
 .pill-dot { width: 7px; height: 7px; background: currentColor; }
 .pill-on { background: rgba(242, 106, 15, 0.12); color: var(--orange); border-color: rgba(242, 106, 15, 0.4); }
+.pill-warn { background: rgba(234, 179, 8, 0.13); color: var(--warn); border-color: rgba(234, 179, 8, 0.5); }
 .pill-off { background: rgba(214, 59, 42, 0.12); color: var(--danger); border-color: rgba(214, 59, 42, 0.4); }
 
 .btn { cursor: pointer; font-size: 12px; font-weight: 700; padding: 6px 11px; white-space: nowrap; flex: none; border: 1px solid var(--bd); background: transparent; color: var(--tx); }
@@ -287,8 +288,8 @@ input, select, button { font-family: inherit; }
 }
 
 /* ---------- Stats ---------- */
-.stats { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid var(--bd); background: var(--s1); margin-bottom: 14px; }
-.stat { padding: 12px 14px; border-right: 1px solid var(--bd); }
+.stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--bd); background: var(--s1); margin-bottom: 14px; }
+.stat { min-width: 0; padding: 12px 14px; border-right: 1px solid var(--bd); }
 .stat:last-child { border-right: none; }
 .stat-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .stat-dot { width: 7px; height: 7px; }
@@ -319,6 +320,11 @@ input, select, button { font-family: inherit; }
 .collector:last-child { border-right: none; }
 .collector-name { font-size: 12px; font-weight: 700; margin-bottom: 3px; }
 .collector-state { font-family: "JetBrains Mono", monospace; font-size: 10.5px; font-weight: 700; }
+.collector-diagnostic { display: block; margin-top: 3px; color: var(--danger); font-size: 8.5px; line-height: 1.35; overflow-wrap: anywhere; }
+.runtime-trust-badge { display: flex; align-items: center; gap: 6px; }
+.runtime-trust-badge.runtime-ok { color: var(--ok); }
+.runtime-trust-badge.runtime-degraded { color: var(--warn); }
+.runtime-trust-badge.runtime-stopped { color: var(--danger); }
 
 /* ---------- Settings ---------- */
 .split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
