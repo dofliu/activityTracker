@@ -10,6 +10,7 @@ from sqlalchemy import desc, func
 
 from core.database import get_db
 from core.models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, ProjectState, OpenLoop, GitHubRepoState, GitHubPREvent
+from core.project_paths import configured_self_project_path, find_configured_project_path
 from core.time_utils import get_local_now
 
 # 未歸戶的收容桶：不是真的工作項目，不應出現在進行中工作、提醒與簡報裡
@@ -435,23 +436,17 @@ def get_active_projects_list(force_refresh: bool = False) -> List[Dict[str, Any]
                 if os.path.exists(latest_ai.cwd):
                     local_path = str(Path(latest_ai.cwd).resolve())
 
-            # 備援從常用根目錄探測
+            # 備援只使用使用者設定的根目錄，避免攜帶特定電腦的絕對路徑。
             if not local_path:
-                candidates = [
-                    Path("D:/Project_CodingSimulation") / p.project_key,
-                    Path("D:/Project_CodingSimulation/PersonalHelper") / p.project_key,
-                    Path("D:/Project_CodingSimulation/researchTopic") / p.project_key,
-                    Path("D:/Project_CodingSimulation/courseRelated") / p.project_key,
-                    Path("D:/Dropbox/Project_Academic/Paper&Patent/01.國際期刊(發表年月)/Planning_Writing") / p.project_key,
-                    Path("D:/Dropbox/Project_Academic/Paper&Patent/01.國際期刊(發表年月)/Submitted") / p.project_key,
-                ]
-                for cand in candidates:
-                    if cand.exists():
-                        local_path = str(cand.resolve())
-                        break
+                configured_path = find_configured_project_path(p.project_key)
+                if configured_path:
+                    local_path = str(configured_path)
 
             if not local_path and p.project_key == "Agent Development":
-                local_path = str(Path("D:/Project_CodingSimulation/PersonalHelper/activityTracker").resolve())
+                local_path = str(
+                    configured_self_project_path()
+                    or Path(__file__).resolve().parents[1]
+                )
 
             # 5. 提取最新 AI 對話資訊
             ai_info = None

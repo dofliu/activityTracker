@@ -15,6 +15,7 @@ from sqlalchemy import desc
 
 from core.database import get_db
 from core.models import ProjectState, OpenLoop, AIPromptEvent, GitActivityEvent, FileActivityEvent, GitHubRepoState, GitHubPREvent
+from core.project_paths import configured_self_project_path, find_configured_project_path
 from core.time_utils import get_local_now
 from core.project_engine import resolve_project_from_path
 
@@ -131,21 +132,15 @@ def build_project_handoff(
             local_path = str(Path(latest_ai.cwd).resolve())
 
         if not local_path:
-            candidates = [
-                Path("D:/Project_CodingSimulation") / project_key,
-                Path("D:/Project_CodingSimulation/PersonalHelper") / project_key,
-                Path("D:/Project_CodingSimulation/researchTopic") / project_key,
-                Path("D:/Project_CodingSimulation/courseRelated") / project_key,
-                Path("D:/Dropbox/Project_Academic/Paper&Patent/01.國際期刊(發表年月)/Planning_Writing") / project_key,
-                Path("D:/Dropbox/Project_Academic/Paper&Patent/01.國際期刊(發表年月)/Submitted") / project_key,
-            ]
-            for cand in candidates:
-                if cand.exists():
-                    local_path = str(cand.resolve())
-                    break
+            configured_path = find_configured_project_path(project_key)
+            if configured_path:
+                local_path = str(configured_path)
 
         if not local_path and project_key == "Agent Development":
-            local_path = str(Path("D:/Project_CodingSimulation/PersonalHelper/activityTracker").resolve())
+            local_path = str(
+                configured_self_project_path()
+                or Path(__file__).resolve().parents[1]
+            )
 
         # 5. 查詢最近 Git Commits
         commits_db = session.query(GitActivityEvent).filter(

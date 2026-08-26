@@ -231,18 +231,25 @@ data_lifecycle:
   backup_retention_days: 30
   auto_backup_on_start: false
 
+project_resolution:
+  # 建議填入自己的專案根目錄；可使用 ~ 與環境變數。
+  search_roots:
+    - "~/Projects"
+  # 可選；留空時會由安裝位置自動定位 OmniContext 自身。
+  self_project_path: ""
+
 watchers:
   file_watcher:
     enabled: true
     watch_directories:
-      - "D:/Project_CodingSimulation"
-      - "D:/Dropbox/Project_Academic/Paper_and_Patent/01.JournalPapers"
+      - "~/Projects"
+      - "~/Documents/Research"
     extensions: [".tex", ".docx", ".md", ".pdf", ".py"]
   
   git_watcher:
     enabled: true
     repositories:
-      - "D:/Project_CodingSimulation"
+      - "~/Projects"
   
   agent_log_watcher:
     enabled: true
@@ -311,6 +318,7 @@ activityTracker/
 │   ├── platform_services.py        # Windows/macOS/Linux argv 型 OS 整合
 │   ├── data_lifecycle.py           # SQLite online backup 與 integrity receipt
 │   ├── project_engine.py           # 專案智能歸戶、多檔案聚合與未結事項引擎
+│   ├── project_paths.py            # 設定驅動的專案根目錄定位
 │   ├── semantic_index.py           # 本機 embeddings、provenance retrieval 與 omni ask
 │   ├── context_memory.py           # Related History 與 derived work-session grouping
 │   ├── fs_utils.py                 # 本機原生檔案總管/瀏覽對話框工具
@@ -394,7 +402,7 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 
 本專案現階段為**個人優先（personal-first）**設計，尚未針對他人環境整備：
 
-* 部分歸戶邏輯仍硬編碼專案根路徑（`core/project_engine.py`）。
+* 專案根目錄已改為 `project_resolution.search_roots` 設定；未設定時才沿用 file/Git watcher 的 roots，因此首次安裝仍應明確設定自己的目錄。
 * 視窗採集、桌面通知與開機排程僅支援 **Windows**。
 * `pyproject.toml`、schema migration 7/7、formal rollback，以及 Windows／Ubuntu／macOS 的 wheel/sdist build、install、API/assets smoke 已完成。
 * `main.py init --watch <path>` 已取代手動複製設定；複雜來源仍需於 `config.yaml` 調整。

@@ -48,6 +48,16 @@ Wheel 安裝可改用 `omnicontext init --watch "D:\Projects"`。
 - 指令會建立本機 `config.yaml`、必要資料目錄與 Browser Extension ingest token。
 - `config.yaml` 與 `omni_context.db` 包含本機路徑或私人資料，不應提交至 Git。
 
+如需讓 Project State 與 Context Handoff 在新電腦上可靠回推專案資料夾，請在 `config.yaml` 明確填入自己的 roots；未設定時才會沿用 file/Git watcher 的設定：
+
+```yaml
+project_resolution:
+  search_roots:
+    - "~/Projects"
+    - "~/Documents/Research"
+  self_project_path: "" # 可選；留空時由安裝位置推導
+```
+
 ## 2. 啟動與確認服務
 
 ### 2.1 LLM API key

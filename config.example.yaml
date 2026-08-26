@@ -16,6 +16,12 @@ data_lifecycle:
   backup_retention_days: 30
   auto_backup_on_start: false
   auto_backup_before_migration: true
+project_resolution:
+  # 依序放置專案根目錄；Project State 與 Context Handoff 只會在這些 roots 下尋找同名專案。
+  # 未設定時，會退回使用 watchers 的 watch_directories 與 repositories，完全不依賴開發者個人路徑。
+  search_roots: []
+  # 可選：本 OmniContext 專案根目錄，供「Agent Development」卡片定位；留空時以安裝位置自動推導。
+  self_project_path: ""
 watchers:
   file_watcher:
     enabled: true

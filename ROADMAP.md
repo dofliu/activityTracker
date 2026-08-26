@@ -269,7 +269,7 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 | 障礙 | 現況 | 嚴重度 |
 | :--- | :--- | :--- |
-| 核心邏輯硬編碼個人路徑 | `project_engine.py:415-418` 寫死 `D:/Project_CodingSimulation` 四層 | 🔴 他人安裝後歸戶會壞 |
+| 專案根目錄設定 | `project_resolution.search_roots` 已供 Project State 與 Context Handoff 共用；未設定時退回 watcher roots | 🟢 使用者仍需在首次安裝填入自己的 roots |
 | 僅支援 Windows | 視窗採集、桌面通知、開機排程綁 win32 / PowerShell | 🟡 Mac / Linux 使用者無法進入 |
 | 發佈打包跨平台未驗證 | Windows isolated wheel/sdist、upgrade、assets 已通過；macOS/Linux matrix 與 public publish 尚未執行 | 🟡 Windows Alpha 可驗證，尚不能宣稱跨平台 release-ready |
 | 首次啟動引導未完整 | `main.py init --watch` 已可用，但 Agent/Git 自動偵測與 capability probe 未完成 | 🟡 基本可啟動，複雜來源仍需調 config |
@@ -401,7 +401,7 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 ## 7. P6：開源與發佈整備（portability/test 基線提前於 P2.5）
 
-1. 將 `project_engine.py` 的硬編碼路徑抽成設定項。
+1. [x] `project_engine.py` 與 Context Handoff 已改用 `project_resolution.search_roots`；支援 `~`／環境變數與 watcher-root fallback，不再內嵌個人絕對路徑。
 2. 擴充已建立的 `python main.py init`，加入本機 Agent 日誌、Git 根目錄與 notification capability 自動偵測。
 3. 維護 `pyproject.toml`、contract tests、schema 7/7、verified backup、formal rollback，以及已通過的 Windows／Ubuntu／macOS × Python 3.10／3.12 CI receipts；下一步取得 live heartbeat 與 ChatGPT／Claude Extension-backed capture receipts。
 4. 無 LLM 金鑰時預設走 Ollama，確保零金鑰也能完整體驗。

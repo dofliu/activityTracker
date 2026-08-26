@@ -215,18 +215,25 @@ data_lifecycle:
   backup_retention_days: 30
   auto_backup_on_start: false
 
+project_resolution:
+  # Add your project roots; ~ and environment variables are supported.
+  search_roots:
+    - "~/Projects"
+  # Optional; blank derives the OmniContext project path from its installation.
+  self_project_path: ""
+
 watchers:
   file_watcher:
     enabled: true
     watch_directories:
-      - "D:/Project_CodingSimulation"
-      - "D:/Dropbox/Project_Academic/Paper_and_Patent/01.JournalPapers"
+      - "~/Projects"
+      - "~/Documents/Research"
     extensions: [".tex", ".docx", ".md", ".pdf", ".py"]
   
   git_watcher:
     enabled: true
     repositories:
-      - "D:/Project_CodingSimulation"
+      - "~/Projects"
   
   agent_log_watcher:
     enabled: true
@@ -292,6 +299,7 @@ activityTracker/
 │   ├── platform_services.py        # Cross-platform argv-based OS integration
 │   ├── data_lifecycle.py           # SQLite online backup and integrity receipt
 │   ├── project_engine.py           # Canonical project resolver & open loop engine
+│   ├── project_paths.py            # Config-driven project-root resolution
 │   ├── semantic_index.py           # Local embeddings, provenance retrieval, and omni ask
 │   ├── context_memory.py            # Derived work sessions and related-history retrieval
 │   ├── fs_utils.py                 # Native Windows folder picker utilities
