@@ -16,12 +16,12 @@ Base = declarative_base()
 
 
 class AIPromptEvent(Base):
-    """記錄所有 AI 相關的問答與指令互動 (Gemini, ChatGPT, Claude, Manus, CLI 等)"""
+    """記錄所有 AI 相關的問答與指令互動 (Gemini, ChatGPT, Claude, CLI 等)"""
     __tablename__ = "ai_prompt_events"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     timestamp = Column(DateTime, default=get_local_now, index=True)
-    platform = Column(String(50), nullable=False, index=True)  # gemini, chatgpt, claude, manus, claude_code, codex, antigravity
+    platform = Column(String(50), nullable=False, index=True)  # gemini, chatgpt, claude, claude_code, codex, antigravity
     url = Column(String(500), nullable=True)
     conversation_id = Column(String(100), nullable=True, index=True)
     prompt_text = Column(Text, nullable=False)

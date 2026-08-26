@@ -1,6 +1,6 @@
 # OmniContext 開發規劃與成果紀錄 — P0 ~ P6
 
-> 最新更新日期：2026-08-26　｜　目前狀態：**personal alpha / P2.6 + P3 context memory + P5-1 proposal-only alpha**。P3-1～P3-5、Windows Toast E2E、formal rollback、Windows/macOS/Linux CI、P5-1、collector runtime diagnostics 與 Extension 1.3.1 live-verification harness 已完成；ChatGPT live selectors 已修復。Claude/Manus 本輪 PASS receipt 與 Extension live heartbeat 尚未完成，整體不具 release-ready 或 autonomous-ready 資格。
+> 最新更新日期：2026-08-26　｜　目前狀態：**personal alpha / P2.6 + P3 context memory + P5-1 proposal-only alpha**。P3-1～P3-5、Windows Toast E2E、formal rollback、Windows/macOS/Linux CI、P5-1、collector runtime diagnostics 與 Extension 1.3.1 live-verification harness 已完成；ChatGPT live selectors 已修復。Claude.ai 本輪 PASS receipt 與 Extension live heartbeat 尚未完成，整體不具 release-ready 或 autonomous-ready 資格。
 > 本文件記錄 OmniContext 從 0 到 1 的缺陷修復歷程、已完成之架構改造與未來的維運與延伸規劃。
 
 ---
@@ -109,14 +109,14 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 
 1. **Chrome MV3 擴充套件實機載入**：
    - Gemini 已有 3 筆 Browser events／2 筆 response；ChatGPT 已完成 2026-08-25 真實 DOM prompt/response selector probe 並修復繁中 send click。
-   - Extension 1.3.1 已加入 start baseline、Content Ready timestamp、event/response delta 與 JSON receipt；Claude.ai／Manus 本輪 PASS 與 live heartbeat 仍待已登入 Chrome Reload 後取得。
+   - Extension 1.3.2 保留 start baseline、Content Ready timestamp、event/response delta 與 JSON receipt，並移除 Manus 監控；Claude.ai 本輪 PASS 與 live heartbeat 仍待已登入 Chrome Reload 後取得。
 2. **自動開機排程佈署 (`scripts/install_autostart.ps1`)**：
    - 註冊 Windows Task Scheduler 工作排程，支援背景靜默啟動（`pythonw.exe`）。
 3. **視窗採集器持續觀察**：
    - 2026-08-23 重啟服務後恢復正常（當日 27 筆）。心跳日誌已就位，若再次靜默可從日誌判斷是讀取端或寫入端。
 4. **Desktop／Web／Transcript coverage 分流**：
    - 2026-08-25 主頁與 `/api/v1/capture/status` 已將三種訊號分開；Claude Desktop incremental E2E 新增 148 turns／125 responses／117 final candidates。
-   - 待完成：一般 Claude 雲端聊天仍不解析 cache；Claude.ai／Manus 仍需 authenticated Browser Extension receipt。
+   - 待完成：一般 Claude 雲端聊天仍不解析 cache；Claude.ai 仍需 authenticated Browser Extension receipt。
 
 ---
 
@@ -124,14 +124,14 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 
 > Architecture decision：在語意記憶與自主執行之前，先讓「來源、turn、回應、待辦、權限與執行平台」都有明確契約。P5 在本節所有 release blockers 關閉前維持 blocked。
 
-**2026-08-26 實作結果：**append-only SQLite registry 維持 7/7；Windows WinRT milestone Toast E2E 與 `1.3.0a1/schema4 → 1.3.0a2/schema5 → rollback` rehearsal 通過。Extension `1.3.1` 在 shared capture core 上新增 timestamped Content Ready receipt 與 fail-closed live verifier；ChatGPT live DOM probe 通過，Claude/Manus 本輪 PASS receipt 仍待完成。P3-2～P3-5 已進入 Alpha；跨平台 workflow run `32757498004` 的六個 jobs 已通過。
+**2026-08-26 實作結果：**append-only SQLite registry 維持 7/7；Windows WinRT milestone Toast E2E 與 `1.3.0a1/schema4 → 1.3.0a2/schema5 → rollback` rehearsal 通過。Extension `1.3.1` 在 shared capture core 上新增 timestamped Content Ready receipt 與 fail-closed live verifier；ChatGPT live DOM probe 通過，Claude.ai 本輪 PASS receipt 仍待完成。P3-2～P3-5 已進入 Alpha；跨平台 workflow run `32757498004` 的六個 jobs 已通過。
 
 ### P2.5-B2 Extension live-verification harness
 
 - `POST /api/v1/extension/verification` 建立 process-local baseline；`GET /api/v1/extension/verification/{id}` 每次以目前 heartbeat 與資料庫 counts 重新判定。
 - PASS 必須同時具備開始後的新 token-authenticated heartbeat、每站新的 Content Ready timestamp、新 Browser event 與非空 assistant response；歷史 `OBSERVED`、單獨 heartbeat 或只有 prompt 都不能通過。
 - Receipt 僅含平台、counts、timestamps 與 stable state，不含 token、URL、Prompt、Response 或本機 path；baseline 不寫入 SQLite，service restart 後失效。
-- **Localhost receipt（2026-08-26）**：Claude/Manus run 可由 UI 建立並進入 RUNNING；因本工作階段無法接管使用者已登入 Chrome，heartbeat、Content Ready、event 與 response delta 均維持 0，正確未升格為 PASS。494px 無頁面水平 overflow，console 無錯誤；完整測試 85/85。
+- **Localhost receipt（2026-08-26）**：Claude.ai run 可由 UI 建立並進入 RUNNING；因本工作階段無法接管使用者已登入 Chrome，heartbeat、Content Ready、event 與 response delta 均維持 0，正確未升格為 PASS。494px 無頁面水平 overflow，console 無錯誤。
 
 ### P2.5-S1 本機 API 安全邊界
 
@@ -195,7 +195,7 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 
 ### 產品目的
 
-- 依每日、每週統計 Claude Code、Codex、ChatGPT、Claude.ai、Gemini、Manus、VS Code 等主要介面的 **foreground active time**。
+- 依每日、每週統計 Claude Code、Codex、ChatGPT、Claude.ai、Gemini、VS Code 等主要介面的 **foreground active time**。
 - 允許使用者設定每日里程碑；達標時以 dashboard 與 desktop notification 提醒、肯定或鼓勵，例如「今天 Claude + Codex 前景使用時間已達 6 小時」。
 - 長時間使用時可選擇顯示休息提醒；語氣、門檻、quiet hours、通知頻率與是否啟用均由使用者設定。
 
@@ -222,7 +222,7 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 - [x] milestone notification 具 idempotency、quiet hours、cooldown 與使用者關閉選項。
 - [x] Windows Dashboard/API 與 Extension token pairing 已實機驗證。
 - [x] Gemini 真實 Browser ingestion 已觀察 3 筆 event／2 筆非空 response。
-- [ ] 新版 Extension heartbeat 實機 receipt、ChatGPT/Claude/Manus、真實達標 Toast、macOS/Linux CI/實機仍待完成。
+- [ ] 新版 Extension heartbeat 實機 receipt、ChatGPT/Claude、真實達標 Toast、macOS/Linux CI/實機仍待完成。
 - [x] Contract tests 已覆蓋 interval merge、跨午夜、缺失平台、通知去重與內建 scheduler job contract。
 - [ ] DST 與完整 retention/privacy matrix 仍待補。
 
@@ -403,7 +403,7 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 1. 將 `project_engine.py` 的硬編碼路徑抽成設定項。
 2. 擴充已建立的 `python main.py init`，加入本機 Agent 日誌、Git 根目錄與 notification capability 自動偵測。
-3. 維護 `pyproject.toml`、contract tests、schema 7/7、verified backup、formal rollback，以及已通過的 Windows／Ubuntu／macOS × Python 3.10／3.12 CI receipts；下一步取得 live heartbeat 與 ChatGPT／Claude／Manus Extension-backed capture receipts。
+3. 維護 `pyproject.toml`、contract tests、schema 7/7、verified backup、formal rollback，以及已通過的 Windows／Ubuntu／macOS × Python 3.10／3.12 CI receipts；下一步取得 live heartbeat 與 ChatGPT／Claude Extension-backed capture receipts。
 4. 無 LLM 金鑰時預設走 Ollama，確保零金鑰也能完整體驗。
 5. 跨平台：視窗採集與桌面通知抽象出平台介面，Windows 以外先降級為停用而非報錯。
 

@@ -138,7 +138,7 @@ def test_extension_heartbeat_requires_token_even_without_origin(monkeypatch):
 def test_extension_verification_api_is_local_only_and_forbids_extra_fields(monkeypatch):
     class FakeRegistry:
         def start(self, platforms, *, timeout_seconds):
-            assert platforms == ["claude", "manus"]
+            assert platforms == ["claude"]
             assert timeout_seconds == 300
             return {
                 "verification_id": "verification-1",
@@ -157,7 +157,7 @@ def test_extension_verification_api_is_local_only_and_forbids_extra_fields(monke
     monkeypatch.setattr("core.server.extension_verification_registry", FakeRegistry())
     started = client.post(
         "/api/v1/extension/verification",
-        json={"platforms": ["claude", "manus"], "timeout_seconds": 300},
+        json={"platforms": ["claude"], "timeout_seconds": 300},
     )
     checked = client.get("/api/v1/extension/verification/verification-1")
     rejected_extra = client.post(

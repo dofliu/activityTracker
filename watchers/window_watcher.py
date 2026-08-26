@@ -70,7 +70,7 @@ def categorize_window(app_name: str, title: str) -> str:
         return "Coding / Development"
     elif any(k in title_lower for k in ["latex", "overleaf", "texstudio", "word", "winword", "zotero", "acrobat", "arxiv", "paper"]):
         return "Research / Paper Writing"
-    elif any(k in title_lower for k in ["gemini", "chatgpt", "claude", "manus", "copilot", "deepseek"]):
+    elif any(k in title_lower for k in ["gemini", "chatgpt", "claude", "copilot", "deepseek"]):
         return "AI Assistance / Research"
     elif any(k in app_lower for k in ["slack", "teams", "discord", "outlook", "mail", "wechat", "telegram"]):
         return "Communication / Email"

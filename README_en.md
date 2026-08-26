@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **Current status: Personal Alpha.** Windows milestone WinRT Toast E2E, schema 7/7, formal package+database rollback, P3-2 through P3-5 Context Memory Alpha, P5-1 proposal-only Alpha, collector runtime diagnostics, the Extension 1.3.1 live-verification harness, and the cross-platform CI matrix have passed. ChatGPT live DOM selectors were repaired, and Claude Desktop Cowork/local-agent transcript capture passed a Windows E2E. Claude.ai/Manus still lack a current-run PASS receipt, and a live Extension heartbeat still requires logged-in Chrome verification, so this is not release-ready.
+> **Current status: Personal Alpha.** Windows milestone WinRT Toast E2E, schema 7/7, formal package+database rollback, P3-2 through P3-5 Context Memory Alpha, P5-1 proposal-only Alpha, collector runtime diagnostics, the Extension 1.3.1 live-verification harness, and the cross-platform CI matrix have passed. ChatGPT live DOM selectors were repaired, and Claude Desktop Cowork/local-agent transcript capture passed a Windows E2E. Claude.ai still lacks a current-run PASS receipt, and a live Extension heartbeat still requires logged-in Chrome verification, so this is not release-ready.
 
 **Documentation:** [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
 
@@ -74,7 +74,7 @@ It is purpose-built to answer three fundamental questions at any moment:
   * **Codex** (`~/.codex/sessions/**`): Parses rollout JSONL records and complete assistant message turns.
   * **Antigravity** (`.gemini/brain/**`): Captures real-time sessions and tool outputs.
 * **Browser Extension (Chrome MV3)**:
-  * Supports **ChatGPT**, **Google Gemini**, **Claude.ai**, and **Manus**.
+  * Supports **ChatGPT**, **Google Gemini**, and **Claude.ai**.
   * Uses a dedicated ingest token, stable turn key, and write-only capability boundary.
 * **Boundary**: normal Claude Desktop cloud-chat Chromium LevelDB cache is detected but not parsed and is never claimed as captured transcript content.
 * **Source fault isolation**: a permission or parser failure in one source such as Claude Desktop skips only that source; Codex, Claude Code, and Antigravity scans continue in the same cycle.
@@ -93,7 +93,7 @@ It is purpose-built to answer three fundamental questions at any moment:
 * Includes a PowerShell background autostart installer (`scripts/install_autostart.ps1`).
 
 ### 7. ⏱️ Daily Interface Usage & Milestones (P2.6 Alpha)
-* The dashboard shows observed foreground time and AI turns for Claude, Codex, ChatGPT, Gemini, Manus, Antigravity, VS Code, and other configured interfaces.
+* The dashboard shows observed foreground time and AI turns for Claude, Codex, ChatGPT, Gemini, Antigravity, VS Code, and other configured interfaces.
 * Daily goals, milestones, notification tone, quiet hours, and cooldown are configurable; SQLite receipts prevent duplicate notifications after restart.
 * Foreground time is not productivity or actual work time. Coverage remains `partial` until a continuous coverage ledger exists.
 * The dashboard `DATA CAPTURE` panel condenses three independent signals—`FOCUS`, `WEB`, and `LOG`—without treating one observed channel as proof of another.
@@ -238,7 +238,6 @@ watchers:
     gemini: true
     chatgpt: true
     claude_web: true
-    manus: true
 
 synthesizer:
   provider: "ollama"
@@ -306,7 +305,7 @@ activityTracker/
 │   ├── git_watcher.py              # Recursive Git scanner & commit tracker
 │   ├── window_watcher.py           # Active window focus & time tracker
 │   ├── agent_log_watcher.py        # Claude Code / Codex / Antigravity log parser
-│   └── browser_extension/          # Chrome MV3 extension (ChatGPT/Gemini/Claude/Manus)
+│   └── browser_extension/          # Chrome MV3 extension (ChatGPT/Gemini/Claude)
 │
 ├── synthesizer/                    # AI synthesis & scheduling engine
 │   ├── aggregator.py               # Multi-day range event aggregation pipeline

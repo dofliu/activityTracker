@@ -12,7 +12,7 @@
 
 - ChatGPT：2026-08-25 於 `chatgpt.com` 繁中 anonymous session 完成真實 DOM probe、送出最小 E2E prompt 並取得 `OK` response。確認 input `#prompt-textarea` 與 response `[data-message-author-role='assistant']`；發現繁中「傳送提示詞」不在原 click selector，已修復。
 - 共用 capture core 新增 composer-scope keydown、form submit、localized send click，以及 response count/text baseline，避免新 prompt 誤配上一則 assistant response。
-- Claude.ai、Manus：可用測試瀏覽器分別導向 login；未取得 authenticated conversation，因此目前只能通過 source/selector contract，不能宣稱真實 capture E2E。
+- Claude.ai：測試瀏覽器導向 login；未取得 authenticated conversation，因此目前只能通過 source/selector contract，不能宣稱真實 capture E2E。
 
 ## Formal rollback rehearsal
 

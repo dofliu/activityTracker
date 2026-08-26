@@ -41,7 +41,7 @@ AI provider 正逐步強化各自產品內的 continuity：
 目前已具備：
 
 - Claude Code、Codex、Antigravity transcript parser。
-- ChatGPT、Gemini、Claude.ai、Manus Browser Extension ingestion bridge。
+- ChatGPT、Gemini、Claude.ai Browser Extension ingestion bridge。
 - Local file、Git commit、GitHub repository/PR、window foreground activity。
 - Canonical project resolver、Project State、Open Loop lifecycle、Context Handoff。
 - Local SQLite、versioned migration、backup/restore drill 與 partial/unavailable coverage semantics。

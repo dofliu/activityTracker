@@ -6,7 +6,7 @@ const DIAGNOSTIC_KEY = "omnicontext_extension_diagnostics";
 const INSTANCE_KEY = "omnicontext_extension_instance_id";
 const HEARTBEAT_ALARM = "omnicontext-heartbeat";
 const OFFLINE_FLUSH_ALARM = "omnicontext-offline-flush";
-const SUPPORTED_PLATFORMS = new Set(["chatgpt", "gemini", "claude", "manus"]);
+const SUPPORTED_PLATFORMS = new Set(["chatgpt", "gemini", "claude"]);
 
 // 只用於本次 Extension session 的去重鍵，不作密碼學用途。
 function simpleHash(str) {

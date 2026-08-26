@@ -137,7 +137,7 @@ def extension_monitor_page():
 # Pydantic 請求與回應結構模型
 # =====================================================================
 class AIPromptCreate(BaseModel):
-    platform: str = Field(..., description="gemini, chatgpt, claude, manus, claude_code, codex, antigravity")
+    platform: str = Field(..., description="gemini, chatgpt, claude, claude_code, codex, antigravity")
     url: Optional[str] = None
     conversation_id: Optional[str] = None
     prompt_text: str = Field(..., description="使用者輸入的 Prompt")
@@ -562,8 +562,6 @@ def create_or_update_ai_event(payload: AIPromptCreate):
         browser_enabled = cfg.get("watchers.browser.chatgpt", True)
     elif plat in ("gemini", "gemini_web"):
         browser_enabled = cfg.get("watchers.browser.gemini", True)
-    elif plat in ("manus", "manus_web"):
-        browser_enabled = cfg.get("watchers.browser.manus", True)
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported browser platform: {plat}")
 

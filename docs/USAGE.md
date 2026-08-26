@@ -109,10 +109,10 @@ python main.py init --show-token
 ```
 
 6. 將 token 貼入 Extension popup 並儲存。
-7. 在 `chrome://extensions/`／`edge://extensions/` 按一次 Reload，讓 Extension `1.3.1` background、timestamped Content Ready receipt、shared capture core 與 content scripts 生效。
+7. 在 `chrome://extensions/`／`edge://extensions/` 按一次 Reload，讓 Extension `1.3.2` background、timestamped Content Ready receipt、shared capture core 與 content scripts 生效。
 8. popup 顯示 pairing 成功與近期 Heartbeat 後，開啟支援網站並完成一輪對話，再到 Extension Monitor 查看 `OBSERVED` 狀態。
 
-目前支援 ChatGPT、Claude.ai、Gemini 與 Manus。Monitor 顯示 ONLINE 只證明 localhost service 正常；RECENT HEARTBEAT 代表 Extension 曾以正確 token 抵達 server；CONTENT READY 代表支援網站載入過 content script；只有 OBSERVED 才代表資料庫已有真實 Browser event。任何單一狀態都不代表完整 coverage。請勿把 token 放入截圖、issue、commit 或公開日誌。
+目前支援 ChatGPT、Claude.ai 與 Gemini。Monitor 顯示 ONLINE 只證明 localhost service 正常；RECENT HEARTBEAT 代表 Extension 曾以正確 token 抵達 server；CONTENT READY 代表支援網站載入過 content script；只有 OBSERVED 才代表資料庫已有真實 Browser event。任何單一狀態都不代表完整 coverage。請勿把 token 放入截圖、issue、commit 或公開日誌。
 
 如需旋轉 token：
 
@@ -139,7 +139,7 @@ PASS 同時要求本輪的新 heartbeat、Content Ready、Browser event 與非�
 $run = Invoke-RestMethod -Method Post `
   -Uri http://127.0.0.1:8765/api/v1/extension/verification `
   -ContentType application/json `
-  -Body '{"platforms":["claude","manus"],"timeout_seconds":600}'
+  -Body '{"platforms":["claude"],"timeout_seconds":600}'
 
 Invoke-RestMethod "http://127.0.0.1:8765/api/v1/extension/verification/$($run.verification_id)"
 ```

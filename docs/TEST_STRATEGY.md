@@ -147,7 +147,7 @@ python main.py extension-path
 
 `.github/workflows/platform-matrix.yml` 在 Windows、Ubuntu、macOS 的 Python 3.10/3.12 執行 pytest、compileall、Extension JS syntax、build、artifact privacy/content 與 installed writable-home/API/assets smoke。2026-08-25 GitHub Actions run `32757498004` 的六個 jobs 全數通過；未來 commit 仍須以各自 run receipt 判定，不沿用本次結果。
 
-2026-08-26 本機完整 `pytest` 為 **85/85**。Collector runtime diagnostics、Extension timestamped Content Ready、response counts 與 fail-closed live verifier contracts 均通過。localhost Claude／Manus run 可建立 baseline 並正確維持 RUNNING：歷史 `10 events / 6 responses`、今日 0、heartbeat 0 不會升格為 PASS；487px Monitor 無頁面水平 overflow且 console 無錯誤。這證明 verifier 與 UI 行為，不代表 Extension 已在使用者 Chrome 連線，也不代表全天 continuous coverage。
+2026-08-26 本機完整 `pytest` 為 **85/85**。Collector runtime diagnostics、Extension timestamped Content Ready、response counts 與 fail-closed live verifier contracts 均通過。localhost Claude.ai run 可建立 baseline 並正確維持 RUNNING：歷史 `10 events / 6 responses`、今日 0、heartbeat 0 不會升格為 PASS；487px Monitor 無頁面水平 overflow且 console 無錯誤。這證明 verifier 與 UI 行為，不代表 Extension 已在使用者 Chrome 連線，也不代表全天 continuous coverage。
 
 Claude Desktop Cowork／local-agent Windows incremental scan曾新增 148 turns、125 筆非空 response、117 筆 `final_candidate`，stable parser 重跑不新增重複 turn。這是本機 Cowork／local-agent receipt，不外推為一般 Claude 雲端聊天 coverage。
 

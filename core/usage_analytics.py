@@ -37,7 +37,6 @@ DEFAULT_INTERFACE_RULES: tuple[dict[str, Any], ...] = (
         "title_contains": ["claude.ai", "claude"],
     },
     {"name": "Gemini", "app_contains": ["gemini"], "title_contains": ["gemini"]},
-    {"name": "Manus", "app_contains": ["manus"], "title_contains": ["manus"]},
     {
         "name": "Antigravity",
         "app_contains": ["antigravity"],
@@ -66,7 +65,6 @@ DEFAULT_GOAL_INTERFACES = (
     "Codex",
     "ChatGPT",
     "Gemini",
-    "Manus",
     "Antigravity",
 )
 
@@ -80,8 +78,6 @@ PLATFORM_INTERFACE_MAP = {
     "chatgpt_web": "ChatGPT",
     "gemini": "Gemini",
     "gemini_web": "Gemini",
-    "manus": "Manus",
-    "manus_web": "Manus",
     "antigravity": "Antigravity",
 }
 

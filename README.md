@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **目前狀態：Personal Alpha。** Windows milestone WinRT Toast E2E、schema 7/7、formal package+DB rollback、P3-2～P3-5、P5-1 proposal-only、collector runtime diagnostics、Extension 1.3.1 live-verification harness 與跨平台 CI 已通過；ChatGPT 真實 DOM selectors 已修復，Claude Desktop Cowork／local-agent transcript 已完成 Windows E2E。Claude.ai／Manus 尚未取得本輪 PASS receipt，Extension live heartbeat 也仍待已登入 Chrome 實機驗證，因此尚非 release-ready。
+> **目前狀態：Personal Alpha。** Windows milestone WinRT Toast E2E、schema 7/7、formal package+DB rollback、P3-2～P3-5、P5-1 proposal-only、collector runtime diagnostics、Extension 1.3.1 live-verification harness 與跨平台 CI 已通過；ChatGPT 真實 DOM selectors 已修復，Claude Desktop Cowork／local-agent transcript 已完成 Windows E2E。Claude.ai 尚未取得本輪 PASS receipt，Extension live heartbeat 也仍待已登入 Chrome 實機驗證，因此尚非 release-ready。
 
 **文件入口：**[完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
 
@@ -74,7 +74,7 @@
   * **Codex**（`~/.codex/sessions/**`）：解析 Rollout JSONL 與 Assistant 訊息回覆。
   * **Antigravity**（`.gemini/brain/**`）：即時擷取對話與執行工具。
 * **瀏覽器擴充套件（Chrome Extension MV3）**：
-  * 支援 **ChatGPT**、**Gemini**、**Claude.ai**、**Manus**。
+  * 支援 **ChatGPT**、**Gemini**、**Claude.ai**。
   * 以獨立 ingest token 實施 write-only capability boundary，並以穩定 turn key Upsert。
 * **明確邊界**：一般 Claude Desktop 雲端聊天目前只偵測 cache 存在，不解析 Chromium LevelDB，也不宣稱已取得對話內容。
 * **來源故障隔離**：Claude Desktop 等單一來源遇到目錄權限或解析錯誤時，只跳過該來源並繼續掃描 Codex、Claude Code 與 Antigravity，不再讓整輪 Agent 採集一起中止。
@@ -100,7 +100,7 @@
 * Telegram 通道保留為選用（預設關閉）。
 
 ### 7. ⏱️ 每日主要介面使用時間與里程碑（P2.6 Alpha）
-* 主頁顯示 Claude、Codex、ChatGPT、Gemini、Manus、Antigravity、VS Code 等介面的每日 **foreground active time** 與 AI turns。
+* 主頁顯示 Claude、Codex、ChatGPT、Gemini、Antigravity、VS Code 等介面的每日 **foreground active time** 與 AI turns。
 * 使用者可設定每日目標、里程碑、通知語氣、quiet hours 與 cooldown；SQLite receipt 防止重啟後重複通知。
 * 數值只代表已觀察到的前景時間，不等於生產力或實際工時；coverage ledger 尚未完成前一律標示 `partial`。
 * 主頁 `DATA CAPTURE` 將 `FOCUS`、`WEB`、`LOG` 三種獨立訊號濃縮在同一區塊；任何一欄 `OBSERVED` 都不能替代另外兩欄。
@@ -254,7 +254,6 @@ watchers:
     gemini: true
     chatgpt: true
     claude_web: true
-    manus: true
 
 synthesizer:
   provider: "gemini"
@@ -325,7 +324,7 @@ activityTracker/
 │   ├── git_watcher.py              # Git 遞迴多倉庫掃描與 Commit 追蹤
 │   ├── window_watcher.py           # 視窗焦點切換與時間分配統計
 │   ├── agent_log_watcher.py        # Claude Code / Codex / Antigravity 日誌解析
-│   └── browser_extension/          # Chrome MV3 擴充套件 (ChatGPT/Gemini/Claude/Manus)
+│   └── browser_extension/          # Chrome MV3 擴充套件 (ChatGPT/Gemini/Claude)
 │
 ├── synthesizer/                    # AI 摘要與排程回顧引擎
 │   ├── aggregator.py               # 多日區間資料聚合與報告管線

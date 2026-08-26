@@ -1446,7 +1446,6 @@ async function loadConfig() {
     $("toggle-gemini").checked = browser.gemini !== false;
     $("toggle-chatgpt").checked = browser.chatgpt !== false;
     $("toggle-claude-web").checked = browser.claude_web !== false;
-    $("toggle-manus").checked = browser.manus !== false;
     $("toggle-window-focus").checked = !(w.window_watcher && w.window_watcher.enabled === false);
     $("toggle-usage-tracking").checked = usage.enabled === true;
     const usageNotifications = usage.notifications || {};
@@ -1533,7 +1532,6 @@ async function saveSettings() {
   cfg.watchers.browser.gemini = $("toggle-gemini").checked;
   cfg.watchers.browser.chatgpt = $("toggle-chatgpt").checked;
   cfg.watchers.browser.claude_web = $("toggle-claude-web").checked;
-  cfg.watchers.browser.manus = $("toggle-manus").checked;
 
   cfg.watchers.window_watcher = cfg.watchers.window_watcher || { enabled: true };
   cfg.watchers.window_watcher.enabled = $("toggle-window-focus").checked;

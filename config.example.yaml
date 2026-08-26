@@ -73,7 +73,6 @@ watchers:
     gemini: true
     chatgpt: true
     claude_web: true
-    manus: true
     heartbeat_stale_minutes: 5
 usage_tracking:
   enabled: true
@@ -84,7 +83,6 @@ usage_tracking:
   - Codex
   - ChatGPT
   - Gemini
-  - Manus
   - Antigravity
   daily_goal_minutes: 360
   milestones_minutes:
@@ -108,9 +106,6 @@ usage_tracking:
   - name: Gemini
     app_contains: [gemini]
     title_contains: [gemini]
-  - name: Manus
-    app_contains: [manus]
-    title_contains: [manus]
   - name: Antigravity
     app_contains: [antigravity]
     title_contains: [antigravity]

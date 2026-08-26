@@ -16,9 +16,9 @@
 - [x] `1.3.0a3` wheel/sdist content/privacy receipt、fresh installed writable-home、schema 7/7 與 HTTP assets smoke 通過。
 - [x] Windows／Ubuntu／macOS × Python 3.10／3.12 GitHub Actions matrix 六個 jobs 通過（run `32757498004`）。
 - [x] Gemini Browser ingestion 已觀察 3 筆 event，其中 2 筆有 response。
-- [ ] Extension `1.3.1` 重新載入後的 Claude／Manus live verification PASS receipt 通過；需同時具備開始後 heartbeat、Content Ready、event 與非空 response delta。
+- [ ] Extension `1.3.2` 重新載入後的 Claude.ai live verification PASS receipt 通過；需同時具備開始後 heartbeat、Content Ready、event 與非空 response delta。
 - [x] ChatGPT 真實 DOM prompt/response selector probe 與繁中 send click 修復通過；該測試瀏覽器未載入 Extension，因此不等於 DB capture receipt。
-- [ ] Claude、Manus authenticated real-browser ingestion 尚未逐站驗證。
+- [ ] Claude.ai authenticated real-browser ingestion 尚未完成驗證。
 - [x] 真實 Windows WinRT milestone Toast E2E、DB receipt 與 duplicate suppression 通過。
 - [x] Formal package + SQLite rollback rehearsal 通過，包含 WAL/SHM handling。
 - [x] P3-2 4,102/4,102 local semantic index 與 P3-3 local `omni ask` 通過。

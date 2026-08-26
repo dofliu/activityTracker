@@ -12,8 +12,6 @@ def _status(
     heartbeat_verified: bool,
     claude_events: int = 2,
     claude_responses: int = 1,
-    manus_events: int = 1,
-    manus_responses: int = 0,
     ready_at: str | None = None,
 ):
     def platform(key, events, responses):
@@ -35,7 +33,6 @@ def _status(
         },
         "platforms": [
             platform("claude", claude_events, claude_responses),
-            platform("manus", manus_events, manus_responses),
         ],
     }
 
@@ -54,7 +51,7 @@ def test_live_verification_requires_new_heartbeat_content_event_and_response():
         now_provider=lambda: clock[-1],
     )
 
-    started = registry.start(["claude", "manus"], timeout_seconds=600)
+    started = registry.start(["claude"], timeout_seconds=600)
     assert started["status"] == "running"
     assert started["checks"]["heartbeat_after_start"] is False
 
@@ -65,8 +62,6 @@ def test_live_verification_requires_new_heartbeat_content_event_and_response():
             heartbeat_verified=True,
             claude_events=3,
             claude_responses=2,
-            manus_events=2,
-            manus_responses=1,
             ready_at="2026-08-26T10:00:30",
         )
     )

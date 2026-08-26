@@ -24,7 +24,7 @@ def test_mv3_background_uses_alarm_heartbeat_and_never_logs_prompt_preview():
 def test_each_content_script_reports_ready_without_logging_prompt_content():
     site_scripts = [
         EXTENSION_DIR / "content_scripts" / name
-        for name in ("chatgpt.js", "gemini.js", "claude.js", "manus.js")
+        for name in ("chatgpt.js", "gemini.js", "claude.js")
     ]
     for script_path in site_scripts:
         source = script_path.read_text(encoding="utf-8")
@@ -49,7 +49,7 @@ def test_manifest_loads_shared_core_before_each_refactored_site_script():
     scripts_by_match = {
         entry["matches"][0]: entry["js"] for entry in manifest["content_scripts"]
     }
-    for host in ("https://chatgpt.com/*", "https://claude.ai/*", "https://manus.im/*"):
+    for host in ("https://chatgpt.com/*", "https://claude.ai/*"):
         assert scripts_by_match[host][0] == "content_scripts/capture_core.js"
 
 

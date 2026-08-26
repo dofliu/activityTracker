@@ -26,7 +26,6 @@ PLATFORM_ROWS = (
     {"key": "claude", "label": "Claude", "interface": "Claude", "web": {"claude", "claude_web"}, "transcript": "claude_desktop"},
     {"key": "codex", "label": "Codex", "interface": "Codex", "web": set(), "transcript": "codex"},
     {"key": "gemini", "label": "Gemini", "interface": "Gemini", "web": {"gemini", "gemini_web"}, "transcript": None},
-    {"key": "manus", "label": "Manus", "interface": "Manus", "web": {"manus", "manus_web"}, "transcript": None},
 )
 
 

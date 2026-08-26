@@ -78,4 +78,4 @@ Browser Extension popup 現在同時呈現 local service health 與 ingest token
 6. [x] Windows Dashboard/API 與 browser-extension token pairing probe 通過；token 未出現在回應，惡意 Origin 為 403。
 7. [x] Gemini 真實網站 browser ingestion 已觀察 3 筆 event，其中 2 筆具非空 response。
 8. [x] Heartbeat persistence、token gate、privacy payload、MV3 alarms 與 content-ready contract tests 通過。
-9. [ ] 瀏覽器重新載入 Extension `1.3.0` 後取得 live heartbeat receipt；ChatGPT live DOM 與 Windows Toast 已通過，仍需 Claude/Manus authenticated capture、DST 與 macOS/Linux evidence。
+9. [ ] 瀏覽器重新載入 Extension `1.3.2` 後取得 live heartbeat receipt；ChatGPT live DOM 與 Windows Toast 已通過，仍需 Claude.ai authenticated capture、DST 與 macOS/Linux evidence。

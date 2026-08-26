@@ -18,7 +18,6 @@ SUPPORTED_BROWSER_PLATFORMS = (
     ("chatgpt", "ChatGPT", "watchers.browser.chatgpt", {"chatgpt", "chatgpt_web"}),
     ("gemini", "Gemini", "watchers.browser.gemini", {"gemini", "gemini_web"}),
     ("claude", "Claude.ai", "watchers.browser.claude_web", {"claude", "claude_web"}),
-    ("manus", "Manus", "watchers.browser.manus", {"manus", "manus_web"}),
 )
 SUPPORTED_BROWSER_KEYS = {item[0] for item in SUPPORTED_BROWSER_PLATFORMS}
 ALLOWED_CAPTURE_STATUSES = {

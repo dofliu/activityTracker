@@ -11,7 +11,7 @@ OmniContext 已有 `WindowEvent`、AI event 與 desktop notification，但尚未
 
 本功能提供：
 
-1. Claude Code、Codex、ChatGPT、Claude.ai、Gemini、Manus、VS Code 等主要介面的每日／每週前景使用時間。
+1. Claude Code、Codex、ChatGPT、Claude.ai、Gemini、VS Code 等主要介面的每日／每週前景使用時間。
 2. 使用者自訂每日目標與多階段里程碑，例如 2、4、6 小時。
 3. 達標後顯示肯定、鼓勵或可選的休息提醒。
 4. Dashboard 顯示資料 coverage，避免把採集失敗誤認為沒有使用。

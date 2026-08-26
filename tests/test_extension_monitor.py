@@ -51,7 +51,6 @@ def test_extension_status_separates_enabled_observed_and_pairing(tmp_path):
                     "chatgpt": True,
                     "gemini": False,
                     "claude_web": True,
-                    "manus": True,
                 }
             },
         }
@@ -112,7 +111,6 @@ def test_verified_heartbeat_is_persisted_without_sensitive_content(tmp_path):
                     "chatgpt": True,
                     "gemini": True,
                     "claude_web": True,
-                    "manus": True,
                     "heartbeat_stale_minutes": 5,
                 }
             },
