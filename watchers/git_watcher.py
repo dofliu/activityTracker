@@ -3,7 +3,7 @@ import threading
 from pathlib import Path
 from datetime import datetime, timedelta
 import logging
-from typing import List, Set
+from typing import List, Set, Dict, Any, Optional
 
 from core.config import get_config
 from core.database import get_db
@@ -55,6 +55,11 @@ class GitWatcherService:
         self._thread: threading.Thread | None = None
         self._cached_repos: List[Path] = []
         self._last_repo_discovery_time = 0.0
+        self._degraded_repos: Dict[str, Dict[str, Any]] = {}
+        self._successful_repos: Set[str] = set()
+        self._scan_count: int = 0
+        self._last_scan_at: Optional[datetime] = None
+        self._healing_events: List[Dict[str, Any]] = []
 
     def start(self):
         enabled = self.cfg.get("watchers.git_watcher.enabled", True)
@@ -72,6 +77,32 @@ class GitWatcherService:
         if self._thread:
             self._thread.join(timeout=2.0)
             logger.info("GitWatcher service stopped.")
+
+    def check_health_and_heal(self) -> Dict[str, Any]:
+        """自我修復：若 Git 監控線程異常中斷但設定為啟用，自動重啟"""
+        enabled = self.cfg.get("watchers.git_watcher.enabled", True)
+        if not enabled:
+            return {"status": "disabled", "healed": False}
+
+        if self._thread and self._thread.is_alive():
+            return {"status": "healthy", "healed": False}
+
+        logger.warning("GitWatcher worker thread dead. Initiating self-healing restart...")
+        try:
+            self._running = True
+            self._thread = threading.Thread(target=self._scan_loop, daemon=True)
+            self._thread.start()
+            receipt = {
+                "timestamp": get_local_now().isoformat(),
+                "action": "restart_git_worker_thread",
+                "status": "success"
+            }
+            self._healing_events.append(receipt)
+            logger.info("GitWatcher self-healing restart succeeded.")
+            return {"status": "healed", "healed": True, "receipt": receipt}
+        except Exception as e:
+            logger.error(f"GitWatcher self-healing failed: {e}", exc_info=True)
+            return {"status": "error", "error": str(e), "healed": False}
 
     def _get_active_repos(self) -> List[Path]:
         # 每 30 分鐘重新遍歷一次倉庫結構
@@ -110,13 +141,16 @@ class GitWatcherService:
 
         db = get_db()
         cutoff_date = (get_local_now() - timedelta(days=7)).date()  # 掃描近 7 天 commits 避免漏掉
+        self._scan_count += 1
+        self._last_scan_at = get_local_now()
 
         for repo_path in repos:
             if not repo_path.exists() or not (repo_path / ".git").exists():
                 continue
 
+            r_key = str(repo_path)
             try:
-                repo = git.Repo(str(repo_path))
+                repo = git.Repo(r_key)
                 # 遍歷最多 30 個近期 commits
                 for commit in repo.iter_commits(max_count=30):
                     commit_dt = datetime.fromtimestamp(commit.committed_date)
@@ -145,7 +179,7 @@ class GitWatcherService:
 
                             event = GitActivityEvent(
                                 repo_name=repo_path.name,
-                                repo_path=str(repo_path),
+                                repo_path=r_key,
                                 commit_hash=commit_hash,
                                 branch=branch_name,
                                 author=commit.author.name,
@@ -157,5 +191,31 @@ class GitWatcherService:
                             )
                             session.add(event)
                             logger.info(f"Git commit logged: [{repo_path.name}@{branch_name}] {commit_hash} - {commit.summary}")
+
+                # 該倉庫掃描成功，移出 degraded 清單
+                self._degraded_repos.pop(r_key, None)
+                self._successful_repos.add(r_key)
             except Exception as e:
+                # 局部故障隔離：單一倉庫異常不影響其他倉庫
+                self._degraded_repos[r_key] = {
+                    "repo_name": repo_path.name,
+                    "error": str(e),
+                    "timestamp": get_local_now().isoformat()
+                }
                 logger.debug(f"Could not read repo {repo_path}: {e}")
+
+    def get_diagnostics(self) -> Dict[str, Any]:
+        """回傳 Git 採集器健全狀態與異常倉庫隔離列表"""
+        is_alive = bool(self._thread and self._thread.is_alive())
+        return {
+            "is_alive": is_alive,
+            "state": "running" if is_alive else "stopped",
+            "total_discovered_repos": len(self._cached_repos),
+            "successful_repos_count": len(self._successful_repos),
+            "degraded_repos_count": len(self._degraded_repos),
+            "degraded_repos": list(self._degraded_repos.values()),
+            "scan_count": self._scan_count,
+            "last_scan_at": self._last_scan_at.isoformat() if self._last_scan_at else None,
+            "healing_events_count": len(self._healing_events),
+            "recent_healing_events": self._healing_events[-5:],
+        }

@@ -2,7 +2,7 @@ import time
 import threading
 from datetime import datetime
 import logging
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any
 import ctypes
 import os
 import sys
@@ -159,6 +159,32 @@ class WindowWatcherService:
         if self._thread:
             self._thread.join(timeout=2.0)
             logger.info("WindowWatcher service stopped.")
+
+    def check_health_and_heal(self) -> Dict[str, Any]:
+        """自我修復：若 Windows 前景視窗監控線程異常終止，自動重啟"""
+        enabled = self.cfg.get("watchers.window_watcher.enabled", True) and sys.platform == "win32"
+        if not enabled:
+            return {"status": "disabled", "healed": False}
+
+        if self._thread and self._thread.is_alive():
+            return {"status": "healthy", "healed": False}
+
+        logger.warning("WindowWatcher thread found dead. Initiating self-healing restart...")
+        try:
+            self._running = True
+            self._current_start_time = get_local_now()
+            self._thread = threading.Thread(target=self._monitor_loop, daemon=True)
+            self._thread.start()
+            receipt = {
+                "timestamp": get_local_now().isoformat(),
+                "action": "restart_window_thread",
+                "status": "success"
+            }
+            logger.info("WindowWatcher self-healing restart succeeded.")
+            return {"status": "healed", "healed": True, "receipt": receipt}
+        except Exception as e:
+            logger.error(f"WindowWatcher self-healing failed: {e}", exc_info=True)
+            return {"status": "error", "error": str(e), "healed": False}
 
     def _flush_current_window(self):
         """將上一個視窗的停留時間結算寫入資料庫 (過濾假 Idle 與過短事件)"""

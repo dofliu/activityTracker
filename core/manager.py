@@ -69,8 +69,13 @@ class WatcherManager:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(WatcherManager, cls).__new__(cls)
-            cls._instance._init_manager()
+            cls._instance._initialized = False
         return cls._instance
+
+    def __init__(self):
+        if not getattr(self, "_initialized", False):
+            self._init_manager()
+            self._initialized = True
 
     def _init_manager(self):
         self._is_running = False
@@ -81,6 +86,45 @@ class WatcherManager:
         self.window_watcher = WindowWatcherService()
         self.agent_log_watcher = AgentLogWatcherService()
         self.scheduler = SynthesisScheduler()
+        self._healing_history: list[Dict[str, Any]] = []
+
+    def supervise_and_heal(self) -> Dict[str, Any]:
+        """主動巡檢所有採集器與排程器，若發現異常終止則自動自我修復"""
+        receipts = {}
+        healed_services = []
+
+        for name, service in [
+            ("file_watcher", self.file_watcher),
+            ("git_watcher", self.git_watcher),
+            ("window_watcher", self.window_watcher),
+            ("agent_log_watcher", self.agent_log_watcher),
+            ("scheduler", self.scheduler),
+        ]:
+            if hasattr(service, "check_health_and_heal"):
+                try:
+                    res = service.check_health_and_heal()
+                    receipts[name] = res
+                    if res.get("healed"):
+                        healed_services.append(name)
+                except Exception as e:
+                    receipts[name] = {"status": "error", "error": str(e), "healed": False}
+
+        now_str = get_local_now().isoformat()
+        if healed_services:
+            event = {
+                "timestamp": now_str,
+                "healed_services": healed_services,
+                "receipts": receipts,
+            }
+            self._healing_history.append(event)
+            logger.info(f"Self-healing supervisor repaired services: {healed_services}")
+
+        return {
+            "timestamp": now_str,
+            "status": "healed" if healed_services else "healthy",
+            "healed_services": healed_services,
+            "service_receipts": receipts,
+        }
 
     @property
     def is_running(self) -> bool:
@@ -129,6 +173,8 @@ class WatcherManager:
         return {"status": "reloaded", "message": "配置已更新並重新套用"}
 
     def get_status(self) -> Dict[str, Any]:
+        if not hasattr(self, "file_watcher"):
+            self._init_manager()
         cfg = get_config()
         db = get_db()
 
@@ -234,6 +280,8 @@ class WatcherManager:
             ),
         }
 
+        file_diagnostics = getattr(self.file_watcher, "get_diagnostics", lambda: {})()
+        git_diagnostics = getattr(self.git_watcher, "get_diagnostics", lambda: {})()
         window_diagnostics = self.window_watcher.get_diagnostics()
         agent_diagnostics = self.agent_log_watcher.get_diagnostics()
         window_interval = max(
@@ -260,6 +308,11 @@ class WatcherManager:
             and agent_diagnostics.get("state") == "degraded"
         ):
             collector_health["agent_log_watcher"] = "degraded"
+        if (
+            collector_runtime["git_watcher"] == "running"
+            and git_diagnostics.get("degraded_repos_count", 0) > 0
+        ):
+            collector_health["git_watcher"] = "degraded"
 
         monitoring_state, degraded_collectors = derive_monitoring_state(
             self._is_running,
@@ -293,8 +346,14 @@ class WatcherManager:
             "collector_runtime": collector_runtime,
             "collector_health": collector_health,
             "collector_diagnostics": {
+                "file_watcher": file_diagnostics,
+                "git_watcher": git_diagnostics,
                 "window_watcher": window_diagnostics,
                 "agent_log_watcher": agent_diagnostics,
+            },
+            "self_healing": {
+                "healing_events_count": len(self._healing_history),
+                "recent_healing_events": self._healing_history[-5:],
             },
             "scheduled_jobs": scheduled_jobs,
             "scheduler_backend": scheduler_backend,

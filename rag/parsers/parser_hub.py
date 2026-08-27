@@ -32,6 +32,16 @@ class ParserHub:
             return self.text_parser
 
     def parse_file(self, file_path: str) -> ParsedDocument:
+        p = Path(file_path)
+        name = p.name
+        if name.startswith("~$") or name.startswith(".~") or name.endswith(".crdownload") or name.endswith(".tmp"):
+            return ParsedDocument(
+                file_path=file_path,
+                filename=name,
+                file_type=p.suffix.lower(),
+                sections=[],
+                metadata={"skipped": "temporary_or_locked_file"}
+            )
         parser = self.get_parser(file_path)
         if parser:
             return parser.parse(file_path)

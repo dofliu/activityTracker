@@ -340,6 +340,31 @@ class AgentLogWatcherService:
             self._thread.join(timeout=2.0)
             logger.info("AgentLogWatcher service stopped.")
 
+    def check_health_and_heal(self) -> Dict[str, Any]:
+        """自我修復：若 Agent 日誌監控線程異常終止，自動重啟"""
+        enabled = self.cfg.get("watchers.agent_log_watcher.enabled", True)
+        if not enabled:
+            return {"status": "disabled", "healed": False}
+
+        if self._thread and self._thread.is_alive():
+            return {"status": "healthy", "healed": False}
+
+        logger.warning("AgentLogWatcher thread dead. Initiating self-healing restart...")
+        try:
+            self._running = True
+            self._thread = threading.Thread(target=self._scan_loop, daemon=True)
+            self._thread.start()
+            receipt = {
+                "timestamp": get_local_now().isoformat(),
+                "action": "restart_agent_log_thread",
+                "status": "success"
+            }
+            logger.info("AgentLogWatcher self-healing restart succeeded.")
+            return {"status": "healed", "healed": True, "receipt": receipt}
+        except Exception as e:
+            logger.error(f"AgentLogWatcher self-healing failed: {e}", exc_info=True)
+            return {"status": "error", "error": str(e), "healed": False}
+
     def _scan_loop(self):
         while self._running:
             try:

@@ -242,6 +242,13 @@ class RelatedMemoryRequest(BaseModel):
     top_k: int = Field(8, ge=1, le=20)
 
 
+class SystemMaintenanceRequest(BaseModel):
+    max_backups: int = Field(7, ge=1, le=100)
+    retention_days: int = Field(90, ge=1, le=3650)
+    do_backup: bool = Field(True)
+    checkpoint_mode: str = Field("TRUNCATE", pattern="^(PASSIVE|FULL|RESTART|TRUNCATE)$")
+
+
 
 # =====================================================================
 # 1. 監控生命週期與控制 API
@@ -249,6 +256,42 @@ class RelatedMemoryRequest(BaseModel):
 @app.get("/api/v1/health")
 def health_check():
     return {"status": "ok", "service": "OmniContext", "time": get_local_now().isoformat()}
+
+
+@app.post("/api/v1/system/maintenance")
+def trigger_system_maintenance(payload: Optional[SystemMaintenanceRequest] = None):
+    """手動觸發資料庫完整維護（WAL Checkpoint + 完整性檢查 + 備份輪替 + 歷史修剪）。"""
+    from core.data_lifecycle import run_database_maintenance
+    p = payload or SystemMaintenanceRequest()
+    try:
+        receipt = run_database_maintenance(
+            max_backups=p.max_backups,
+            retention_days=p.retention_days,
+            do_backup=p.do_backup,
+        )
+        return receipt
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/system/maintenance/receipt")
+def get_system_maintenance_receipt():
+    """查詢最近一次資料庫維護的收據與健康狀態。"""
+    from core.data_lifecycle import get_latest_maintenance_receipt
+    receipt = get_latest_maintenance_receipt()
+    if not receipt:
+        raise HTTPException(status_code=404, detail="No maintenance receipt found yet")
+    return receipt
+
+
+@app.post("/api/v1/system/wal-checkpoint")
+def trigger_wal_checkpoint(mode: str = Query("TRUNCATE", pattern="^(PASSIVE|FULL|RESTART|TRUNCATE)$")):
+    """單獨手動觸發 SQLite WAL Checkpoint。"""
+    from core.data_lifecycle import checkpoint_sqlite_database
+    try:
+        return checkpoint_sqlite_database(mode=mode)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.get("/api/v1/extension/status")
@@ -375,6 +418,68 @@ def start_monitoring():
 def stop_monitoring():
     manager = get_manager()
     return manager.stop_all()
+
+
+class SystemMaintenanceRequest(BaseModel):
+    max_backups: Optional[int] = 7
+    retention_days: Optional[int] = 90
+    dry_run: Optional[bool] = False
+
+
+@app.post("/api/v1/system/maintenance")
+def trigger_system_maintenance(payload: SystemMaintenanceRequest = Body(default_factory=SystemMaintenanceRequest)):
+    """手動觸發資料庫生命週期維護（Checkpoint、完整性檢查、歷史修剪、線上備份、輪替）"""
+    from core.data_lifecycle import run_database_maintenance
+    res = run_database_maintenance(
+        max_backups=payload.max_backups or 7,
+        retention_days=payload.retention_days or 90,
+        dry_run=payload.dry_run or False,
+    )
+    return res
+
+
+@app.get("/api/v1/system/maintenance/receipt")
+def get_system_maintenance_receipt():
+    """取得最近一次資料庫維護收據與健康資訊"""
+    from core.data_lifecycle import get_latest_maintenance_receipt
+    receipt = get_latest_maintenance_receipt()
+    if not receipt:
+        return {"status": "no_receipt", "message": "尚未執行過資料庫維護"}
+    return receipt
+
+
+@app.post("/api/v1/system/wal-checkpoint")
+def trigger_wal_checkpoint(mode: str = Query("TRUNCATE", description="PASSIVE, FULL, RESTART, TRUNCATE")):
+    """手動執行 SQLite WAL Checkpoint"""
+    from core.data_lifecycle import checkpoint_sqlite_database
+    return checkpoint_sqlite_database(mode=mode)
+
+
+@app.post("/api/v1/system/heal")
+def trigger_system_heal():
+    """主動檢查所有背景採集器與排程器，若發現異常中斷自動執行自我修復 (Self-Healing)"""
+    manager = get_manager()
+    return manager.supervise_and_heal()
+
+
+@app.get("/api/v1/system/health")
+def get_system_health():
+    """全域系統健康診斷端點：整合採集器診斷、自我修復狀態、維護收據與資料庫指標"""
+    from core.data_lifecycle import get_latest_maintenance_receipt
+    manager = get_manager()
+    status = manager.get_status()
+    receipt = get_latest_maintenance_receipt()
+    return {
+        "status": status.get("monitoring_state", "unknown"),
+        "is_running": status.get("is_running", False),
+        "degraded_collectors": status.get("degraded_collectors", []),
+        "collector_health": status.get("collector_health", {}),
+        "collector_diagnostics": status.get("collector_diagnostics", {}),
+        "self_healing": status.get("self_healing", {}),
+        "latest_maintenance": receipt,
+        "database_migration": status.get("database_migration", {}),
+        "metrics": status.get("metrics", {}),
+    }
 
 
 class OpenPathRequest(BaseModel):

@@ -1,12 +1,12 @@
 name: OmniContext Activity Tracker
 name_zh: OmniContext 個人全景活動追蹤系統
 category: personal_tools
-progress: 96
+progress: 97
 progress_basis: "依 P0-P7 加權里程碑估計；不是 release readiness 百分比"
 status: active_hardening
 release_ready: false
 last_updated: "2026-08-27"
-current_phase: "P2.6 Capture Hardening + P3 Context Memory Alpha + P5-1 Proposal-only + P7 DeskRAG Single-Server Integration"
+current_phase: "P2.6 Hardening + P3 Memory + P7 DeskRAG + Data Lifecycle & Collector Self-Healing"
 next_milestone: "使用已登入 Chrome Reload Extension 1.3.2，讓 Claude.ai live-verification harness 取得本輪 PASS receipt"
 planned_features:
   - id: FEATURE-001
@@ -36,6 +36,13 @@ planned_features:
     priority: must_have
     scope: "解析 PDF/Office/Text，滑動窗口切分，FastEmbed+ChromaDB 向量庫與 Jieba+BM25 關鍵字索引，Hybrid RRF 檢索，多模型 SSE 串流問答與總管定位"
     trust_boundary: "全部於本機運行解析與向量化；可選擇純本機 Ollama 離線問答；引文皆附精準頁碼與段落出處"
+    specification: "walkthrough.md"
+  - id: FEATURE-005
+    name: "採集器局部容錯隔離、自我修復守護與系統生命週期維護"
+    stage: implemented_alpha
+    priority: must_have
+    scope: "Watchdog Observer 自動重啟、Git 損壞倉庫隔離、Agent 多來源熔斷、系統自動 WAL Checkpoint 與線上輪替備份"
+    trust_boundary: "單一採集器或單一倉庫損毀不得導致全系統崩潰；自動恢復收據保留於本機診斷端點"
     specification: "walkthrough.md"
 technologies:
   - Python

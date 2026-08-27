@@ -43,7 +43,13 @@ class RAGSettings:
         ".exe", ".dll", ".so", ".dylib", ".bin", ".sys", ".iso", ".img",
         ".zip", ".tar", ".gz", ".7z", ".rar", ".bz2", ".xz",
         ".dat", ".tmp", ".temp", ".log", ".msi", ".cab", ".pdb", ".lib",
-        ".a", ".o", ".class", ".pyc", ".pyd", ".pyo", ".lock"
+        ".a", ".o", ".class", ".pyc", ".pyd", ".pyo", ".lock",
+        ".crdownload", ".swp", ".swo", ".part", ".bak", ".ds_store"
+    }
+
+    # Filename prefixes to strictly ignore (e.g. Office temp files, hidden files)
+    IGNORE_PREFIXES: Set[str] = {
+        "~$", ".~", ".#", ".~lock."
     }
 
     @property

@@ -200,6 +200,9 @@ For Extension pairing, milestone configuration, backups, and troubleshooting, se
 | `python main.py ask` | Ask cross-AI/repository history with traceable sources | `python main.py ask "How did rollback work?" --project activityTracker` |
 | `python main.py sessions` | Derive recent project work sessions from existing observations | `python main.py sessions --project activityTracker --hours 24` |
 | `python main.py recall` | Find related local history without storing the query | `python main.py recall "rollback rehearsal" --project activityTracker` |
+| `python main.py maintain` | Run SQLite health maintenance (Checkpoint, prune, backup, rotate) | `python main.py maintain --retention-days 90` |
+| `python main.py heal` | Supervise and auto-restart degraded or dead collector workers | `python main.py heal` |
+| `python main.py wal-checkpoint` | Manually checkpoint and truncate the SQLite WAL log | `python main.py wal-checkpoint --mode TRUNCATE` |
 
 With an installed wheel, replace `python main.py` with `omnicontext` or `omni`.
 

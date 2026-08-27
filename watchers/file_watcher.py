@@ -1,8 +1,9 @@
 import os
 import time
+import threading
 import fnmatch
 from pathlib import Path
-from typing import Set, Dict, List
+from typing import Set, Dict, List, Any
 import logging
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
@@ -167,36 +168,114 @@ class FileWatcherService:
     def __init__(self):
         self.observer = Observer()
         self.cfg = get_config()
+        self._lock = threading.Lock()
+        self._scheduled_dirs: List[str] = []
+        self._failed_dirs: List[str] = []
+        self._healing_events: List[Dict[str, Any]] = []
 
     def start(self):
-        enabled = self.cfg.get("watchers.file_watcher.enabled", True)
-        if not enabled:
-            logger.info("File watcher is disabled in config.")
-            return
+        with self._lock:
+            enabled = self.cfg.get("watchers.file_watcher.enabled", True)
+            if not enabled:
+                logger.info("File watcher is disabled in config.")
+                return
 
-        directories = self.cfg.get_paths("watchers.file_watcher.watch_directories")
-        exts = set(self.cfg.get("watchers.file_watcher.extensions", [".tex", ".docx", ".md", ".pdf", ".txt", ".py"]))
-        ignore_patterns = self.cfg.get("watchers.file_watcher.ignore_patterns", [])
+            directories = self.cfg.get_paths("watchers.file_watcher.watch_directories")
+            exts = set(self.cfg.get("watchers.file_watcher.extensions", [".tex", ".docx", ".md", ".pdf", ".txt", ".py"]))
+            ignore_patterns = self.cfg.get("watchers.file_watcher.ignore_patterns", [])
 
-        handler = ActivityFileHandler(allowed_exts=exts, ignore_patterns=ignore_patterns)
-        scheduled_count = 0
+            handler = ActivityFileHandler(allowed_exts=exts, ignore_patterns=ignore_patterns)
+            self._scheduled_dirs = []
+            self._failed_dirs = []
 
-        for d_path in directories:
-            if d_path.exists() and d_path.is_dir():
-                self.observer.schedule(handler, str(d_path), recursive=True)
-                logger.info(f"Watching directory: {d_path}")
-                scheduled_count += 1
+            for d_path in directories:
+                if d_path.exists() and d_path.is_dir():
+                    try:
+                        self.observer.schedule(handler, str(d_path), recursive=True)
+                        self._scheduled_dirs.append(str(d_path))
+                        logger.info(f"Watching directory: {d_path}")
+                    except Exception as e:
+                        self._failed_dirs.append(str(d_path))
+                        logger.warning(f"Failed to schedule watch on {d_path}: {e}")
+                else:
+                    self._failed_dirs.append(str(d_path))
+                    logger.warning(f"Watch directory not found: {d_path}")
+
+            if len(self._scheduled_dirs) > 0:
+                try:
+                    self.observer.start()
+                    logger.info(f"FileWatcher service started, monitoring {len(self._scheduled_dirs)} directories.")
+                except Exception as e:
+                    logger.error(f"Failed to start FileWatcher observer: {e}", exc_info=True)
             else:
-                logger.warning(f"Watch directory not found: {d_path}")
-
-        if scheduled_count > 0:
-            self.observer.start()
-            logger.info(f"FileWatcher service started, monitoring {scheduled_count} directories.")
-        else:
-            logger.warning("No valid directories to monitor for FileWatcher.")
+                logger.warning("No valid directories to monitor for FileWatcher.")
 
     def stop(self):
-        if self.observer.is_alive():
-            self.observer.stop()
-            self.observer.join()
-            logger.info("FileWatcher service stopped.")
+        with self._lock:
+            if self.observer.is_alive():
+                self.observer.stop()
+                self.observer.join(timeout=2.0)
+                logger.info("FileWatcher service stopped.")
+
+    def check_health_and_heal(self) -> Dict[str, Any]:
+        """自我修復：若檔案監控異常停止但設定為啟用，自動重啟並排程"""
+        with self._lock:
+            enabled = self.cfg.get("watchers.file_watcher.enabled", True)
+            if not enabled:
+                return {"status": "disabled", "healed": False}
+
+            if self.observer.is_alive():
+                return {"status": "healthy", "healed": False}
+
+            logger.warning("FileWatcher observer found dead/stopped. Initiating self-healing restart...")
+            try:
+                # 重新建立 Observer
+                self.observer = Observer()
+                directories = self.cfg.get_paths("watchers.file_watcher.watch_directories")
+                exts = set(self.cfg.get("watchers.file_watcher.extensions", [".tex", ".docx", ".md", ".pdf", ".txt", ".py"]))
+                ignore_patterns = self.cfg.get("watchers.file_watcher.ignore_patterns", [])
+
+                handler = ActivityFileHandler(allowed_exts=exts, ignore_patterns=ignore_patterns)
+                self._scheduled_dirs = []
+                self._failed_dirs = []
+
+                for d_path in directories:
+                    if d_path.exists() and d_path.is_dir():
+                        try:
+                            self.observer.schedule(handler, str(d_path), recursive=True)
+                            self._scheduled_dirs.append(str(d_path))
+                        except Exception as e:
+                            self._failed_dirs.append(str(d_path))
+                    else:
+                        self._failed_dirs.append(str(d_path))
+
+                if len(self._scheduled_dirs) > 0:
+                    self.observer.start()
+                    receipt = {
+                        "timestamp": get_local_now().isoformat(),
+                        "action": "restart_observer",
+                        "status": "success",
+                        "monitored_count": len(self._scheduled_dirs)
+                    }
+                    self._healing_events.append(receipt)
+                    logger.info(f"FileWatcher self-healing succeeded: {len(self._scheduled_dirs)} directories re-scheduled.")
+                    return {"status": "healed", "healed": True, "receipt": receipt}
+                else:
+                    return {"status": "no_valid_directories", "healed": False}
+            except Exception as e:
+                logger.error(f"FileWatcher self-healing failed: {e}", exc_info=True)
+                return {"status": "error", "error": str(e), "healed": False}
+
+    def get_diagnostics(self) -> Dict[str, Any]:
+        """提供採集器健全度與修復診斷資訊"""
+        is_alive = self.observer.is_alive()
+        return {
+            "is_alive": is_alive,
+            "state": "running" if is_alive else "stopped",
+            "scheduled_directories_count": len(self._scheduled_dirs),
+            "scheduled_directories": self._scheduled_dirs,
+            "failed_directories": self._failed_dirs,
+            "healing_events_count": len(self._healing_events),
+            "recent_healing_events": self._healing_events[-5:],
+            "last_healed_at": self._healing_events[-1]["timestamp"] if self._healing_events else None
+        }

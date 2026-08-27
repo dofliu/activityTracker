@@ -59,7 +59,14 @@ class Database:
         return self._migration_receipt
 
     def get_session(self) -> Session:
+        if self._session_factory is None:
+            self.init_db()
         return self._session_factory()
+
+    def wal_checkpoint(self, mode: str = "TRUNCATE") -> dict:
+        """執行 SQLite WAL Checkpoint"""
+        from .data_lifecycle import checkpoint_sqlite_database
+        return checkpoint_sqlite_database(mode=mode)
 
     @contextmanager
     def session_scope(self):

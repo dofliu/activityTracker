@@ -700,6 +700,27 @@ def cmd_resume(project_key: Optional[str] = None, copy_to_clipboard: bool = Fals
             logger.warning(f"Could not copy to clipboard: {e}")
 
 
+def cmd_maintain(max_backups: int = 7, retention_days: int = 90, dry_run: bool = False):
+    from core.data_lifecycle import run_database_maintenance
+    print(f"🔧 Starting database maintenance (retention={retention_days}d, max_backups={max_backups}, dry_run={dry_run})...")
+    res = run_database_maintenance(max_backups=max_backups, retention_days=retention_days, dry_run=dry_run)
+    print(json.dumps(res, indent=2, ensure_ascii=False))
+
+
+def cmd_heal():
+    manager = get_manager()
+    print("🩺 Running self-healing supervisor check on all collectors...")
+    res = manager.supervise_and_heal()
+    print(json.dumps(res, indent=2, ensure_ascii=False))
+
+
+def cmd_wal_checkpoint(mode: str = "TRUNCATE"):
+    from core.data_lifecycle import checkpoint_sqlite_database
+    print(f"📦 Executing SQLite WAL checkpoint ({mode})...")
+    res = checkpoint_sqlite_database(mode=mode)
+    print(json.dumps(res, indent=2, ensure_ascii=False))
+
+
 def main():
     parser = argparse.ArgumentParser(description="OmniContext - 個人全景上下文與進行中專案智慧中樞")
     subparsers = parser.add_subparsers(dest="command", help="子指令")
@@ -818,6 +839,14 @@ def main():
         "extension-path",
         help="顯示 Chrome/Edge Load unpacked 的 Browser Extension 目錄",
     )
+    maintain_parser = subparsers.add_parser("maintain", help="執行資料庫完整生命週期維護與線上備份輪替")
+    maintain_parser.add_argument("--max-backups", type=int, default=7, help="保留備份數量")
+    maintain_parser.add_argument("--retention-days", type=int, default=90, help="原始細碎事件保留天數")
+    maintain_parser.add_argument("--dry-run", action="store_true", help="只預覽不實際刪除")
+
+    subparsers.add_parser("heal", help="執行背景採集器自我修復與健康巡檢")
+    wal_parser = subparsers.add_parser("wal-checkpoint", help="手動執行 SQLite WAL Checkpoint")
+    wal_parser.add_argument("--mode", default="TRUNCATE", choices=["PASSIVE", "FULL", "RESTART", "TRUNCATE"])
 
     args = parser.parse_args()
 
@@ -904,6 +933,16 @@ def main():
         cmd_assets_status()
     elif args.command == "extension-path":
         cmd_extension_path()
+    elif args.command == "maintain":
+        cmd_maintain(
+            getattr(args, "max_backups", 7),
+            getattr(args, "retention_days", 90),
+            getattr(args, "dry_run", False),
+        )
+    elif args.command == "heal":
+        cmd_heal()
+    elif args.command == "wal-checkpoint":
+        cmd_wal_checkpoint(getattr(args, "mode", "TRUNCATE"))
     else:
         parser.print_help()
 

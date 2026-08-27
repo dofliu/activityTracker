@@ -227,3 +227,233 @@ def run_configured_restore_drill(
         else latest_backup_path()
     )
     return restore_drill(source, receipt_dir)
+
+
+def checkpoint_sqlite_database(
+    db_path: str | Path | None = None,
+    mode: str = "TRUNCATE",
+) -> dict[str, Any]:
+    """
+    執行 SQLite WAL Checkpoint，將 WAL 內容同步回主庫並截斷 WAL 檔案。
+    模式支援 PASSIVE, FULL, RESTART, TRUNCATE（預設 TRUNCATE）。
+    """
+    path = Path(db_path or configured_database_path()).expanduser().resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"Database not found: {path}")
+
+    wal_path = Path(f"{path}-wal")
+    wal_size_before = wal_path.stat().st_size if wal_path.exists() else 0
+
+    valid_modes = {"PASSIVE", "FULL", "RESTART", "TRUNCATE"}
+    chk_mode = mode.upper() if mode.upper() in valid_modes else "TRUNCATE"
+
+    with closing(sqlite3.connect(path, timeout=30)) as conn:
+        cursor = conn.cursor()
+        result = cursor.execute(f"PRAGMA wal_checkpoint({chk_mode});").fetchone()
+        busy, log_pages, checkpointed_pages = result[0], result[1], result[2]
+
+    wal_size_after = wal_path.stat().st_size if wal_path.exists() else 0
+
+    return {
+        "operation": "wal_checkpoint",
+        "mode": chk_mode,
+        "database": str(path),
+        "busy": bool(busy),
+        "log_pages": log_pages,
+        "checkpointed_pages": checkpointed_pages,
+        "wal_size_bytes_before": wal_size_before,
+        "wal_size_bytes_after": wal_size_after,
+        "timestamp": datetime.now().astimezone().isoformat(),
+    }
+
+
+def rotate_backups(
+    backup_dir: str | Path | None = None,
+    max_backups: int = 7,
+) -> dict[str, Any]:
+    """
+    滾動保留最新 max_backups 份備份檔案，自動清理過期的舊備份。
+    """
+    root = Path(backup_dir or configured_backup_dir()).expanduser().resolve()
+    if not root.exists():
+        return {
+            "retained_count": 0,
+            "deleted_count": 0,
+            "deleted_files": [],
+            "retained_files": [],
+        }
+
+    backups = sorted(
+        (p for p in root.glob("*.db") if p.is_file()),
+        key=lambda p: (p.stat().st_mtime_ns, p.name),
+        reverse=True,
+    )
+
+    keep_count = max(1, int(max_backups))
+    retained = backups[:keep_count]
+    to_delete = backups[keep_count:]
+
+    deleted_names = []
+    for old_backup in to_delete:
+        try:
+            old_backup.unlink()
+            deleted_names.append(old_backup.name)
+        except OSError:
+            pass
+
+    return {
+        "operation": "rotate_backups",
+        "max_backups": keep_count,
+        "retained_count": len(retained),
+        "deleted_count": len(deleted_names),
+        "retained_files": [p.name for p in retained],
+        "deleted_files": deleted_names,
+        "timestamp": datetime.now().astimezone().isoformat(),
+    }
+
+
+def prune_historical_raw_events(
+    retention_days: int = 90,
+    dry_run: bool = False,
+    db_path: str | Path | None = None,
+) -> dict[str, Any]:
+    """
+    修剪超過 retention_days 天的高頻原始活動記錄（如 file_activity_events 與 window_events）。
+    保留每日摘要（DailySummary）與檢查點（IngestionCheckpoint），維持資料庫精簡流暢。
+    """
+    path = Path(db_path or configured_database_path()).expanduser().resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"Database not found: {path}")
+
+    from datetime import timedelta
+    cutoff = datetime.now() - timedelta(days=max(1, int(retention_days)))
+    cutoff_iso = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+
+    deleted_counts: dict[str, int] = {}
+    target_tables = [
+        ("file_activity_events", "timestamp"),
+        ("window_events", "start_time"),
+    ]
+
+    with closing(sqlite3.connect(path, timeout=30)) as conn:
+        cursor = conn.cursor()
+        for table, time_col in target_tables:
+            # 檢查表格是否存在
+            check = cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                (table,)
+            ).fetchone()
+            if not check:
+                continue
+
+            # 檢查欄位是否存在，若不存在則動態檢測時間欄位
+            col_info = cursor.execute(f"PRAGMA table_info({table})").fetchall()
+            col_names = [col[1] for col in col_info]
+            active_time_col = time_col if time_col in col_names else ("timestamp" if "timestamp" in col_names else None)
+            if not active_time_col:
+                continue
+
+            count_query = f"SELECT COUNT(*) FROM {table} WHERE {active_time_col} < ?"
+            count = cursor.execute(count_query, (cutoff_iso,)).fetchone()[0]
+            deleted_counts[table] = count
+
+            if not dry_run and count > 0:
+                delete_query = f"DELETE FROM {table} WHERE {active_time_col} < ?"
+                cursor.execute(delete_query, (cutoff_iso,))
+        
+        if not dry_run:
+            conn.commit()
+
+    return {
+        "operation": "prune_historical_raw_events",
+        "retention_days": retention_days,
+        "cutoff_timestamp": cutoff_iso,
+        "dry_run": dry_run,
+        "deleted_records": deleted_counts,
+        "total_pruned": sum(deleted_counts.values()),
+        "timestamp": datetime.now().astimezone().isoformat(),
+    }
+
+
+def run_database_maintenance(
+    db_path: str | Path | None = None,
+    max_backups: int = 7,
+    retention_days: int = 90,
+    do_backup: bool = True,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """
+    綜合執行 SQLite 完整健康維護：
+    1. 執行 WAL Checkpoint (TRUNCATE)
+    2. 檢查資料庫完整性 (PRAGMA integrity_check)
+    3. 執行歷史原始事件修剪
+    4. 建立線上 Verified Backup（可選）
+    5. 執行備份滾動輪替 (保留最新 N 份)
+    6. 再次 WAL Checkpoint 確保乾淨狀態
+    7. 輸出持久化 maintenance_receipt.json
+    """
+    path = Path(db_path or configured_database_path()).expanduser().resolve()
+    
+    # 1. 首次 Checkpoint
+    chk_before = checkpoint_sqlite_database(path, mode="TRUNCATE") if not dry_run else {"dry_run": True}
+
+    # 2. 完整性檢查
+    verify_res = verify_sqlite_database(path)
+
+    # 3. 歷史事件修剪
+    prune_res = prune_historical_raw_events(retention_days=retention_days, db_path=path, dry_run=dry_run)
+
+    # 4. 備份
+    backup_receipt = None
+    if do_backup and not dry_run:
+        backup_receipt = create_configured_backup()
+
+    # 5. 備份輪替
+    rotation_res = rotate_backups(max_backups=max_backups) if not dry_run else {"dry_run": True}
+
+    # 6. 二次 Checkpoint
+    chk_after = checkpoint_sqlite_database(path, mode="TRUNCATE") if not dry_run else {"dry_run": True}
+
+    receipt = {
+        "receipt_version": 1,
+        "operation": "database_maintenance",
+        "status": "passed" if verify_res["integrity"] == "ok" else "warning",
+        "database": str(path),
+        "integrity": verify_res["integrity"],
+        "size_bytes": verify_res["size_bytes"],
+        "checkpoint_initial": chk_before,
+        "checkpoint_final": chk_after,
+        "pruning": prune_res,
+        "backup": backup_receipt,
+        "backup_rotation": rotation_res,
+        "created_at": datetime.now().astimezone().isoformat(),
+    }
+
+    # 持久化維護收據
+    backup_dir = Path(configured_backup_dir()).expanduser().resolve()
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    receipt_file = backup_dir / "latest_maintenance_receipt.json"
+    try:
+        temp_file = receipt_file.with_suffix(".json.tmp")
+        temp_file.write_text(
+            json.dumps(receipt, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8"
+        )
+        temp_file.replace(receipt_file)
+        receipt["receipt_path"] = str(receipt_file)
+    except Exception:
+        pass
+
+    return receipt
+
+
+def get_latest_maintenance_receipt() -> dict[str, Any] | None:
+    """取得最近一次維護的收據檔案。"""
+    backup_dir = Path(configured_backup_dir()).expanduser().resolve()
+    receipt_file = backup_dir / "latest_maintenance_receipt.json"
+    if not receipt_file.is_file():
+        return None
+    try:
+        return json.loads(receipt_file.read_text(encoding="utf-8"))
+    except Exception:
+        return None

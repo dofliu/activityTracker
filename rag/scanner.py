@@ -65,6 +65,13 @@ class FileScanner:
         return dir_name.lower() in rag_settings.IGNORE_DIRS or dir_name.startswith("$")
 
     def _should_index_file(self, filename: str) -> bool:
+        # Ignore temporary prefix files (e.g. ~$*.docx, .~*) and hidden files
+        for prefix in getattr(rag_settings, "IGNORE_PREFIXES", {"~$", ".~", ".#", ".~lock."}):
+            if filename.startswith(prefix):
+                return False
+        if filename.startswith("."):
+            return False
+
         ext = Path(filename).suffix.lower()
         if ext in rag_settings.IGNORE_EXTS:
             return False
@@ -82,7 +89,7 @@ class FileScanner:
             with open(file_path, "rb") as f:
                 hasher.update(f.read(65536))
             return hasher.hexdigest()
-        except Exception:
+        except (PermissionError, OSError, FileNotFoundError):
             return ""
 
     def scan_folder_files(self, folder_path: str) -> List[Dict[str, Any]]:

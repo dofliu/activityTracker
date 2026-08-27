@@ -436,7 +436,27 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 ---
 
-## 9. 建議執行順序
+## 9. ✅ P8：系統基礎穩健化工程（資料庫生命週期維護與採集器自我修復守護）(Completed)
+
+> 完成日期：2026-08-27 | 狀態：**✅ 已完成並通過 109/109 自動化測試驗證**
+
+已完成 OmniContext 的全方位基礎穩健化加固，確保系統在 Windows 平台下長期常駐（數週至數月）具備最高等級的可靠性：
+
+1. **第一步：SQLite WAL 自動 Checkpoint、歷史事件修剪與線上輪替備份 (`core/data_lifecycle.py`)**：
+   - 每小時背景自動執行 `PRAGMA wal_checkpoint(TRUNCATE)`，防止高頻寫入導致 WAL 檔案無限膨脹。
+   - 每日深夜 03:30 自動修剪 90 天前的高頻原始細碎事件（`FileActivityEvent`, `WindowEvent`），保留已計算的每日摘要與檢查點。
+   - 滾動備份機制（保留最新 7 份 Verified Backup），杜絕磁碟空間膨脹。
+   - 全域 Office 暫存鎖定檔（`~$*.docx`, `~$*.xlsx`）與下載暫存檔排除防呆。
+2. **第二步：採集器局部容錯隔離與自我修復守護 (`watchers/` & `core/manager.py`)**：
+   - `FileWatcherService`：Watchdog Observer 異常終止檢測與安全自動重啟重排程 (`check_health_and_heal`)。
+   - `GitWatcherService`：單一損壞或鎖定 Git 倉庫局部隔離 (`_degraded_repos`)，不中斷其他 60+ 個倉庫掃描，背景線程支援自我修復。
+   - `AgentLogWatcherService`：多 AI 來源（Claude Code / Codex / Antigravity / Claude Desktop）故障隔離與熔斷保護。
+   - `WatcherManager`：主動巡檢所有已啟用採集器與排程器 (`supervise_and_heal`)，並保存診斷與修復收據。
+   - `core/server.py`：暴露 `POST /api/v1/system/heal` 與 `GET /api/v1/system/health`。
+
+---
+
+## 10. 建議執行順序
 
 ```
 P2.5-S1 API 安全邊界

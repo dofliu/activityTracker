@@ -219,6 +219,9 @@ OmniContext 支援完整的終端命令列操作：
 | `python main.py ask` | 查詢自己的跨 AI／Repository 歷史並列出來源 | `python main.py ask "上次如何處理 rollback?" --project activityTracker` |
 | `python main.py sessions` | 將近期 evidence 整理為 derived work sessions | `python main.py sessions --project activityTracker --hours 72` |
 | `python main.py recall` | 查詢相似歷史工作，不保存 query | `python main.py recall "formal rollback rehearsal" --project activityTracker` |
+| `python main.py maintain` | 執行資料庫健康維護（Checkpoint、修剪、線上備份、輪替） | `python main.py maintain --retention-days 90` |
+| `python main.py heal` | 巡檢背景採集器並自動修復異常線程 (Self-Healing) | `python main.py heal` |
+| `python main.py wal-checkpoint` | 手動截斷並同步 SQLite WAL 檔案至主庫 | `python main.py wal-checkpoint --mode TRUNCATE` |
 
 Installed wheel 可將表中的 `python main.py` 改為 `omnicontext` 或較短的 `omni`。
 

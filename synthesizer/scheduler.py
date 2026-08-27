@@ -117,6 +117,28 @@ class SynthesisScheduler:
                     f"Usage milestone evaluation scheduled every {usage_interval} minutes."
                 )
 
+            # SQLite WAL 每小時自動 Checkpoint
+            wal_interval_hours = max(1, int(self.cfg.get("data_lifecycle.wal_checkpoint_interval_hours", 1)))
+            self._apscheduler.add_job(
+                func=self._run_wal_checkpoint_job,
+                trigger="interval",
+                hours=wal_interval_hours,
+                id="wal_checkpoint_job",
+                replace_existing=True,
+            )
+            logger.info(f"SQLite WAL checkpoint scheduled every {wal_interval_hours} hours.")
+
+            # 資料庫每日深夜維護 (03:30)
+            self._apscheduler.add_job(
+                func=self._run_daily_maintenance_job,
+                trigger="cron",
+                hour=3,
+                minute=30,
+                id="database_maintenance_job",
+                replace_existing=True,
+            )
+            logger.info("Database daily maintenance scheduled for 03:30 daily.")
+
             self._apscheduler.start()
         except ImportError:
             # 原生執行緒排程備援機制
@@ -327,6 +349,56 @@ class SynthesisScheduler:
                 self._notifier.send_morning_briefing()
         except Exception as e:
             logger.error(f"Error sending morning briefing: {e}", exc_info=True)
+
+    def _run_wal_checkpoint_job(self):
+        logger.info("Triggering scheduled SQLite WAL checkpoint...")
+        try:
+            from core.data_lifecycle import checkpoint_sqlite_database
+            res = checkpoint_sqlite_database(mode="TRUNCATE")
+            logger.info(
+                f"WAL Checkpoint finished: busy={res.get('busy')}, "
+                f"log_pages={res.get('log_pages')}, checkpointed={res.get('checkpointed_pages')}"
+            )
+        except Exception as e:
+            logger.error(f"Error during WAL checkpoint: {e}", exc_info=True)
+
+    def _run_daily_maintenance_job(self):
+        logger.info("Triggering scheduled database maintenance...")
+        try:
+            from core.data_lifecycle import run_database_maintenance
+            max_backups = int(self.cfg.get("data_lifecycle.max_backups", 7))
+            retention_days = int(self.cfg.get("data_lifecycle.retention_days", 90))
+            res = run_database_maintenance(max_backups=max_backups, retention_days=retention_days)
+            logger.info(
+                f"Database maintenance finished: status={res.get('status')}, "
+                f"integrity={res.get('integrity')}"
+            )
+        except Exception as e:
+            logger.error(f"Error during database maintenance: {e}", exc_info=True)
+
+    def check_health_and_heal(self):
+        """自我修復：若排程器異常終止，自動重啟"""
+        daily_enabled = self.cfg.get("synthesizer.schedule.enabled", True)
+        checkpoint_enabled = self.cfg.get("synthesizer.periodic_checkpoint.enabled", True)
+        enabled = daily_enabled or checkpoint_enabled
+
+        if not enabled:
+            return {"status": "disabled", "healed": False}
+
+        is_running = bool(
+            (self._apscheduler and getattr(self._apscheduler, "running", False))
+            or (self._thread and self._thread.is_alive())
+        )
+        if is_running:
+            return {"status": "healthy", "healed": False}
+
+        logger.warning("SynthesisScheduler is stopped/dead. Initiating self-healing restart...")
+        try:
+            self.start()
+            return {"status": "healed", "healed": True, "action": "restart_scheduler"}
+        except Exception as e:
+            logger.error(f"SynthesisScheduler self-healing failed: {e}", exc_info=True)
+            return {"status": "error", "error": str(e), "healed": False}
 
     def shutdown(self):
         if self._apscheduler and self._apscheduler.running:
