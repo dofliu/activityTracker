@@ -436,11 +436,11 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
 ---
 
-## 9. ✅ P8：系統基礎穩健化工程（資料庫生命週期維護與採集器自我修復守護）(Completed)
+## 9. ✅ P8：系統基礎穩健化工程（生命週期維護、自我修復守護與 Web 維護面板）(Completed)
 
-> 完成日期：2026-08-27 | 狀態：**✅ 已完成並通過 109/109 自動化測試驗證**
+> 完成日期：2026-08-27 | 狀態：**✅ 已完成並通過 114/114 自動化測試驗證**
 
-已完成 OmniContext 的全方位基礎穩健化加固，確保系統在 Windows 平台下長期常駐（數週至數月）具備最高等級的可靠性：
+已完成 OmniContext 的全方位基礎穩健化加固，確保系統在 Windows 平台下長期常駐（數週至數月）具備最高等級的可靠性與可觀察性：
 
 1. **第一步：SQLite WAL 自動 Checkpoint、歷史事件修剪與線上輪替備份 (`core/data_lifecycle.py`)**：
    - 每小時背景自動執行 `PRAGMA wal_checkpoint(TRUNCATE)`，防止高頻寫入導致 WAL 檔案無限膨脹。
@@ -453,6 +453,11 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
    - `AgentLogWatcherService`：多 AI 來源（Claude Code / Codex / Antigravity / Claude Desktop）故障隔離與熔斷保護。
    - `WatcherManager`：主動巡檢所有已啟用採集器與排程器 (`supervise_and_heal`)，並保存診斷與修復收據。
    - `core/server.py`：暴露 `POST /api/v1/system/heal` 與 `GET /api/v1/system/health`。
+3. **第三步：Web 儀表板系統健康燈號與一鍵維護面板 (`web/`)**：
+   - 新增 `07 · 🛡️ 系統健康與維護` 專屬操作面板。
+   - 視覺化 5 大採集器詳細診斷矩陣（包含失敗目錄、Git 隔離損壞倉庫警示、AI 來源狀態）。
+   - 提供「一鍵自我修復」、「立即 WAL Checkpoint」、「執行資料庫完整維護」按鈕與最新維護收據展示。
+   - 嵌入深色維護操作即時終端視窗（Action Console），即時輸出結構化 JSON 收據。
 
 ---
 

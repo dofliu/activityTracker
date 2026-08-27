@@ -47,6 +47,12 @@ from synthesizer.aggregator import (
     generate_periodic_checkpoint,
     list_periodic_checkpoints
 )
+from .data_lifecycle import (
+    checkpoint_sqlite_database,
+    run_database_maintenance,
+    get_latest_maintenance_receipt,
+    configured_database_path,
+)
 from rag.router import router as rag_router
 
 logger = logging.getLogger("OmniContext.Server")
@@ -258,42 +264,6 @@ def health_check():
     return {"status": "ok", "service": "OmniContext", "time": get_local_now().isoformat()}
 
 
-@app.post("/api/v1/system/maintenance")
-def trigger_system_maintenance(payload: Optional[SystemMaintenanceRequest] = None):
-    """手動觸發資料庫完整維護（WAL Checkpoint + 完整性檢查 + 備份輪替 + 歷史修剪）。"""
-    from core.data_lifecycle import run_database_maintenance
-    p = payload or SystemMaintenanceRequest()
-    try:
-        receipt = run_database_maintenance(
-            max_backups=p.max_backups,
-            retention_days=p.retention_days,
-            do_backup=p.do_backup,
-        )
-        return receipt
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-@app.get("/api/v1/system/maintenance/receipt")
-def get_system_maintenance_receipt():
-    """查詢最近一次資料庫維護的收據與健康狀態。"""
-    from core.data_lifecycle import get_latest_maintenance_receipt
-    receipt = get_latest_maintenance_receipt()
-    if not receipt:
-        raise HTTPException(status_code=404, detail="No maintenance receipt found yet")
-    return receipt
-
-
-@app.post("/api/v1/system/wal-checkpoint")
-def trigger_wal_checkpoint(mode: str = Query("TRUNCATE", pattern="^(PASSIVE|FULL|RESTART|TRUNCATE)$")):
-    """單獨手動觸發 SQLite WAL Checkpoint。"""
-    from core.data_lifecycle import checkpoint_sqlite_database
-    try:
-        return checkpoint_sqlite_database(mode=mode)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
 @app.get("/api/v1/extension/status")
 def get_extension_monitor_status(request: Request):
     """Dashboard 可看觀測狀態；Extension 帶 token 時另可驗證 pairing。"""
@@ -444,8 +414,8 @@ def get_system_maintenance_receipt():
     from core.data_lifecycle import get_latest_maintenance_receipt
     receipt = get_latest_maintenance_receipt()
     if not receipt:
-        return {"status": "no_receipt", "message": "尚未執行過資料庫維護"}
-    return receipt
+        return {"has_receipt": False, "status": "no_receipt", "message": "尚未執行過資料庫維護"}
+    return {"has_receipt": True, "receipt": receipt, **receipt}
 
 
 @app.post("/api/v1/system/wal-checkpoint")
@@ -465,20 +435,34 @@ def trigger_system_heal():
 @app.get("/api/v1/system/health")
 def get_system_health():
     """全域系統健康診斷端點：整合採集器診斷、自我修復狀態、維護收據與資料庫指標"""
-    from core.data_lifecycle import get_latest_maintenance_receipt
+    from core.data_lifecycle import get_latest_maintenance_receipt, configured_database_path
     manager = get_manager()
     status = manager.get_status()
     receipt = get_latest_maintenance_receipt()
+    db_path = configured_database_path()
+    wal_path = Path(str(db_path) + "-wal")
+    db_size = db_path.stat().st_size if db_path.is_file() else 0
+    wal_size = wal_path.stat().st_size if wal_path.is_file() else 0
+
     return {
         "status": status.get("monitoring_state", "unknown"),
         "is_running": status.get("is_running", False),
         "degraded_collectors": status.get("degraded_collectors", []),
+        "watchers": status.get("watchers", {}),
+        "collector_runtime": status.get("collector_runtime", {}),
         "collector_health": status.get("collector_health", {}),
         "collector_diagnostics": status.get("collector_diagnostics", {}),
         "self_healing": status.get("self_healing", {}),
+        "database": {
+            "path": str(db_path),
+            "size_bytes": db_size,
+            "wal_size_bytes": wal_size,
+            "active_projects_count": len(get_active_projects_list()),
+        },
         "latest_maintenance": receipt,
         "database_migration": status.get("database_migration", {}),
         "metrics": status.get("metrics", {}),
+        "timestamp": get_local_now().isoformat(),
     }
 
 
@@ -1135,3 +1119,4 @@ def list_github_prs(state: Optional[str] = None):
             }
             for pr in prs
         ]
+

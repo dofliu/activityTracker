@@ -557,3 +557,35 @@ details.trust-panel[open] summary { border-bottom: none; }
 
 .streaming-cursor { display: inline-block; width: 6px; height: 14px; background: var(--orange); margin-left: 2px; vertical-align: middle; animation: blink 0.8s infinite; }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+/* ---------- System Health & Maintenance Hub Styles ---------- */
+.system-overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 12px 0 14px; }
+.system-stat-card { background: var(--s1); border: 1px solid var(--bd); border-radius: 6px; padding: 12px 14px; transition: transform 0.15s ease, border-color 0.15s ease; }
+.system-stat-card:hover { border-color: var(--orange); transform: translateY(-1px); }
+.system-stat-val { font-size: 18px; font-weight: 700; font-family: "JetBrains Mono", monospace; margin: 4px 0 2px; color: var(--tx); }
+.system-stat-val.text-success { color: var(--success, #22c55e); }
+.system-stat-val.text-warning { color: var(--warn, #eab308); }
+.system-stat-val.text-danger { color: var(--danger, #ef4444); }
+
+.system-actions-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; padding-top: 12px; border-top: 1px dashed var(--bd); }
+.system-actions-bar .btn { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; padding: 8px 14px; border-radius: 6px; }
+
+.diagnostics-matrix-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin: 10px 0; }
+.collector-diag-card { background: var(--s1); border: 1px solid var(--bd); border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.collector-diag-card.degraded { border-color: var(--warn, #eab308); background: rgba(234, 179, 8, 0.04); }
+.collector-diag-card.stopped { border-color: var(--danger, #ef4444); }
+.collector-diag-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; margin-bottom: 2px; }
+.collector-diag-title { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--tx); }
+.collector-diag-metrics { display: flex; flex-direction: column; gap: 3px; color: var(--mu); font-family: "JetBrains Mono", monospace; font-size: 11px; margin-top: 4px; }
+.collector-diag-metric-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(128, 128, 128, 0.1); padding-bottom: 2px; }
+.collector-diag-isolated-box { margin-top: 6px; padding: 6px 8px; background: rgba(239, 68, 68, 0.08); border-left: 3px solid var(--danger, #ef4444); border-radius: 2px; font-size: 11px; color: var(--danger, #ef4444); }
+
+.receipt-card-body { padding: 10px 0; font-size: 12.5px; }
+.receipt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.receipt-item { background: var(--s1); border: 1px solid var(--bd); border-radius: 6px; padding: 10px 12px; }
+.receipt-item-title { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--mu); margin-bottom: 4px; }
+.receipt-item-val { font-family: "JetBrains Mono", monospace; font-size: 13px; font-weight: 600; color: var(--tx); }
+
+.system-console-wrapper { background: #0c0d0e; border: 1px solid var(--bd); border-radius: 6px; padding: 10px 14px; margin-top: 8px; max-height: 240px; overflow-y: auto; }
+.system-console-output { font-family: "JetBrains Mono", monospace; font-size: 11.5px; line-height: 1.5; color: #38bdf8; margin: 0; white-space: pre-wrap; word-break: break-all; }
+

@@ -44,6 +44,7 @@
       <button class="tab" data-tab="tab-settings" data-i18n="tab_settings">04 · 監控配置</button>
       <button class="tab" data-tab="tab-summaries" data-i18n="tab_summaries">05 · 每日摘要</button>
       <button class="tab" data-tab="tab-checkpoints" data-i18n="tab_checkpoints">06 · 活動快照</button>
+      <button class="tab" data-tab="tab-system-health" data-i18n="tab_system_health">07 · 🛡️ 系統健康與維護</button>
     </nav>
   </div>
 
@@ -479,6 +480,89 @@
             </div>
             <div id="checkpoint-markdown-viewer" class="markdown"><p class="muted" data-i18n="ph_cp_click">請從左側點選快照日誌以檢視期間活動細節。</p></div>
           </article>
+        </div>
+      </section>
+
+      <!-- 07 系統健康與維護 -->
+      <section id="tab-system-health" class="pane">
+        <!-- 頂部健康總覽與快捷按鈕卡片 -->
+        <div class="panel mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent">01</span>
+            <span class="panel-title" data-i18n="system_health_p1_title">系統運行總覽與生命週期控制</span>
+            <span id="system-overall-badge" class="trust ok">HEALTHY</span>
+            <button id="btn-refresh-system-health" class="btn btn-ghost btn-sm head-right" data-i18n="btn_refresh_health">重新整理</button>
+          </div>
+          <div class="system-overview-grid">
+            <div class="system-stat-card">
+              <div class="mono-mini muted" data-i18n="label_system_state">MONITORING STATE</div>
+              <div id="sys-stat-state" class="system-stat-val text-success">HEALTHY</div>
+              <div id="sys-stat-uptime" class="mono-mini muted">運行中</div>
+            </div>
+            <div class="system-stat-card">
+              <div class="mono-mini muted" data-i18n="label_db_size">DATABASE SIZE</div>
+              <div id="sys-stat-dbsize" class="system-stat-val">— MB</div>
+              <div id="sys-stat-wal" class="mono-mini muted">WAL: — KB</div>
+            </div>
+            <div class="system-stat-card">
+              <div class="mono-mini muted" data-i18n="label_managed_projects">MANAGED WORKSTREAMS</div>
+              <div id="sys-stat-projects" class="system-stat-val">— 專案</div>
+              <div id="sys-stat-dbpath" class="mono-mini muted text-truncate" title="">omni_context.db</div>
+            </div>
+            <div class="system-stat-card">
+              <div class="mono-mini muted" data-i18n="label_self_healing_status">SELF-HEALING SUPERVISOR</div>
+              <div id="sys-stat-healed-count" class="system-stat-val">0 次修復</div>
+              <div id="sys-stat-last-heal" class="mono-mini muted">常駐守護中</div>
+            </div>
+          </div>
+
+          <div class="system-actions-bar">
+            <button id="btn-trigger-heal-ui" class="btn btn-primary" title="主動巡檢 5 大採集器與排程器，自動重啟掛掉的線程">
+              🩺 <span data-i18n="btn_trigger_heal">一鍵自我修復 (Self-Heal)</span>
+            </button>
+            <button id="btn-trigger-wal-ui" class="btn btn-ghost" title="手動將 WAL 日誌截斷同步回 SQLite 主庫 (TRUNCATE)">
+              📦 <span data-i18n="btn_trigger_wal">執行 WAL Checkpoint</span>
+            </button>
+            <button id="btn-trigger-maintain-ui" class="btn btn-ghost" title="執行完整健康檢查、90天事件修剪、線上驗證備份與滾動輪替 (保留7份)">
+              🔧 <span data-i18n="btn_trigger_maintain">執行資料庫完整維護</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 採集器與排程器即時診斷矩陣 -->
+        <div class="panel mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent">02</span>
+            <span class="panel-title" data-i18n="system_health_p2_title">採集器容錯隔離與健康矩陣</span>
+            <span class="muted small" data-i18n="system_health_p2_note">各採集器獨立隔離，單一損壞不中斷全域監控</span>
+          </div>
+          <div id="collectors-diagnostics-grid" class="diagnostics-matrix-grid">
+            <div class="placeholder">正在載入採集器診斷數據…</div>
+          </div>
+        </div>
+
+        <!-- 資料庫維護收據與線上備份輪替 -->
+        <div class="panel mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent">03</span>
+            <span class="panel-title" data-i18n="system_health_p3_title">最近維護收據與備份保險庫</span>
+            <span id="maintenance-integrity-badge" class="trust ok">INTEGRITY OK</span>
+          </div>
+          <div id="maintenance-receipt-container" class="receipt-card-body">
+            <div class="placeholder">正在載入最近一次資料庫維護收據…</div>
+          </div>
+        </div>
+
+        <!-- 即時操作日誌終端視窗 -->
+        <div class="panel">
+          <div class="panel-head">
+            <span class="mono-label accent">04</span>
+            <span class="panel-title" data-i18n="system_health_p4_title">維護操作即時終端 (Action Console)</span>
+            <button id="btn-clear-system-console" class="btn btn-ghost btn-sm head-right" data-i18n="btn_clear_console">清空輸出</button>
+          </div>
+          <div class="system-console-wrapper">
+            <pre id="system-action-console" class="system-console-output">// 系統維護終端就緒。點擊上方按鈕執行自我修復、WAL Checkpoint 或完整維護時，即時 JSON 回饋將輸出於此。</pre>
+          </div>
         </div>
       </section>
 
