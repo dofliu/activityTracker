@@ -304,6 +304,59 @@ def _migration_008_rag_tables(connection: Connection) -> None:
     ))
 
 
+def _migration_009_github_issues_and_snoozes(connection: Connection) -> None:
+    """GitHub issue 明細與 proposal snooze 回饋。
+
+    repo 層的 open_issues_count 由 GitHub API 提供，但它把 PR 也算進去，
+    因此無法回答「有哪些 issue 待處理」。此處改存 issue 明細。
+    """
+    connection.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS github_issue_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            repo_name VARCHAR(100) NOT NULL,
+            issue_number INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            state VARCHAR(20) NOT NULL,
+            author VARCHAR(100),
+            assignee VARCHAR(100),
+            html_url VARCHAR(500) NOT NULL,
+            labels_json TEXT,
+            comments_count INTEGER DEFAULT 0,
+            created_at DATETIME,
+            updated_at DATETIME,
+            closed_at DATETIME
+        );
+        """
+    ))
+    connection.execute(text(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_github_issue_repo_number "
+        "ON github_issue_events(repo_name, issue_number);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_github_issue_state_updated "
+        "ON github_issue_events(state, updated_at);"
+    ))
+    connection.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS proposal_snoozes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            proposal_type VARCHAR(64) NOT NULL,
+            project_key VARCHAR(255) NOT NULL,
+            subject_ref VARCHAR(255) NOT NULL DEFAULT '',
+            snoozed_until DATETIME,
+            dismissed INTEGER DEFAULT 0,
+            note TEXT,
+            created_at DATETIME
+        );
+        """
+    ))
+    connection.execute(text(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_proposal_snooze_target "
+        "ON proposal_snoozes(proposal_type, project_key, subject_ref);"
+    ))
+
+
 MIGRATIONS: tuple[MigrationDefinition, ...] = (
     MigrationDefinition(
         1,
@@ -358,6 +411,13 @@ MIGRATIONS: tuple[MigrationDefinition, ...] = (
         "rag_indexed_folders:create;rag_indexed_files:create;rag_chat_sessions:create;rag_chat_messages:create;"
         "indexes:path,folder_id,status,session_id",
         _migration_008_rag_tables,
+    ),
+    MigrationDefinition(
+        9,
+        "github_issues_and_proposal_snoozes",
+        "github_issue_events:create;proposal_snoozes:create;"
+        "indexes:repo_number,state_updated,snooze_target",
+        _migration_009_github_issues_and_snoozes,
     ),
 )
 

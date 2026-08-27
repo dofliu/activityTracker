@@ -871,9 +871,21 @@ function renderSecretaryProposals() {
     box.innerHTML = `<div class="placeholder">${currentLang === "zh-TW" ? "目前沒有超過規則門檻的建議；不代表所有工作都已完成。" : "No suggestion crossed the current rule threshold; this does not prove all work is complete."}</div>`;
     return;
   }
+  const zh = currentLang === "zh-TW";
   box.innerHTML = proposals.map(item => {
     const refs = (item.evidence_refs || []).map(ref => `<span class="proposal-ref">${esc(ref)}</span>`).join("");
     const priority = String(item.priority || "medium").toUpperCase();
+    // detail 是 PR/issue 標題；title 只有 repo#number，兩者都要顯示才看得懂是什麼事
+    const detail = item.detail ? `<div class="proposal-detail">${esc(item.detail)}</div>` : "";
+    const link = item.url
+      ? `<a class="proposal-link" href="${esc(item.url)}" target="_blank" rel="noopener">${zh ? "在 GitHub 開啟 →" : "Open on GitHub →"}</a>`
+      : "";
+    // 被每專案上限折疊掉的數量：讓使用者知道那裡還有多少事，而不是以為只有這些
+    const pending = item.same_project_pending
+      ? `<span class="proposal-pending">${zh ? `此專案另有 ${item.same_project_pending} 項` : `+${item.same_project_pending} more here`}</span>`
+      : "";
+    const snoozeArgs = [item.proposal_type, item.project_key, item.subject_ref || ""]
+      .map(v => `'${esc(String(v)).replace(/'/g, "\'")}'`).join(", ");
     return `
       <article class="proposal-card">
         <div class="proposal-card-top">
@@ -881,13 +893,48 @@ function renderSecretaryProposals() {
           <span class="trust ${item.priority === "high" ? "broken" : "noisy"}">${esc(priority)}</span>
         </div>
         <div class="proposal-title">${esc(item.title)}</div>
+        ${detail}
         <div class="proposal-reason">${esc(item.reason)}</div>
-        <div class="proposal-action"><span>${currentLang === "zh-TW" ? "建議" : "Suggested"}</span>${esc(item.suggested_action)}</div>
-        <div class="proposal-meta"><span>${esc(item.risk_level || "L0_READ_ONLY")}</span><span>${currentLang === "zh-TW" ? "不執行" : "NOT EXECUTABLE"}</span></div>
+        <div class="proposal-action"><span>${zh ? "建議" : "Suggested"}</span>${esc(item.suggested_action)}</div>
+        <div class="proposal-meta">
+          <span>${esc(item.risk_level || "L0_READ_ONLY")}</span>
+          <span>${zh ? "不執行" : "NOT EXECUTABLE"}</span>
+          ${pending}
+          ${link}
+          <button class="btn btn-ghost btn-sm" onclick="window.snoozeProposal(${snoozeArgs}, 7)">${zh ? "7 天內不再提醒" : "Snooze 7d"}</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.snoozeProposal(${snoozeArgs}, null)">${zh ? "不再提醒" : "Dismiss"}</button>
+        </div>
         <div class="proposal-refs">${refs}</div>
       </article>`;
   }).join("");
 }
+
+// 回饋迴路：使用者說「這個先不用提醒」。沒有這個，分流清單永遠不會變準。
+window.snoozeProposal = async function (proposalType, projectKey, subjectRef, days) {
+  const zh = currentLang === "zh-TW";
+  const permanent = days === null;
+  const label = permanent
+    ? (zh ? "確定不再提醒這一項？" : "Dismiss this suggestion permanently?")
+    : (zh ? `${days} 天內不再提醒這一項？` : `Snooze this suggestion for ${days} days?`);
+  if (!confirm(label)) return;
+  try {
+    const res = await fetch("/api/v1/secretary/proposals/snooze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        proposal_type: proposalType,
+        project_key: projectKey,
+        subject_ref: subjectRef,
+        days: permanent ? null : days,
+        dismissed: permanent,
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    await loadSecretaryProposals();
+  } catch (err) {
+    alert((zh ? "設定失敗：" : "Failed: ") + err.message);
+  }
+};
 
 // ---------------------------------------------------------------- live feed
 async function refreshFeed() {

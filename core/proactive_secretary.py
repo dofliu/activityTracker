@@ -1,8 +1,14 @@
-"""P5-1 proposal-only 主動秘書；只讀取本機 evidence，不執行任何行動。"""
+"""P5-1 proposal-only 主動秘書；只讀取本機 evidence，不執行任何行動。
+
+分流（triage）而非派工（dispatch）：專案太多時，這裡負責回答
+「接下來該碰哪一個、為什麼」，決定權仍在使用者手上。
+
+訊號來源見 `core/triage_signals.py`。回饋（snooze / 忽略）由 `proposal_snoozes` 承載——
+沒有回饋迴路，清單會一直重推使用者已經判斷過不重要的事，永遠不會變準。
+"""
 
 from __future__ import annotations
 
-from collections import defaultdict
 from datetime import datetime
 import hashlib
 from typing import Any
@@ -10,14 +16,32 @@ from typing import Any
 from .config import get_config
 from .database import get_db
 from .extension_monitor import build_extension_status
-from .models import OpenLoop, ProjectState
+from .models import ProposalSnooze
 from .time_utils import get_local_now
+from .triage_signals import (
+    collect_issue_signals,
+    collect_open_loop_signals,
+    collect_pr_signals,
+    repo_issue_backlog,
+)
 
 
 CLAIM_BOUNDARY = (
     "Proposals are deterministic read-only suggestions derived from observed local evidence. "
     "They are not executed, persisted, or proof that the suggested action is necessary or correct."
 )
+
+# 每種訊號對應的下一步；措辭一律是使用者自己要做的判斷，不是交給系統代勞。
+SUGGESTED_ACTIONS = {
+    "ci_failing_pr": "先看 CI 失敗的檢查項目，修好再 merge；若已不需要則直接關閉。",
+    "review_ready_pr": "檢視差異後 merge，或留下 review 意見。",
+    "aging_pr": "確認這個 PR 還要不要——繼續推進、轉回 draft 或關閉。",
+    "assigned_issue": "確認目前狀態，回報進度或重新指派。",
+    "aging_issue": "判斷是否仍需處理；不需要就關閉，需要就排入本週。",
+    "stalled_open_loop": "先看 Context Handoff 與來源，再決定要繼續、標記 stale 或結案。",
+    "unfinished_recent": "趁脈絡還在，把未收尾的部分收掉或明確標記下一步。",
+    "verify_extension_heartbeat": "在 Chrome 重新載入 unpacked Extension，開啟 popup 後檢查 heartbeat 與逐站 Content Ready。",
+}
 
 
 def _local_naive(value: datetime | None) -> datetime | None:
@@ -43,6 +67,104 @@ def _evidence(source_ref: str, kind: str, observed_at: datetime | None) -> dict[
     }
 
 
+def _priority_from_score(score: float) -> str:
+    if score >= 0.80:
+        return "high"
+    if score >= 0.55:
+        return "medium"
+    return "low"
+
+
+def _apply_project_diversity(
+    proposals: list[dict[str, Any]], max_per_project: int
+) -> list[dict[str, Any]]:
+    """每個專案最多保留 N 項。
+
+    沒有這道限制，一個累積了 8 個 PR 的 repo 會把整張清單佔滿，
+    分流就退化成「看某個 repo 的 PR 列表」，失去跨專案比較的意義。
+    被折疊的數量掛在保留項目上，使用者仍看得到那裡還有多少事。
+    """
+    kept: list[dict[str, Any]] = []
+    per_project: dict[str, int] = {}
+    suppressed: dict[str, int] = {}
+
+    for item in proposals:
+        key = item["project_key"]
+        if per_project.get(key, 0) < max_per_project:
+            per_project[key] = per_project.get(key, 0) + 1
+            kept.append(item)
+        else:
+            suppressed[key] = suppressed.get(key, 0) + 1
+
+    for item in kept:
+        item["same_project_pending"] = suppressed.get(item["project_key"], 0)
+    return kept
+
+
+def _disabled_result(now: datetime) -> dict[str, Any]:
+    return {
+        "status": "disabled",
+        "mode": "proposal_only",
+        "proposals": [],
+        "generated_at": now.isoformat(timespec="seconds"),
+        "execution_available": False,
+        "cloud_llm_used": False,
+        "query_persisted": False,
+        "claim_boundary": CLAIM_BOUNDARY,
+    }
+
+
+def _active_snoozes(session: Any, now: datetime) -> set[tuple[str, str, str]]:
+    """回傳仍在生效的 snooze 目標；過期的自動失效，不需要清理排程。"""
+    active: set[tuple[str, str, str]] = set()
+    for row in session.query(ProposalSnooze).all():
+        if row.dismissed:
+            active.add((row.proposal_type, row.project_key, row.subject_ref or ""))
+            continue
+        until = _local_naive(row.snoozed_until)
+        if until is not None and until > now:
+            active.add((row.proposal_type, row.project_key, row.subject_ref or ""))
+    return active
+
+
+def _signal_to_proposal(signal: dict[str, Any], now: datetime) -> dict[str, Any]:
+    evidence = [
+        _evidence(
+            signal["evidence_ref"],
+            signal["signal_type"],
+            signal.get("observed_at"),
+        )
+    ]
+    # 未結事項只帶 source_ref，不帶標題：標題可能含使用者的原始提問內容。
+    for ref in signal.get("open_loop_refs", []):
+        evidence.append(_evidence(ref, "open_loop", signal.get("observed_at")))
+
+    evidence_refs = [item["source_ref"] for item in evidence]
+    score = float(signal["score"])
+
+    return {
+        "proposal_id": _proposal_id(
+            signal["signal_type"], signal["project_key"], evidence_refs
+        ),
+        "proposal_type": signal["signal_type"],
+        "project_key": signal["project_key"],
+        "subject_ref": signal["subject_ref"],
+        "title": signal["title"],
+        "detail": signal.get("detail", ""),
+        "reason": "；".join(signal["reasons"]),
+        "reasons": list(signal["reasons"]),
+        "suggested_action": SUGGESTED_ACTIONS.get(signal["signal_type"], ""),
+        "priority": _priority_from_score(score),
+        "risk_level": "L0_READ_ONLY",
+        "execution_available": False,
+        "url": signal.get("url"),
+        "age_days": signal.get("age_days", 0.0),
+        "evidence_refs": evidence_refs,
+        "evidence": evidence,
+        "score": round(score, 3),
+    }
+
+
 def build_action_proposals(
     *,
     database: Any | None = None,
@@ -58,22 +180,20 @@ def build_action_proposals(
     configured_limit = int(cfg.get("proactive_secretary.max_proposals", 6))
     result_limit = max(1, min(int(limit or configured_limit), 12))
     if not bool(cfg.get("proactive_secretary.enabled", True)):
-        return {
-            "status": "disabled",
-            "mode": "proposal_only",
-            "proposals": [],
-            "generated_at": now.isoformat(timespec="seconds"),
-            "execution_available": False,
-            "cloud_llm_used": False,
-            "query_persisted": False,
-            "claim_boundary": CLAIM_BOUNDARY,
-        }
+        return _disabled_result(now)
 
     stalled_hours = max(
         1,
         min(int(cfg.get("proactive_secretary.stalled_open_loop_hours", 48)), 24 * 90),
     )
+    # 剛動過的專案不需要提醒——你正在做。要閒置超過這個門檻才值得提「還沒收尾」。
+    recent_idle_hours = max(
+        1,
+        min(int(cfg.get("proactive_secretary.unfinished_recent_min_idle_hours", 12)), stalled_hours),
+    )
+
     proposals: list[dict[str, Any]] = []
+    signals: list[dict[str, Any]] = []
 
     # Extension status 是非敏感 derived status；不得將歷史 event 等同近期 heartbeat。
     status = extension_status
@@ -82,95 +202,64 @@ def build_action_proposals(
     extension = status.get("extension", {}) if isinstance(status, dict) else {}
     if extension.get("token_configured") and not extension.get("heartbeat_verified"):
         evidence_refs = ["extension_status:live"]
-        proposals.append(
-            {
-                "proposal_id": _proposal_id(
-                    "verify_extension_heartbeat", "OmniContext", evidence_refs
-                ),
-                "proposal_type": "verify_extension_heartbeat",
-                "project_key": "OmniContext",
-                "title": "驗證 Browser Extension 即時連線",
-                "reason": "本機服務已有 ingest token，但目前沒有近期 token-authenticated heartbeat receipt。",
-                "suggested_action": "在 Chrome 重新載入 unpacked Extension，開啟 popup 後檢查 heartbeat 與逐站 Content Ready。",
-                "priority": "high",
-                "risk_level": "L0_READ_ONLY",
-                "execution_available": False,
-                "evidence_refs": evidence_refs,
-                "evidence": [
-                    {
-                        "source_ref": "extension_status:live",
-                        "kind": "derived_extension_status",
-                        "observed_at": now.isoformat(timespec="seconds"),
-                    }
-                ],
-                "score": 1.0,
-            }
-        )
+        proposals.append({
+            "proposal_id": _proposal_id(
+                "verify_extension_heartbeat", "OmniContext", evidence_refs
+            ),
+            "proposal_type": "verify_extension_heartbeat",
+            "project_key": "OmniContext",
+            "subject_ref": "extension:heartbeat",
+            "title": "驗證 Browser Extension 即時連線",
+            "detail": "",
+            "reason": "本機服務已有 ingest token，但目前沒有近期 token-authenticated heartbeat receipt。",
+            "reasons": ["本機服務已有 ingest token，但目前沒有近期 token-authenticated heartbeat receipt。"],
+            "suggested_action": SUGGESTED_ACTIONS["verify_extension_heartbeat"],
+            "priority": "high",
+            "risk_level": "L0_READ_ONLY",
+            "execution_available": False,
+            "url": None,
+            "age_days": 0.0,
+            "evidence_refs": evidence_refs,
+            "evidence": [
+                _evidence("extension_status:live", "derived_extension_status", now)
+            ],
+            "score": 1.0,
+        })
 
-    # 直接讀 ProjectState/OpenLoop，避免呼叫會 refresh/write 的 project list helper。
+    counters = {
+        "open_prs": 0,
+        "open_issues": 0,
+        "open_loop_projects": 0,
+        "snoozed": 0,
+    }
+
     with database.session_scope() as session:
-        projects = {
-            item.project_key.lower(): item
-            for item in session.query(ProjectState).all()
-        }
-        open_loops = (
-            session.query(OpenLoop)
-            .filter(OpenLoop.status == "open")
-            .order_by(OpenLoop.project_key, OpenLoop.id)
-            .all()
-        )
-        grouped: dict[str, list[OpenLoop]] = defaultdict(list)
-        for loop in open_loops:
-            grouped[loop.project_key.lower()].append(loop)
+        snoozed = _active_snoozes(session, now)
 
-        for normalized_key, loops in grouped.items():
-            project = projects.get(normalized_key)
-            if project is None or project.last_activity_at is None:
-                continue
-            last_activity_at = _local_naive(project.last_activity_at)
-            idle_hours = max(0.0, (now - last_activity_at).total_seconds() / 3600)
-            if idle_hours < stalled_hours:
-                continue
+        pr_signals = collect_pr_signals(session, now)
+        issue_signals = collect_issue_signals(session, now)
+        loop_signals = collect_open_loop_signals(session, now, stalled_hours)
 
-            selected_loops = loops[:3]
-            evidence = [
-                _evidence(
-                    f"project_states:{project.id}",
-                    "project_state",
-                    project.last_activity_at,
-                )
-            ] + [
-                _evidence(
-                    f"open_loops:{loop.id}",
-                    "open_loop",
-                    loop.last_seen_at or loop.created_at,
-                )
-                for loop in selected_loops
-            ]
-            evidence_refs = [item["source_ref"] for item in evidence]
-            idle_days = int(idle_hours // 24)
-            priority = "high" if idle_hours >= 24 * 7 else "medium"
-            proposals.append(
-                {
-                    "proposal_id": _proposal_id(
-                        "review_stalled_open_loops", project.project_key, evidence_refs
-                    ),
-                    "proposal_type": "review_stalled_open_loops",
-                    "project_key": project.project_key,
-                    "title": f"複核 {project.display_name} 的未結事項",
-                    "reason": (
-                        f"此專案已有約 {idle_days} 天未觀察到活動，"
-                        f"且仍有 {len(loops)} 項 actionable Open Loop。"
-                    ),
-                    "suggested_action": "先檢視 Context Handoff 與來源，再決定要繼續、標記 stale 或結案。",
-                    "priority": priority,
-                    "risk_level": "L0_READ_ONLY",
-                    "execution_available": False,
-                    "evidence_refs": evidence_refs,
-                    "evidence": evidence,
-                    "score": round(min(0.99, 0.55 + idle_hours / (24 * 90)), 3),
-                }
-            )
+        # 剛動過就不提醒；閒置超過門檻才納入
+        loop_signals = [
+            item
+            for item in loop_signals
+            if item["signal_type"] != "unfinished_recent"
+            or item["age_days"] * 24 >= recent_idle_hours
+        ]
+
+        counters["open_prs"] = len(pr_signals)
+        counters["open_issues"] = len(issue_signals)
+        counters["open_loop_projects"] = len(loop_signals)
+        counters["repo_issue_backlog"] = repo_issue_backlog(session)
+
+        signals = pr_signals + issue_signals + loop_signals
+        for signal in signals:
+            key = (signal["signal_type"], signal["project_key"], signal["subject_ref"])
+            if key in snoozed:
+                counters["snoozed"] += 1
+                continue
+            proposals.append(_signal_to_proposal(signal, now))
 
     priority_rank = {"high": 0, "medium": 1, "low": 2}
     proposals.sort(
@@ -180,18 +269,82 @@ def build_action_proposals(
             item["proposal_id"],
         )
     )
+    total_candidates = len(proposals)
+    max_per_project = max(1, int(cfg.get("proactive_secretary.max_per_project", 2)))
+    proposals = _apply_project_diversity(proposals, max_per_project)
+
     return {
         "status": "proposal_only",
         "mode": "proposal_only",
         "proposals": proposals[:result_limit],
+        "total_candidates": total_candidates,
         "generated_at": now.isoformat(timespec="seconds"),
         "inputs": {
-            "project_states": len(projects),
-            "actionable_open_loops": len(open_loops),
+            "open_prs": counters["open_prs"],
+            "open_issues": counters["open_issues"],
+            "open_loop_projects": counters["open_loop_projects"],
+            "snoozed_suppressed": counters["snoozed"],
+            "repo_issue_backlog": counters.get("repo_issue_backlog", {}),
+            "max_per_project": max_per_project,
             "stalled_open_loop_hours": stalled_hours,
+            "unfinished_recent_min_idle_hours": recent_idle_hours,
         },
         "execution_available": False,
         "cloud_llm_used": False,
         "query_persisted": False,
         "claim_boundary": CLAIM_BOUNDARY,
+    }
+
+
+def snooze_proposal(
+    *,
+    proposal_type: str,
+    project_key: str,
+    subject_ref: str = "",
+    days: int | None = 7,
+    dismissed: bool = False,
+    note: str | None = None,
+    database: Any | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """記錄「這個先不要再提醒我」。
+
+    這是唯一會寫入資料庫的秘書相關操作，且只寫 proposal_snoozes，
+    不觸碰任何事件資料，也不改變 build_action_proposals 的唯讀性質。
+    """
+    from datetime import timedelta
+
+    database = database or get_db()
+    now = _local_naive(now or get_local_now())
+    until = None if dismissed or days is None else now + timedelta(days=max(1, int(days)))
+
+    with database.session_scope() as session:
+        record = (
+            session.query(ProposalSnooze)
+            .filter_by(
+                proposal_type=proposal_type,
+                project_key=project_key,
+                subject_ref=subject_ref or "",
+            )
+            .first()
+        )
+        if record is None:
+            record = ProposalSnooze(
+                proposal_type=proposal_type,
+                project_key=project_key,
+                subject_ref=subject_ref or "",
+                created_at=now,
+            )
+            session.add(record)
+        record.snoozed_until = until
+        record.dismissed = bool(dismissed)
+        record.note = note
+
+    return {
+        "status": "snoozed",
+        "proposal_type": proposal_type,
+        "project_key": project_key,
+        "subject_ref": subject_ref or "",
+        "dismissed": bool(dismissed),
+        "snoozed_until": until.isoformat(timespec="seconds") if until else None,
     }

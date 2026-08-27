@@ -31,7 +31,7 @@ from .extension_monitor import build_extension_status, record_extension_heartbea
 from .extension_verification import extension_verification_registry
 from .capture_coverage import build_capture_coverage
 from .context_memory import build_recent_work_sessions, find_related_work
-from .proactive_secretary import build_action_proposals
+from .proactive_secretary import build_action_proposals, snooze_proposal
 from .usage_analytics import evaluate_daily_milestones, get_usage_summary
 from .time_utils import get_local_now
 from .runtime_paths import resolve_runtime_path, web_assets_dir
@@ -357,6 +357,31 @@ def get_secretary_proposals(
 ):
     """P5-1 proposal-only derived view；不保存、不執行任何建議。"""
     return build_action_proposals(limit=limit)
+
+
+class SnoozeProposalRequest(BaseModel):
+    proposal_type: str
+    project_key: str
+    subject_ref: str = ""
+    days: Optional[int] = 7
+    dismissed: bool = False
+    note: Optional[str] = None
+
+
+@app.post("/api/v1/secretary/proposals/snooze")
+def snooze_secretary_proposal(payload: SnoozeProposalRequest):
+    """記錄「先不要再提醒我」；只寫 proposal_snoozes，不觸碰事件資料。
+
+    這是分流清單能變準的唯一途徑：沒有回饋，系統會一直重推已被判斷為不重要的事。
+    """
+    return snooze_proposal(
+        proposal_type=payload.proposal_type,
+        project_key=payload.project_key,
+        subject_ref=payload.subject_ref,
+        days=payload.days,
+        dismissed=payload.dismissed,
+        note=payload.note,
+    )
 
 
 @app.post("/api/v1/usage/milestones/evaluate")

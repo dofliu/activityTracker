@@ -322,3 +322,43 @@ class RAGChatMessage(Base):
     provider = Column(String(50), nullable=True)
     model = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=get_local_now)
+
+
+class GitHubIssueEvent(Base):
+    """記錄 GitHub Issue 明細
+
+    repo 層的 open_issues_count 由 GitHub API 提供，但該數值把 PR 也計入，
+    因此無法回答「有哪些 issue 待處理」。此表存 issue 本身。
+    """
+    __tablename__ = "github_issue_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    repo_name = Column(String(100), nullable=False, index=True)
+    issue_number = Column(Integer, nullable=False, index=True)
+    title = Column(Text, nullable=False)
+    state = Column(String(20), nullable=False, index=True)  # open, closed
+    author = Column(String(100), nullable=True)
+    assignee = Column(String(100), nullable=True)
+    html_url = Column(String(500), nullable=False)
+    labels_json = Column(Text, nullable=True)
+    comments_count = Column(Integer, default=0)
+    created_at = Column(DateTime, nullable=True, index=True)
+    updated_at = Column(DateTime, nullable=True, index=True)
+    closed_at = Column(DateTime, nullable=True)
+
+
+class ProposalSnooze(Base):
+    """秘書提案的回饋：使用者說「這個先不要再提醒我」
+
+    沒有這個回饋迴路，分流清單永遠不會變準——它會一直重推你已經判斷過不重要的事。
+    """
+    __tablename__ = "proposal_snoozes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    proposal_type = Column(String(64), nullable=False, index=True)
+    project_key = Column(String(255), nullable=False, index=True)
+    subject_ref = Column(String(255), nullable=False, default="")  # 例如 pr:repo#12
+    snoozed_until = Column(DateTime, nullable=True)  # None 且 dismissed=True 代表永久忽略
+    dismissed = Column(Boolean, default=False)
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=get_local_now)

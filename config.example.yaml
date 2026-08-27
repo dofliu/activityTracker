@@ -172,6 +172,8 @@ context_memory:
   related_threshold: 0.50
 
 proactive_secretary:
+  max_per_project: 2
+  unfinished_recent_min_idle_hours: 12
   # Alpha 僅產生 read-only proposals；不保存、不執行，也不呼叫 cloud LLM。
   enabled: true
   max_proposals: 6

@@ -589,3 +589,13 @@ details.trust-panel[open] summary { border-bottom: none; }
 .system-console-wrapper { background: #0c0d0e; border: 1px solid var(--bd); border-radius: 6px; padding: 10px 14px; margin-top: 8px; max-height: 240px; overflow-y: auto; }
 .system-console-output { font-family: "JetBrains Mono", monospace; font-size: 11.5px; line-height: 1.5; color: #38bdf8; margin: 0; white-space: pre-wrap; word-break: break-all; }
 
+
+/* 分流卡片：PR/issue 標題、外部連結與折疊數量 */
+.proposal-detail { font-size: 12.5px; color: var(--fg); margin: 2px 0 4px; line-height: 1.5; }
+.proposal-link { font-size: 12px; color: var(--ac); text-decoration: none; }
+.proposal-link:hover { text-decoration: underline; }
+.proposal-pending { font-size: 11.5px; color: var(--mu); }
+.proposal-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.btn-sm { padding: 2px 8px; font-size: 11.5px; }
+.btn-ghost { background: transparent; border: 1px solid var(--bd); color: var(--mu); }
+.btn-ghost:hover { color: var(--fg); border-color: var(--ac); }

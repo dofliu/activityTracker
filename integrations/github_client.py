@@ -10,7 +10,7 @@ from pathlib import Path
 
 from core.config import get_config
 from core.database import get_db
-from core.models import GitHubRepoState, GitHubPREvent, ProjectState
+from core.models import GitHubRepoState, GitHubPREvent, GitHubIssueEvent, ProjectState
 from core.time_utils import get_local_now
 
 logger = logging.getLogger("OmniContext.GitHubClient")
@@ -164,6 +164,30 @@ class GitHubClient:
             logger.warning(f"Failed to fetch PRs for {owner}/{repo}: {e}")
             return []
 
+    def fetch_repo_issues(self, owner: str, repo: str, limit: int = 30) -> List[Dict[str, Any]]:
+        """讀取指定倉庫的 Open Issues
+
+        注意：GitHub 的 /issues 端點會把 Pull Request 一併回傳（PR 在 API 眼中也是 issue），
+        必須用 pull_request 欄位過濾掉，否則 PR 會被重複計成 issue。
+        """
+        token = self.get_token()
+        url = f"{GITHUB_API_BASE}/repos/{owner}/{repo}/issues"
+        params = {
+            "state": "open",
+            "sort": "updated",
+            "direction": "desc",
+            "per_page": limit,
+        }
+
+        try:
+            res = requests.get(url, headers=self._headers(token), params=params, timeout=12)
+            if not res.ok:
+                return []
+            return [item for item in res.json() if "pull_request" not in item]
+        except Exception as e:
+            logger.warning(f"Failed to fetch issues for {owner}/{repo}: {e}")
+            return []
+
     def fetch_pr_ci_status(self, owner: str, repo: str, head_sha: str) -> str:
         """取得 PR 最新 Commit 的 CI Check Runs 狀態"""
         token = self.get_token()
@@ -232,6 +256,7 @@ class GitHubClient:
         repos = self.fetch_all_repositories(limit=max_repos)
         synced_repos_count = 0
         synced_prs_count = 0
+        synced_issues_count = 0
         active_prs_list = []
 
         now = get_local_now()
@@ -358,17 +383,79 @@ class GitHubClient:
                     if pr_state == "open" or (merged_at and merged_at >= now - timedelta(days=7)):
                         active_prs_list.append({**pr_summary_dict, "repo": repo_name, "full_name": full_name})
 
+                # Issues：只在該 repo 確實有 issue 時才打 API，避免 57 個 repo 全部多一次請求。
+                # open_issues 是 GitHub 的合計值（含 PR），扣掉 open PR 才是真正的 issue 數。
+                estimated_issue_count = max(0, int(open_issues or 0) - open_prs_count)
+                if estimated_issue_count > 0:
+                    issues_data = self.fetch_repo_issues(owner, repo_name, limit=30)
+                    for issue in issues_data:
+                        issue_num = issue.get("number")
+                        if issue_num is None:
+                            continue
+                        assignee_login = (issue.get("assignee") or {}).get("login")
+                        labels = [
+                            label.get("name")
+                            for label in (issue.get("labels") or [])
+                            if isinstance(label, dict) and label.get("name")
+                        ]
+                        issue_record = (
+                            session.query(GitHubIssueEvent)
+                            .filter_by(repo_name=repo_name, issue_number=issue_num)
+                            .first()
+                        )
+                        payload = dict(
+                            title=issue.get("title") or "",
+                            state=issue.get("state") or "open",
+                            author=(issue.get("user") or {}).get("login"),
+                            assignee=assignee_login,
+                            html_url=issue.get("html_url") or "",
+                            labels_json=json.dumps(labels, ensure_ascii=False) if labels else None,
+                            comments_count=int(issue.get("comments") or 0),
+                            updated_at=self.parse_iso_time(issue.get("updated_at")),
+                            closed_at=self.parse_iso_time(issue.get("closed_at")),
+                        )
+                        if issue_record is None:
+                            session.add(GitHubIssueEvent(
+                                repo_name=repo_name,
+                                issue_number=issue_num,
+                                created_at=self.parse_iso_time(issue.get("created_at")),
+                                **payload,
+                            ))
+                        else:
+                            for field, value in payload.items():
+                                setattr(issue_record, field, value)
+                        synced_issues_count += 1
+
+                    # 本輪回傳的 open issue 之外，其餘先前記為 open 的視為已關閉
+                    seen_numbers = {i.get("number") for i in issues_data if i.get("number") is not None}
+                    stale_open = (
+                        session.query(GitHubIssueEvent)
+                        .filter(
+                            GitHubIssueEvent.repo_name == repo_name,
+                            GitHubIssueEvent.state == "open",
+                        )
+                        .all()
+                    )
+                    for record in stale_open:
+                        if record.issue_number not in seen_numbers:
+                            record.state = "closed"
+                            record.closed_at = record.closed_at or now
+
                 repo_record.open_prs_count = open_prs_count
                 repo_record.open_issues_count = open_issues
                 repo_record.metadata_json = json.dumps(repo_pr_summaries, ensure_ascii=False)
                 synced_repos_count += 1
 
-        logger.info(f"GitHub sync completed: {synced_repos_count} repos, {synced_prs_count} PRs synced.")
+        logger.info(
+            f"GitHub sync completed: {synced_repos_count} repos, "
+            f"{synced_prs_count} PRs, {synced_issues_count} issues synced."
+        )
         return {
             "status": "success",
             "username": auth_status.get("username"),
             "synced_repos_count": synced_repos_count,
             "synced_prs_count": synced_prs_count,
+            "synced_issues_count": synced_issues_count,
             "active_prs": active_prs_list
         }
 
