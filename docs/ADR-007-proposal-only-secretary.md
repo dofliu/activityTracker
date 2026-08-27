@@ -31,3 +31,36 @@ P5-1 Alpha 採用 deterministic、read-only derived view：
 ## Consequences
 
 P5-1 可先驗證「建議是否有用」，不會擴大系統權限。任何 approve/execute、agent dispatch、Git/file mutation、外部 API 或付費操作都留在獨立 P5 executor gate，不能由本 ADR 推導授權。
+
+---
+
+## Addendum 2026-08-27：P5-2/P5-3 executor 嘗試與回退
+
+2026-08-27 的 commit `871ee29` 實作了 `core/agent_dispatcher.py`（SafetyGate + 背景 worker）
+與 `POST /api/v1/secretary/proposals/{id}/execute`，並把 `execution_available` 改為 `True`。
+本 ADR 的 acceptance criteria 因此失效，`tests/test_proactive_secretary.py` 的兩項
+contract test 轉為 failing。
+
+**決議：回退至 proposal-only，executor 另案處理。** 已於 main 移除 dispatcher、
+execute/jobs endpoints、`AgentExecutionJob` model 與前端 Execute 按鈕；
+完整實作保留於分支 `wip/p5-2-agent-executor`（commit `871ee29`），未刪除。
+
+回退的三個具體理由（供未來 ADR-008 直接引用）：
+
+1. **SafetyGate 未實際分級。** `verify_authorization()` 對 `L0_READ_ONLY`、`L1_ASSIST`、
+   `L2_MUTATE` 一視同仁，只檢查 `user_intent == "explicit_approval"`；而 `submit_job()`
+   自行把該字串寫死傳入，human-in-the-loop 在此層未被強制。
+2. **command 由呼叫端提供。** endpoint 的 `command` 取自 request body 而非 server 端
+   產生的 proposal，再送入 `asyncio.create_subprocess_shell()`；proposal_id 僅為標籤，
+   不構成任何約束。
+3. **執行路徑無憑證要求。** local security middleware 只擋非 loopback 與帶有不允許
+   Origin 的請求；不帶 Origin header 的本機請求可直接抵達，且不需 token。
+   對照 browser extension 寫入單筆 AI event 需 `x-omnicontext-ingest-token`，
+   執行 shell 的門檻反而更低。
+
+**ADR-008 若要恢復 executor，至少需滿足：**
+
+- endpoint 只接受 `proposal_id`，command 由 server 從白名單模板產生，不接受自由字串。
+- 以 `create_subprocess_exec` 傳 argv list 取代 `create_subprocess_shell`。
+- 執行路徑要求獨立 token；`L2_MUTATE` 需與 `L0`/`L1` 不同的二次確認機制。
+- 本 ADR 的 acceptance criteria 與對應 contract tests 同步更新，不得留在 failing 狀態。

@@ -19,7 +19,6 @@ from watchers.git_watcher import GitWatcherService
 from watchers.window_watcher import WindowWatcherService
 from watchers.agent_log_watcher import AgentLogWatcherService
 from synthesizer.scheduler import SynthesisScheduler
-from core.agent_dispatcher import get_dispatcher
 
 logger = logging.getLogger("OmniContext.Manager")
 
@@ -87,7 +86,6 @@ class WatcherManager:
         self.window_watcher = WindowWatcherService()
         self.agent_log_watcher = AgentLogWatcherService()
         self.scheduler = SynthesisScheduler()
-        self.agent_dispatcher = get_dispatcher()
         self._healing_history: list[Dict[str, Any]] = []
 
     def supervise_and_heal(self) -> Dict[str, Any]:
@@ -143,7 +141,6 @@ class WatcherManager:
             self.window_watcher.start()
             self.agent_log_watcher.start()
             self.scheduler.start()
-            self.agent_dispatcher.start()
             self._is_running = True
             return {"status": "started", "message": "全景監控服務已成功啟動"}
 
@@ -158,7 +155,6 @@ class WatcherManager:
             self.window_watcher.stop()
             self.agent_log_watcher.stop()
             self.scheduler.shutdown()
-            self.agent_dispatcher.stop()
             self._is_running = False
             return {"status": "stopped", "message": "全景監控服務已停止"}
 
