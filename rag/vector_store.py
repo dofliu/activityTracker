@@ -48,6 +48,10 @@ class VectorStore:
                     meta["sheet"] = c.sheet_name
                 if c.section_title:
                     meta["title"] = c.section_title
+                if c.metadata:
+                    for k, v in c.metadata.items():
+                        if v is not None and isinstance(v, (str, int, float, bool)):
+                            meta[k] = v
                 metadatas.append(meta)
 
             embeddings = embedding_service.embed_documents(texts)
@@ -65,7 +69,13 @@ class VectorStore:
         except Exception as e:
             logger.warning(f"ChromaDB delete error for {file_path}: {e}")
 
-    def query(self, query_text: str, top_k: int = 10) -> List[Dict[str, Any]]:
+    def delete_by_source_domain(self, source_domain: str):
+        try:
+            self.collection.delete(where={"source_domain": source_domain})
+        except Exception as e:
+            logger.warning(f"ChromaDB delete error for domain {source_domain}: {e}")
+
+    def query(self, query_text: str, top_k: int = 10, where: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         query_vector = embedding_service.embed_query(query_text)
         count = self.collection.count()
         if count == 0:
@@ -73,11 +83,14 @@ class VectorStore:
 
         actual_k = min(top_k, count)
         try:
-            results = self.collection.query(
-                query_embeddings=[query_vector],
-                n_results=actual_k,
-                include=["documents", "metadatas", "distances"]
-            )
+            kwargs: Dict[str, Any] = {
+                "query_embeddings": [query_vector],
+                "n_results": actual_k,
+                "include": ["documents", "metadatas", "distances"]
+            }
+            if where:
+                kwargs["where"] = where
+            results = self.collection.query(**kwargs)
         except Exception as e:
             logger.error(f"ChromaDB query error: {e}")
             return []

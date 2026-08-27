@@ -16,6 +16,12 @@ class CitationSource(BaseModel):
     content: str
     score: float
     retrieval_type: str
+    source_domain: Optional[str] = "document"  # "document" | "activity"
+    source_type: Optional[str] = None          # "ai_turn" | "git_commit" | "project_state" | "open_loop" | "file_activity" | "document"
+    project_key: Optional[str] = None
+    source_ref: Optional[str] = None
+    timestamp: Optional[str] = None
+    trust_status: Optional[str] = None
 
 
 class BaseRetriever(ABC):

@@ -100,6 +100,14 @@
           <div class="context-memory-boundary" data-i18n="secretary_boundary">只呈現本機 evidence 衍生建議；不保存、不呼叫 cloud LLM，也不會自動執行。</div>
         </section>
 
+        <section class="panel secretary-jobs-panel mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent">BACKGROUND JOBS</span>
+            <button class="btn btn-ghost btn-sm head-right" onclick="loadSecretaryJobs()">Refresh</button>
+          </div>
+          <div id="secretary-jobs-list" class="secretary-proposals-list"><div class="placeholder">Loading background jobs…</div></div>
+        </section>
+
         <div class="context-memory-grid mb-14">
           <section class="panel context-sessions-panel">
             <div class="panel-head">

@@ -23,6 +23,12 @@ class CitationSource(BaseModel):
     content: str
     score: float
     retrieval_type: str
+    source_domain: Optional[str] = "document"  # "document" | "activity"
+    source_type: Optional[str] = None          # "ai_turn" | "git_commit" | "project_state" | "open_loop" | "file_activity" | "document"
+    project_key: Optional[str] = None
+    source_ref: Optional[str] = None
+    timestamp: Optional[str] = None
+    trust_status: Optional[str] = None
 
 
 class BM25Service:
@@ -59,7 +65,17 @@ class BM25Service:
         self.corpus_chunks = [c for c in self.corpus_chunks if c.get("metadata", {}).get("file_path") != file_path]
         self.build_index(self.corpus_chunks)
 
-    def query(self, query_text: str, top_k: int = 10) -> List[Dict[str, Any]]:
+    def delete_by_source_domain(self, source_domain: str):
+        self.corpus_chunks = [c for c in self.corpus_chunks if c.get("metadata", {}).get("source_domain") != source_domain]
+        self.build_index(self.corpus_chunks)
+
+    def query(
+        self,
+        query_text: str,
+        top_k: int = 10,
+        scope: Optional[str] = None,
+        project_filter: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         if not self.bm25 or not self.corpus_chunks:
             return []
 
@@ -68,24 +84,44 @@ class BM25Service:
             return []
 
         scores = self.bm25.get_scores(tokenized_query)
-        top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:top_k]
+        scored_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
 
         results = []
         max_score = max(scores) if len(scores) > 0 and max(scores) > 0 else 1.0
 
-        for idx in top_indices:
+        for idx in scored_indices:
             score = scores[idx]
             if score <= 0:
                 continue
             item = self.corpus_chunks[idx]
+            meta = item.get("metadata", {})
+
+            # Filter by scope (all / documents / activity)
+            if scope and scope != "all":
+                item_domain = meta.get("source_domain", "document")
+                if scope == "documents" and item_domain != "document":
+                    continue
+                if scope == "activity" and item_domain != "activity":
+                    continue
+
+            # Filter by project
+            if project_filter:
+                item_project = str(meta.get("project_key") or "").lower()
+                req_project = str(project_filter).lower()
+                if req_project not in item_project:
+                    continue
+
             norm_score = float(score / max_score)
             results.append({
                 "chunk_id": item["chunk_id"],
                 "content": item["content"],
-                "metadata": item.get("metadata", {}),
+                "metadata": meta,
                 "score": norm_score,
                 "retrieval_type": "bm25"
             })
+            if len(results) >= top_k:
+                break
+
         return results
 
     def _save_index(self):

@@ -445,6 +445,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadUsagePanels();
   loadContextSessions();
   loadSecretaryProposals();
+  loadSecretaryJobs();
   loadRAGFolders();
   loadRAGSessions();
   loadRAGStrategies();
@@ -480,7 +481,7 @@ function initTabs() {
       tab.classList.add("active");
       const id = tab.dataset.tab;
       $(id).classList.add("active");
-      if (id === "tab-projects") { loadProjects(); loadUsagePanels(); loadContextSessions(); loadSecretaryProposals(); }
+      if (id === "tab-projects") { loadProjects(); loadUsagePanels(); loadContextSessions(); loadSecretaryProposals(); loadSecretaryJobs(); }
       if (id === "tab-rag") { loadRAGFolders(); loadRAGFiles(); loadRAGSessions(); loadRAGProgress(); loadRAGStrategies(); }
       if (id === "tab-settings") loadConfig();
       if (id === "tab-summaries") loadSummaries();
@@ -874,6 +875,10 @@ function renderSecretaryProposals() {
   box.innerHTML = proposals.map(item => {
     const refs = (item.evidence_refs || []).map(ref => `<span class="proposal-ref">${esc(ref)}</span>`).join("");
     const priority = String(item.priority || "medium").toUpperCase();
+    const executable = item.execution_available;
+    const execBtn = executable 
+      ? `<button class="btn btn-primary btn-sm" style="margin-left:auto; z-index:10; pointer-events:auto;" onclick="window.executeProposal('${esc(item.proposal_id)}')">${currentLang === "zh-TW" ? "執行" : "Execute"}</button>`
+      : `<span>${currentLang === "zh-TW" ? "不執行" : "NOT EXECUTABLE"}</span>`;
     return `
       <article class="proposal-card">
         <div class="proposal-card-top">
@@ -883,10 +888,67 @@ function renderSecretaryProposals() {
         <div class="proposal-title">${esc(item.title)}</div>
         <div class="proposal-reason">${esc(item.reason)}</div>
         <div class="proposal-action"><span>${currentLang === "zh-TW" ? "建議" : "Suggested"}</span>${esc(item.suggested_action)}</div>
-        <div class="proposal-meta"><span>${esc(item.risk_level || "L0_READ_ONLY")}</span><span>${currentLang === "zh-TW" ? "不執行" : "NOT EXECUTABLE"}</span></div>
+        <div class="proposal-meta" style="display:flex;align-items:center;gap:0.5rem;width:100%;"><span>${esc(item.risk_level || "L0_READ_ONLY")}</span>${execBtn}</div>
+
         <div class="proposal-refs">${refs}</div>
       </article>`;
   }).join("");
+}
+
+window.executeProposal = async function(proposal_id) {
+  if (!secretaryProposalsCache) return;
+  const proposal = (secretaryProposalsCache.proposals || []).find(p => p.proposal_id === proposal_id);
+  if (!proposal) return;
+  if (!confirm(`Are you sure you want to execute [${proposal.risk_level}] ${proposal.title}?`)) return;
+  
+  try {
+    const res = await fetch(`/api/v1/secretary/proposals/${encodeURIComponent(proposal_id)}/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(proposal)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      alert("Failed to execute: " + (err.detail || err.message || res.statusText));
+      return;
+    }
+    alert("Execution started!");
+    loadSecretaryJobs();
+  } catch (err) {
+    alert("Error starting execution: " + err);
+  }
+};
+
+async function loadSecretaryJobs() {
+  const box = $("secretary-jobs-list");
+  if (!box) return;
+  try {
+    const data = await getJSON("/api/v1/secretary/jobs?limit=5");
+    if (!data.jobs || !data.jobs.length) {
+      box.innerHTML = `<div class="placeholder">${currentLang === "zh-TW" ? "目前沒有執行中的任務。" : "No background jobs."}</div>`;
+      return;
+    }
+    box.innerHTML = data.jobs.map(job => {
+      let statusCls = "trust ";
+      if (job.status === "completed") statusCls += "ok";
+      else if (job.status === "failed") statusCls += "broken";
+      else statusCls += "noisy";
+      
+      const out = job.output_text ? `<div class="job-output">${esc(job.output_text)}</div>` : "";
+      const err = job.error_message ? `<div class="job-error">${esc(job.error_message)}</div>` : "";
+      return `
+      <article class="proposal-card">
+        <div class="proposal-card-top">
+          <span class="proposal-project">${esc(job.title)}</span>
+          <span class="${statusCls}">${esc(job.status.toUpperCase())}</span>
+        </div>
+        <div class="proposal-action" style="font-family:monospace;font-size:0.75rem;opacity:0.8;margin-top:0.5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(job.command)}</div>
+        ${out}${err}
+      </article>`;
+    }).join("");
+  } catch (e) {
+    console.error("Failed to load jobs", e);
+  }
 }
 
 // ---------------------------------------------------------------- live feed
