@@ -189,6 +189,40 @@ class MilestoneNotificationReceipt(Base):
     )
 
 
+class BackgroundTaskRun(Base):
+    """具 start/end receipt 的本機 agent 背景任務。
+
+    此表刻意不重複保存 prompt 或 response；內容仍只留在既有
+    ``AIPromptEvent`` 的受控本機來源中。只有 start 與明確 completion
+    timestamp 都存在的列，才可以做為可加總的背景執行時間。
+    """
+    __tablename__ = "background_task_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_key = Column(String(64), unique=True, nullable=False, index=True)
+    platform = Column(String(50), nullable=False, index=True)
+    session_id = Column(String(100), nullable=True, index=True)
+    project_tag = Column(String(255), nullable=True, index=True)
+    cwd = Column(String(1000), nullable=True)
+    started_at = Column(DateTime, nullable=False, index=True)
+    completed_at = Column(DateTime, nullable=True, index=True)
+    duration_seconds = Column(Float, nullable=True)
+    status = Column(String(40), nullable=False, default="awaiting_final", index=True)
+    start_evidence_kind = Column(String(80), nullable=False, default="user_prompt")
+    completion_evidence_kind = Column(String(80), nullable=True)
+    source_path = Column(String(1500), nullable=False)
+    start_position = Column(Integer, nullable=True)
+    end_position = Column(Integer, nullable=True)
+    observed_at = Column(DateTime, default=get_local_now, nullable=False, index=True)
+    created_at = Column(DateTime, default=get_local_now, nullable=False)
+    updated_at = Column(DateTime, default=get_local_now, onupdate=get_local_now)
+
+    __table_args__ = (
+        Index("ix_background_tasks_status_started", "status", "started_at"),
+        Index("ix_background_tasks_platform_started", "platform", "started_at"),
+    )
+
+
 class SemanticDocument(Base):
     """P3-2 本機 semantic index；每筆向量可追溯到原始 SQLite row。"""
     __tablename__ = "semantic_documents"
@@ -298,6 +332,33 @@ class RAGIndexedFile(Base):
     status = Column(String(50), default="pending", index=True)  # pending, indexed, error
     error_message = Column(Text, nullable=True)
     indexed_at = Column(DateTime, nullable=True)
+
+
+class RAGIndexJob(Base):
+    """DeskRAG 背景工作控制紀錄；僅保存工作狀態，不保存文件內容。"""
+    __tablename__ = "rag_index_jobs"
+
+    id = Column(String(36), primary_key=True)
+    job_type = Column(String(32), nullable=False, index=True)  # index, remove_folder, clear_all
+    folder_id = Column(Integer, nullable=True, index=True)
+    status = Column(String(32), nullable=False, default="queued", index=True)
+    requested_at = Column(DateTime, default=get_local_now)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=get_local_now, onupdate=get_local_now)
+    worker_pid = Column(Integer, nullable=True)
+    total_files = Column(Integer, default=0)
+    processed_files = Column(Integer, default=0)
+    indexed_chunks = Column(Integer, default=0)
+    error_count = Column(Integer, default=0)
+    max_files = Column(Integer, nullable=True)
+    throttle_ms = Column(Integer, default=0)
+    current_file = Column(String(1000), nullable=True)
+    message = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
+    pause_requested = Column(Integer, default=0)
+    cancel_requested = Column(Integer, default=0)
+    result_json = Column(Text, nullable=True)
 
 
 class RAGChatSession(Base):

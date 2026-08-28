@@ -35,7 +35,15 @@ class BM25Service:
     def __init__(self):
         self.bm25: Optional[BM25Okapi] = None
         self.corpus_chunks: List[Dict[str, Any]] = []
+        # 主服務啟動時不要把可能數十萬切片的 Pickle 載入 RAM。
+        # 索引 worker 或第一次 BM25 query 才載入；主監控 API 因此維持可用。
+        self._loaded = False
+
+    def _ensure_loaded(self):
+        if self._loaded:
+            return
         self._load_index()
+        self._loaded = True
 
     def _tokenize(self, text: str) -> List[str]:
         text = text.lower()
@@ -44,6 +52,7 @@ class BM25Service:
         return filtered
 
     def build_index(self, chunks: List[Dict[str, Any]]):
+        self._loaded = True
         self.corpus_chunks = chunks
         if not chunks:
             self.bm25 = None
@@ -55,6 +64,7 @@ class BM25Service:
         self._save_index()
 
     def add_or_update_chunks(self, new_chunks: List[Dict[str, Any]]):
+        self._ensure_loaded()
         chunk_map = {c["chunk_id"]: c for c in self.corpus_chunks}
         for nc in new_chunks:
             chunk_map[nc["chunk_id"]] = nc
@@ -62,10 +72,36 @@ class BM25Service:
         self.build_index(self.corpus_chunks)
 
     def delete_by_file_path(self, file_path: str):
-        self.corpus_chunks = [c for c in self.corpus_chunks if c.get("metadata", {}).get("file_path") != file_path]
+        self.delete_by_file_paths([file_path])
+
+    def delete_by_file_paths(self, file_paths: List[str]):
+        """一次重建 BM25，避免資料夾刪除時對每個檔案重算一次。"""
+        if not file_paths:
+            return
+        self._ensure_loaded()
+        path_set = set(file_paths)
+        self.corpus_chunks = [
+            c for c in self.corpus_chunks
+            if c.get("metadata", {}).get("file_path") not in path_set
+        ]
         self.build_index(self.corpus_chunks)
 
+    def remove_paths_without_rebuild(self, file_paths: List[str]):
+        """供 index worker 合併同一批變更後再重建一次 BM25。"""
+        if not file_paths:
+            return
+        self._ensure_loaded()
+        path_set = set(file_paths)
+        self.corpus_chunks = [
+            c for c in self.corpus_chunks
+            if c.get("metadata", {}).get("file_path") not in path_set
+        ]
+
+    def clear(self):
+        self.build_index([])
+
     def delete_by_source_domain(self, source_domain: str):
+        self._ensure_loaded()
         self.corpus_chunks = [c for c in self.corpus_chunks if c.get("metadata", {}).get("source_domain") != source_domain]
         self.build_index(self.corpus_chunks)
 
@@ -76,6 +112,7 @@ class BM25Service:
         scope: Optional[str] = None,
         project_filter: Optional[str] = None
     ) -> List[Dict[str, Any]]:
+        self._ensure_loaded()
         if not self.bm25 or not self.corpus_chunks:
             return []
 
@@ -139,8 +176,9 @@ class BM25Service:
                 with open(bm25_path, "rb") as f:
                     data = pickle.load(f)
                     chunks = data.get("chunks", [])
+                    self.corpus_chunks = chunks
                     if chunks:
-                        self.build_index(chunks)
+                        self.bm25 = BM25Okapi([self._tokenize(c["content"]) for c in chunks])
             except Exception as e:
                 logger.warning(f"BM25 load error: {e}")
 

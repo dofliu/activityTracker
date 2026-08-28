@@ -131,6 +131,12 @@ usage_tracking:
     quiet_hours_end: '08:00'
     cooldown_minutes: 60
     check_interval_minutes: 15
+background_task_tracking:
+  # 與前景時間分開；只接受本機 session 的 prompt start + explicit final receipt。
+  enabled: true
+  platforms: [claude_code, claude_desktop, codex]
+  # 超過上限的來源 timestamp 視為不可信，不計入背景時間。
+  max_task_duration_seconds: 28800
 synthesizer:
   schedule:
     enabled: false
@@ -224,3 +230,9 @@ rag:
   active_provider: ollama
   active_model: llama3.2:latest
   system_prompt: 你是專業的本地知識庫與工作脈絡 AI 助手。請根據檢索到的文件內容精準回答。
+  indexing:
+    # 每次工作有明確邊界；大型資料夾請分批執行，不會阻塞主服務。
+    max_files_per_run: 500
+    throttle_ms: 25
+    max_file_size_mb: 50
+    vector_batch_size: 32

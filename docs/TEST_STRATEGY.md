@@ -28,6 +28,8 @@
 - Migration safety：checksum mismatch、未知較新版本與 migration exception 都必須 fail-closed；失敗版本不得寫入 applied receipt。
 - Open Loop API：resolve、reopen、stale、supersede；actionable list 只含 open。
 - Packaging runtime：`OMNICONTEXT_HOME`／`OMNICONTEXT_CONFIG`、relative data path、config template、Web/Extension assets 與 `init` writable-home contract。
+- DeskRAG worker：主 API 只建立／控制／讀取 job receipt；掃描、embedding、刪除、空間回收與一致性驗證不得在 web process 執行。確認式刪除無 `confirm=true` 必須 fail-closed；測試 BM25 不得寫入正式 runtime pickle。
+- Background agent task：只有本機 prompt start + explicit final completion 的 paired receipt 才可產生 duration；start-only、時間倒退、超過上限與平台未允許時不得補值。背景 task API 不得回傳 Prompt、Response 或 source path。
 
 ### Smoke tests
 
@@ -89,12 +91,14 @@ python main.py extension-path
 - Config-driven app/title classification；title rule 優先於 generic process rule。
 - Interval clipping、exact dedupe、overlap resolution、跨午夜拆分與空集合。
 - AI interaction count 與 foreground duration 分離。
+- Background agent execution time 與 foreground duration、AI turns、milestones 分離；平行 task 總數使用 interval union，避免 double count。
 - Milestone 門檻、quiet hours、disabled state 與 notification message tone。
 - Secret resolver 優先使用目前 Process 環境，Windows 才允許 fallback 到 User／Machine registry；無效的環境變數名稱必須 fail-closed。
 
 ### Integration tests
 
 - `GET /api/v1/usage/today` 回傳 interface rows、coverage、goal 與 milestone state。
+- `GET /api/v1/background-tasks/today` 僅回傳可驗證 task receipt 摘要，不可洩漏內容或本機路徑。
 - `POST /api/v1/usage/milestones/evaluate` 在相同日期／門檻重送時不建立第二筆 receipt。
 - `GET /api/v1/extension/status` 不洩漏 token，並區分 configured、enabled、observed event。
 - `GET /api/v1/capture/status` 必須分開回傳 Desktop Focus、Web Capture、Transcript，且不得輸出 prompt、response、URL 或本機 path。

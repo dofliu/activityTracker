@@ -106,5 +106,22 @@ class RAGSettings:
             "你是專業的本地知識庫與工作脈絡 AI 助手。請根據檢索到的文件內容精準回答問題，並在引用內容時標註來源。"
         ))
 
+    @property
+    def INDEX_MAX_FILES_PER_RUN(self) -> int:
+        """以保守預設值阻止誤把大型磁碟或同步根目錄整批索引。"""
+        return max(1, int(get_config().get("rag.indexing.max_files_per_run", 500)))
+
+    @property
+    def INDEX_THROTTLE_MS(self) -> int:
+        return max(0, int(get_config().get("rag.indexing.throttle_ms", 25)))
+
+    @property
+    def INDEX_MAX_FILE_SIZE_MB(self) -> int:
+        return max(1, int(get_config().get("rag.indexing.max_file_size_mb", 50)))
+
+    @property
+    def INDEX_VECTOR_BATCH_SIZE(self) -> int:
+        return max(1, int(get_config().get("rag.indexing.vector_batch_size", 32)))
+
 
 rag_settings = RAGSettings()

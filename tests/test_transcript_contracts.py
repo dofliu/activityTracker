@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from core.models import AIPromptEvent, Base
+from core.models import AIPromptEvent, BackgroundTaskRun, Base
 from watchers.agent_log_watcher import (
     AgentLogWatcherService,
     build_turn_key,
@@ -92,6 +92,7 @@ def test_codex_phase_upgrades_commentary_to_explicit_final(tmp_path):
     rows.append(
         {
             "type": "response_item",
+            "timestamp": "2026-08-24T00:07:00Z",
             "payload": {"role": "assistant", "phase": "final_answer", "content": "final result"},
         }
     )
@@ -101,6 +102,10 @@ def test_codex_phase_upgrades_commentary_to_explicit_final(tmp_path):
         event = session.query(AIPromptEvent).one()
         assert event.response_status == "final_candidate"
         assert event.response_text == "final result"
+        task = session.query(BackgroundTaskRun).one()
+        assert task.status == "completed"
+        assert task.duration_seconds == 7 * 60
+        assert task.completion_evidence_kind == "codex_final_answer"
 
 
 def test_malformed_jsonl_is_not_silently_accepted(tmp_path):
@@ -125,6 +130,7 @@ def test_claude_desktop_project_log_preserves_provenance_and_is_idempotent(tmp_p
         },
         {
             "type": "assistant",
+            "timestamp": "2026-08-25T01:12:00Z",
             "message": {"content": [{"type": "text", "text": "已完成桌面檢查"}], "stop_reason": "end_turn"},
         },
     ]
@@ -146,6 +152,10 @@ def test_claude_desktop_project_log_preserves_provenance_and_is_idempotent(tmp_p
         assert event.response_status == "final_candidate"
         assert event.source_path == str(source.resolve())
         assert event.source_position == 1
+        task = session.query(BackgroundTaskRun).one()
+        assert task.status == "completed"
+        assert task.duration_seconds == 12 * 60
+        assert task.completion_evidence_kind == "claude_end_turn"
 
 
 def test_agent_source_failure_does_not_block_remaining_sources(monkeypatch):

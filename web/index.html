@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css?v=1.3.0a4-ui9">
+  <link rel="stylesheet" href="/static/style.css?v=1.3.0a5-background-tasks">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
@@ -83,6 +83,22 @@
             <div id="capture-coverage-boundary" class="usage-boundary capture-boundary">三種訊號各自獨立；有前景使用時間不代表已取得對話內容。</div>
           </div>
         </div>
+
+        <section class="panel background-task-panel mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent" data-i18n="background_tasks_title">BACKGROUND AGENT TASKS</span>
+            <span id="background-tasks-evidence" class="trust noisy">LOADING</span>
+          </div>
+          <div class="background-task-body">
+            <div class="background-task-summary">
+              <div class="mono-mini muted" data-i18n="background_tasks_label">可驗證背景 agent／CLI 執行時間</div>
+              <div id="background-tasks-value" class="usage-value">—</div>
+              <div id="background-tasks-meta" class="muted small">載入中…</div>
+              <div id="background-tasks-boundary" class="usage-boundary" data-i18n="background_tasks_boundary">只納入本機來源可確認的開始與最終完成收據；不與前景使用時間混算。</div>
+            </div>
+            <div id="background-tasks-list" class="background-task-list"><div class="placeholder">載入背景任務收據…</div></div>
+          </div>
+        </section>
 
         <div id="resume-card" class="resume">
           <div class="resume-head"><span class="mono-label" data-i18n="resume_head">RESUME HERE</span><span class="resume-head-zh" data-i18n="resume_sub">上次做到哪</span></div>
@@ -168,7 +184,12 @@
             <div class="panel" style="padding: 12px;">
               <div class="panel-head mb-8" style="padding: 0 0 6px 0; border-bottom: 1px solid var(--bd);">
                 <span class="mono-label accent">📂 知識庫目錄</span>
-                <button class="btn btn-primary btn-sm" id="btn-rag-scan-now" title="立即對所有目錄進行增量掃描">⚡ 掃描索引</button>
+                <div style="display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end;">
+                  <button class="btn btn-primary btn-sm" id="btn-rag-scan-now" title="以設定上限啟動增量索引">⚡ 掃描索引</button>
+                  <button class="btn btn-ghost btn-sm" id="btn-rag-pause" disabled>⏸ 暫停</button>
+                  <button class="btn btn-ghost btn-sm" id="btn-rag-resume" disabled>▶ 恢復</button>
+                  <button class="btn btn-ghost btn-sm" id="btn-rag-cancel" disabled style="color:var(--danger);">取消</button>
+                </div>
               </div>
               
               <div class="input-row mb-8" style="flex-direction: column; gap: 6px;">
@@ -176,6 +197,16 @@
                 <div style="display: flex; gap: 6px;">
                   <input type="text" id="input-rag-folder-name" placeholder="目錄別名 (選填)" style="flex: 1; font-size: 11px;">
                   <button class="btn btn-ghost btn-sm" id="btn-rag-add-folder">+ 加入</button>
+                </div>
+                <div style="display:flex; gap:6px; align-items:center; font-size:10px; color:var(--mu);">
+                  <label style="display:flex; gap:3px; align-items:center;">本次上限
+                    <input id="input-rag-max-files" type="number" min="1" value="500" style="width:58px; font-size:10px; padding:3px;">
+                    檔
+                  </label>
+                  <label style="display:flex; gap:3px; align-items:center;">間隔
+                    <input id="input-rag-throttle-ms" type="number" min="0" value="25" style="width:48px; font-size:10px; padding:3px;">
+                    ms
+                  </label>
                 </div>
               </div>
 
@@ -186,13 +217,20 @@
                   <span id="rag-progress-percent" class="mono-mini">0%</span>
                 </div>
                 <div class="usage-progress" style="height: 6px; margin-bottom: 4px;"><span id="rag-progress-bar" style="width: 0%;"></span></div>
-                <div id="rag-progress-detail" class="muted small" style="font-size: 10px;">準備中…</div>
-              </div>
+                 <div id="rag-progress-detail" class="muted small" style="font-size: 10px;">準備中…</div>
+               </div>
 
-              <div id="rag-folders-list" class="taglist" style="max-height: 180px; overflow-y: auto;">
+               <div id="rag-storage-card" class="rag-storage-card mb-8">
+                 <div class="mono-mini muted">索引儲存空間載入中…</div>
+               </div>
+               <button class="btn btn-ghost btn-sm" id="btn-rag-verify-index" style="width:100%; margin-top:-4px; margin-bottom:8px;">✓ 驗證索引與空間</button>
+               <button class="btn btn-ghost btn-sm" id="btn-rag-rebuild-bm25" style="width:100%; margin-top:-4px; margin-bottom:8px;">↻ 從 Chroma 重建 BM25</button>
+
+               <div id="rag-folders-list" class="taglist" style="max-height: 180px; overflow-y: auto;">
                 <div class="placeholder">載入知識庫目錄…</div>
-              </div>
-            </div>
+               </div>
+               <button class="btn btn-ghost btn-sm" id="btn-rag-clear-index" style="color:var(--danger); width:100%; margin-top:8px;">🗑 清空所有 RAG 索引</button>
+             </div>
 
             <!-- 已索引檔案清單 -->
             <div class="panel" style="padding: 12px; flex: 1;">
@@ -599,6 +637,6 @@
   </div>
 
   <div id="toast-container"></div>
-  <script src="/static/app.js?v=1.3.0a4-ui9"></script>
+  <script src="/static/app.js?v=1.3.0a5-background-tasks"></script>
 </body>
 </html>

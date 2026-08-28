@@ -23,9 +23,12 @@ class VectorStore:
             metadata={"hnsw:space": "cosine"}
         )
 
-    def add_chunks(self, chunks: List[ChunkItem], batch_size: int = 64):
+    def add_chunks(self, chunks: List[ChunkItem], batch_size: int | None = None):
         if not chunks:
             return
+
+        # 較小批次降低本機 embedding 與 Chroma 同時占用的峰值記憶體。
+        batch_size = batch_size or rag_settings.INDEX_VECTOR_BATCH_SIZE
 
         for i in range(0, len(chunks), batch_size):
             batch = chunks[i:i + batch_size]
@@ -64,10 +67,32 @@ class VectorStore:
             )
 
     def delete_by_file_path(self, file_path: str):
+        self.delete_by_file_paths([file_path])
+
+    def delete_by_file_paths(self, file_paths: List[str], batch_size: int = 100):
+        """批次刪除，避免每一個檔案都建立一次 Chroma transaction。"""
+        if not file_paths:
+            return
+        for start in range(0, len(file_paths), batch_size):
+            batch = file_paths[start:start + batch_size]
+            try:
+                if len(batch) == 1:
+                    self.collection.delete(where={"file_path": batch[0]})
+                else:
+                    self.collection.delete(where={"file_path": {"$in": batch}})
+            except Exception as e:
+                logger.warning("ChromaDB batch delete error (%s files): %s", len(batch), e)
+
+    def clear(self):
+        """Reset only this application's collection, leaving source files untouched."""
         try:
-            self.collection.delete(where={"file_path": file_path})
+            self.client.delete_collection(self.collection_name)
         except Exception as e:
-            logger.warning(f"ChromaDB delete error for {file_path}: {e}")
+            logger.warning("ChromaDB collection reset warning: %s", e)
+        self.collection = self.client.get_or_create_collection(
+            name=self.collection_name,
+            metadata={"hnsw:space": "cosine"}
+        )
 
     def delete_by_source_domain(self, source_domain: str):
         try:

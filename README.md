@@ -106,7 +106,12 @@
 * 主頁 `DATA CAPTURE` 將 `FOCUS`、`WEB`、`LOG` 三種獨立訊號濃縮在同一區塊；任何一欄 `OBSERVED` 都不能替代另外兩欄。
 * `http://127.0.0.1:8765/extension-monitor` 是 Browser Extension 的進階診斷頁，負責 enabled／observed、heartbeat 與逐站狀態；token pairing 仍只能在 Extension popup 完成。
 
-### 8. 🧠 本機 Semantic Index 與 `omni ask`（P3-2 / P3-3 Alpha）
+### 8. 🧾 可驗證背景 Agent／CLI 任務時間（Alpha）
+* 主頁另以 `BACKGROUND AGENT TASKS` 顯示 Claude Code、Claude Desktop local-agent、Codex session 的 **paired local receipt** 執行時間。
+* 只有來源內的 prompt start 與明確 final completion timestamp 成對存在才會結算；縮小視窗後仍可被納入，但 generic Terminal／PowerShell 與缺 final receipt 的工作不會估算。
+* 這個數字與前景使用時間、AI turns、里程碑完全分離；平行任務以時間聯集計算總數，避免 double counting。完整邊界見 [ADR-010](docs/ADR-010-verified-background-agent-task-time.md)。
+
+### 9. 🧠 本機 Semantic Index 與 `omni ask`（P3-2 / P3-3 Alpha）
 * 以 loopback Ollama `bge-m3` 將 AI turns、Git commits、file activity metadata、Open Loops 與 Project State 建立 1024 維本機索引，資料不送至 cloud provider。
 * `content_hash + embedding_model` 增量更新；每筆保留原始 SQLite `source_ref`、project、timestamp、trust status 與 embedding input 降級模式。
 * `omni ask` 可先 retrieval-only，也可由本機 Ollama 生成含 `[S1]` 引用的答案；similarity 不是來源真實性或 coverage 證明。
@@ -122,7 +127,7 @@
 * 正式 localhost 已產生 2 張建議與 3 個 evidence refs，惡意 Origin 為 403；桌面與 494px 介面 smoke 通過。此 receipt 不授權後續 executor。
 
 ### 11. 📚 DeskRAG 本地知識庫與文件智慧問答系統（Single Server 整合版）
-* **單一伺服器無縫整併**：將 `deskRAG` 完整本機知識庫系統整併進 OmniContext，不需啟動兩個伺服器，統一於 `http://127.0.0.1:8765` 提供服務。
+* **單一 Web 入口、獨立索引 worker**：Dashboard 與 API 維持於 `http://127.0.0.1:8765`；檔案掃描、解析、embedding、刪除與空間維護改由另一個本機 process 執行，長時間索引不佔用主服務。
 * **全方位檔案解析器（Parser Hub）**：
   * **PDF**：以 PyMuPDF 擷取文字並保留頁碼（Page Number）。
   * **Office 文件**：支援 Word（`.docx` 段落與標題）、PowerPoint（`.pptx` 投影片）、Excel（`.xlsx` 工作表數據）。
@@ -134,6 +139,8 @@
   * **融合演算法**：支援 **Hybrid RRF（倒數排名融合）** 與 **Weighted Fusion（線性加權融合）**。
 * **多模型問答與 SSE 串流**：支援 Ollama 本機離線模型、Google Gemini、Anthropic Claude、OpenAI，提供 SSE 逐字串流輸出與來源引文卡片。
 * **Windows 原生檔案總管喚起**：引文卡片點擊「📂 在總管開啟」即可在 Windows 檔案總管精準定位並選中該檔案。
+* **受控索引生命週期**：每次可設定檔案上限與間隔，支援暫停、恢復、取消；「移除資料夾索引」與「清空所有 RAG 索引」都必須明確確認，且不會刪除來源檔案或 RAG 對話。
+* **可回查容量與一致性**：介面顯示來源檔案、來源大小、SQLite 切片、最近 worker 驗證的向量／BM25 數量與索引空間。驗證、BM25 重建、SQLite `VACUUM` 均在 worker 執行；未驗證時顯示 `待驗證`，不以估算值冒充實測。
 
 ---
 

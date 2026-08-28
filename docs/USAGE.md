@@ -207,6 +207,31 @@ usage_tracking:
 
 Release template 的里程碑通知預設關閉。啟用後，同一天相同 milestone 與 channel 只會通知一次，狀態保存在 SQLite receipt 中。
 
+### 可驗證背景 Agent／CLI 任務時間
+
+主頁的 `BACKGROUND AGENT TASKS` 是另一條獨立訊號，不會加入前景使用時間、里程碑或 AI turns。它目前只讀取 Claude Code、Claude Desktop local-agent 與 Codex 的本機 session transcript：來源內需同時有 user prompt 的 start timestamp，以及 Claude `end_turn` 或 Codex `final_answer` 的 completion timestamp，才會產生可加總的背景執行時間。
+
+- 視窗縮小後，任務仍可在完成 receipt 出現時列入此卡片。
+- 只有 start、尚未看到 final 的任務顯示為等待 completion evidence，不會預估時間。
+- Generic Terminal／PowerShell、browser 對話、cloud-only session 與任何缺 local receipt 的工作不納入。
+- 背景任務總時間採重疊 interval union；若兩個 Agent 平行執行，總數不會 double count。此數字仍不是生產力、工時或全天 Agent coverage。
+- 來源 timestamp 出現倒退或超過 `max_task_duration_seconds`（預設 8 小時）時，該筆標為不可信並排除。
+
+可在 `config.yaml` 調整或關閉：
+
+```yaml
+background_task_tracking:
+  enabled: true
+  platforms: [claude_code, claude_desktop, codex]
+  max_task_duration_seconds: 28800
+```
+
+可用本機 API 檢視今天的 receipt 摘要；回應不含 Prompt、Response 或本機 source path：
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8765/api/v1/background-tasks/today
+```
+
 預覽今日判定而不發送通知、也不寫入 receipt：
 
 ```powershell
@@ -256,6 +281,30 @@ omni recall "formal rollback rehearsal" --project activityTracker
 Dashboard「進行中工作」會同步顯示 `RECENT WORK SESSIONS` 與 `RELATED HISTORY`。Session 只納入能可靠歸戶的 AI、Git 與 file metadata；Window focus 尚未具備 canonical project identity，因此不混入 session。預設 gap 45 分鐘、related threshold 0.50，可在 `context_memory` 設定調整。0.50 是目前 `bge-m3` + 本機語料的 Alpha 起點，不是通用或真實性門檻。
 
 若本機 Ollama 或 semantic index 不可用，Related History 會明確顯示 unavailable，不改送 cloud。Session 的 span 只是首末事件時間差，不代表實際工時、專注度或任務連續性。
+
+### 管理 DeskRAG 索引
+
+在 Dashboard 的「03 · 知識庫與 RAG」中，掃描按鈕會建立一個獨立本機 worker；主頁、採集器與 Health API 不會在同一個 process 內等待文件解析或 embedding。
+
+1. 新增資料夾或按「掃描索引」前，設定本次檔案上限與每檔間隔。預設為 500 檔、25 ms、單檔最多 50 MB；大型資料夾請分批執行。
+2. 執行中可按「暫停／恢復／取消」。取消會在目前單一檔案或向量批次完成後生效，不會強制中斷寫入。
+3. 「移除索引」只移除選定資料夾的 RAG metadata、Chroma vectors 與 BM25 chunks；原始檔案與 RAG 對話不會被刪除。作業完成後會執行 SQLite checkpoint、`VACUUM` 與一致性檢查。
+4. 「清空所有 RAG 索引」需確認並輸入 `CLEAR`。它只清空 RAG 資料夾／檔案／向量／BM25，不會刪除來源檔與對話。
+5. 容量卡片的向量、BM25 與 Chroma 空間來自獨立 worker 的最近驗證收據；初次升級或尚未驗證時顯示「待驗證」。按「驗證索引與空間」可取得實測計數。若 BM25 顯示不一致，可按「從 Chroma 重建 BM25」，此作業不會重新掃描來源資料夾。
+
+API 也可用於本機自動化：
+
+```powershell
+# 啟動受限的索引工作
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8765/api/v1/rag/scan" `
+  -ContentType "application/json" -Body '{"max_files":500,"throttle_ms":25}'
+
+# 讀取最新 job 與輕量儲存摘要
+Invoke-RestMethod "http://127.0.0.1:8765/api/v1/rag/jobs/current"
+Invoke-RestMethod "http://127.0.0.1:8765/api/v1/rag/storage"
+```
+
+不要以「索引完成」推論所有來源均已處理；若工作顯示 `completed_limited`，表示仍有檔案留待下一批。資料夾層的檔案數是掃描時看到的候選數，已索引檔案數與切片數則是已實際寫入的 metadata。
 
 ### 查看 Proposal-only 主動秘書建議
 

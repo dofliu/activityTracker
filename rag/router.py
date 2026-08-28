@@ -5,7 +5,7 @@ import json
 import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -14,12 +14,11 @@ from core.models import RAGIndexedFolder, RAGIndexedFile, RAGChatSession, RAGCha
 from core.platform_services import open_local_path
 from core.time_utils import get_local_now
 from rag.config import rag_settings
-from rag.scanner import scanner, progress
-from rag.vector_store import vector_store
-from rag.retriever import bm25_service
-from rag.retrieval.registry import retriever_registry
-from rag.llm_gateway import llm_gateway
-from rag.parsers.parser_hub import parser_hub
+from rag.jobs import (
+    create_job, get_job, get_latest_job, launch_worker, request_cancel,
+    request_pause, update_job,
+)
+from rag.storage import storage_report
 
 logger = logging.getLogger("OmniContext.RAG.Router")
 router = APIRouter(prefix="/api/v1/rag", tags=["DeskRAG Knowledge & Chat"])
@@ -29,6 +28,30 @@ router = APIRouter(prefix="/api/v1/rag", tags=["DeskRAG Knowledge & Chat"])
 class AddFolderRequest(BaseModel):
     path: str
     name: Optional[str] = None
+    max_files: Optional[int] = None
+    throttle_ms: Optional[int] = None
+
+
+class ScanRequest(BaseModel):
+    folder_id: Optional[int] = None
+    max_files: Optional[int] = None
+    throttle_ms: Optional[int] = None
+
+
+class ConfirmIndexRemovalRequest(BaseModel):
+    confirm: bool = False
+
+
+def _start_job_or_raise(job_type: str, folder_id: Optional[int] = None, max_files: Optional[int] = None, throttle_ms: Optional[int] = None):
+    try:
+        job = create_job(job_type, folder_id=folder_id, max_files=max_files, throttle_ms=throttle_ms)
+        return launch_worker(job["id"])
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        if "job" in locals():
+            update_job(job["id"], status="failed", error_message=str(exc), message="worker 無法啟動")
+        raise HTTPException(status_code=500, detail=f"無法啟動 RAG worker: {exc}") from exc
 
 
 class OpenFileRequest(BaseModel):
@@ -84,7 +107,7 @@ def list_folders():
 
 
 @router.post("/folders")
-def add_folder(req: AddFolderRequest, background_tasks: BackgroundTasks):
+def add_folder(req: AddFolderRequest):
     p = Path(req.path).resolve()
     if not p.exists() or not p.is_dir():
         raise HTTPException(status_code=400, detail=f"目錄不存在或非資料夾: {req.path}")
@@ -110,47 +133,123 @@ def add_folder(req: AddFolderRequest, background_tasks: BackgroundTasks):
             session.flush()
             folder_id = new_folder.id
 
-    background_tasks.add_task(scanner.run_indexing_task, folder_id)
+    job = _start_job_or_raise("index", folder_id, req.max_files, req.throttle_ms)
     return {
         "success": True,
         "folder_id": folder_id,
         "path": folder_path,
-        "message": "目錄已成功加入，正在背景建立索引..."
+        "job": job,
+        "message": "目錄已成功加入，已交由獨立 RAG worker 建立索引。"
     }
 
 
 @router.delete("/folders/{folder_id}")
-def delete_folder(folder_id: int):
+def delete_folder(folder_id: int, confirm: bool = False):
+    """保留舊路徑，但沒有 confirm 就不會刪除任何索引。"""
+    if not confirm:
+        raise HTTPException(status_code=400, detail="請改用確認式 POST /folders/{id}/remove-index")
+    return remove_folder_index(folder_id, ConfirmIndexRemovalRequest(confirm=True))
+
+
+@router.post("/folders/{folder_id}/remove-index")
+def remove_folder_index(folder_id: int, req: ConfirmIndexRemovalRequest):
+    if not req.confirm:
+        raise HTTPException(status_code=400, detail="此操作需要 confirm=true；原始來源檔案不會被刪除。")
     db = get_db()
     with db.session_scope() as session:
         fld = session.query(RAGIndexedFolder).filter_by(id=folder_id).first()
         if not fld:
             raise HTTPException(status_code=404, detail="找不到指定的資料夾")
-
-        f_path = fld.path
-        files = session.query(RAGIndexedFile).filter_by(folder_id=folder_id).all()
-        for f in files:
-            vector_store.delete_by_file_path(f.path)
-            bm25_service.delete_by_file_path(f.path)
-
-        session.query(RAGIndexedFile).filter_by(folder_id=folder_id).delete()
-        session.query(RAGIndexedFolder).filter_by(id=folder_id).delete()
-
-    return {"success": True, "message": f"資料夾 {f_path} 及其索引已成功刪除。"}
+        folder_path = fld.path
+    job = _start_job_or_raise("remove_folder", folder_id)
+    return {
+        "success": True,
+        "job": job,
+        "message": f"已確認移除 {folder_path} 的索引；原始檔案不會被刪除。",
+    }
 
 
 @router.post("/scan")
-def trigger_scan(background_tasks: BackgroundTasks, folder_id: Optional[int] = None):
-    if progress.is_running:
-        return {"success": False, "message": "索引掃描任務正在執行中..."}
-    background_tasks.add_task(scanner.run_indexing_task, folder_id)
-    return {"success": True, "message": "已觸發知識庫掃描與索引任務。"}
+def trigger_scan(req: ScanRequest = ScanRequest()):
+    job = _start_job_or_raise("index", req.folder_id, req.max_files, req.throttle_ms)
+    return {"success": True, "job": job, "message": "已交由獨立 RAG worker 掃描與索引。"}
+
+
+@router.post("/clear-index")
+def clear_all_index(req: ConfirmIndexRemovalRequest):
+    if not req.confirm:
+        raise HTTPException(status_code=400, detail="此操作需要 confirm=true；僅清空 RAG 索引，不會刪除來源檔或對話。")
+    job = _start_job_or_raise("clear_all")
+    return {
+        "success": True,
+        "job": job,
+        "message": "已確認清空全部 RAG 索引；原始來源檔與對話紀錄不會被刪除。",
+    }
+
+
+@router.get("/jobs/current")
+def current_job():
+    return get_latest_job() or {"status": "idle", "is_running": False}
+
+
+@router.get("/jobs/{job_id}")
+def job_detail(job_id: str):
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="找不到指定 RAG 工作")
+    return job
+
+
+@router.post("/jobs/{job_id}/pause")
+def pause_job(job_id: str):
+    job = request_pause(job_id, True)
+    if not job:
+        raise HTTPException(status_code=404, detail="找不到指定 RAG 工作")
+    return job
+
+
+@router.post("/jobs/{job_id}/resume")
+def resume_job(job_id: str):
+    job = request_pause(job_id, False)
+    if not job:
+        raise HTTPException(status_code=404, detail="找不到指定 RAG 工作")
+    return job
+
+
+@router.post("/jobs/{job_id}/cancel")
+def cancel_job(job_id: str):
+    job = request_cancel(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="找不到指定 RAG 工作")
+    return job
+
+
+@router.get("/storage")
+def rag_storage():
+    return storage_report()
+
+
+@router.post("/storage/verify")
+def rag_storage_verify():
+    job = _start_job_or_raise("audit")
+    return {"success": True, "job": job, "message": "已交由獨立 worker 驗證 Chroma、BM25 與 SQLite 一致性。"}
+
+
+@router.post("/storage/rebuild-bm25")
+def rag_rebuild_bm25():
+    job = _start_job_or_raise("rebuild_bm25")
+    return {"success": True, "job": job, "message": "已交由獨立 worker 從 Chroma 重建 BM25，不會重新掃描來源檔案。"}
 
 
 @router.get("/progress")
 def get_progress():
-    data = progress.to_dict()
-    data["total_indexed_chunks"] = vector_store.count()
+    data = get_latest_job() or {
+        "status": "idle", "is_running": False, "progress_percent": 0,
+        "processed_files": 0, "total_files": 0, "indexed_chunks": 0,
+        "current_file": "", "elapsed_seconds": 0, "error_count": 0,
+    }
+    # SQLite summary is lightweight; direct Chroma count is deliberately worker-only.
+    data["total_indexed_chunks"] = storage_report()["source_chunks"]
     return data
 
 
@@ -218,6 +317,7 @@ def get_file_content(path: str):
         raise HTTPException(status_code=404, detail="檔案不存在或非檔案")
 
     try:
+        from rag.parsers.parser_hub import parser_hub
         doc = parser_hub.parse_file(str(p))
         return {
             "filename": doc.filename,
@@ -232,6 +332,7 @@ def get_file_content(path: str):
 
 @router.get("/strategies")
 def list_strategies():
+    from rag.retrieval.registry import retriever_registry
     return {
         "default": retriever_registry.default_strategy,
         "strategies": retriever_registry.list_strategies()
@@ -248,6 +349,7 @@ async def chat_stream(req: ChatRequest):
     context_text = ""
 
     if req.enable_rag:
+        from rag.retrieval.registry import retriever_registry
         citations = retriever_registry.retrieve(
             query=last_user_message,
             strategy=req.retrieval_strategy,
@@ -267,6 +369,7 @@ async def chat_stream(req: ChatRequest):
     llm_msgs = [{"role": m.role, "content": m.content} for m in req.messages]
 
     async def event_generator():
+        from rag.llm_gateway import llm_gateway
         citation_data = [c.model_dump() for c in citations]
         yield f"event: citations\ndata: {json.dumps(citation_data, ensure_ascii=False)}\n\n"
 

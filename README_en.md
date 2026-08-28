@@ -100,7 +100,12 @@ It is purpose-built to answer three fundamental questions at any moment:
 * The dashboard `DATA CAPTURE` panel condenses three independent signals—`FOCUS`, `WEB`, and `LOG`—without treating one observed channel as proof of another.
 * `http://127.0.0.1:8765/extension-monitor` is the advanced Browser Extension diagnostic page for enabled/observed, heartbeat, and per-site state; token pairing remains inside the Extension popup.
 
-### 8. 🧠 Local Semantic Index and `omni ask` (P3-2 / P3-3 Alpha)
+### 8. 🧾 Verified Background Agent / CLI Task Time (Alpha)
+* `BACKGROUND AGENT TASKS` separately shows paired local-receipt execution time from Claude Code, Claude Desktop local-agent, and Codex sessions.
+* A task is counted only when its local source contains both a prompt-start and an explicit final-completion timestamp. It can therefore appear after its window is minimized; generic Terminal/PowerShell work and tasks without a final receipt are never estimated.
+* This metric remains separate from foreground time, AI turns, and milestones. Parallel tasks use an interval union for the total to avoid double counting. See [ADR-010](docs/ADR-010-verified-background-agent-task-time.md) for its evidence boundary.
+
+### 9. 🧠 Local Semantic Index and `omni ask` (P3-2 / P3-3 Alpha)
 * Loopback Ollama `bge-m3` indexes AI turns, Git commits, file-activity metadata, Open Loops, and Project State without sending the index to a cloud provider.
 * Incremental updates use content hashes and retain SQLite source references, project, time, trust status, and embedding-input degradation provenance.
 * `omni ask` supports retrieval-only mode or a local Ollama answer with `[S1]` citations. Similarity is not source validation or proof of coverage.

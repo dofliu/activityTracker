@@ -228,6 +228,33 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 
 ---
 
+## 2.7 P2.7：可驗證背景 Agent／CLI 任務時間（Alpha 已實作）
+
+> 需求來源：2026-08-29。設計決策見 [`docs/ADR-010-verified-background-agent-task-time.md`](docs/ADR-010-verified-background-agent-task-time.md)。
+
+### 產品目的
+
+- 補足「視窗縮小但本機 Agent 仍在執行」的可追溯時間訊號，不把它誤當成前景使用或人類工作時間。
+- 第一版只處理 Claude Code、Claude Desktop local-agent transcript 與 Codex session；generic Terminal command、browser AI 與沒有 local receipt 的 provider 不補值。
+
+### 信任與隱私邊界
+
+- 必須同時取得來源內的 user prompt start timestamp 與 explicit final completion timestamp；缺任一端為 `awaiting_final`，不結算。
+- 不重複保存 prompt、response、URL 或 source path 至 API；來源仍可在本機 ingestion provenance 中回查。
+- 每日總執行秒數採 interval union；平行 Agent 不會在總數 double count，且不與 `WindowEvent` foreground time 相加。
+- end ≤ start 或超過 `background_task_tracking.max_task_duration_seconds` 時標為 `untrusted_duration`，不估算。
+
+### 依賴與驗收
+
+- [x] SQLite migration 12、stable task key 與重掃 idempotency。
+- [x] Claude/Codex transcript final marker 轉為 paired receipt，API 回應不含內容或本機 path。
+- [x] Dashboard 獨立顯示 VERIFIED／WAITING、完成件數、等待 final 件數與最近完成 receipt。
+- [x] Contract tests 覆蓋 start-only、explicit final、重疊 union、異常時長、migration 與 API privacy。
+- [x] localhost service restart 後，取得 Codex 7 筆 completed receipt、5 筆 awaiting-final receipt；API 以 3,076.659 秒的 interval union 回傳 51.3 分鐘。
+- [ ] 取得 Claude Code 與 Claude Desktop local-agent 的 live completed receipt；此項未完成前不宣稱平台全天背景工作 coverage。
+
+---
+
 # 第二階段規劃：從「日誌」到「記憶」
 
 > 規劃日期：2026-08-24
@@ -434,6 +461,14 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 6. **資料庫遷移與完整測試**：
    - 完成 Migration 008 資料庫結構升級，全專案通過 100/100 單元與整合測試。
 
+### ✅ P7.1：DeskRAG 索引生命週期與主服務隔離（2026-08-29）
+
+1. **worker isolation**：掃描、解析、embedding、移除索引、清空索引、BM25 重建與一致性驗證都透過獨立本機 process 執行；`127.0.0.1:8765` 僅建立、控制與讀取 job receipt。
+2. **明確資源邊界**：預設每次最多 500 檔、單檔最多 50 MB、每檔 25 ms 間隔，可由操作介面調整；資料夾完整掃描統計與本次處理上限分開呈現。
+3. **安全刪除與回收**：資料夾移除與全部清空都要二次確認，明確保留來源檔案與對話；刪除 worker 批次更新 Chroma/BM25、執行 SQLite checkpoint + `VACUUM`，並保存一致性結果。
+4. **可觀察性**：來源檔案、切片、最新 worker 實測向量／BM25 數量與空間以 receipt 回報；主服務不直接讀取大型 Chroma 或 BM25。若 BM25 不一致，可從既有 Chroma 重建，不需重掃來源資料夾。
+5. **驗收邊界**：已通過 migration、API confirmation 與 RAG retrieval contract tests；大型正式索引重建屬 worker runtime，完成後才可宣稱 BM25 與 Chroma 一致。
+
 ---
 
 ## 9. ✅ P8：系統基礎穩健化工程（生命週期維護、自我修復守護與 Web 維護面板）(Completed)
@@ -483,4 +518,3 @@ P2.5-S1 API 安全邊界
 1. P3-1 已證明 Context Handoff 的產品價值，但 final-response 與 Open Loop 仍需可信度 gate。
 2. P3-2 + P3-3 只有建立在可追溯 turn contract 上，語意檢索結果才可被引用與回查。
 3. P5 先做 proposal-only；任何自主修改都必須具備 allowlist、dirty-worktree check、timeout、cancel、audit receipt 與分級批准。
-

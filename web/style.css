@@ -126,6 +126,15 @@ input, select, button { font-family: inherit; }
 .usage-interface { font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .usage-duration { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--tx); }
 .usage-interactions { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--mu); }
+.background-task-body { display: grid; grid-template-columns: minmax(235px, 0.6fr) minmax(0, 1.4fr); min-height: 126px; }
+.background-task-summary { padding: 16px; border-right: 1px solid var(--bd); }
+.background-task-list { min-width: 0; padding: 8px 14px; }
+.background-task-row { display: grid; grid-template-columns: minmax(92px, 0.7fr) minmax(120px, 1.5fr) auto 48px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--bd); }
+.background-task-row:last-child { border-bottom: none; }
+.background-task-platform { color: var(--orange); font-size: 11px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.background-task-project { color: var(--mu); font-family: "JetBrains Mono", monospace; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.background-task-duration, .background-task-completed { color: var(--tx); font-family: "JetBrains Mono", monospace; font-size: 10px; text-align: right; white-space: nowrap; }
+.background-task-completed { color: var(--mu); }
 .capture-panel { min-width: 0; }
 .capture-extension-summary { padding: 10px 14px 7px; color: var(--mu); font-size: 10.5px; line-height: 1.4; }
 .capture-coverage-list { padding: 0 14px 5px; }
@@ -360,9 +369,10 @@ input[type="checkbox"] { accent-color: var(--orange); flex: none; }
   .topbar-actions { width: 100%; flex-wrap: wrap; }
   .tabs { overflow-x: auto; }
   .tab { flex: 0 0 auto; }
-  .overview-grid, .usage-body, .context-memory-grid { grid-template-columns: 1fr; }
+  .overview-grid, .usage-body, .background-task-body, .context-memory-grid { grid-template-columns: 1fr; }
   .capture-coverage-row { grid-template-columns: minmax(70px, 0.75fr) repeat(3, minmax(0, 1fr)); }
   .usage-goal { border-right: none; border-bottom: 1px solid var(--bd); }
+  .background-task-summary { border-right: none; border-bottom: 1px solid var(--bd); }
   .usage-settings-fields { grid-template-columns: 1fr 1fr; }
   .llm-key-grid { grid-template-columns: 1fr; }
   .split { grid-template-columns: 1fr; }
@@ -547,6 +557,9 @@ details.trust-panel[open] summary { border-bottom: none; }
 .rag-folder-info { min-width: 0; flex: 1; margin-right: 8px; }
 .rag-folder-path { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--mu); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rag-folder-name { font-weight: 600; color: var(--tx); }
+.rag-storage-card { padding: 8px 10px; border: 1px solid var(--bd); border-radius: 4px; background: var(--s1); font-size: 10px; line-height: 1.55; }
+.rag-storage-card .rag-storage-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; }
+.rag-storage-card .rag-storage-alert { color: var(--warn, #b77b17); margin-top: 4px; }
 
 .rag-file-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--bd); font-size: 11px; cursor: pointer; }
 .rag-file-item:hover { background: var(--s2); }

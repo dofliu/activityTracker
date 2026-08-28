@@ -23,7 +23,7 @@ def test_fresh_database_reaches_latest_version_and_rerun_is_idempotent(tmp_path)
         backup_dir=backup_dir,
     )
     assert first["before"]["state"] == "fresh"
-    assert first["applied_now"] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert first["applied_now"] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     assert first["pre_migration_backup"] is None
     assert first["after"]["state"] == "up_to_date"
 
@@ -38,6 +38,8 @@ def test_fresh_database_reaches_latest_version_and_rerun_is_idempotent(tmp_path)
     assert "rag_indexed_files" in inspector.get_table_names()
     assert "rag_chat_sessions" in inspector.get_table_names()
     assert "rag_chat_messages" in inspector.get_table_names()
+    assert "rag_index_jobs" in inspector.get_table_names()
+    assert "background_task_runs" in inspector.get_table_names()
     indexes = {item["name"] for item in inspector.get_indexes("ai_prompt_events")}
     assert "ux_ai_prompt_events_turn_key" in indexes
     engine.dispose()
@@ -49,7 +51,7 @@ def test_fresh_database_reaches_latest_version_and_rerun_is_idempotent(tmp_path)
     )
     assert second["applied_now"] == []
     assert second["pre_migration_backup"] is None
-    assert second["after"]["applied_versions"] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert second["after"]["applied_versions"] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
 
 def test_legacy_database_is_backed_up_upgraded_and_data_is_preserved(tmp_path):
@@ -97,7 +99,7 @@ def test_legacy_database_is_backed_up_upgraded_and_data_is_preserved(tmp_path):
     )
     assert receipt["before"]["state"] == "unversioned"
     assert receipt["pre_migration_backup"]["integrity"] == "ok"
-    assert receipt["applied_now"] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert receipt["applied_now"] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
     with closing(sqlite3.connect(database_path)) as connection:
         ai_columns = {
@@ -123,7 +125,7 @@ def test_legacy_database_is_backed_up_upgraded_and_data_is_preserved(tmp_path):
         history_count = connection.execute(
             "SELECT COUNT(*) FROM schema_migrations"
         ).fetchone()[0]
-        assert history_count == 9
+        assert history_count == 12
 
 
 def test_checksum_mismatch_is_incompatible_and_fails_closed(tmp_path):
@@ -149,7 +151,7 @@ def test_unknown_newer_version_is_rejected(tmp_path):
         connection.execute(
             "INSERT INTO schema_migrations "
             "(version, name, checksum, applied_at, duration_ms) "
-            "VALUES (10, 'future', 'future-checksum', '2026-08-24T00:00:00+08:00', 0)"
+                "VALUES (13, 'future', 'future-checksum', '2026-08-24T00:00:00+08:00', 0)"
         )
         connection.commit()
 
@@ -188,7 +190,7 @@ def test_failed_migration_does_not_write_applied_receipt(tmp_path):
 
 
 def test_registry_is_contiguous_and_checksums_are_stable():
-    assert [migration.version for migration in MIGRATIONS] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert [migration.version for migration in MIGRATIONS] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     assert all(len(migration.checksum) == 64 for migration in MIGRATIONS)
 
 
@@ -199,17 +201,17 @@ def test_versioned_database_does_not_bypass_registry_with_create_all(
     database_path = tmp_path / "versioned.db"
     upgrade_sqlite_database(database_path, backup_before=False)
 
-    def migration_010(connection):
+    def migration_013(connection):
         connection.execute(text(
             "CREATE TABLE registry_only_table (id INTEGER PRIMARY KEY)"
         ))
 
     definitions = MIGRATIONS + (
         MigrationDefinition(
-            10,
+            13,
             "registry_only_schema_change",
             "create:registry_only_table",
-            migration_010,
+            migration_013,
         ),
     )
 
@@ -223,5 +225,5 @@ def test_versioned_database_does_not_bypass_registry_with_create_all(
         definitions=definitions,
     )
 
-    assert receipt["applied_now"] == [10]
+    assert receipt["applied_now"] == [13]
     assert receipt["after"]["state"] == "up_to_date"

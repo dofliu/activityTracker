@@ -4,7 +4,9 @@ from rag.retriever import BM25Service
 from rag.retrieval.base import CitationSource
 
 
-def test_bm25_service():
+def test_bm25_service(monkeypatch):
+    # 單元測試不得覆寫使用者設定中的正式 BM25 pickle。
+    monkeypatch.setattr(BM25Service, "_save_index", lambda self: None)
     bm25 = BM25Service()
     chunks = [
         {"chunk_id": "c1", "content": "OmniContext is a personal activity tracker", "metadata": {"filename": "f1.md"}},

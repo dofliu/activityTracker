@@ -10,6 +10,7 @@ import logging
 from typing import Set, Dict, Any, Optional, List, Tuple
 
 from core.config import get_config
+from core.background_tasks import BackgroundTaskEvidence, record_background_task_evidence
 from core.database import get_db
 from core.desktop_sources import (
     default_claude_desktop_logs_dir,
@@ -563,11 +564,14 @@ class AgentLogWatcherService:
         """將 Claude JSONL 依 user boundary 配對，供 CLI 與 Desktop 共用。"""
         current_user_prompt = ""
         current_user_time = None
+        current_user_time_verified = False
         current_cwd = None
         current_session_id = None
         current_user_position = None
         accumulated_responses: List[str] = []
         explicit_final_responses: List[str] = []
+        explicit_final_time = None
+        explicit_final_position = None
 
         def flush_turn(*, boundary_closed: bool) -> None:
             if not current_user_prompt or not current_user_time:
@@ -591,6 +595,23 @@ class AgentLogWatcherService:
                     boundary_closed=boundary_closed,
                 ),
             )
+            # 背景時間必須同時有來源中的 start 與 final timestamp；不能用掃描時間補值。
+            if current_user_time_verified:
+                record_background_task_evidence(
+                    BackgroundTaskEvidence(
+                        platform=platform,
+                        source_path=str(project_log.resolve()),
+                        started_at=current_user_time,
+                        start_position=current_user_position,
+                        session_id=current_session_id,
+                        cwd=current_cwd,
+                        completed_at=explicit_final_time if explicit_final else None,
+                        end_position=explicit_final_position if explicit_final else None,
+                        completion_evidence_kind="claude_end_turn" if explicit_final else None,
+                    ),
+                    database=db,
+                    cfg=self.cfg,
+                )
 
         for line_number, item in iter_jsonl_records(project_log):
             msg_type = item.get("type")
@@ -604,17 +625,22 @@ class AgentLogWatcherService:
                     flush_turn(boundary_closed=True)
                     current_user_prompt = user_text
                     current_user_time = timestamp or get_local_now()
+                    current_user_time_verified = timestamp is not None
                     current_cwd = item.get("cwd") or str(project_log.parent)
                     current_session_id = item.get("sessionId")
                     current_user_position = line_number
                     accumulated_responses = []
                     explicit_final_responses = []
+                    explicit_final_time = None
+                    explicit_final_position = None
             elif msg_type == "assistant":
                 assistant_text = extract_claude_assistant_text(content)
                 if assistant_text and not assistant_text.startswith("["):
                     accumulated_responses.append(assistant_text)
                     if isinstance(message, dict) and message.get("stop_reason") == "end_turn":
                         explicit_final_responses.append(assistant_text)
+                        explicit_final_time = timestamp
+                        explicit_final_position = line_number
 
         flush_turn(boundary_closed=False)
 
@@ -738,12 +764,16 @@ class AgentLogWatcherService:
         session_cwd = None
         current_prompt = ""
         current_time = None
+        current_time_verified = False
         current_position: int | None = None
         assistant_messages: List[str] = []
         explicit_final_messages: List[str] = []
+        explicit_final_time = None
+        explicit_final_position: int | None = None
 
         def flush_turn(boundary_closed: bool = False) -> None:
-            nonlocal current_prompt, current_time, current_position, assistant_messages, explicit_final_messages
+            nonlocal current_prompt, current_time, current_time_verified, current_position
+            nonlocal assistant_messages, explicit_final_messages, explicit_final_time, explicit_final_position
             if not current_prompt:
                 return
             final_response = select_last_assistant_message(explicit_final_messages)
@@ -765,11 +795,30 @@ class AgentLogWatcherService:
                     boundary_closed=boundary_closed,
                 ),
             )
+            if current_time_verified:
+                record_background_task_evidence(
+                    BackgroundTaskEvidence(
+                        platform="codex",
+                        source_path=str(file_path.resolve()),
+                        started_at=current_time,
+                        start_position=current_position,
+                        session_id=session_id,
+                        cwd=session_cwd,
+                        completed_at=explicit_final_time if final_response else None,
+                        end_position=explicit_final_position if final_response else None,
+                        completion_evidence_kind="codex_final_answer" if final_response else None,
+                    ),
+                    database=db,
+                    cfg=self.cfg,
+                )
             current_prompt = ""
             current_time = None
+            current_time_verified = False
             current_position = None
             assistant_messages = []
             explicit_final_messages = []
+            explicit_final_time = None
+            explicit_final_position = None
 
         for line_number, d in iter_jsonl_records(file_path):
             t = d.get("type")
@@ -790,6 +839,7 @@ class AgentLogWatcherService:
                     flush_turn(boundary_closed=True)
                     current_prompt = content
                     current_time = ts or get_local_now()
+                    current_time_verified = ts is not None
                     current_position = line_number
 
                 elif role == "assistant" and current_prompt:
@@ -799,6 +849,8 @@ class AgentLogWatcherService:
                     if payload.get("phase") == "final_answer" and candidate:
                         if candidate not in explicit_final_messages:
                             explicit_final_messages.append(candidate)
+                        explicit_final_time = ts
+                        explicit_final_position = line_number
 
             elif t == "event_msg" and isinstance(payload, dict):
                 p_type = payload.get("type")
@@ -817,6 +869,8 @@ class AgentLogWatcherService:
                         if item.get("phase") == "final_answer" and candidate:
                             if candidate not in explicit_final_messages:
                                 explicit_final_messages.append(candidate)
+                            explicit_final_time = ts
+                            explicit_final_position = line_number
 
         flush_turn(boundary_closed=False)
 

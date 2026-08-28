@@ -357,6 +357,93 @@ def _migration_009_github_issues_and_snoozes(connection: Connection) -> None:
     ))
 
 
+def _migration_010_rag_worker_jobs(connection: Connection) -> None:
+    """將 DeskRAG 長時間作業改為可恢復、可控制的獨立 worker 工作。"""
+    connection.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS rag_index_jobs (
+            id VARCHAR(36) PRIMARY KEY,
+            job_type VARCHAR(32) NOT NULL,
+            folder_id INTEGER,
+            status VARCHAR(32) NOT NULL DEFAULT 'queued',
+            requested_at DATETIME,
+            started_at DATETIME,
+            completed_at DATETIME,
+            updated_at DATETIME,
+            worker_pid INTEGER,
+            total_files INTEGER DEFAULT 0,
+            processed_files INTEGER DEFAULT 0,
+            indexed_chunks INTEGER DEFAULT 0,
+            error_count INTEGER DEFAULT 0,
+            max_files INTEGER,
+            throttle_ms INTEGER DEFAULT 0,
+            current_file VARCHAR(1000),
+            message TEXT,
+            error_message TEXT,
+            pause_requested INTEGER DEFAULT 0,
+            cancel_requested INTEGER DEFAULT 0
+        );
+        """
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_rag_jobs_status_requested "
+        "ON rag_index_jobs(status, requested_at);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_rag_jobs_folder "
+        "ON rag_index_jobs(folder_id, requested_at);"
+    ))
+
+
+def _migration_011_rag_worker_result_receipts(connection: Connection) -> None:
+    """保留 worker 非內容型結果，讓主服務不必讀取大型 Chroma collection。"""
+    columns = {
+        row[1] for row in connection.execute(text("PRAGMA table_info(rag_index_jobs)")).fetchall()
+    }
+    if "result_json" not in columns:
+        connection.execute(text("ALTER TABLE rag_index_jobs ADD COLUMN result_json TEXT"))
+
+
+def _migration_012_background_task_receipts(connection: Connection) -> None:
+    """保存本機 agent 任務的成對 start/end receipt，不儲存內容本身。"""
+    connection.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS background_task_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_key VARCHAR(64) UNIQUE NOT NULL,
+            platform VARCHAR(50) NOT NULL,
+            session_id VARCHAR(100),
+            project_tag VARCHAR(255),
+            cwd VARCHAR(1000),
+            started_at DATETIME NOT NULL,
+            completed_at DATETIME,
+            duration_seconds FLOAT,
+            status VARCHAR(40) NOT NULL DEFAULT 'awaiting_final',
+            start_evidence_kind VARCHAR(80) NOT NULL DEFAULT 'user_prompt',
+            completion_evidence_kind VARCHAR(80),
+            source_path VARCHAR(1500) NOT NULL,
+            start_position INTEGER,
+            end_position INTEGER,
+            observed_at DATETIME NOT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME
+        );
+        """
+    ))
+    connection.execute(text(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_background_task_runs_task_key "
+        "ON background_task_runs(task_key);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_background_tasks_status_started "
+        "ON background_task_runs(status, started_at);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_background_tasks_platform_started "
+        "ON background_task_runs(platform, started_at);"
+    ))
+
+
 MIGRATIONS: tuple[MigrationDefinition, ...] = (
     MigrationDefinition(
         1,
@@ -418,6 +505,26 @@ MIGRATIONS: tuple[MigrationDefinition, ...] = (
         "github_issue_events:create;proposal_snoozes:create;"
         "indexes:repo_number,state_updated,snooze_target",
         _migration_009_github_issues_and_snoozes,
+    ),
+    MigrationDefinition(
+        10,
+        "rag_worker_job_control",
+        "rag_index_jobs:create;indexes:status_requested,folder_requested;"
+        "controls:pause,cancel,rate_limit,file_limit",
+        _migration_010_rag_worker_jobs,
+    ),
+    MigrationDefinition(
+        11,
+        "rag_worker_result_receipts",
+        "rag_index_jobs:add:result_json;privacy:no_document_content",
+        _migration_011_rag_worker_result_receipts,
+    ),
+    MigrationDefinition(
+        12,
+        "background_task_receipts",
+        "background_task_runs:create;indexes:unique_key,status_started,platform_started;"
+        "privacy:no_prompt_no_response;contract:paired_local_agent_start_end",
+        _migration_012_background_task_receipts,
     ),
 )
 

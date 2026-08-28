@@ -204,6 +204,27 @@ def test_usage_api_exposes_claim_and_coverage_contract(monkeypatch):
     assert response.json()["metric_label"] == "foreground_active_time"
 
 
+def test_background_task_api_keeps_duration_separate_and_content_private(monkeypatch):
+    monkeypatch.setattr(
+        "core.server.get_background_task_summary",
+        lambda *_args, **_kwargs: {
+            "metric_label": "verified_background_agent_execution_time",
+            "claim_boundary": "not foreground or productivity",
+            "verified_seconds": 600,
+            "recent_tasks": [{"platform": "codex", "duration_seconds": 600}],
+        },
+    )
+    response = client.get(
+        "/api/v1/background-tasks/today",
+        headers={"Origin": "http://127.0.0.1:8765"},
+    )
+    assert response.status_code == 200
+    assert response.json()["metric_label"] == "verified_background_agent_execution_time"
+    assert "prompt_text" not in response.text
+    assert "response_text" not in response.text
+    assert "source_path" not in response.text
+
+
 def test_capture_status_api_exposes_separate_channels_without_sensitive_content(monkeypatch):
     monkeypatch.setattr(
         "core.server.build_capture_coverage",
@@ -329,6 +350,8 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     assert "/api/v1/extension/status" in monitor.text
     assert dashboard.status_code == 200
     assert "usage-goal-value" in dashboard.text
+    assert "background-tasks-value" in dashboard.text
+    assert "background-tasks-list" in dashboard.text
     assert "capture-coverage-list" in dashboard.text
     assert "llm-key-status-badge" in dashboard.text
     assert "context-sessions-list" in dashboard.text
@@ -337,14 +360,15 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     assert "PROPOSAL ONLY" in dashboard.text
     assert "DATA CAPTURE" in dashboard.text
     assert "extension-capture-badge" not in dashboard.text
-    assert "style.css?v=1.3.0a4-ui9" in dashboard.text
-    assert "app.js?v=1.3.0a4-ui9" in dashboard.text
+    assert "style.css?v=1.3.0a5-background-tasks" in dashboard.text
+    assert "app.js?v=1.3.0a5-background-tasks" in dashboard.text
     assert "data-trust-runtime-badge" in dashboard.text
     assert "/extension-monitor" in dashboard.text
     stylesheet = client.get("/static/style.css")
     assert stylesheet.status_code == 200
     assert 'input:not([type="checkbox"])' in stylesheet.text
     assert ".usage-toggle-row" in stylesheet.text
+    assert ".background-task-body" in stylesheet.text
     assert ".pill-warn" in stylesheet.text
     assert ".collector-diagnostic" in stylesheet.text
     assert "grid-template-columns: repeat(5, minmax(0, 1fr))" in stylesheet.text

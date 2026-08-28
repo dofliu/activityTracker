@@ -121,6 +121,9 @@ const I18N = {
     usage_title: "TODAY · 前景使用與里程碑",
     btn_refresh_usage: "重新整理",
     usage_goal_label: "AI 協作前景使用時間",
+    background_tasks_title: "BACKGROUND AGENT TASKS",
+    background_tasks_label: "可驗證背景 agent／CLI 執行時間",
+    background_tasks_boundary: "只納入本機來源可確認的開始與最終完成收據；不與前景使用時間混算，也不代表生產力或所有電腦工作。",
     extension_monitor_title: "EXTENSION MONITOR",
     btn_open_monitor: "開啟完整監控",
     capture_status_title: "DATA CAPTURE",
@@ -282,6 +285,9 @@ const I18N = {
     usage_title: "TODAY · FOREGROUND USE & MILESTONES",
     btn_refresh_usage: "Refresh",
     usage_goal_label: "AI collaboration foreground time",
+    background_tasks_title: "BACKGROUND AGENT TASKS",
+    background_tasks_label: "Verified background agent / CLI execution time",
+    background_tasks_boundary: "Only paired local start and explicit final-completion receipts are included. This is separate from foreground time, productivity, and all computer work.",
     extension_monitor_title: "EXTENSION MONITOR",
     btn_open_monitor: "Open Full Monitor",
     capture_status_title: "DATA CAPTURE",
@@ -569,10 +575,11 @@ function formatUsageDuration(seconds) {
 }
 
 async function loadUsagePanels() {
-  const [usageResult, extensionResult, captureResult] = await Promise.allSettled([
+  const [usageResult, extensionResult, captureResult, backgroundTaskResult] = await Promise.allSettled([
     getJSON("/api/v1/usage/today"),
     getJSON("/api/v1/extension/status"),
-    getJSON("/api/v1/capture/status")
+    getJSON("/api/v1/capture/status"),
+    getJSON("/api/v1/background-tasks/today")
   ]);
   if (usageResult.status === "fulfilled") renderUsagePanel(usageResult.value);
   else renderUsagePanelError();
@@ -581,6 +588,8 @@ async function loadUsagePanels() {
     extensionResult.status === "fulfilled" ? extensionResult.value : null
   );
   else renderCaptureCoverageError();
+  if (backgroundTaskResult.status === "fulfilled") renderBackgroundTaskPanel(backgroundTaskResult.value);
+  else renderBackgroundTaskPanelError();
 }
 
 function renderUsagePanel(data) {
@@ -2105,7 +2114,12 @@ function initRAGTab() {
       try {
         addBtn.disabled = true;
         addBtn.textContent = "⏳ 加入中…";
-        await postJSON("/api/v1/rag/folders", { path, name: name || undefined });
+        await postJSON("/api/v1/rag/folders", {
+          path,
+          name: name || undefined,
+          max_files: readRAGNumber("input-rag-max-files", 500, 1),
+          throttle_ms: readRAGNumber("input-rag-throttle-ms", 25, 0),
+        });
         pathInput.value = "";
         nameInput.value = "";
         loadRAGFolders();
@@ -2126,12 +2140,72 @@ function initRAGTab() {
       try {
         scanBtn.disabled = true;
         scanBtn.textContent = "⏳ 啟動中…";
-        await postJSON("/api/v1/rag/scan", {});
+        await postJSON("/api/v1/rag/scan", {
+          max_files: readRAGNumber("input-rag-max-files", 500, 1),
+          throttle_ms: readRAGNumber("input-rag-throttle-ms", 25, 0),
+        });
         startRAGProgressPolling();
       } catch (e) {
         alert("啟動掃描失敗: " + e.message);
       } finally {
         setTimeout(() => { scanBtn.disabled = false; scanBtn.textContent = "⚡ 掃描索引"; }, 1500);
+      }
+    });
+  }
+
+  const jobAction = (buttonId, action) => {
+    const button = $(buttonId);
+    if (!button) return;
+    button.addEventListener("click", async () => {
+      const job = await getJSON("/api/v1/rag/jobs/current");
+      if (!job.id) return;
+      try {
+        await postJSON(`/api/v1/rag/jobs/${encodeURIComponent(job.id)}/${action}`, {});
+        startRAGProgressPolling();
+      } catch (e) {
+        alert("工作控制失敗: " + e.message);
+      }
+    });
+  };
+  jobAction("btn-rag-pause", "pause");
+  jobAction("btn-rag-resume", "resume");
+  jobAction("btn-rag-cancel", "cancel");
+
+  const clearIndexBtn = $("btn-rag-clear-index");
+  if (clearIndexBtn) {
+    clearIndexBtn.addEventListener("click", async () => {
+      if (!confirm("確定清空所有 RAG 索引嗎？只會刪除切片、向量與資料夾索引紀錄，不會刪除原始檔案或對話。")) return;
+      if (prompt("請輸入 CLEAR 以確認清空所有 RAG 索引：") !== "CLEAR") return;
+      try {
+        await postJSON("/api/v1/rag/clear-index", { confirm: true });
+        startRAGProgressPolling();
+      } catch (e) {
+        alert("清空索引失敗: " + e.message);
+      }
+    });
+  }
+
+  const verifyIndexBtn = $("btn-rag-verify-index");
+  if (verifyIndexBtn) {
+    verifyIndexBtn.addEventListener("click", async () => {
+      try {
+        await postJSON("/api/v1/rag/storage/verify", {});
+        startRAGProgressPolling();
+      } catch (e) {
+        alert("無法啟動索引驗證: " + e.message);
+      }
+    });
+  }
+
+  const rebuildBM25Btn = $("btn-rag-rebuild-bm25");
+  if (rebuildBM25Btn) {
+    rebuildBM25Btn.addEventListener("click", async () => {
+      if (!confirm("確定從既有 Chroma 向量庫重建 BM25 嗎？不會重新掃描來源檔案，但大型索引仍需要一些時間。")) return;
+      try {
+        await postJSON("/api/v1/rag/storage/rebuild-bm25", {});
+        startRAGProgressPolling();
+      } catch (e) {
+        alert("無法啟動 BM25 重建: " + e.message);
       }
     });
   }
@@ -2245,7 +2319,7 @@ async function loadRAGFolders() {
           <div class="rag-folder-name">${esc(f.name || Path_basename(f.path))} <span class="mono-mini muted">(${f.file_count || 0} 檔案)</span></div>
           <div class="rag-folder-path" title="${esc(f.path)}">${esc(f.path)}</div>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="deleteRAGFolder(${f.id})" style="color:var(--danger); padding:2px 6px;">✕</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteRAGFolder(${f.id})" title="移除此資料夾的索引，保留原始檔案" style="color:var(--danger); padding:2px 6px;">移除索引</button>
       </div>
     `).join("");
   } catch (e) {
@@ -2260,63 +2334,138 @@ function Path_basename(p) {
 }
 
 async function deleteRAGFolder(id) {
-  if (!confirm("確定要移除此目錄及其向量索引嗎？")) return;
+  if (!confirm("確定移除這個資料夾的 RAG 索引嗎？原始檔案不會被刪除，完成後會執行 SQLite 空間回收與一致性檢查。")) return;
   try {
-    await fetch(API + `/api/v1/rag/folders/${id}`, { method: "DELETE" });
-    loadRAGFolders();
-    loadRAGFiles();
+    await postJSON(`/api/v1/rag/folders/${id}/remove-index`, { confirm: true });
+    startRAGProgressPolling();
   } catch (e) {
     alert("刪除失敗: " + e.message);
   }
 }
 
 let ragProgressPollTimer = null;
-function startRAGProgressPolling() {
+
+function readRAGNumber(id, fallback, minimum) {
+  const value = Number($(id)?.value);
+  return Number.isFinite(value) && value >= minimum ? Math.floor(value) : fallback;
+}
+
+function renderBackgroundTaskPanel(data) {
+  const enabled = data.enabled !== false;
+  const status = data.evidence_status || "not_observed";
+  const badge = $("background-tasks-evidence");
+  badge.className = "trust " + (!enabled ? "broken" : status === "verified_receipts" ? "ok" : "noisy");
+  badge.textContent = !enabled ? "DISABLED" : status === "verified_receipts" ? "VERIFIED" : "WAITING";
+  $("background-tasks-value").textContent = formatUsageDuration(data.verified_seconds || 0);
+
+  const completed = Number(data.completed_task_count || 0);
+  const awaiting = Number(data.awaiting_final_count || 0);
+  const untrusted = Number(data.untrusted_duration_count || 0);
+  $("background-tasks-meta").textContent = currentLang === "zh-TW"
+    ? `已完成 ${completed} 件 · 等待 final receipt ${awaiting} 件${untrusted ? ` · 異常時長未計入 ${untrusted} 件` : ""}`
+    : `${completed} completed · ${awaiting} awaiting final receipt${untrusted ? ` · ${untrusted} excluded duration` : ""}`;
+  $("background-tasks-boundary").textContent = currentLang === "zh-TW"
+    ? "只納入本機來源可確認的 prompt 開始與明確 final completion；與前景使用時間完全分開，不代表生產力、一般 Terminal 或全部工作。"
+    : "Only local prompt-start and explicit final-completion receipts are included. It is separate from foreground time, productivity, generic terminal time, and all work.";
+
+  const rows = (data.recent_tasks || []).slice(0, 6);
+  $("background-tasks-list").innerHTML = rows.length ? rows.map(item => {
+    const completedAt = item.completed_at ? new Date(item.completed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
+    const project = item.project_tag || (currentLang === "zh-TW" ? "未歸戶專案" : "Unassigned project");
+    return `<div class="background-task-row">
+      <span class="background-task-platform">${esc(item.label)}</span>
+      <span class="background-task-project" title="${esc(project)}">${esc(project)}</span>
+      <span class="background-task-duration">${formatUsageDuration(item.duration_seconds)}</span>
+      <span class="background-task-completed">${completedAt}</span>
+    </div>`;
+  }).join("") : `<div class="placeholder">${currentLang === "zh-TW" ? "今日尚無可由開始與 final receipt 成對驗證的背景任務。" : "No background task has paired start and final receipts today."}</div>`;
+}
+
+function renderBackgroundTaskPanelError() {
+  $("background-tasks-evidence").className = "trust broken";
+  $("background-tasks-evidence").textContent = "UNAVAILABLE";
+  $("background-tasks-list").innerHTML = `<div class="placeholder">${currentLang === "zh-TW" ? "無法載入背景任務收據。" : "Unable to load background task receipts."}</div>`;
+}
+
+function formatRAGBytes(bytes) {
+  if (bytes === null || bytes === undefined) return "待驗證";
+  const value = Number(bytes || 0);
+  if (value < 1024) return `${value} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let scaled = value / 1024;
+  let unit = 0;
+  while (scaled >= 1024 && unit < units.length - 1) { scaled /= 1024; unit += 1; }
+  return `${scaled.toFixed(scaled >= 100 ? 0 : 1)} ${units[unit]}`;
+}
+
+function renderRAGJob(data) {
   const box = $("rag-progress-box");
+  const totalChunks = $("rag-total-chunks-count");
+  if (totalChunks) totalChunks.textContent = `${data.total_indexed_chunks || 0} 切片`;
+  if (!data.id && !data.is_running) return false;
   if (box) box.style.display = "block";
+  const isActive = Boolean(data.is_running);
+  const statusMap = {
+    scanning: "掃描目錄中…", indexing: "正在建立切片向量…", paused: "⏸ 已暫停",
+    cancelling: "正在取消…", completed: "✅ 索引完成", completed_limited: "✅ 本次上限完成",
+    cancelled: "已取消", failed: "索引失敗",
+  };
+  const status = data.status || "idle";
+  const isCompleted = status === "completed" || status === "completed_limited";
+  const percent = isCompleted ? 100 : (data.progress_percent || 0);
+  if ($("rag-progress-bar")) $("rag-progress-bar").style.width = `${percent}%`;
+  if ($("rag-progress-percent")) $("rag-progress-percent").textContent = `${percent}%`;
+  if ($("rag-progress-status")) $("rag-progress-status").textContent = statusMap[status] || status;
+  if ($("rag-progress-detail")) {
+    const detail = data.message || `處理中：${data.current_file || ""} (${data.processed_files || 0}/${data.total_files || 0})`;
+    $("rag-progress-detail").textContent = `${detail}${data.current_file ? ` · ${data.current_file}` : ""}`;
+  }
+  if ($("btn-rag-pause")) $("btn-rag-pause").disabled = !isActive || status === "paused" || status === "cancelling";
+  if ($("btn-rag-resume")) $("btn-rag-resume").disabled = status !== "paused";
+  if ($("btn-rag-cancel")) $("btn-rag-cancel").disabled = !isActive || status === "cancelling";
+  return isActive;
+}
+
+async function refreshRAGStorage() {
+  const card = $("rag-storage-card");
+  if (!card) return;
+  try {
+    const data = await getJSON("/api/v1/rag/storage");
+    const vectorCount = data.vector_chunks === null || data.vector_chunks === undefined ? "待驗證" : Number(data.vector_chunks).toLocaleString();
+    card.innerHTML = `<div class="rag-storage-grid">
+      <span>來源檔案 ${Number(data.source_files || 0).toLocaleString()}</span><span>來源大小 ${formatRAGBytes(data.source_bytes)}</span>
+      <span>資料庫切片 ${Number(data.source_chunks || 0).toLocaleString()}</span><span>向量 ${vectorCount}</span>
+      <span>索引空間 ${formatRAGBytes(data.index_bytes)}</span><span>SQLite ${formatRAGBytes(data.sqlite_bytes)}</span>
+    </div>${data.consistency === "matched" ? "" : `<div class="rag-storage-alert">${data.consistency === "unverified" ? "尚未以獨立 worker 驗證 Chroma／BM25，請按「驗證索引與空間」。" : `索引計數待檢查：向量差異 ${Number(data.vector_delta || 0).toLocaleString()}。`}</div>`}`;
+  } catch (e) {
+    card.textContent = "索引儲存空間暫時無法取得。";
+  }
+}
+
+async function pollRAGProgress() {
+  const data = await getJSON("/api/v1/rag/progress");
+  const isActive = renderRAGJob(data);
+  if (!isActive) {
+    if (ragProgressPollTimer) clearInterval(ragProgressPollTimer);
+    ragProgressPollTimer = null;
+    loadRAGFolders();
+    loadRAGFiles();
+    refreshRAGStorage();
+  }
+}
+
+function startRAGProgressPolling() {
   if (ragProgressPollTimer) clearInterval(ragProgressPollTimer);
-
-  ragProgressPollTimer = setInterval(async () => {
-    try {
-      const data = await getJSON("/api/v1/rag/progress");
-      const bar = $("rag-progress-bar");
-      const percentText = $("rag-progress-percent");
-      const statusText = $("rag-progress-status");
-      const detailText = $("rag-progress-detail");
-      const totalChunks = $("rag-total-chunks-count");
-
-      if (totalChunks) totalChunks.textContent = `${data.total_indexed_chunks || 0} 切片`;
-
-      if (data.is_running) {
-        if (box) box.style.display = "block";
-        if (bar) bar.style.width = `${data.progress_percent || 0}%`;
-        if (percentText) percentText.textContent = `${data.progress_percent || 0}%`;
-        if (statusText) statusText.textContent = data.status === "scanning" ? "掃描目錄中…" : "正在建立切片向量…";
-        if (detailText) detailText.textContent = `處理中: ${esc(data.current_file || "")} (${data.processed_files}/${data.total_files})`;
-      } else {
-        if (bar) bar.style.width = `100%`;
-        if (percentText) percentText.textContent = `100%`;
-        if (statusText) statusText.textContent = "✅ 索引完成";
-        if (detailText) detailText.textContent = `共完成 ${data.processed_files || 0} 個檔案，耗時 ${data.elapsed_seconds || 0} 秒`;
-        clearInterval(ragProgressPollTimer);
-        ragProgressPollTimer = null;
-        loadRAGFolders();
-        loadRAGFiles();
-        setTimeout(() => { if (box && !progress.is_running) box.style.display = "none"; }, 5000);
-      }
-    } catch (e) {
-      clearInterval(ragProgressPollTimer);
-      ragProgressPollTimer = null;
-    }
-  }, 1000);
+  pollRAGProgress().catch(() => {});
+  ragProgressPollTimer = setInterval(() => pollRAGProgress().catch(() => {}), 1000);
 }
 
 async function loadRAGProgress() {
   try {
     const data = await getJSON("/api/v1/rag/progress");
-    const totalChunks = $("rag-total-chunks-count");
-    if (totalChunks) totalChunks.textContent = `${data.total_indexed_chunks || 0} 切片`;
-    if (data.is_running) startRAGProgressPolling();
+    const active = renderRAGJob(data);
+    if (active) startRAGProgressPolling();
+    refreshRAGStorage();
   } catch (e) {}
 }
 

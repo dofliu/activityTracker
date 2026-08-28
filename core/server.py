@@ -32,6 +32,7 @@ from .extension_verification import extension_verification_registry
 from .capture_coverage import build_capture_coverage
 from .context_memory import build_recent_work_sessions, find_related_work
 from .proactive_secretary import build_action_proposals, snooze_proposal
+from .background_tasks import get_background_task_summary
 from .usage_analytics import evaluate_daily_milestones, get_usage_summary
 from .time_utils import get_local_now
 from .runtime_paths import resolve_runtime_path, web_assets_dir
@@ -307,6 +308,14 @@ def get_today_usage(date_str: Optional[str] = Query(None, alias="date")):
     try:
         manager_status = get_manager().get_status()
         return get_usage_summary(date_str, manager_status=manager_status)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="date must use YYYY-MM-DD") from exc
+
+
+@app.get("/api/v1/background-tasks/today")
+def get_today_background_tasks(date_str: Optional[str] = Query(None, alias="date")):
+    try:
+        return get_background_task_summary(date_str)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="date must use YYYY-MM-DD") from exc
 
