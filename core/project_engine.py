@@ -2,11 +2,13 @@ import re
 import os
 import time
 import hashlib
+from threading import RLock
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Set
 from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from core.database import get_db
 from core.models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, ProjectState, OpenLoop, GitHubRepoState, GitHubPREvent
@@ -92,6 +94,9 @@ def shorten_filename(name: str, max_len: int = 26) -> str:
 _PROJECT_CACHE: List[Dict[str, Any]] = []
 _LAST_PROJECT_REFRESH_TIME: float = 0.0
 _PROJECT_CACHE_TTL: float = 30.0  # 30 秒快取
+# 同一個服務的多個 API 請求可能同時發現快取過期；鎖住重整流程，
+# 避免兩邊都先讀到「尚未建立」而競爭寫入同一個 project_key。
+_PROJECT_REFRESH_LOCK = RLock()
 
 
 CATEGORY_FOLDERS = {
@@ -193,147 +198,167 @@ def normalize_project_name(path_or_tag: str | None) -> str:
 def refresh_project_states(force: bool = False):
     """從各類事件動態計算並更新 project_states 資料表 (採用歷史事件多數決與 Git 倉庫判定)"""
     global _LAST_PROJECT_REFRESH_TIME
-    now_ts = time.time()
-    
-    if not force and (now_ts - _LAST_PROJECT_REFRESH_TIME) < _PROJECT_CACHE_TTL:
+    if not force and (time.time() - _LAST_PROJECT_REFRESH_TIME) < _PROJECT_CACHE_TTL:
         return
 
-    db = get_db()
-    now = get_local_now()
+    with _PROJECT_REFRESH_LOCK:
+        # 等待前一個請求完成後必須重新檢查 TTL，否則仍會重複進行全量掃描。
+        if not force and (time.time() - _LAST_PROJECT_REFRESH_TIME) < _PROJECT_CACHE_TTL:
+            return
 
-    # 專案活動匯總結構
-    # norm_key -> {"last_time": dt, "last_action": str, "git_cnt": int, "code_cnt": int, "paper_cnt": int, "ai_cnt": int}
-    project_stats: Dict[str, Dict[str, Any]] = {}
+        db = get_db()
+        now = get_local_now()
 
-    def _ensure_proj(norm_key: str):
-        if norm_key not in project_stats:
-            project_stats[norm_key] = {
-                "display_name": norm_key,
-                "last_time": datetime.min,
-                "last_action": "無動態",
-                "git_cnt": 0,
-                "code_cnt": 0,
-                "paper_cnt": 0,
-                "ai_cnt": 0
-            }
+        # 專案活動匯總結構
+        # norm_key -> {"last_time": dt, "last_action": str, "git_cnt": int, "code_cnt": int, "paper_cnt": int, "ai_cnt": int}
+        project_stats: Dict[str, Dict[str, Any]] = {}
 
-    with db.session_scope() as session:
-        # 1. 收集 Git Repos
-        git_events = session.query(GitActivityEvent).order_by(desc(GitActivityEvent.timestamp)).all()
-        for g in git_events:
-            repo_norm = normalize_project_name(g.repo_name)
-            if repo_norm in ["General / Unassigned", ""]:
-                continue
-            _ensure_proj(repo_norm)
-            project_stats[repo_norm]["git_cnt"] += 1
-            if g.timestamp > project_stats[repo_norm]["last_time"]:
-                project_stats[repo_norm]["last_time"] = g.timestamp
-                project_stats[repo_norm]["last_action"] = f"Git: {summarize_action(g.message)} (+{g.insertions}/-{g.deletions})"
+        def _ensure_proj(norm_key: str):
+            if norm_key not in project_stats:
+                project_stats[norm_key] = {
+                    "display_name": norm_key,
+                    "last_time": datetime.min,
+                    "last_action": "無動態",
+                    "git_cnt": 0,
+                    "code_cnt": 0,
+                    "paper_cnt": 0,
+                    "ai_cnt": 0
+                }
 
-        # 2. 收集 Files (論文與文檔)
-        file_events = session.query(FileActivityEvent).order_by(desc(FileActivityEvent.timestamp)).all()
-        proj_files: Dict[str, List[FileActivityEvent]] = {}
-        for f in file_events:
-            p_name = resolve_project_from_path(f.file_path) if f.file_path else normalize_project_name(f.project_name)
-            if p_name in ["General / Unassigned", ""]:
-                continue
-            if p_name not in proj_files:
-                proj_files[p_name] = []
-            proj_files[p_name].append(f)
+        with db.session_scope() as session:
+            # 1. 收集 Git Repos
+            git_events = session.query(GitActivityEvent).order_by(desc(GitActivityEvent.timestamp)).all()
+            for g in git_events:
+                repo_norm = normalize_project_name(g.repo_name)
+                if repo_norm in ["General / Unassigned", ""]:
+                    continue
+                _ensure_proj(repo_norm)
+                project_stats[repo_norm]["git_cnt"] += 1
+                if g.timestamp > project_stats[repo_norm]["last_time"]:
+                    project_stats[repo_norm]["last_time"] = g.timestamp
+                    project_stats[repo_norm]["last_action"] = f"Git: {summarize_action(g.message)} (+{g.insertions}/-{g.deletions})"
 
-        for p_name, f_list in proj_files.items():
-            _ensure_proj(p_name)
-            for ev in f_list:
-                ext = (ev.file_type or "").lower()
-                path_lower = (ev.file_path or "").lower()
-                is_academic_path = any(k in path_lower for k in ["paper", "patent", "期刊", "01.", "draft_paper", "academic"])
-                if ext in [".tex", ".docx", ".pdf"] or is_academic_path:
-                    project_stats[p_name]["paper_cnt"] += 1
-                elif ext in [".py", ".ts", ".js", ".c", ".cpp", ".rs", ".go", ".html", ".css", ".json", ".yaml", ".yml", ".sh", ".ps1"]:
-                    project_stats[p_name]["code_cnt"] += 1
-                elif ext in [".md", ".txt"]:
-                    if is_academic_path:
+            # 2. 收集 Files (論文與文檔)
+            file_events = session.query(FileActivityEvent).order_by(desc(FileActivityEvent.timestamp)).all()
+            proj_files: Dict[str, List[FileActivityEvent]] = {}
+            for f in file_events:
+                p_name = resolve_project_from_path(f.file_path) if f.file_path else normalize_project_name(f.project_name)
+                if p_name in ["General / Unassigned", ""]:
+                    continue
+                if p_name not in proj_files:
+                    proj_files[p_name] = []
+                proj_files[p_name].append(f)
+
+            for p_name, f_list in proj_files.items():
+                _ensure_proj(p_name)
+                for ev in f_list:
+                    ext = (ev.file_type or "").lower()
+                    path_lower = (ev.file_path or "").lower()
+                    is_academic_path = any(k in path_lower for k in ["paper", "patent", "期刊", "01.", "draft_paper", "academic"])
+                    if ext in [".tex", ".docx", ".pdf"] or is_academic_path:
                         project_stats[p_name]["paper_cnt"] += 1
-                    else:
+                    elif ext in [".py", ".ts", ".js", ".c", ".cpp", ".rs", ".go", ".html", ".css", ".json", ".yaml", ".yml", ".sh", ".ps1"]:
                         project_stats[p_name]["code_cnt"] += 1
+                    elif ext in [".md", ".txt"]:
+                        if is_academic_path:
+                            project_stats[p_name]["paper_cnt"] += 1
+                        else:
+                            project_stats[p_name]["code_cnt"] += 1
 
-            latest_f = f_list[0]
-            if latest_f.timestamp > project_stats[p_name]["last_time"]:
-                project_stats[p_name]["last_time"] = latest_f.timestamp
-                # 統計最近同一次工作階段 (2小時內) 的異動檔案
-                recent_cutoff = latest_f.timestamp - timedelta(hours=2)
-                recent_files = [ev.file_name for ev in f_list if ev.timestamp >= recent_cutoff]
-                distinct_recent = list(dict.fromkeys(recent_files))
-                if len(distinct_recent) > 1:
-                    files_preview = ", ".join(shorten_filename(n) for n in distinct_recent[:2])
-                    more = f" 等共 {len(distinct_recent)} 個檔案" if len(distinct_recent) > 2 else " 共 2 個檔案"
-                    project_stats[p_name]["last_action"] = f"異動 {files_preview}{more}"
+                latest_f = f_list[0]
+                if latest_f.timestamp > project_stats[p_name]["last_time"]:
+                    project_stats[p_name]["last_time"] = latest_f.timestamp
+                    # 統計最近同一次工作階段 (2小時內) 的異動檔案
+                    recent_cutoff = latest_f.timestamp - timedelta(hours=2)
+                    recent_files = [ev.file_name for ev in f_list if ev.timestamp >= recent_cutoff]
+                    distinct_recent = list(dict.fromkeys(recent_files))
+                    if len(distinct_recent) > 1:
+                        files_preview = ", ".join(shorten_filename(n) for n in distinct_recent[:2])
+                        more = f" 等共 {len(distinct_recent)} 個檔案" if len(distinct_recent) > 2 else " 共 2 個檔案"
+                        project_stats[p_name]["last_action"] = f"異動 {files_preview}{more}"
+                    else:
+                        detail = latest_f.diff_summary or ""
+                        suffix = f" ({detail})" if detail else ""
+                        project_stats[p_name]["last_action"] = f"[{latest_f.action.upper()}] {shorten_filename(latest_f.file_name, 34)}{suffix}"
+
+            # 3. 收集 AI Prompts
+            ai_events = session.query(AIPromptEvent).order_by(desc(AIPromptEvent.timestamp)).all()
+            for a in ai_events:
+                tag = a.project_tag or (resolve_project_from_path(a.cwd) if a.cwd else "AI Interactions")
+                norm_tag = normalize_project_name(tag)
+                if norm_tag in ["General / Unassigned", ""]:
+                    continue
+                _ensure_proj(norm_tag)
+                project_stats[norm_tag]["ai_cnt"] += 1
+                if a.timestamp > project_stats[norm_tag]["last_time"]:
+                    project_stats[norm_tag]["last_time"] = a.timestamp
+                    project_stats[norm_tag]["last_action"] = f"[{a.platform.upper()}] {summarize_action(a.prompt_text)}"
+
+            # 4. 查詢 GitHub Repos 與本機 Git 狀態作為決定性判準
+            gh_repo_names = {r.repo_name.lower() for r in session.query(GitHubRepoState).all()}
+
+            # 5. 多數決判定專案分類
+            valid_keys = set()
+            for p_key, st in project_stats.items():
+                if st["last_time"] == datetime.min:
+                    continue
+                valid_keys.add(p_key)
+
+                # 分類多數決邏輯
+                is_git_repo = (p_key.lower() in gh_repo_names) or (st["git_cnt"] > 0)
+                if is_git_repo or (st["code_cnt"] > st["paper_cnt"]):
+                    category = "Coding / Development"
+                elif st["paper_cnt"] >= st["code_cnt"] and st["paper_cnt"] > 0:
+                    category = "Research / Paper Writing"
+                elif st["ai_cnt"] > 0:
+                    category = "AI / Research"
                 else:
-                    detail = latest_f.diff_summary or ""
-                    suffix = f" ({detail})" if detail else ""
-                    project_stats[p_name]["last_action"] = f"[{latest_f.action.upper()}] {shorten_filename(latest_f.file_name, 34)}{suffix}"
+                    category = "General Activity"
 
-        # 3. 收集 AI Prompts
-        ai_events = session.query(AIPromptEvent).order_by(desc(AIPromptEvent.timestamp)).all()
-        for a in ai_events:
-            tag = a.project_tag or (resolve_project_from_path(a.cwd) if a.cwd else "AI Interactions")
-            norm_tag = normalize_project_name(tag)
-            if norm_tag in ["General / Unassigned", ""]:
-                continue
-            _ensure_proj(norm_tag)
-            project_stats[norm_tag]["ai_cnt"] += 1
-            if a.timestamp > project_stats[norm_tag]["last_time"]:
-                project_stats[norm_tag]["last_time"] = a.timestamp
-                project_stats[norm_tag]["last_action"] = f"[{a.platform.upper()}] {summarize_action(a.prompt_text)}"
+                diff_days = (now - st["last_time"]).days
+                status = "active" if diff_days <= 2 else ("idle" if diff_days <= 5 else "stale")
 
-        # 4. 查詢 GitHub Repos 與本機 Git 狀態作為決定性判準
-        gh_repo_names = {r.repo_name.lower() for r in session.query(GitHubRepoState).all()}
-
-        # 5. 多數決判定專案分類
-        valid_keys = set()
-        for p_key, st in project_stats.items():
-            if st["last_time"] == datetime.min:
-                continue
-            valid_keys.add(p_key)
-
-            # 分類多數決邏輯
-            is_git_repo = (p_key.lower() in gh_repo_names) or (st["git_cnt"] > 0)
-            if is_git_repo or (st["code_cnt"] > st["paper_cnt"]):
-                category = "Coding / Development"
-            elif st["paper_cnt"] >= st["code_cnt"] and st["paper_cnt"] > 0:
-                category = "Research / Paper Writing"
-            elif st["ai_cnt"] > 0:
-                category = "AI / Research"
-            else:
-                category = "General Activity"
-
-            diff_days = (now - st["last_time"]).days
-            status = "active" if diff_days <= 2 else ("idle" if diff_days <= 5 else "stale")
-
-            proj = session.query(ProjectState).filter_by(project_key=p_key).first()
-            if not proj:
-                proj = ProjectState(
+                insert_stmt = sqlite_insert(ProjectState).values(
                     project_key=p_key,
                     display_name=p_key,
                     category=category,
                     last_activity_at=st["last_time"],
                     last_action_summary=st["last_action"],
                     status=status,
-                    updated_at=now
+                    updated_at=now,
                 )
-                session.add(proj)
-            else:
-                proj.display_name = p_key
-                proj.category = category
-                proj.last_activity_at = st["last_time"]
-                proj.last_action_summary = st["last_action"]
-                proj.status = status
-                proj.updated_at = now
+                # 除了程序內 lock，也用資料庫原子 UPSERT 承接外部程序或手動
+                # 同步可能同時寫入的情況；唯一鍵不再導致 health/專案 API 失敗。
+                session.execute(
+                    insert_stmt.on_conflict_do_update(
+                        index_elements=[ProjectState.project_key],
+                        set_={
+                            "display_name": insert_stmt.excluded.display_name,
+                            "category": insert_stmt.excluded.category,
+                            "last_activity_at": insert_stmt.excluded.last_activity_at,
+                            "last_action_summary": insert_stmt.excluded.last_action_summary,
+                            "status": insert_stmt.excluded.status,
+                            "updated_at": insert_stmt.excluded.updated_at,
+                        },
+                    )
+                )
 
-        # 刪除已不在 valid_keys 中的歷史碎片專案
-        session.query(ProjectState).filter(~ProjectState.project_key.in_(valid_keys)).delete(synchronize_session=False)
+            # 刪除已不在 valid_keys 中的歷史碎片專案
+            session.query(ProjectState).filter(~ProjectState.project_key.in_(valid_keys)).delete(synchronize_session=False)
 
-    _LAST_PROJECT_REFRESH_TIME = time.time()
+        _LAST_PROJECT_REFRESH_TIME = time.time()
+
+
+def get_project_state_count() -> int:
+    """只讀取既有專案狀態筆數，供 health endpoint 使用而不觸發重整。"""
+    db = get_db()
+    with db.session_scope() as session:
+        return int(
+            session.query(func.count(ProjectState.id))
+            .filter(~func.lower(ProjectState.project_key).in_(BUCKET_PROJECT_KEYS))
+            .scalar()
+            or 0
+        )
 
 
 def get_active_projects_list(force_refresh: bool = False) -> List[Dict[str, Any]]:

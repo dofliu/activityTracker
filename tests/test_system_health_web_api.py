@@ -53,6 +53,20 @@ def test_get_system_health(client):
     assert db_info["size_bytes"] >= 0
 
 
+def test_system_health_reads_materialized_project_count_without_refresh(client, monkeypatch):
+    """Health 輪詢不可觸發專案重整，否則會把讀取端點變成競爭寫入來源。"""
+    def _unexpected_refresh(*_args, **_kwargs):
+        raise AssertionError("health endpoint must not refresh project states")
+
+    monkeypatch.setattr("core.project_engine.refresh_project_states", _unexpected_refresh)
+    monkeypatch.setattr("core.server.get_project_state_count", lambda: 7)
+
+    response = client.get("/api/v1/system/health")
+
+    assert response.status_code == 200
+    assert response.json()["database"]["active_projects_count"] == 7
+
+
 def test_post_system_heal(client):
     """驗證 POST /api/v1/system/heal 觸發巡檢與修復"""
     resp = client.post("/api/v1/system/heal")

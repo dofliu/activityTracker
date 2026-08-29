@@ -4,7 +4,7 @@ import hashlib
 import yaml
 from pathlib import Path
 from datetime import datetime, date, timedelta
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from fastapi import FastAPI, Depends, HTTPException, Query, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -38,11 +38,12 @@ from .time_utils import get_local_now
 from .runtime_paths import resolve_runtime_path, web_assets_dir
 from .secret_resolver import resolve_secret_env
 from .project_engine import (
-    get_active_projects_list,
+    get_project_state_count,
     get_open_loops_list,
     refresh_project_states,
     transition_open_loop,
 )
+from .repo_sync import LocalRepositorySync, RepositorySyncRejected
 from synthesizer.aggregator import (
     generate_daily_summary_pipeline,
     generate_periodic_checkpoint,
@@ -491,7 +492,8 @@ def get_system_health():
             "path": str(db_path),
             "size_bytes": db_size,
             "wal_size_bytes": wal_size,
-            "active_projects_count": len(get_active_projects_list()),
+            # Health check 只讀取已物化的狀態；不可因輪詢而觸發全量掃描與寫入。
+            "active_projects_count": get_project_state_count(),
         },
         "latest_maintenance": receipt,
         "database_migration": status.get("database_migration", {}),
@@ -1020,9 +1022,43 @@ class GitHubConnectRequest(BaseModel):
     token: Optional[str] = None
 
 
+class RepositorySyncActionRequest(BaseModel):
+    """本機 Git 寫入動作必須以已列出的 repo_id 與明確確認發出。"""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    repo_id: str = Field(..., pattern=r"^[a-f0-9]{16}$")
+    action: Literal["fetch", "pull_ff_only", "push", "commit_staged"]
+    confirmation: Literal["confirmed"]
+    commit_message: Optional[str] = Field(default=None, max_length=300)
+
+
 # =====================================================================
 # 9. GitHub 雲端專案與 PR 智慧追蹤 API (GitHub Cloud Integration)
 # =====================================================================
+@app.get("/api/v1/repos/sync-status")
+def get_local_repository_sync_status():
+    """列出設定 root 內的本機 Git 狀態。
+
+    ahead/behind 只比較目前本機保存的 remote-tracking ref；不會在載入頁面時
+    自動連線、fetch 或改動任何 worktree。
+    """
+    return LocalRepositorySync().list_statuses()
+
+
+@app.post("/api/v1/repos/sync-action")
+def run_local_repository_sync_action(req: RepositorySyncActionRequest):
+    """逐一執行已確認的 fetch / fast-forward pull / staged commit / push。"""
+    try:
+        return LocalRepositorySync().execute(
+            repo_id=req.repo_id,
+            action=req.action,
+            commit_message=req.commit_message,
+        )
+    except RepositorySyncRejected as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @app.get("/api/v1/github/status")
 def get_github_status():
     """取得 GitHub 連線與認證狀態"""

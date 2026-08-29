@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css?v=1.3.0a5-background-tasks">
+  <link rel="stylesheet" href="/static/style.css?v=1.3.0a9-repository-sync">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
@@ -456,6 +456,26 @@
             </div>
           </div>
         </div>
+
+        <div class="panel mb-14" id="repo-sync-panel">
+          <div class="panel-head">
+            <span class="mono-label accent">06</span><span class="panel-title" data-i18n="repo_sync_title">本機 Git 同步中心</span>
+            <span id="repo-sync-badge" class="trust neutral" data-i18n="repo_sync_manual">逐項手動確認</span>
+          </div>
+          <div class="repo-sync-body">
+            <div class="repo-sync-intro">
+              <div>
+                <strong data-i18n="repo_sync_intro_title">檢查本機 branch 與遠端追蹤差異</strong>
+                <p data-i18n="repo_sync_intro_detail">狀態只讀取本機已保存的 remote-tracking refs。先按 Fetch 更新遠端參照，再依條件執行 fast-forward Pull、staged Commit 或 Push。</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="btn-repo-sync-refresh" data-i18n="btn_repo_sync_refresh">↻ 重讀同步狀態</button>
+            </div>
+            <div id="repo-sync-summary" class="repo-sync-summary mono-mini muted" data-i18n="repo_sync_loading">正在讀取設定範圍內的 repositories…</div>
+            <div id="repo-sync-list" class="repo-sync-list" aria-live="polite"></div>
+            <div id="repo-sync-result" class="repo-sync-result mono-mini muted"></div>
+          </div>
+          <div class="panel-foot repo-sync-foot" data-i18n="repo_sync_boundary">不會自動同步、不會自動 git add、不會 force push；Commit 只會提交您已明確 staged 的檔案。</div>
+        </div>
       </section>
 
       <!-- 04 每日摘要 -->
@@ -628,15 +648,15 @@
         </div>
       </details>
 
-      <!-- OPEN LOOPS (主要待辦事項面板) -->
-      <div class="panel">
-        <div class="rail-head"><span data-i18n="rail_open_loops">OPEN LOOPS</span><span id="loop-tally">—</span></div>
-        <div id="open-loops-list"><div class="placeholder" data-i18n="ph_loading_loops">載入未結事項…</div></div>
+      <!-- FOCUS NOW：一次一張大型卡，混合已觀測事項與明確標示的唯讀建議。 -->
+      <div class="panel focus-carousel-panel">
+        <div class="rail-head"><span data-i18n="rail_focus_now">FOCUS NOW</span><span id="loop-tally">—</span></div>
+        <div id="open-loops-list" class="focus-carousel"><div class="placeholder" data-i18n="ph_loading_loops">載入重點事項…</div></div>
       </div>
     </aside>
   </div>
 
   <div id="toast-container"></div>
-  <script src="/static/app.js?v=1.3.0a5-background-tasks"></script>
+  <script src="/static/app.js?v=1.3.0a8-repository-sync"></script>
 </body>
 </html>

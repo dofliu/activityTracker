@@ -67,6 +67,12 @@
   * 提取各 PR 的標題、狀態（Open / Merged / Draft）、分支流向（`head -> base`）、CI 測試結果（`SUCCESS` / `PENDING` / `FAILURE`）與審查狀態。
   * Web 儀表板提供直接點擊跳轉至 GitHub PR 的超連結。
 
+### 2.1. 🔁 本機 Git 同步中心（逐項確認）
+* **本機狀態與雲端 metadata 分流**：GitHub 卡片維持讀取雲端 repo／PR；同步中心則顯示設定 roots 下各 repo 的 branch、upstream、cached ahead/behind 與 worktree 變更，兩者不再混稱為「同步」。
+* **受控雙向同步**：每個 repo 可先 `Fetch` 更新 remote-tracking refs，再依條件執行 `Pull --ff-only`、`Commit staged`、`Push`。
+* **安全預設**：沒有排程自動同步、不會 `git add`、不提供 force push；Pull/Push 都要求 clean worktree，Commit 只處理使用者已 staged 的檔案並要求輸入 message。詳見 [使用說明](docs/USAGE.md#13-本機-git-同步中心) 與 [ADR-011](docs/ADR-011-safe-local-repository-sync.md)。
+* **目前範圍**：本機資料夾尚未 `git init`、本機 Git repo 尚未設定 remote、以及 GitHub repo 尚未 clone 到電腦，會被明確保留為下一階段的 Repo Onboarding／Reconciliation；目前不會自動建立雲端 repo、初始化資料夾或 clone，以避免將使用者意圖不明的資料夾直接發布到遠端。
+
 ### 3. 🤖 跨平台 AI 對話全景記錄（來源可追溯；P2.5 強化中）
 * **本機 CLI / IDE Agent**：
   * **Claude Code**（`~/.claude/projects/`）：完整記錄命令、提問與對話細節。

@@ -360,8 +360,10 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     assert "PROPOSAL ONLY" in dashboard.text
     assert "DATA CAPTURE" in dashboard.text
     assert "extension-capture-badge" not in dashboard.text
-    assert "style.css?v=1.3.0a5-background-tasks" in dashboard.text
-    assert "app.js?v=1.3.0a5-background-tasks" in dashboard.text
+    assert "style.css?v=1.3.0a9-repository-sync" in dashboard.text
+    assert "app.js?v=1.3.0a8-repository-sync" in dashboard.text
+    assert "focus-carousel" in dashboard.text
+    assert "repo-sync-panel" in dashboard.text
     assert "data-trust-runtime-badge" in dashboard.text
     assert "/extension-monitor" in dashboard.text
     stylesheet = client.get("/static/style.css")

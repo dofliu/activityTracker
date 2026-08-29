@@ -23,6 +23,12 @@ let llmStatusCache = null;
 let contextSessionsCache = null;
 let relatedContextCache = null;
 let secretaryProposalsCache = null;
+let focusCarouselItems = [];
+let focusCarouselIndex = 0;
+let focusCarouselTimer = null;
+let focusCarouselUserPaused = false;
+let focusCarouselPointerPaused = false;
+let repositorySyncCache = [];
 
 const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t == null ? "" : t)
@@ -118,6 +124,13 @@ const I18N = {
     btn_save_apply: "儲存並套用",
     settings_save_note: "寫回 config.yaml 後即時熱更新",
     settings_p4_title: "GitHub 雲端整合 (全專案與 PR 追蹤)",
+    repo_sync_title: "本機 Git 同步中心",
+    repo_sync_manual: "逐項手動確認",
+    repo_sync_intro_title: "檢查本機 branch 與遠端追蹤差異",
+    repo_sync_intro_detail: "狀態只讀取本機已保存的 remote-tracking refs。先按 Fetch 更新遠端參照，再依條件執行 fast-forward Pull、staged Commit 或 Push。",
+    btn_repo_sync_refresh: "↻ 重讀同步狀態",
+    repo_sync_loading: "正在讀取設定範圍內的 repositories…",
+    repo_sync_boundary: "不會自動同步、不會自動 git add、不會 force push；Commit 只會提交您已明確 staged 的檔案。",
     usage_title: "TODAY · 前景使用與里程碑",
     btn_refresh_usage: "重新整理",
     usage_goal_label: "AI 協作前景使用時間",
@@ -167,8 +180,20 @@ const I18N = {
     btn_copy_log: "複製 Log",
     ph_cp_click: "請從左側點選快照日誌以檢視期間活動細節。",
     rail_open_loops: "OPEN LOOPS",
-    ph_loading_loops: "載入未結事項…",
-    ph_no_loops: "無未結事項。",
+    rail_focus_now: "FOCUS NOW",
+    ph_loading_loops: "載入重點事項…",
+    ph_no_loops: "目前沒有可輪播的重點事項。",
+    focus_observed: "已觀測 · OPEN LOOP",
+    focus_proposal: "唯讀建議 · PROPOSAL ONLY",
+    focus_view_project: "查看專案 ↗",
+    focus_resolve: "✓ 完成",
+    focus_snooze: "7 天不提醒",
+    focus_previous: "上一項",
+    focus_next: "下一項",
+    focus_pause: "暫停輪播",
+    focus_play: "繼續輪播",
+    focus_count: "第 {current} / {total} 張 · 未結 {open}",
+    focus_boundary: "僅輪播前 5 項；已觀測事項可結案，建議不會自動執行。",
     data_trust_title: "DATA TRUST",
     data_trust_desc: "8 項 contract gates 已通過；runtime 仍以 collector probes 判定，coverage 不完整時不得升格。",
     trust_d1: "統一時區 (Local Timezone)",
@@ -282,6 +307,13 @@ const I18N = {
     btn_save_apply: "Save & Apply",
     settings_save_note: "Hot reloaded directly into config.yaml",
     settings_p4_title: "GitHub Cloud Integration (Public & Private Repos + PRs)",
+    repo_sync_title: "Local Git Sync Center",
+    repo_sync_manual: "Manual confirmation per repository",
+    repo_sync_intro_title: "Check local branches against tracked remotes",
+    repo_sync_intro_detail: "Status reads locally cached remote-tracking refs only. Fetch refreshes refs, then Fast-forward Pull, staged Commit, or Push is enabled only when safe.",
+    btn_repo_sync_refresh: "↻ Refresh sync status",
+    repo_sync_loading: "Reading repositories within configured scope…",
+    repo_sync_boundary: "No automatic sync, git add, or force push. Commit only includes files you explicitly staged.",
     usage_title: "TODAY · FOREGROUND USE & MILESTONES",
     btn_refresh_usage: "Refresh",
     usage_goal_label: "AI collaboration foreground time",
@@ -331,8 +363,20 @@ const I18N = {
     btn_copy_log: "Copy Log",
     ph_cp_click: "Select a checkpoint log on the left to inspect detailed activity records.",
     rail_open_loops: "OPEN LOOPS",
-    ph_loading_loops: "Loading open loops…",
-    ph_no_loops: "No open loops.",
+    rail_focus_now: "FOCUS NOW",
+    ph_loading_loops: "Loading focus items…",
+    ph_no_loops: "No focus items to rotate.",
+    focus_observed: "OBSERVED · OPEN LOOP",
+    focus_proposal: "READ-ONLY · PROPOSAL",
+    focus_view_project: "View project ↗",
+    focus_resolve: "✓ Done",
+    focus_snooze: "Snooze 7d",
+    focus_previous: "Previous item",
+    focus_next: "Next item",
+    focus_pause: "Pause rotation",
+    focus_play: "Resume rotation",
+    focus_count: "Card {current} / {total} · {open} open",
+    focus_boundary: "Only the top five rotate. Observed items can be resolved; proposals never execute automatically.",
     data_trust_title: "DATA TRUST",
     data_trust_desc: "Eight contract gates passed; runtime still depends on collector probes and incomplete coverage is never promoted.",
     trust_d1: "Unified Timezone (Local TZ)",
@@ -398,6 +442,7 @@ function applyLanguage(lang) {
   renderOpenLoops();
   renderContextSessions();
   renderSecretaryProposals();
+  renderRepositorySyncStatus();
   if (relatedContextCache) renderRelatedContext(relatedContextCache);
   if ($("llm-key-status-badge")) renderLLMStatus();
 }
@@ -424,7 +469,11 @@ async function postJSON(url, body) {
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body)
   });
-  if (!res.ok) throw new Error(url + " → " + res.status);
+  if (!res.ok) {
+    let detail = "";
+    try { detail = (await res.json()).detail || ""; } catch (_) { /* 保留 HTTP fallback */ }
+    throw new Error(detail || (url + " → " + res.status));
+  }
   return res.json();
 }
 
@@ -435,10 +484,12 @@ document.addEventListener("DOMContentLoaded", () => {
   initControls();
   initSettingsForm();
   initGitHubSection();
+  initRepositorySyncSection();
   initSummariesTab();
   initCheckpointsTab();
   initRAGTab();
   initSystemHealthTab();
+  initFocusCarousel();
 
   refreshStatus();
   refreshFeed();
@@ -446,6 +497,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadOpenLoops();
   loadConfig();
   loadGitHubStatus();
+  loadRepositorySyncStatus();
   loadSummaries();
   loadCheckpoints();
   loadUsagePanels();
@@ -873,6 +925,7 @@ function renderSecretaryProposals() {
   const badge = $("secretary-proposals-badge");
   if (!box || !badge) return;
   if (!secretaryProposalsCache) return;
+  renderFocusCarousel();
   const proposals = secretaryProposalsCache.proposals || [];
   badge.textContent = `${proposals.length} ${currentLang === "zh-TW" ? "項" : "ITEMS"}`;
   badge.className = `trust ${proposals.length ? "noisy" : "ok"}`;
@@ -1367,66 +1420,188 @@ async function renderProjectDetail(key) {
 }
 
 
-// ---------------------------------------------------------------- open loops rail
+// ---------------------------------------------------------------- focus carousel (observed open loops + proposal-only suggestions)
 async function loadOpenLoops() {
   try {
     loopsCache = await getJSON("/api/v1/open-loops");
-    renderOpenLoops();
   } catch (e) {
-    $("open-loops-list").innerHTML = `<div class="placeholder">${t("ph_loading_loops")}</div>`;
+    loopsCache = [];
   }
+  renderOpenLoops();
+}
+
+function focusDateMs(value) {
+  const parsed = Date.parse(String(value || "").replace(" ", "T"));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function buildFocusCarouselItems() {
+  const now = Date.now();
+  const candidates = [];
+
+  for (const loop of loopsCache) {
+    const lastSeen = focusDateMs(loop.last_seen_at || loop.created_at);
+    const ageDays = lastSeen ? Math.max(0, (now - lastSeen) / 86400000) : 30;
+    // Open Loop 沒有人工 priority 欄位，因此只用可檢查的來源信心與時間排序，
+    // 不把這個畫面偽裝成 AI 已判定的事實重要度。
+    const score = 0.42 + Math.min(0.16, ageDays / 180) + Math.min(0.10, Number(loop.confidence || 0) * 0.10);
+    candidates.push({
+      key: `open-loop:${loop.id}`,
+      kind: "open_loop",
+      priority: "observed",
+      score,
+      project_key: loop.project_key,
+      title: loop.title,
+      detail: loop.created_at || "",
+      updated_at: lastSeen,
+      loop_id: loop.id,
+    });
+  }
+
+  for (const proposal of secretaryProposalsCache?.proposals || []) {
+    candidates.push({
+      key: `proposal:${proposal.proposal_id}`,
+      kind: "proposal",
+      priority: proposal.priority || "medium",
+      score: Number(proposal.score || 0),
+      project_key: proposal.project_key || "OmniContext",
+      title: proposal.detail || proposal.title,
+      detail: proposal.suggested_action || proposal.reason || "",
+      updated_at: 0,
+      proposal_type: proposal.proposal_type,
+      subject_ref: proposal.subject_ref || "",
+    });
+  }
+
+  candidates.sort((left, right) => (
+    right.score - left.score || right.updated_at - left.updated_at || left.key.localeCompare(right.key)
+  ));
+
+  // 同一專案最多兩張，避免單一大量待辦或 repository 佔滿整個焦點輪播。
+  const projectCounts = new Map();
+  const selected = [];
+  for (const item of candidates) {
+    const count = projectCounts.get(item.project_key) || 0;
+    if (count >= 2) continue;
+    projectCounts.set(item.project_key, count + 1);
+    selected.push(item);
+    if (selected.length === 5) break;
+  }
+  return selected;
 }
 
 function renderOpenLoops() {
-  $("loop-tally").textContent = String(loopsCache.length);
+  renderFocusCarousel();
+}
+
+function renderFocusCarousel() {
   const box = $("open-loops-list");
-  if (!loopsCache.length) {
+  const tally = $("loop-tally");
+  if (!box || !tally) return;
+
+  focusCarouselItems = buildFocusCarouselItems();
+  tally.textContent = `${focusCarouselItems.length}/5 · ${loopsCache.length}`;
+  if (!focusCarouselItems.length) {
     box.innerHTML = `<div class="placeholder">${t("ph_no_loops")}</div>`;
     return;
   }
-  box.innerHTML = loopsCache.map(l => `
-    <div class="loop" data-id="${l.id}" data-project="${esc(l.project_key)}" title="${t('title_click_to_open_project')}">
-      <div class="loop-main">
-        <div class="loop-text">${esc(l.title)}</div>
-        <div class="loop-src"><span style="color:var(--orange); font-weight:700;">${esc(l.project_key)}</span> · ${esc(l.created_at || "")}</div>
+  focusCarouselIndex = Math.min(focusCarouselIndex, focusCarouselItems.length - 1);
+  const item = focusCarouselItems[focusCarouselIndex];
+  const observed = item.kind === "open_loop";
+  const source = observed ? t("focus_observed") : t("focus_proposal");
+  const priority = observed ? source : String(item.priority || "medium").toUpperCase();
+  const action = observed
+    ? `<button class="focus-action focus-resolve-btn" data-resolve="${item.loop_id}">${t("focus_resolve")}</button>`
+    : `<button class="focus-action focus-secondary-action" data-focus-snooze="1">${t("focus_snooze")}</button>`;
+  const dots = focusCarouselItems.map((candidate, index) => `
+    <button class="focus-dot ${index === focusCarouselIndex ? "active" : ""}" data-focus-index="${index}" aria-label="${esc(t("focus_count", {current: index + 1, total: focusCarouselItems.length, open: loopsCache.length}))}" aria-current="${index === focusCarouselIndex ? "true" : "false"}"></button>`
+  ).join("");
+
+  box.innerHTML = `
+    <article class="focus-card ${observed ? "focus-observed" : "focus-proposal"}" data-id="${observed ? item.loop_id : ""}">
+      <div class="focus-card-top">
+        <span class="focus-source">${esc(source)}</span>
+        <span class="focus-priority ${esc(String(item.priority || "medium").toLowerCase())}">${esc(priority)}</span>
       </div>
-      <button class="loop-resolve-btn" data-resolve="${l.id}" title="${t('title_mark_resolved')}">✓</button>
-    </div>`).join("");
+      <div class="focus-project">${esc(item.project_key)}</div>
+      <h2 class="focus-title" title="${esc(item.title)}">${esc(item.title)}</h2>
+      <div class="focus-detail">${esc(item.detail || (currentLang === "zh-TW" ? "可回到專案查看來源與下一步。" : "Open the project to review its source and next step."))}</div>
+      <div class="focus-card-bottom">
+        <div class="focus-controls">
+          <button class="focus-nav" data-focus-prev aria-label="${esc(t("focus_previous"))}">←</button>
+          <div class="focus-dots">${dots}</div>
+          <button class="focus-nav" data-focus-next aria-label="${esc(t("focus_next"))}">→</button>
+          <button class="focus-nav focus-toggle" data-focus-toggle aria-label="${esc(focusCarouselUserPaused ? t("focus_play") : t("focus_pause"))}" aria-pressed="${focusCarouselUserPaused}">${focusCarouselUserPaused ? "▶" : "Ⅱ"}</button>
+        </div>
+        <div class="focus-actions">
+          <button class="focus-action focus-primary-action" data-focus-project="${esc(item.project_key)}">${t("focus_view_project")}</button>
+          ${action}
+        </div>
+        <div class="focus-boundary">${t("focus_boundary")} · ${t("focus_count", {current: focusCarouselIndex + 1, total: focusCarouselItems.length, open: loopsCache.length})}</div>
+      </div>
+    </article>`;
+}
 
-  box.querySelectorAll(".loop").forEach(el => {
-    // 點選主要區域：跳轉至 01 進行中工作頁籤並展開該專案
-    el.addEventListener("click", (ev) => {
-      const pKey = el.dataset.project;
-      if (pKey) {
-        // 切換到 01 專案頁籤
-        const tabBtn = document.querySelector('.tabs button[data-tab="tab-projects"]');
-        if (tabBtn) tabBtn.click();
+function focusProject(projectKey) {
+  if (!projectKey) return;
+  const tabBtn = document.querySelector('.tabs button[data-tab="tab-projects"]');
+  if (tabBtn) tabBtn.click();
+  const isIdle = projectsCache.some(project => project.project_key === projectKey && project.idle_days > 60);
+  if (isIdle) showAllProjects = true;
+  expandProject(projectKey, true);
+  showToast(currentLang === "zh-TW" ? `🎯 已定位並展開專案: ${projectKey}` : `🎯 Focused project: ${projectKey}`);
+}
 
-        // 若屬於 60 天以上閒置專案，自動切換至顯示全部
-        const isIdle = projectsCache.some(p => p.project_key === pKey && p.idle_days > 60);
-        if (isIdle) showAllProjects = true;
+function initFocusCarousel() {
+  const box = $("open-loops-list");
+  if (!box) return;
 
-        expandProject(pKey, true);
-        showToast(currentLang === "zh-TW" ? `🎯 已定位並展開專案: ${pKey}` : `🎯 Focused project: ${pKey}`);
-      }
-    });
-
-    // 點選結案按鈕：確認解決此未結事項
-    const resBtn = el.querySelector("[data-resolve]");
-    if (resBtn) {
-      resBtn.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        resolveLoop(el);
-      });
+  box.addEventListener("mouseenter", () => { focusCarouselPointerPaused = true; });
+  box.addEventListener("mouseleave", () => { focusCarouselPointerPaused = false; });
+  box.addEventListener("focusin", () => { focusCarouselPointerPaused = true; });
+  box.addEventListener("focusout", () => { focusCarouselPointerPaused = false; });
+  box.addEventListener("click", event => {
+    const target = event.target.closest("button");
+    if (!target) return;
+    if (target.dataset.focusIndex !== undefined) {
+      focusCarouselIndex = Number(target.dataset.focusIndex);
+      renderFocusCarousel();
+    } else if (target.hasAttribute("data-focus-prev")) {
+      focusCarouselIndex = (focusCarouselIndex - 1 + focusCarouselItems.length) % focusCarouselItems.length;
+      renderFocusCarousel();
+    } else if (target.hasAttribute("data-focus-next")) {
+      focusCarouselIndex = (focusCarouselIndex + 1) % focusCarouselItems.length;
+      renderFocusCarousel();
+    } else if (target.hasAttribute("data-focus-toggle")) {
+      focusCarouselUserPaused = !focusCarouselUserPaused;
+      renderFocusCarousel();
+    } else if (target.dataset.focusProject) {
+      focusProject(target.dataset.focusProject);
+    } else if (target.dataset.resolve) {
+      resolveLoop(target.closest(".focus-card"));
+    } else if (target.dataset.focusSnooze) {
+      const item = focusCarouselItems[focusCarouselIndex];
+      if (item) window.snoozeProposal(item.proposal_type, item.project_key, item.subject_ref, 7);
     }
   });
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) renderFocusCarousel();
+  });
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    focusCarouselTimer = window.setInterval(() => {
+      if (document.hidden || focusCarouselUserPaused || focusCarouselPointerPaused || focusCarouselItems.length < 2) return;
+      focusCarouselIndex = (focusCarouselIndex + 1) % focusCarouselItems.length;
+      renderFocusCarousel();
+    }, 9000);
+  }
 }
 
 async function resolveLoop(el) {
-  const id = el.dataset.id;
-  if (el.classList.contains("done")) return;
+  const id = el?.dataset.id;
+  if (!id || el.classList.contains("done")) return;
   el.classList.add("done");
-  const resBtn = el.querySelector(".loop-resolve-btn");
+  const resBtn = el.querySelector("[data-resolve]");
   if (resBtn) {
     resBtn.style.background = "var(--ok)";
     resBtn.style.borderColor = "var(--ok)";
@@ -1434,10 +1609,9 @@ async function resolveLoop(el) {
   }
   try {
     await postJSON(`/api/v1/open-loops/${id}/resolve`);
-    loopsCache = loopsCache.filter(l => String(l.id) !== String(id));
-    $("loop-tally").textContent = String(loopsCache.length);
+    loopsCache = loopsCache.filter(loop => String(loop.id) !== String(id));
     showToast(currentLang === "zh-TW" ? "⚡ 未結事項已標記為已結案！" : "⚡ Marked open loop as resolved!");
-    setTimeout(() => { renderOpenLoops(); loadProjects(); }, 550);
+    setTimeout(() => { renderOpenLoops(); loadSecretaryProposals(); loadProjects(); }, 550);
   } catch (e) {
     el.classList.remove("done");
     if (resBtn) {
@@ -1675,6 +1849,195 @@ async function saveSettings() {
   } finally {
     setTimeout(() => { btn.disabled = false; btn.textContent = label; }, 1600);
   }
+}
+
+// ------------------------------------------------------ local repository sync
+function repoSyncLabels() {
+  const zh = currentLang === "zh-TW";
+  return zh ? {
+    noRepo: "尚未在監控設定中加入 Git repository root。",
+    cached: "ahead / behind 比較的是本機已保存的 remote-tracking refs；按 Fetch 才會更新遠端參照。",
+    truncated: "清單已達安全上限，請縮小 repositories 設定範圍或調高 config 上限。",
+    clean: "CLEAN",
+    dirty: "WORKTREE CHANGED",
+    synced: "已同步",
+    ahead: "待 Push",
+    behind: "待 Pull",
+    diverged: "已分歧",
+    no_upstream: "未設定 upstream",
+    detached_head: "Detached HEAD",
+    upstream_unavailable: "Upstream 不可用",
+    unavailable: "無法讀取",
+    unknown: "未知狀態",
+    fetch: "Fetch",
+    pull: "Pull (FF only)",
+    commit: "Commit staged",
+    push: "Push",
+    staged: "staged",
+    unstaged: "unstaged",
+    untracked: "untracked",
+    conflicts: "conflicts",
+    confirmFetch: "只更新此 repository 的遠端參照（不改變 worktree）？",
+    confirmPull: "只允許 fast-forward Pull。worktree 將前進到遠端既有 commit，繼續？",
+    confirmPush: "推送此 repository 目前 branch 的既有 commits（不會 force push），繼續？",
+    commitPrompt: "輸入 commit message（只會提交已 staged 的檔案）：",
+    confirmCommit: "確認建立 staged-only commit？\n\n",
+    working: "執行中…",
+    success: "已完成",
+    failed: "未執行：",
+    actionHint: "每個動作都會在執行前重新檢查 branch、upstream、worktree 與分歧狀態。",
+  } : {
+    noRepo: "No Git repository root is configured for monitoring.",
+    cached: "Ahead / behind uses locally cached remote-tracking refs. Fetch refreshes those refs.",
+    truncated: "The safe list limit was reached. Narrow the configured roots or raise the config limit.",
+    clean: "CLEAN",
+    dirty: "WORKTREE CHANGED",
+    synced: "Synced",
+    ahead: "Push pending",
+    behind: "Pull pending",
+    diverged: "Diverged",
+    no_upstream: "No upstream",
+    detached_head: "Detached HEAD",
+    upstream_unavailable: "Upstream unavailable",
+    unavailable: "Unavailable",
+    unknown: "Unknown",
+    fetch: "Fetch",
+    pull: "Pull (FF only)",
+    commit: "Commit staged",
+    push: "Push",
+    staged: "staged",
+    unstaged: "unstaged",
+    untracked: "untracked",
+    conflicts: "conflicts",
+    confirmFetch: "Refresh this repository's remote refs only (does not change the worktree)?",
+    confirmPull: "Only fast-forward Pull is allowed. The worktree will advance to existing remote commits. Continue?",
+    confirmPush: "Push the current branch's existing commits (never force push)?",
+    commitPrompt: "Enter a commit message (only explicitly staged files will be committed):",
+    confirmCommit: "Create a staged-only commit?\n\n",
+    working: "Working…",
+    success: "Completed",
+    failed: "Not executed: ",
+    actionHint: "Every action rechecks branch, upstream, worktree, and divergence before it runs.",
+  };
+}
+
+function repoSyncStateText(repo, labels) {
+  const state = repo.sync_state || "unknown";
+  const base = labels[state] || labels.unknown;
+  if (state === "ahead" && Number.isInteger(repo.ahead)) return `${base} ↑${repo.ahead}`;
+  if (state === "behind" && Number.isInteger(repo.behind)) return `${base} ↓${repo.behind}`;
+  if (state === "diverged") return `${base} ↑${repo.ahead ?? "?"} ↓${repo.behind ?? "?"}`;
+  return base;
+}
+
+function repoSyncActionButton(repo, action, label) {
+  const actionState = (repo.actions || {})[action] || {};
+  const allowed = actionState.allowed === true;
+  const hint = allowed ? label : (actionState.reason || "Unavailable");
+  return `<button class="btn btn-ghost btn-sm repo-sync-action ${allowed ? "" : "is-disabled"}"
+      data-repo-id="${esc(repo.repo_id)}" data-repo-action="${esc(action)}"
+      title="${esc(hint)}" ${allowed ? "" : "disabled"}>${esc(label)}</button>`;
+}
+
+function renderRepositorySyncStatus() {
+  const list = $("repo-sync-list");
+  const summary = $("repo-sync-summary");
+  if (!list || !summary) return;
+  const labels = repoSyncLabels();
+  if (!repositorySyncCache.length) {
+    summary.textContent = labels.noRepo;
+    list.innerHTML = "";
+    return;
+  }
+
+  const needsAttention = repositorySyncCache.filter(repo =>
+    repo.sync_state !== "synced" || !repo.clean
+  ).length;
+  summary.innerHTML = `<strong>${repositorySyncCache.length}</strong> repositories · <strong>${needsAttention}</strong> ${currentLang === "zh-TW" ? "項需要處理" : "need attention"}<br><span>${esc(labels.cached)}</span>`;
+  list.innerHTML = repositorySyncCache.map(repo => {
+    const worktree = repo.worktree || {};
+    const counts = [
+      worktree.staged_files ? `${worktree.staged_files} ${labels.staged}` : "",
+      worktree.unstaged_files ? `${worktree.unstaged_files} ${labels.unstaged}` : "",
+      worktree.untracked_files ? `${worktree.untracked_files} ${labels.untracked}` : "",
+      worktree.conflicted_files ? `${worktree.conflicted_files} ${labels.conflicts}` : "",
+    ].filter(Boolean);
+    const stateClass = `state-${String(repo.sync_state || "unknown").replace(/[^a-z_]/g, "")}`;
+    const branch = repo.branch || "—";
+    const upstream = repo.upstream || "—";
+    const statusHint = repo.error || (repo.operation_in_progress ? `Git: ${repo.operation_in_progress}` : "");
+    return `<article class="repo-sync-row ${stateClass}">
+      <div class="repo-sync-main">
+        <div class="repo-sync-name">${esc(repo.name)} <span class="repo-sync-state">${esc(repoSyncStateText(repo, labels))}</span></div>
+        <div class="repo-sync-meta"><code>${esc(branch)}</code> → <code>${esc(upstream)}</code></div>
+        <div class="repo-sync-path" title="${esc(repo.path || "")}">${esc(repo.path || "")}</div>
+        <div class="repo-sync-worktree ${repo.clean ? "is-clean" : "is-dirty"}">${repo.clean ? labels.clean : `${labels.dirty}${counts.length ? ` · ${esc(counts.join(" · "))}` : ""}`}</div>
+        ${statusHint ? `<div class="repo-sync-warning">${esc(statusHint)}</div>` : ""}
+      </div>
+      <div class="repo-sync-actions">
+        ${repoSyncActionButton(repo, "fetch", labels.fetch)}
+        ${repoSyncActionButton(repo, "pull_ff_only", labels.pull)}
+        ${repoSyncActionButton(repo, "commit_staged", labels.commit)}
+        ${repoSyncActionButton(repo, "push", labels.push)}
+      </div>
+    </article>`;
+  }).join("");
+}
+
+async function loadRepositorySyncStatus() {
+  const summary = $("repo-sync-summary");
+  try {
+    const data = await getJSON("/api/v1/repos/sync-status");
+    repositorySyncCache = Array.isArray(data.repositories) ? data.repositories : [];
+    renderRepositorySyncStatus();
+    if (data.truncated && summary) {
+      summary.insertAdjacentHTML("beforeend", `<br><span class="repo-sync-warning">${esc(repoSyncLabels().truncated)}</span>`);
+    }
+  } catch (e) {
+    if (summary) summary.textContent = currentLang === "zh-TW" ? "無法讀取本機 Git 狀態。" : "Unable to read local Git status.";
+  }
+}
+
+async function runRepositorySyncAction(repoId, action) {
+  const labels = repoSyncLabels();
+  const result = $("repo-sync-result");
+  let commitMessage = null;
+  let confirmation = labels.confirmFetch;
+  if (action === "pull_ff_only") confirmation = labels.confirmPull;
+  if (action === "push") confirmation = labels.confirmPush;
+  if (action === "commit_staged") {
+    commitMessage = window.prompt(labels.commitPrompt, "");
+    if (commitMessage === null || !commitMessage.trim()) return;
+    confirmation = labels.confirmCommit + commitMessage.trim();
+  }
+  if (!window.confirm(confirmation)) return;
+
+  if (result) result.textContent = labels.working;
+  try {
+    const receipt = await postJSON("/api/v1/repos/sync-action", {
+      repo_id: repoId,
+      action,
+      confirmation: "confirmed",
+      commit_message: commitMessage,
+    });
+    if (result) result.textContent = `${labels.success} · ${receipt.repo_name} · ${action}`;
+    await loadRepositorySyncStatus();
+    loadProjects(true);
+  } catch (e) {
+    if (result) result.textContent = `${labels.failed}${e.message}`;
+    await loadRepositorySyncStatus();
+  }
+}
+
+function initRepositorySyncSection() {
+  const refresh = $("btn-repo-sync-refresh");
+  if (refresh) refresh.addEventListener("click", () => loadRepositorySyncStatus());
+  const list = $("repo-sync-list");
+  if (list) list.addEventListener("click", (event) => {
+    const button = event.target.closest(".repo-sync-action");
+    if (!button || button.disabled) return;
+    runRepositorySyncAction(button.dataset.repoId, button.dataset.repoAction);
+  });
 }
 
 // ---------------------------------------------------------------- github

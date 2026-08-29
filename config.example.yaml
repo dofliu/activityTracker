@@ -53,6 +53,14 @@ watchers:
     enabled: true
     repositories: []
     scan_interval_seconds: 300
+repository_sync:
+  # 本機 Git 同步中心與 git_watcher 共用這些明示設定的 repository roots。
+  # 不會自動 fetch / pull / commit / push；每項動作均由 Dashboard 個別確認。
+  command_timeout_seconds: 30
+  # 讀取 branch/worktree 的單一 repo 上限與有限並行度；逾時只隔離該 repo。
+  status_timeout_seconds: 5
+  status_parallelism: 8
+  max_repositories: 80
   window_watcher:
     enabled: true
     heartbeat_minutes: 5

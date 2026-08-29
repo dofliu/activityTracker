@@ -1,6 +1,6 @@
 # OmniContext 開發規劃與成果紀錄 — P0 ~ P6
 
-> 最新更新日期：2026-08-26　｜　目前狀態：**personal alpha / P2.6 + P3 context memory + P5-1 proposal-only alpha**。P3-1～P3-5、Windows Toast E2E、formal rollback、Windows/macOS/Linux CI、P5-1、collector runtime diagnostics 與 Extension 1.3.1 live-verification harness 已完成；ChatGPT live selectors 已修復。Claude.ai 本輪 PASS receipt 與 Extension live heartbeat 尚未完成，整體不具 release-ready 或 autonomous-ready 資格。
+> 最新更新日期：2026-08-29　｜　目前狀態：**personal alpha / P2.6 + P3 context memory + P4.2 local Git sync + P5-1 proposal-only alpha**。P3-1～P3-5、Windows Toast E2E、formal rollback、Windows/macOS/Linux CI、P5-1、collector runtime diagnostics、Extension 1.3.1 live-verification harness 與本機 Git 同步中心已完成；ChatGPT live selectors 已修復。Claude.ai 本輪 PASS receipt 與 Extension live heartbeat 尚未完成，整體不具 release-ready 或 autonomous-ready 資格。
 > 本文件記錄 OmniContext 從 0 到 1 的缺陷修復歷程、已完成之架構改造與未來的維運與延伸規劃。
 
 ---
@@ -106,6 +106,19 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 ---
 
 ## 2. 維運清單 (Remaining Maintenance)
+
+### ✅ P4.2：受控本機 Repository 同步
+
+- 新增 Dashboard「本機 Git 同步中心」，以既有 `watchers.git_watcher.repositories` 的設定 root 為唯一範圍，顯示 branch、upstream、cached ahead/behind、staged／unstaged／untracked／conflict。
+- 狀態載入不連網；使用者可對單一 repo 明確執行 `fetch --prune`、`pull --ff-only`、staged-only `commit`、`push`。
+- 安全邊界：不接受 Web path、無自動排程、無 `git add`、無 force push，Pull/Push 僅於 clean 且無分歧時可用；詳見 [`ADR-011`](docs/ADR-011-safe-local-repository-sync.md)。
+
+### ⏳ P4.3：Repo Onboarding／Reconciliation（下一階段）
+
+- **目標**：處理三種尚未成對的狀態：一般本機資料夾、已 `git init` 但未設定 remote、以及 GitHub 已存在但尚未 clone 的 repo。
+- **本機優先比對**：同時列出 configured local roots 與已同步 GitHub metadata，但不以名稱相同推論為同一專案；候選配對必須顯示 evidence（名稱、既有 remote、選定目錄）並由使用者確認。
+- **確認式動作**：在使用者指定目標資料夾與 visibility 後，才可 `git init`、建立／連結 remote、建立初始 commit，或 `git clone`；clone 前須檢查目錄存在性與非空衝突。
+- **不納入第一版**：批次初始化、掃描後自動發布、覆寫非空資料夾、強制重設 remote、auto-merge／force push，以及自動收集或發布任何 secret。
 
 1. **Chrome MV3 擴充套件實機載入**：
    - Gemini 已有 3 筆 Browser events／2 筆 response；ChatGPT 已完成 2026-08-25 真實 DOM prompt/response selector probe 並修復繁中 send click。

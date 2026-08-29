@@ -4,7 +4,7 @@
 >
 > 主要驗證平台：Windows 11、Python 3.12、Chrome/Edge MV3
 
-本文件提供可直接執行的安裝、啟動、Browser Extension 配對、每日使用、備份與故障排查流程。架構決策另見 [ADR-001](ADR-001-p2-5-trust-boundary.md)、[ADR-002](ADR-002-extension-monitor-and-usage-milestones.md)、[ADR-003](ADR-003-versioned-sqlite-migrations.md)、[ADR-004](ADR-004-packaged-runtime-layout.md)、[ADR-006](ADR-006-derived-context-sessions-and-related-history.md)、[ADR-007](ADR-007-proposal-only-secretary.md) 與 [Release Checklist](RELEASE_CHECKLIST.md)。
+本文件提供可直接執行的安裝、啟動、Browser Extension 配對、每日使用、備份與故障排查流程。架構決策另見 [ADR-001](ADR-001-p2-5-trust-boundary.md)、[ADR-002](ADR-002-extension-monitor-and-usage-milestones.md)、[ADR-003](ADR-003-versioned-sqlite-migrations.md)、[ADR-004](ADR-004-packaged-runtime-layout.md)、[ADR-006](ADR-006-derived-context-sessions-and-related-history.md)、[ADR-007](ADR-007-proposal-only-secretary.md)、[ADR-011](ADR-011-safe-local-repository-sync.md) 與 [Release Checklist](RELEASE_CHECKLIST.md)。
 
 ## 1. 安裝與初始化
 
@@ -56,6 +56,42 @@ project_resolution:
     - "~/Projects"
     - "~/Documents/Research"
   self_project_path: "" # 可選；留空時由安裝位置推導
+```
+
+### 1.3 本機 Git 同步中心
+
+Dashboard「監控配置 → 本機 Git 同步中心」與 GitHub 雲端整合是兩套不同功能：
+
+- **GitHub 雲端整合**只讀取 GitHub repo／PR metadata，不會對本機檔案或 branch 執行 Git 指令。
+- **本機 Git 同步中心**只管理 `watchers.git_watcher.repositories` 明示設定 root 下發現的 repositories；頁面初次載入只讀取本機 cached remote-tracking refs，不會自動連網。
+
+建議工作順序：先按各 repo 的 **Fetch** 更新遠端參照，再依卡片條件選擇 **Pull (FF only)**、**Commit staged** 或 **Push**。`ahead / behind` 在 Fetch 前只代表本機最後保存的遠端資訊，不保證是即時遠端狀態。
+
+安全規則：
+
+- Pull 只允許 clean worktree 且可以 fast-forward；分歧、conflict、rebase／merge 中一律不提供 Pull。
+- Push 不提供 force push，且只在 clean worktree、沒有落後或分歧時啟用。
+- Commit 必須自行先在 Git/IDE stage 指定檔案並輸入 message；系統不會 `git add`，也不會提交 untracked 或未 staged 的檔案。
+- 不會自動排程 `fetch`、`pull`、`commit` 或 `push`。
+
+目前同步中心的工作範圍是「已存在本機 Git repository」；下列情況會顯示為尚未納管或未設定 upstream，而不會自行變更資料夾或雲端：
+
+| 情況 | 目前行為 | Repo Onboarding／Reconciliation 規劃 |
+| --- | --- | --- |
+| 先建立一般本機資料夾 | 不列入 Git 同步清單 | 使用者確認資料夾後，提供 `git init`、選擇 visibility、建立或連結 GitHub repo 的流程 |
+| 本機已 `git init`、尚無 remote | 顯示 `no_upstream`，不提供 Push | 讓使用者選擇連結既有 GitHub repo，或明確建立新的 remote repo |
+| GitHub 有 repo、電腦尚未 clone | GitHub 卡片可讀 metadata；同步中心沒有本機項目 | 顯示「尚未有本機副本」，選擇目標父資料夾後才執行 clone，並先檢查路徑衝突 |
+
+這些操作都會是一次一個 repository 的確認式流程；不會由偵測到同名資料夾或 GitHub repo 就自動執行。
+
+可依設備調整清單與單一指令逾時：
+
+```yaml
+repository_sync:
+  command_timeout_seconds: 30
+  status_timeout_seconds: 5
+  status_parallelism: 8
+  max_repositories: 80
 ```
 
 ## 2. 啟動與確認服務

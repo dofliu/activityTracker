@@ -68,6 +68,12 @@ It is purpose-built to answer three fundamental questions at any moment:
   * Captures PR titles, states (Open / Merged / Draft), branch flows (`head -> base`), GitHub Actions CI test results (`SUCCESS` / `PENDING` / `FAILURE`), and review approval statuses.
   * Web dashboard includes direct clickable links to GitHub PR pages.
 
+### 2.1 🔁 Local Git Sync Center (per-repository confirmation)
+* **Separate from GitHub Cloud Sync**: GitHub integration reads cloud repository/PR metadata; the Local Git Sync Center reports configured local repository branches, cached ahead/behind refs, and worktree state.
+* **Controlled two-way workflow**: Refresh each repository with `Fetch`, then use `Pull --ff-only`, `Commit staged`, or `Push` only when its preflight is safe.
+* **Safe defaults**: No scheduled sync, no automatic `git add`, and no force push. Pull/Push require a clean non-diverged worktree; Commit requires an explicit message and includes only pre-staged files. See [Usage Guide](docs/USAGE.md#13-本機-git-同步中心) and [ADR-011](docs/ADR-011-safe-local-repository-sync.md).
+* **Current scope**: A plain local folder, a local Git repository without a remote, and a GitHub repository not yet cloned are intentionally left for the planned Repo Onboarding / Reconciliation flow. The current release never initializes a folder, creates a cloud repository, or clones automatically.
+
 ### 3. 🤖 Cross-Platform AI Conversation Capture (Full Prompts & Responses)
 * **Local CLI / IDE Agents**:
   * **Claude Code** (`~/.claude/projects/`): Logs bash executions, tool calls, and user prompts.

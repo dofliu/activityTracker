@@ -6,8 +6,8 @@ progress_basis: "依 P0-P8 加權里程碑估計；不是 release readiness 百�
 status: active_hardening
 release_ready: false
 last_updated: "2026-08-29"
-current_phase: "P2.6/P2.7 Time Evidence Hardening + P3 Memory + P7 DeskRAG worker lifecycle + P8 System Health & Maintenance Hub"
-next_milestone: "決定 P5-2 executor 去留：撰寫 ADR-008（白名單 command + argv exec + 獨立 token）或維持 proposal-only"
+current_phase: "P2.6/P2.7 Time Evidence Hardening + P3 Memory + P4.2 Safe Local Git Sync + P7 DeskRAG worker lifecycle + P8 System Health & Maintenance Hub"
+next_milestone: "設計並實作 P4.3 Repo Onboarding／Reconciliation：安全處理本機資料夾、無 upstream repo 與尚未 clone 的 GitHub repo"
 planned_features:
   - id: FEATURE-001
     name: "每日主要介面使用時間與里程碑教練"
@@ -58,6 +58,20 @@ planned_features:
     scope: "以 Claude Code、Claude Desktop local-agent、Codex 的成對 local start/final receipt 統計背景執行時間，並獨立呈現"
     trust_boundary: "不可與 WindowEvent 前景時間、AI turns、里程碑或生產力混算；generic Terminal、cloud-only、start-only 與異常 duration 一律不補值"
     specification: "docs/ADR-010-verified-background-agent-task-time.md"
+  - id: FEATURE-008
+    name: "受控本機 Git Repository 同步中心"
+    stage: implemented_alpha
+    priority: should_have
+    scope: "在使用者明示設定的 Git roots 下顯示本機 branch、cached ahead/behind 與 worktree 狀態，並逐一確認 fetch、fast-forward pull、staged-only commit、push"
+    trust_boundary: "狀態初始比較僅為 cached local remote-tracking ref；無自動同步、無 git add、無 force push；pull/push 需 clean worktree 且無分歧；不接受 dashboard 傳入任意本機路徑"
+    specification: "docs/ADR-011-safe-local-repository-sync.md"
+  - id: FEATURE-009
+    name: "Repo Onboarding／Reconciliation"
+    stage: planned
+    priority: should_have
+    scope: "比對使用者設定的本機 roots 與 GitHub metadata，處理一般資料夾、未設定 remote 的 Git repo、以及尚未 clone 的雲端 repo；所有 init、remote、create、clone 都採單一 repo 的確認式流程"
+    trust_boundary: "不得由同名自動配對、不得自動初始化或發布資料夾、不得覆寫非空目錄、不得批次 create/clone、不得 force reset/push；任何遠端建立或 clone 均需使用者選定路徑與明確確認"
+    specification: "docs/ADR-011-safe-local-repository-sync.md"
 technologies:
   - Python
   - FastAPI
@@ -85,6 +99,17 @@ description: "Local-first, provider-neutral personal work-context layer spanning
 description_zh: "本機優先、provider-neutral 的個人工作脈絡層；跨 AI、應用與 Repository 統整事件，使用 cloud LLM 摘要時才將選定脈絡傳送至該 provider。"
 evidence_snapshot:
   captured_at: "2026-08-25 10:15 Asia/Taipei"
+  repository_sync:
+    captured_at: "2026-08-29 Asia/Taipei"
+    local_api: passed
+    configured_repositories_observed: 64
+    status_api_elapsed_seconds: 2.64
+    automatic_sync: false
+    remote_tracking_basis: "cached_local_remote_tracking_ref"
+    unavailable_worktrees: 1
+    unavailable_worktree_note: "research-dashboard 的 .git metadata 無法作為有效 worktree 讀取；已局部隔離，不影響其餘 repositories。"
+    action_contract_tests: passed
+    claim_boundary: "此 receipt 僅證明設定範圍內的本機 status 聚合與安全 action contract；未執行 live fetch/pull/commit/push，不代表所有遠端 repository 已即時同步。"
   background_task_receipts:
     captured_at: "2026-08-29 05:05 Asia/Taipei"
     sqlite_schema_migration: "12/12 applied on controlled localhost restart"
@@ -382,6 +407,7 @@ quality_gates:
   automated_tests: passed_85_contract_tests
   usage_milestone_alpha: passed_contract_and_windows_dashboard_api_smoke
   background_task_receipts: passed_contract_tests_and_localhost_live_codex_receipt
+  repository_sync: passed_contract_tests_and_localhost_read_only_status_smoke
   documentation_current: passed_readme_usage_roadmap_status_sync
   backup_lifecycle: passed_online_backup_and_isolated_restore_drill
   versioned_migration: passed_fresh_legacy_backup_copy_and_live_upgrade_5_of_5
