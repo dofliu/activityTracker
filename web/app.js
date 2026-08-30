@@ -50,13 +50,19 @@ const I18N = {
     btn_theme_dark: "☾ 深色",
     btn_quick_checkpoint: "⏱️ 快照",
     btn_quick_summary: "⚡ 生成今日摘要",
-    tab_projects: "01 · 進行中工作",
-    tab_dashboard: "02 · 即時情報流",
+    tab_assistant: "01 · 🤖 小秘書",
+    tab_projects: "02 · 進行中工作",
     tab_rag: "03 · 📚 知識庫與 RAG",
-    tab_settings: "04 · 監控配置",
-    tab_summaries: "05 · 每日摘要",
-    tab_checkpoints: "06 · 活動快照",
-    tab_system_health: "07 · 🛡️ 系統健康與維護",
+    tab_summaries: "04 · 每日摘要",
+    tab_checkpoints: "05 · 活動快照",
+    tab_dashboard: "06 · 即時情報流",
+    tab_settings: "07 · 監控配置",
+    tab_system_health: "08 · 🛡️ 系統健康與維護",
+    assistant_title: "🤖 小秘書 · 交辦與提問",
+    assistant_input_ph: "請小秘書查資料、寫摘要、建議下一步…",
+    btn_assistant_send: "交辦 ⚡",
+    assistant_chat_empty: "問文件、查專案進度、請我建議下一步——回答會引用本機知識庫與工作紀錄。",
+    assistant_chat_boundary: "對話使用本機知識庫（RAG）與所選模型；完整引用卡片與對話歷史在「知識庫與 RAG」分頁。",
     system_health_p1_title: "系統運行總覽與生命週期控制",
     system_health_p2_title: "採集器容錯隔離與健康矩陣",
     system_health_p2_note: "各採集器獨立隔離，單一損壞不中斷全域監控",
@@ -233,13 +239,19 @@ const I18N = {
     btn_theme_dark: "☾ Dark",
     btn_quick_checkpoint: "⏱️ Checkpoint",
     btn_quick_summary: "⚡ Today's Summary",
-    tab_projects: "01 · Active Workstreams",
-    tab_dashboard: "02 · Live Feed",
+    tab_assistant: "01 · 🤖 Assistant",
+    tab_projects: "02 · Active Workstreams",
     tab_rag: "03 · 📚 Knowledge & RAG",
-    tab_settings: "04 · Settings",
-    tab_summaries: "05 · Daily Summaries",
-    tab_checkpoints: "06 · Checkpoints",
-    tab_system_health: "07 · 🛡️ System Health & Maintenance",
+    tab_summaries: "04 · Daily Summaries",
+    tab_checkpoints: "05 · Checkpoints",
+    tab_dashboard: "06 · Live Feed",
+    tab_settings: "07 · Settings",
+    tab_system_health: "08 · 🛡️ System Health & Maintenance",
+    assistant_title: "🤖 ASSISTANT · ASK OR DELEGATE",
+    assistant_input_ph: "Ask for documents, summaries, or the next step…",
+    btn_assistant_send: "Send ⚡",
+    assistant_chat_empty: "Ask about documents or project progress, or request a next step — answers cite the local knowledge base and work history.",
+    assistant_chat_boundary: "Chat runs through the local knowledge base (RAG) and the selected model; full citation cards and history live in the Knowledge & RAG tab.",
     system_health_p1_title: "System Runtime & Lifecycle Control",
     system_health_p2_title: "Collector Fault Isolation & Diagnostics Matrix",
     system_health_p2_note: "Isolated collectors; single failure never halts overall monitoring",
@@ -490,6 +502,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initRAGTab();
   initSystemHealthTab();
   initFocusCarousel();
+  initAssistantHome();
 
   refreshStatus();
   refreshFeed();
@@ -503,6 +516,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadUsagePanels();
   loadContextSessions();
   loadSecretaryProposals();
+  loadAssistantStrip();
   loadRAGFolders();
   loadRAGSessions();
   loadRAGStrategies();
@@ -510,6 +524,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   setInterval(() => { refreshStatus(); refreshFeed(); }, POLL_MS);
   setInterval(loadUsagePanels, 30000);
+  setInterval(loadAssistantStrip, 30000);
 });
 
 // ---------------------------------------------------------------- theme
@@ -538,7 +553,8 @@ function initTabs() {
       tab.classList.add("active");
       const id = tab.dataset.tab;
       $(id).classList.add("active");
-      if (id === "tab-projects") { loadProjects(); loadUsagePanels(); loadContextSessions(); loadSecretaryProposals(); }
+      if (id === "tab-assistant") { loadSecretaryProposals(); loadAssistantStrip(); syncAssistantModelControls(); }
+      if (id === "tab-projects") { loadProjects(); loadUsagePanels(); loadContextSessions(); }
       if (id === "tab-rag") { loadRAGFolders(); loadRAGFiles(); loadRAGSessions(); loadRAGProgress(); loadRAGStrategies(); }
       if (id === "tab-settings") loadConfig();
       if (id === "tab-summaries") loadSummaries();
@@ -926,6 +942,18 @@ function renderSecretaryProposals() {
   if (!box || !badge) return;
   if (!secretaryProposalsCache) return;
   renderFocusCarousel();
+  // 小秘書首頁的 advisor 徽章：LLM 註解啟用且成功時顯示 provider，否則 RULES
+  const advisorBadge = $("assistant-advisor-badge");
+  if (advisorBadge) {
+    const adv = secretaryProposalsCache.advisor || null;
+    if (adv && (adv.status === "annotated" || adv.status === "cached")) {
+      advisorBadge.textContent = `LLM · ${String(adv.provider || "").toUpperCase()}`;
+      advisorBadge.className = "trust ok";
+    } else {
+      advisorBadge.textContent = "RULES";
+      advisorBadge.className = "trust noisy";
+    }
+  }
   const proposals = secretaryProposalsCache.proposals || [];
   badge.textContent = `${proposals.length} ${currentLang === "zh-TW" ? "項" : "ITEMS"}`;
   badge.className = `trust ${proposals.length ? "noisy" : "ok"}`;
@@ -1076,6 +1104,132 @@ window.executeProposal = async function (proposalId) {
     alert((zh ? "執行失敗：" : "Execution failed: ") + err.message);
   }
 };
+
+// ---------------------------------------------------------------- 01 小秘書首頁（assistant home）
+// 對話與 RAG 分頁共用同一條 session／歷史；首頁只是入口與精簡鏡像。
+function syncAssistantModelControls() {
+  const providerSrc = $("select-rag-provider");
+  const providerDst = $("select-assistant-provider");
+  if (providerSrc && providerDst) {
+    providerDst.innerHTML = providerSrc.innerHTML;
+    providerDst.value = providerSrc.value;
+  }
+  const modelSrc = $("select-rag-model");
+  const modelDst = $("select-assistant-model");
+  if (modelSrc && modelDst) {
+    modelDst.innerHTML = modelSrc.innerHTML;
+    if (modelSrc.value) modelDst.value = modelSrc.value;
+  }
+}
+
+function sendAssistantMessage() {
+  const input = $("input-assistant-prompt");
+  if (!input) return;
+  // 送出前把首頁的 provider/model 同步回 RAG 分頁控制項，走同一條發送流程。
+  const providerDst = $("select-assistant-provider");
+  const modelDst = $("select-assistant-model");
+  const providerSrc = $("select-rag-provider");
+  const modelSrc = $("select-rag-model");
+  if (providerDst && providerSrc && providerDst.value) providerSrc.value = providerDst.value;
+  if (modelDst && modelSrc && modelDst.value) modelSrc.value = modelDst.value;
+  sendRAGChatMessage(input);
+}
+
+function initAssistantHome() {
+  syncAssistantModelControls();
+  const providerDst = $("select-assistant-provider");
+  if (providerDst) {
+    providerDst.addEventListener("change", () => {
+      const src = $("select-rag-provider");
+      if (src) src.value = providerDst.value;
+      updateRAGModelSelect(providerDst.value);
+      syncAssistantModelControls();
+    });
+  }
+  const modelDst = $("select-assistant-model");
+  if (modelDst) {
+    modelDst.addEventListener("change", () => {
+      const src = $("select-rag-model");
+      if (src) src.value = modelDst.value;
+    });
+  }
+  const sendBtn = $("btn-assistant-send");
+  const input = $("input-assistant-prompt");
+  if (sendBtn) sendBtn.addEventListener("click", sendAssistantMessage);
+  if (input) {
+    input.addEventListener("keydown", event => {
+      if (event.key === "Enter") sendAssistantMessage();
+    });
+  }
+}
+
+function renderAssistantChatMirror() {
+  const box = $("assistant-chat-messages");
+  if (!box) return;
+  const zh = currentLang === "zh-TW";
+  if (!ragChatHistory.length) {
+    box.innerHTML = `<div class="placeholder">${esc(t("assistant_chat_empty"))}</div>`;
+    return;
+  }
+  const recent = ragChatHistory.slice(-12);
+  box.innerHTML = recent.map(msg => {
+    const isUser = msg.role === "user";
+    const cites = !isUser && Array.isArray(msg.citations) && msg.citations.length
+      ? `<div class="assistant-cite-chip">📎 ${msg.citations.length} ${zh ? "則引用 · 詳見知識庫分頁" : "citations · see RAG tab"}</div>`
+      : "";
+    return `
+      <div class="assistant-msg ${isUser ? "user" : "bot"}">
+        <span class="assistant-msg-role">${isUser ? (zh ? "您" : "YOU") : "🤖"}</span>
+        <div class="assistant-msg-body">${esc(msg.content || "…")}${cites}</div>
+      </div>`;
+  }).join("");
+  box.scrollTop = box.scrollHeight;
+}
+
+function assistantChip(label, value, tone) {
+  return `
+    <div class="assistant-chip">
+      <span class="mono-mini muted">${esc(label)}</span>
+      <span class="assistant-chip-value ${tone || ""}">${esc(value)}</span>
+    </div>`;
+}
+
+async function loadAssistantStrip() {
+  const box = $("assistant-strip");
+  if (!box) return;
+  const zh = currentLang === "zh-TW";
+  const [usage, background] = await Promise.all([
+    getJSON("/api/v1/usage/today").catch(() => null),
+    getJSON("/api/v1/background-tasks/today").catch(() => null),
+  ]);
+  const chips = [];
+  if (usage && usage.goal) {
+    chips.push(assistantChip(
+      zh ? "AI 協作前景" : "AI FOREGROUND",
+      `${usage.goal.foreground_minutes ?? 0} min`,
+      ""
+    ));
+    chips.push(assistantChip(
+      "COVERAGE",
+      String(usage.coverage_status || "?").toUpperCase(),
+      usage.coverage_status === "observed" ? "ok" : ""
+    ));
+  }
+  if (background) {
+    chips.push(assistantChip(
+      zh ? "背景任務" : "BG TASKS",
+      `${background.verified_minutes ?? 0} min · ${background.completed_task_count ?? 0} ${zh ? "件" : "done"}`,
+      ""
+    ));
+  }
+  const proposals = secretaryProposalsCache && Array.isArray(secretaryProposalsCache.proposals)
+    ? secretaryProposalsCache.proposals.length
+    : null;
+  if (proposals !== null) {
+    chips.push(assistantChip(zh ? "待判斷建議" : "SUGGESTIONS", String(proposals), proposals ? "" : "ok"));
+  }
+  box.innerHTML = chips.join("");
+}
 
 // ---------------------------------------------------------------- live feed
 async function refreshFeed() {
@@ -3025,6 +3179,7 @@ async function loadRAGMessages(sessionId) {
 }
 
 function renderRAGMessages() {
+  renderAssistantChatMirror(); // 小秘書首頁同步顯示同一條對話
   const container = $("rag-chat-messages");
   if (!container) return;
 
@@ -3083,9 +3238,10 @@ function renderRAGMessages() {
   container.scrollTop = container.scrollHeight;
 }
 
-async function sendRAGChatMessage() {
+async function sendRAGChatMessage(fromInput) {
   if (isRagStreaming) return;
-  const promptInput = $("input-rag-prompt");
+  // 小秘書首頁與 RAG 分頁共用同一條對話流（同 session、同歷史）。
+  const promptInput = fromInput || $("input-rag-prompt");
   const prompt = (promptInput.value || "").trim();
   if (!prompt) return;
 
@@ -3145,6 +3301,11 @@ async function sendRAGChatMessage() {
   if (sendBtn) {
     sendBtn.disabled = true;
     sendBtn.textContent = "串流中…";
+  }
+  const assistantBtn = $("btn-assistant-send");
+  if (assistantBtn) {
+    assistantBtn.disabled = true;
+    assistantBtn.textContent = currentLang === "zh-TW" ? "回覆中…" : "Streaming…";
   }
 
   try {
@@ -3224,6 +3385,10 @@ async function sendRAGChatMessage() {
     if (sendBtn) {
       sendBtn.disabled = false;
       sendBtn.textContent = "發送 ⚡";
+    }
+    if (assistantBtn) {
+      assistantBtn.disabled = false;
+      assistantBtn.textContent = t("btn_assistant_send");
     }
   }
 }

@@ -45,13 +45,13 @@ It is purpose-built to answer three fundamental questions at any moment:
 │          ┌───────────────────────┼───────────────────────┐               │
 │          ▼                       ▼                       ▼               │
 │  [ Web Dashboard UI ]    [ DeskRAG Subsystem ]     [ AI Synthesis ]      │
-│  • 01 · Workstreams      • PDF/Docx/Pptx/Xlsx/Md   • Multi-Day Reviews   │
-│  • 02 · Live Feed        • FastEmbed + ChromaDB    • Periodic Snapshots  │
-│  • 03 · Knowledge & RAG  • Jieba + BM25 Keyword    • Telegram Push       │
-│  • 04 · Settings         • Hybrid RRF Retrieval    • Multi-LLM (Gemini/  │
-│  • 05 · Summaries        • Multi-LLM SSE Chat        Claude/OpenAI/Ollama│
-│  • 06 · Checkpoints      • Native Explorer Reveal                        │
-│  • 07 · System Health & Maintenance  · 🌐 Bilingual (EN/ZH)              │
+│  • 01 · 🤖 Assistant     • PDF/Docx/Pptx/Xlsx/Md   • Multi-Day Reviews   │
+│    (chat + suggestions)  • FastEmbed + ChromaDB    • Periodic Snapshots  │
+│  • 02 · Workstreams      • Jieba + BM25 Keyword    • Telegram Push       │
+│  • 03 · Knowledge & RAG  • Hybrid RRF Retrieval    • Multi-LLM (Gemini/  │
+│  • 04 · Summaries        • Multi-LLM SSE Chat        Claude/OpenAI/Ollama│
+│  • 05 · Checkpoints · 06 · Live Feed · Explorer Reveal                   │
+│  • 07 · Settings · 08 · System Health  · 🌐 Bilingual (EN/ZH)            │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 

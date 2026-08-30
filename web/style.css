@@ -245,6 +245,51 @@ input, select, button { font-family: inherit; }
 /* P5-R2 executor：可代辦動作與批准按鈕 */
 .proposal-exec-label { margin-top: 7px; padding: 6px 9px; border-left: 2px solid var(--bd); color: var(--mu); font-size: 10px; }
 .proposal-exec-btn { color: var(--orange); border-color: var(--orange); }
+
+/* 01 小秘書首頁 */
+.assistant-hero { padding-bottom: 12px; }
+.assistant-chat-messages {
+  min-height: 180px; max-height: 46vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px; border-bottom: 1px solid var(--bd);
+}
+.assistant-msg { display: flex; gap: 10px; align-items: flex-start; min-width: 0; }
+.assistant-msg-role {
+  flex: none; min-width: 30px; text-align: center; padding: 2px 5px;
+  background: var(--s2); color: var(--mu);
+  font-family: "JetBrains Mono", monospace; font-size: 9px; letter-spacing: 1px;
+}
+.assistant-msg.user .assistant-msg-role { color: var(--orange); }
+.assistant-msg-body {
+  min-width: 0; font-size: 12.5px; line-height: 1.65; white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.assistant-msg.bot .assistant-msg-body { color: var(--fg, inherit); }
+.assistant-msg.user .assistant-msg-body { color: var(--mu); }
+.assistant-cite-chip {
+  margin-top: 5px; display: inline-block; padding: 2px 6px; background: var(--s2);
+  color: var(--mu); font-family: "JetBrains Mono", monospace; font-size: 9px;
+}
+.assistant-input-row { display: flex; gap: 8px; padding: 12px 14px 4px; flex-wrap: wrap; }
+.assistant-input-row input {
+  flex: 1 1 260px; min-width: 0; padding: 10px 12px; font-size: 13px;
+  background: var(--s2); border: 1px solid var(--bd); color: inherit;
+}
+.assistant-input-row input:focus { outline: none; border-color: var(--orange); }
+.assistant-select { font-size: 11px; padding: 4px 6px; max-width: 170px; background: var(--s2); border: 1px solid var(--bd); color: inherit; }
+.assistant-hero .context-memory-boundary { margin: 8px 14px 0; }
+.assistant-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.assistant-chip {
+  display: flex; flex-direction: column; gap: 4px; padding: 10px 12px;
+  background: var(--s1, var(--s2)); border: 1px solid var(--bd);
+}
+.assistant-chip-value { font-size: 16px; font-weight: 600; letter-spacing: 0.3px; }
+.assistant-chip-value.ok { color: var(--ok, #3fae6a); }
+@media (max-width: 640px) {
+  .assistant-chat-messages { max-height: 38vh; }
+  .assistant-input-row { flex-direction: column; }
+  .assistant-select { max-width: none; }
+}
 .related-memory-match-meta { margin-top: 4px; color: var(--mu); font-family: "JetBrains Mono", monospace; font-size: 9px; }
 
 /* ---------- Projects ---------- */

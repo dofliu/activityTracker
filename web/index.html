@@ -38,13 +38,14 @@
       </div>
     </div>
     <nav class="tabs">
-      <button class="tab active" data-tab="tab-projects" data-i18n="tab_projects">01 · 進行中工作</button>
-      <button class="tab" data-tab="tab-dashboard" data-i18n="tab_dashboard">02 · 即時情報流</button>
+      <button class="tab active" data-tab="tab-assistant" data-i18n="tab_assistant">01 · 🤖 小秘書</button>
+      <button class="tab" data-tab="tab-projects" data-i18n="tab_projects">02 · 進行中工作</button>
       <button class="tab" data-tab="tab-rag" data-i18n="tab_rag">03 · 📚 知識庫與 RAG</button>
-      <button class="tab" data-tab="tab-settings" data-i18n="tab_settings">04 · 監控配置</button>
-      <button class="tab" data-tab="tab-summaries" data-i18n="tab_summaries">05 · 每日摘要</button>
-      <button class="tab" data-tab="tab-checkpoints" data-i18n="tab_checkpoints">06 · 活動快照</button>
-      <button class="tab" data-tab="tab-system-health" data-i18n="tab_system_health">07 · 🛡️ 系統健康與維護</button>
+      <button class="tab" data-tab="tab-summaries" data-i18n="tab_summaries">04 · 每日摘要</button>
+      <button class="tab" data-tab="tab-checkpoints" data-i18n="tab_checkpoints">05 · 活動快照</button>
+      <button class="tab" data-tab="tab-dashboard" data-i18n="tab_dashboard">06 · 即時情報流</button>
+      <button class="tab" data-tab="tab-settings" data-i18n="tab_settings">07 · 監控配置</button>
+      <button class="tab" data-tab="tab-system-health" data-i18n="tab_system_health">08 · 🛡️ 系統健康與維護</button>
     </nav>
   </div>
 
@@ -52,7 +53,45 @@
     <main class="main">
 
       <!-- 01 進行中工作 -->
-      <section id="tab-projects" class="pane active">
+      <!-- 01 小秘書首頁：對話交辦 + 建議 + 今日概況 -->
+      <section id="tab-assistant" class="pane active">
+        <div class="panel assistant-hero mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent" data-i18n="assistant_title">🤖 小秘書 · 交辦與提問</span>
+            <span id="assistant-advisor-badge" class="trust noisy">RULES</span>
+          </div>
+          <div id="assistant-chat-messages" class="assistant-chat-messages">
+            <div class="placeholder" data-i18n="assistant_chat_empty">問文件、查專案進度、請我建議下一步——回答會引用本機知識庫與工作紀錄。</div>
+          </div>
+          <div class="assistant-input-row">
+            <input id="input-assistant-prompt" type="text" maxlength="4000" data-i18n-ph="assistant_input_ph" placeholder="請小秘書查資料、寫摘要、建議下一步…">
+            <select id="select-assistant-provider" class="assistant-select" title="LLM provider"></select>
+            <select id="select-assistant-model" class="assistant-select" title="模型"></select>
+            <button id="btn-assistant-send" class="btn btn-primary" data-i18n="btn_assistant_send">交辦 ⚡</button>
+          </div>
+          <div class="context-memory-boundary" data-i18n="assistant_chat_boundary">對話使用本機知識庫（RAG）與所選模型；完整引用卡片與對話歷史在「知識庫與 RAG」分頁。</div>
+        </div>
+
+        <div id="assistant-strip" class="assistant-strip mb-14"></div>
+
+        <section class="panel secretary-inbox mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent" data-i18n="secretary_title">SECRETARY SUGGESTIONS</span>
+            <span class="trust noisy">PROPOSAL ONLY</span>
+            <span id="secretary-proposals-badge" class="trust noisy">LOADING</span>
+            <button id="btn-refresh-proposals" class="btn btn-ghost btn-sm head-right" data-i18n="btn_refresh_proposals">重新整理</button>
+          </div>
+          <div class="secretary-inbox-body">
+            <div class="secretary-inbox-tools">
+              <span data-i18n="secretary_inbox_hint">待您判斷的建議；不等於現在需要處理。</span>
+            </div>
+            <div id="secretary-proposals-list" class="secretary-proposals-list"><div class="placeholder" data-i18n="ph_loading_proposals">正在整理可追溯建議…</div></div>
+            <div class="context-memory-boundary" data-i18n="secretary_boundary">只呈現本機 evidence 衍生建議；不保存、不會自動執行。LLM 註解（若啟用）僅供參考，預設使用本機模型。</div>
+          </div>
+        </section>
+      </section>
+
+      <section id="tab-projects" class="pane">
         <div class="overview-grid mb-14">
           <div class="panel usage-panel">
             <div class="panel-head">
@@ -130,23 +169,6 @@
             <div class="context-memory-boundary" data-i18n="related_memory_boundary">查詢只送往本機 Ollama 且不保存；similarity 不代表工作重複或歷史結論正確。</div>
           </section>
         </div>
-
-        <details id="secretary-inbox" class="panel secretary-inbox mb-14">
-          <summary class="panel-head secretary-inbox-summary">
-            <span class="mono-label accent" data-i18n="secretary_title">SUGGESTION INBOX</span>
-            <span class="trust noisy">PROPOSAL ONLY</span>
-            <span id="secretary-proposals-badge" class="trust noisy">LOADING</span>
-            <span class="secretary-inbox-toggle head-right" data-i18n="secretary_inbox_toggle">展開建議</span>
-          </summary>
-          <div class="secretary-inbox-body">
-            <div class="secretary-inbox-tools">
-              <span data-i18n="secretary_inbox_hint">待您判斷的建議；不等於現在需要處理。</span>
-              <button id="btn-refresh-proposals" class="btn btn-ghost btn-sm" data-i18n="btn_refresh_proposals">重新整理</button>
-            </div>
-            <div id="secretary-proposals-list" class="secretary-proposals-list"><div class="placeholder" data-i18n="ph_loading_proposals">正在整理可追溯建議…</div></div>
-            <div class="context-memory-boundary" data-i18n="secretary_boundary">只呈現本機 evidence 衍生建議；不保存、不會自動執行。LLM 註解（若啟用）僅供參考，預設使用本機模型。</div>
-          </div>
-        </details>
 
         <div class="row-between mb-8">
           <span id="projects-count" class="mono-label muted">ACTIVE WORKSTREAMS</span>
