@@ -581,11 +581,13 @@ P2.5-S1 API 安全邊界
 - 依 ADR-011 與 FEATURE-009 trust boundary 實作三種情境的單一 repo 確認式流程：本機資料夾尚未 `git init`、本機 repo 無 remote、GitHub repo 尚未 clone。
 - 禁止事項維持：不同名自動配對、不自動初始化／發布、不覆寫非空目錄、不批次 create/clone、不 force reset/push。
 
-### 中期（可平行）：P6 發佈整備收尾
+### ✅ 中期（可平行）：P6 發佈整備收尾
 - Wheel/sdist、formal rollback、3-OS × 2-Python CI 均已通過：走完 `docs/RELEASE_CHECKLIST.md`，打 `v1.3.0aX` tag 併發布 GitHub Release（可先不上 PyPI）。
 - 在乾淨環境（或另一台機器）照 README 快速開始逐步驗證一次，修正安裝文件落差。
-  ▶ 2026-08-30：已於 Linux container 完成一輪發佈預演——`python -m build`、`verify_release_artifacts`（content + privacy receipt PASS）、乾淨 venv 安裝 wheel、`init`／`assets-status`／`migration-status`（13/13）、web server HTTP smoke 與 `verify_installed_package` checks 全數通過。剩 tag + GitHub Release 的實際發佈動作。
+  ▶ 2026-08-30：已於 Linux container 完成一輪發佈預演——`python -m build`、`verify_release_artifacts`（content + privacy receipt PASS）、乾淨 venv 安裝 wheel、`init`／`assets-status`／`migration-status`（13/13）、web server HTTP smoke 與 `verify_installed_package` checks 全數通過。
+  ▶ ✅ 2026-08-31：**v1.3.0a5 已發佈**為 GitHub pre-release——新增 `.github/workflows/release.yml`（推 tag 或 workflow_dispatch 即自動 build → verify → release），附 wheel/sdist 與 SHA-256 receipt，交叉驗證一致。<https://github.com/dofliu/activityTracker/releases/tag/v1.3.0a5>
 
 ### 長期（>6 週）：P5-2 executor 重啟與 P4 收集層
 - P5-2 executor 曾於 `871ee29` 實作、`f8f5400` revert 回 ADR-007 proposal-only 契約；重啟條件：P2.5 gate 全綠 + allowlist、dirty-worktree check、timeout/cancel、audit receipt、L0/L1/L2 分級批准全數就位，並以獨立 ADR 驗收。
+  ▶ 2026-08-31：重啟契約已定稿於 [ADR-008](docs/ADR-008-gated-agent-executor.md)（Proposed）——白名單 action template、三級實質分級、獨立 execution token、L2 一次性 confirm code、audit receipt（migration 014）、失敗封閉；實作依 P5-R1～R5 分階段。
 - P4 其餘來源（瀏覽器閱讀、行事曆、terminal history、未 commit 狀態）維持「能否改變決策」檢驗，逐項評估後才納入。

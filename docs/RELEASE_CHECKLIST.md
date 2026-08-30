@@ -29,10 +29,10 @@
 
 - [x] bump `core/__init__.py` 至 `1.3.0a5` 並重建 wheel/sdist，重跑 `scripts/verify_release_artifacts.py`。
 - [x] 乾淨 venv 安裝與 service smoke 已於 Linux 預演通過（2026-08-30）；乾淨 Windows VM 重跑列為 post-release 追蹤項。
-- [ ] 建立 tagged release（`git tag v1.3.0a5` + push tag，自動觸發 `.github/workflows/release.yml`）。
-- [ ] Release workflow 建立 GitHub Release（pre-release），附 wheel/sdist 與 `release-artifacts-receipt.json`（SHA-256）；PyPI 不在本次範圍。
-- [ ] 下載附件並比對 SHA-256 與 receipt 一致。
-- [ ] 監看啟動錯誤、migration state、HTTP health 與 collector health。
+- [x] 建立 tagged release：由 `release.yml` workflow_dispatch（run `33325867113`）在 main `6d020f0` 建立 `v1.3.0a5` tag（session git 憑證無法推 tag，workflow 路徑為正式作法之一）。
+- [x] Release workflow 建立 GitHub Release（pre-release），附 wheel/sdist 與 `release-artifacts-receipt.json`：<https://github.com/dofliu/activityTracker/releases/tag/v1.3.0a5>。
+- [x] SHA-256 交叉驗證一致：receipt 與 GitHub asset digest 相同（wheel `f2a54bed…`、sdist `3cf7ef0b…`）。
+- [ ] 監看啟動錯誤、migration state、HTTP health 與 collector health（發佈後於日常運行中持續）。
 
 Publish 已獲使用者授權（2026-08-31）；`release_ready` 指「穩定版就緒」，alpha pre-release 發佈後仍維持 `false`。
 
@@ -41,7 +41,7 @@ Publish 已獲使用者授權（2026-08-31）；`release_ready` 指「穩定版�
 - [ ] 驗證 `omnicontext init`、`assets-status`、`extension-path` 與 `migration-status`。
 - [ ] 驗證 Dashboard、Extension Monitor 與 `/static/app.js` HTTP 200。
 - [ ] 確認 Browser event、foreground coverage 與 notification claim boundary 未被放寬。
-- [ ] 更新 release notes、STATUS 與遠端 tag SHA。
+- [x] 更新 release notes、STATUS 與遠端 tag SHA（STATUS.yaml `first_public_release`）。
 
 ## Rollback Triggers
 

@@ -326,7 +326,7 @@ activityTracker/
 │   ├── USAGE.md                    # User guide: setup, pairing, daily operation, backups, troubleshooting
 │   ├── PRODUCT_POSITIONING.md      # Product positioning and evidence boundaries
 │   ├── TEST_STRATEGY.md / RELEASE_CHECKLIST.md
-│   ├── ADR-001 ~ ADR-011           # Architecture decision records (ADR-008 unused)
+│   ├── ADR-001 ~ ADR-011           # Architecture decision records
 │   └── archive/                    # Archived one-off plans and completion reports
 │
 ├── core/                           # Core service modules

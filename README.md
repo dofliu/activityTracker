@@ -349,7 +349,7 @@ activityTracker/
 │   ├── USAGE.md                    # 使用手冊：安裝、配對、日常操作、備份與故障排查
 │   ├── PRODUCT_POSITIONING.md      # 產品定位與證據邊界
 │   ├── TEST_STRATEGY.md / RELEASE_CHECKLIST.md  # 測試策略與發佈檢查
-│   ├── ADR-001 ~ ADR-011           # 架構決策紀錄（ADR-008 從缺）
+│   ├── ADR-001 ~ ADR-011           # 架構決策紀錄
 │   └── archive/                    # 已歸檔的一次性規劃書與完成報告
 │
 ├── core/                           # 核心服務模組

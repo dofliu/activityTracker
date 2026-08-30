@@ -32,7 +32,7 @@
 
 ## 架構決策紀錄（ADR）
 
-> ADR 記錄「為什麼這樣設計、邊界在哪裡」。編號 ADR-008 從缺（未曾使用），非文件遺失。
+> ADR 記錄「為什麼這樣設計、邊界在哪裡」。
 
 | 編號 | 標題 | 主題 |
 | :--- | :--- | :--- |
@@ -43,6 +43,7 @@
 | [ADR-005](ADR-005-local-semantic-index-and-ask.md) | Local Semantic Index 與 `omni ask` | 本機 embeddings、retrieval、引用 |
 | [ADR-006](ADR-006-derived-context-sessions-and-related-history.md) | Derived Context Sessions 與 Related History | 衍生工作階段、相似歷史 |
 | [ADR-007](ADR-007-proposal-only-secretary.md) | Proposal-only 主動秘書安全邊界 | 秘書只提案不執行的契約（P5-2 executor 曾實作後 revert 回此契約） |
+| [ADR-008](ADR-008-gated-agent-executor.md) | Gated Agent Executor 安全契約（Proposed） | P5 executor 重啟條件：白名單 template、三級閘門、execution token、audit receipt |
 | [ADR-009](ADR-009-deskrag-worker-index-lifecycle.md) | DeskRAG worker 索引生命週期 | RAG 索引 worker 隔離、資源與刪除邊界 |
 | [ADR-010](ADR-010-verified-background-agent-task-time.md) | 可驗證背景 Agent 任務時間 | 成對 receipt 才計時的邊界 |
 | [ADR-011](ADR-011-safe-local-repository-sync.md) | 受控本機 Repository 同步 | Git 同步中心安全預設與 P4.3 Onboarding 邊界 |
