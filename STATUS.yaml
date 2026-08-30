@@ -5,7 +5,7 @@ progress: 99
 progress_basis: "依 P0-P8 加權里程碑估計；不是 release readiness 百分比"
 status: active_hardening
 release_ready: false
-last_updated: "2026-08-30"
+last_updated: "2026-08-31"
 current_phase: "P2.6/P2.7 Time Evidence Hardening + P3 Memory + P4.2 Safe Local Git Sync + P7 DeskRAG worker lifecycle + P8 System Health & Maintenance Hub"
 next_milestone: "設計並實作 P4.3 Repo Onboarding／Reconciliation：安全處理本機資料夾、無 upstream repo 與尚未 clone 的 GitHub repo"
 planned_features:
@@ -353,7 +353,7 @@ evidence_snapshot:
   extension_live_verification_harness:
     captured_at: "2026-08-26 16:05 Asia/Taipei"
     extension_version: 1.3.1
-    status: passed_contract_and_localhost_running_smoke
+    status: passed_contract_localhost_smoke_and_real_chrome_pass
     architecture: process_local_baseline_not_persisted
     required_pass_signals: [new_verified_heartbeat, content_ready_after_start, event_after_start, nonempty_response_after_start]
     response_metrics_added: true
@@ -369,9 +369,20 @@ evidence_snapshot:
     extension_responses_today: 0
     heartbeat_verified: false
     claude_current_total: "1 event / 0 responses"
-    real_pass_receipt: not_obtained
+    real_pass_receipt:
+      status: passed
+      captured_at: "2026-08-31 01:03 Asia/Taipei"
+      verification_id: 857027de377a41f691b31399884490bd
+      acceptance_script: scripts/extension_live_acceptance.py
+      heartbeat_after_start: true
+      platforms_passed: [chatgpt, claude]
+      chatgpt_event_delta: 3
+      chatgpt_response_delta: 2
+      claude_event_delta: 3
+      claude_response_delta: 2
+      gemini_in_scope: false
     privacy_boundary: "Receipt excludes token, URL, prompt, response and local path."
-    claim_boundary: "Harness behavior and localhost UI are verified; authenticated Chrome heartbeat and per-site capture remain unverified until a current-run PASS receipt exists."
+    claim_boundary: "Harness behavior, localhost UI and the 2026-08-31 real logged-in Chrome PASS are verified; a single-run PASS proves that run's heartbeat, content-ready, event and non-empty response only, not continuous or complete coverage."
   formal_rollback_evidence:
     status: passed
     path: "1.3.0a1/schema4 -> 1.3.0a2/schema5 -> 1.3.0a1/schema4"
@@ -432,16 +443,16 @@ quality_gates:
   proposal_only_secretary: passed_local_read_only_alpha
   collector_source_fault_isolation: passed_contract_and_windows_recovery_e2e
   collector_runtime_diagnostics: passed_contract_live_api_and_responsive_dashboard_smoke
-  extension_live_verification: passed_contract_and_localhost_running_smoke_real_pass_pending
+  extension_live_verification: passed_contract_localhost_smoke_and_real_chrome_pass_receipt_2026_08_31
   continuous_coverage_ledger: implemented_migration_013_contract_tests_passed_windows_live_receipt_pending
   live_receipt_acceptance_scripts: passed_localhost_e2e_background_tasks_and_extension
   autonomous_execution: blocked_by_p2_5
 known_blockers:
-  - "Extension 歷史 events_total=10，但 2026-08-26 runtime receipt 的 events_today=0、pairing_verified=false、heartbeat_verified=false；歷史事件不得代表目前在線，Claude.ai authenticated Browser capture 仍未完成。2026-08-30 已提供 scripts/extension_live_acceptance.py 驗收腳本（localhost E2E 通過），待已登入 Chrome 實機執行取得本輪 PASS receipt"
+  - "Extension live PASS 已於 2026-08-31 01:03 取得（ChatGPT＋Claude.ai，heartbeat 已驗證，各 3 event／2 response delta）；殘餘範圍：Gemini 未在本輪驗證，且單輪 PASS 不代表連續或全天 Browser capture coverage"
   - "P2.6 continuous coverage ledger 已於 2026-08-30 實作（migration 013、coverage_ledger_job heartbeat、/api/v1/usage/coverage，contract tests 通過）；Windows 實機全天 ledger receipt 尚未取得，正式環境 coverage 仍為 partial 直到實測達門檻"
   - "P2.7 已取得 Codex live completed receipt，但尚未取得 Claude Code 與 Claude Desktop local-agent live receipt；2026-08-30 已提供 scripts/background_task_live_acceptance.py 驗收腳本（localhost E2E 通過），待實機執行。generic Terminal、cloud-only、未完成任務與平台全天 coverage 均不宣稱已覆蓋"
   - "337 筆 legacy AI rows 無 response_status，僅保留為歷史資料，不進入 canonical synthesis/handoff 結論"
   - "Windows wheel/sdist install/upgrade/assets、formal rollback 與 1.3.0a4 candidate packaging 已驗證；2026-08-30 於 Linux container 重新驗證 build、artifact content receipt、fresh venv 安裝、schema 13/13 與 HTTP smoke（verify_installed_package checks 全數通過）；public publish/tag 尚未執行"
   - "Windows/Ubuntu/macOS × Python 3.10/3.12 CI run 32757498004 已通過；window/notification 實機能力仍限 Windows，其他平台採明確降級"
   - "P5-1 僅完成 proposal-only derived view；approve/execute、Agent Dispatcher、任何檔案/Git/外部 API mutation 仍未授權也未實作"
-key_metrics: "P0-P2 可日常運行；P3-1 handoff、P3-2 semantic index 4,380/4,380、P3-3 omni ask、P3-4 Related History、P3-5 derived Session、SQLite schema 7/7、Windows Toast E2E、formal package+DB rollback 與 3-OS/2-Python CI 六個 jobs 已通過。P5-1 proposal-only Alpha 以 2 張 live proposal／3 個 evidence refs 完成 localhost UI/API smoke，無保存、無 cloud LLM、無 execution。2026-08-26 完成 collector runtime diagnostics、Extension 1.3.1 live verifier 與 project_resolution config-driven roots；Verifier 可拒絕歷史事件並要求新 heartbeat、Content Ready、event 與 response，但 Claude.ai 本輪 PASS 尚未取得；整體仍非 release-ready，P5 autonomous executor 維持 blocked。"
+key_metrics: "P0-P2 可日常運行；P3-1 handoff、P3-2 semantic index 4,380/4,380、P3-3 omni ask、P3-4 Related History、P3-5 derived Session、SQLite schema 7/7、Windows Toast E2E、formal package+DB rollback 與 3-OS/2-Python CI 六個 jobs 已通過。P5-1 proposal-only Alpha 以 2 張 live proposal／3 個 evidence refs 完成 localhost UI/API smoke，無保存、無 cloud LLM、無 execution。2026-08-26 完成 collector runtime diagnostics、Extension 1.3.1 live verifier 與 project_resolution config-driven roots；Verifier 可拒絕歷史事件並要求新 heartbeat、Content Ready、event 與 response。2026-08-30 完成 P2.6 coverage ledger（migration 013）、兩支 live 驗收腳本與 Linux 發佈預演；2026-08-31 01:03 以 extension_live_acceptance 在已登入 Chrome 取得 ChatGPT＋Claude.ai 本輪 real PASS receipt（heartbeat 已驗證）。剩 P2.7 claude_code／claude_desktop live receipt、全天 ledger 實測與 tag／發佈；整體仍非 release-ready，P5 autonomous executor 維持 blocked。"

@@ -147,10 +147,29 @@ def main(argv: list[str] | None = None) -> int:
         print("\n# 可貼回 STATUS.yaml evidence_snapshot 的建議段落：")
         print(render_status_snippet(receipt))
     else:
+        print("\n# 尚未通過。常見原因與對策：")
         print(
-            "\n# 尚未通過：在該平台實際執行一個任務並等它完成"
-            "（需要成對 start + final receipt），再重跑本腳本。"
+            f"#  1) 本腳本以「當日」為界（本次檢查 {receipt.get('date')}）。"
+            "剛過午夜時今天可能還沒有任何完成任務；"
+            "可用 --date YYYY-MM-DD 檢查前一天的 receipt。"
         )
+        print(
+            "#  2) claude_code 只讀「本機」Claude Code CLI 的 transcript"
+            "（雲端／網頁版 session 不會寫入本機 ~/.claude/projects）；"
+            "claude_desktop 需要 Cowork／local-agent 任務。"
+            "在本機實際跑一個任務並等它完整結束。"
+        )
+        awaiting = int(receipt.get("awaiting_final_count") or 0)
+        if awaiting:
+            print(
+                f"#  3) 偵測到 {awaiting} 筆已開始、尚未看到 final 的任務——"
+                "等它們真正完成後會轉為 completed，再重跑本腳本。"
+            )
+        else:
+            print(
+                "#  3) 任務完成後 agent watcher 約每 60 秒增量掃描一次，"
+                "稍候 1–2 分鐘再重跑。"
+            )
     return 0 if receipt["status"] == "passed" else 1
 
 

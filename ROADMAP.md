@@ -145,6 +145,7 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 - PASS 必須同時具備開始後的新 token-authenticated heartbeat、每站新的 Content Ready timestamp、新 Browser event 與非空 assistant response；歷史 `OBSERVED`、單獨 heartbeat 或只有 prompt 都不能通過。
 - Receipt 僅含平台、counts、timestamps 與 stable state，不含 token、URL、Prompt、Response 或本機 path；baseline 不寫入 SQLite，service restart 後失效。
 - **Localhost receipt（2026-08-26）**：Claude.ai run 可由 UI 建立並進入 RUNNING；因本工作階段無法接管使用者已登入 Chrome，heartbeat、Content Ready、event 與 response delta 均維持 0，正確未升格為 PASS。494px 無頁面水平 overflow，console 無錯誤。
+- ✅ **Real Chrome PASS receipt（2026-08-31 01:03 Asia/Taipei）**：以 `scripts/extension_live_acceptance.py` 在已登入 Chrome 實機完成——新 token-authenticated heartbeat 已驗證，ChatGPT 與 Claude.ai 各取得本輪 3 筆 event／2 筆非空 response 的 delta，全平台 `passed: true`（verification_id `857027de…`）。此 PASS 只證明該輪能力，不證明連續或全天 coverage；Gemini 未在本輪範圍。
 
 ### P2.5-S1 本機 API 安全邊界
 
@@ -237,7 +238,8 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 - [x] milestone notification 具 idempotency、quiet hours、cooldown 與使用者關閉選項。
 - [x] Windows Dashboard/API 與 Extension token pairing 已實機驗證。
 - [x] Gemini 真實 Browser ingestion 已觀察 3 筆 event／2 筆非空 response。
-- [ ] 新版 Extension heartbeat 實機 receipt、ChatGPT/Claude、真實達標 Toast、macOS/Linux CI/實機仍待完成。
+- [x] 新版 Extension heartbeat 實機 receipt 與 ChatGPT／Claude.ai 本輪 live capture（2026-08-31 PASS，見 P2.5-B2）。
+- [ ] 真實達標 Toast 與 macOS/Linux 實機能力仍待完成。
 - [x] Contract tests 已覆蓋 interval merge、跨午夜、缺失平台、通知去重與內建 scheduler job contract。
 - [x] Continuous coverage ledger：heartbeat 開啟/延長/中斷分段、時鐘倒退防護、當日 union 覆蓋率與 `observed` 升級條件均有 contract tests（2026-08-30）。
 - [ ] Windows 實機全天 ledger receipt（讓正式環境的 usage coverage 實際脫離 `partial`）。
@@ -564,8 +566,9 @@ P2.5-S1 API 安全邊界
 > 背景：本日已完成 repository 整理——所有分支收斂於 `main`（`wip/p5-2-agent-executor` 內容已完整包含於 main 歷史，分支指標移除；如需回溯 executor 實作，checkout `871ee29`），並補齊文件索引（`docs/INDEX.md`）與 README 修訂。以下依「先把已實作變成已驗證，再擴張」原則排序。
 
 ### 短期（1–2 週）：清除 known_blockers 的驗證債
-1. **Extension live PASS receipt**：在已登入的實機 Chrome 完成 Extension 1.3.1 heartbeat 與 ChatGPT／Claude.ai 本輪 capture 收據（STATUS `known_blockers` 首項，也是 release-ready 的最大缺口）。
-   ▶ 2026-08-30：驗收腳本 `scripts/extension_live_acceptance.py` 已完成並通過 localhost E2E；剩實機執行。
+1. ✅ **Extension live PASS receipt**：在已登入的實機 Chrome 完成 Extension 1.3.1 heartbeat 與 ChatGPT／Claude.ai 本輪 capture 收據（STATUS `known_blockers` 首項，也是 release-ready 的最大缺口）。
+   ▶ 2026-08-30：驗收腳本 `scripts/extension_live_acceptance.py` 已完成並通過 localhost E2E。
+   ▶ ✅ 2026-08-31 01:03：實機 PASS 取得——heartbeat 驗證通過，ChatGPT／Claude.ai 各 3 event／2 response delta（見 P2.5-B2 與 STATUS.yaml）。
 2. **P2.7 Claude Code／Claude Desktop local-agent live receipt**：目前僅 Codex 有 live completed receipt，補齊其餘兩個來源。
    ▶ 2026-08-30：驗收腳本 `scripts/background_task_live_acceptance.py` 已完成並通過 localhost E2E；剩實機執行。
 3. **P2.6 continuous coverage ledger**：讓每日使用時間的 coverage 脫離永久 `partial` 標示。

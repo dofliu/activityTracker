@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **目前狀態：Personal Alpha。** Windows milestone WinRT Toast E2E、schema 7/7、formal package+DB rollback、P3-2～P3-5、P5-1 proposal-only、collector runtime diagnostics、Extension 1.3.1 live-verification harness 與跨平台 CI 已通過；ChatGPT 真實 DOM selectors 已修復，Claude Desktop Cowork／local-agent transcript 已完成 Windows E2E。Claude.ai 尚未取得本輪 PASS receipt，Extension live heartbeat 也仍待已登入 Chrome 實機驗證，因此尚非 release-ready。
+> **目前狀態：Personal Alpha。** Windows milestone WinRT Toast E2E、schema 13/13、formal package+DB rollback、P3-2～P3-5、P5-1 proposal-only、collector runtime diagnostics、P2.6 continuous coverage ledger 與跨平台 CI 已通過；**Extension 1.3.1 已於 2026-08-31 在已登入 Chrome 取得 ChatGPT＋Claude.ai 本輪 live PASS receipt（heartbeat 已驗證）**。剩餘缺口：Claude Code／Claude Desktop 背景任務 live receipt、全天 coverage ledger 實測與正式 tag／發佈，因此尚非 release-ready。
 
 **文件入口：**[📚 文件總覽](docs/INDEX.md) · [完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
 

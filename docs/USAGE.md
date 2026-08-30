@@ -291,7 +291,11 @@ Invoke-RestMethod http://127.0.0.1:8765/api/v1/background-tasks/today
 python scripts/background_task_live_acceptance.py --platforms claude_code,claude_desktop,codex
 ```
 
-每個要求的平台當日至少有 1 筆 completed receipt 才會 PASS（exit code 0），並輸出可貼回 `STATUS.yaml` 的建議段落。
+每個要求的平台當日至少有 1 筆 completed receipt 才會 PASS（exit code 0），並輸出可貼回 `STATUS.yaml` 的建議段落。注意三件事：
+
+- 以「當日」為界；剛過午夜時可用 `--date YYYY-MM-DD` 檢查前一天。
+- `claude_code` 只會讀**本機** Claude Code CLI 的 transcript（`~/.claude/projects`）；雲端／網頁版 Claude Code session 不會產生本機 receipt。`claude_desktop` 需要 Cowork／local-agent 任務。
+- 任務完成後 agent watcher 約每 60 秒增量掃描一次，完成後稍候再重跑。
 
 預覽今日判定而不發送通知、也不寫入 receipt：
 
