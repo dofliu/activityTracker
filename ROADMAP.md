@@ -578,6 +578,7 @@ P2.5-S1 API 安全邊界
 ### 中期（可平行）：P6 發佈整備收尾
 - Wheel/sdist、formal rollback、3-OS × 2-Python CI 均已通過：走完 `docs/RELEASE_CHECKLIST.md`，打 `v1.3.0aX` tag 併發布 GitHub Release（可先不上 PyPI）。
 - 在乾淨環境（或另一台機器）照 README 快速開始逐步驗證一次，修正安裝文件落差。
+  ▶ 2026-08-30：已於 Linux container 完成一輪發佈預演——`python -m build`、`verify_release_artifacts`（content + privacy receipt PASS）、乾淨 venv 安裝 wheel、`init`／`assets-status`／`migration-status`（13/13）、web server HTTP smoke 與 `verify_installed_package` checks 全數通過。剩 tag + GitHub Release 的實際發佈動作。
 
 ### 長期（>6 週）：P5-2 executor 重啟與 P4 收集層
 - P5-2 executor 曾於 `871ee29` 實作、`f8f5400` revert 回 ADR-007 proposal-only 契約；重啟條件：P2.5 gate 全綠 + allowlist、dirty-worktree check、timeout/cancel、audit receipt、L0/L1/L2 分級批准全數就位，並以獨立 ADR 驗收。
