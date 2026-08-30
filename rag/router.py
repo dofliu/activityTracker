@@ -3,6 +3,7 @@ import sys
 import uuid
 import json
 import logging
+import asyncio
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Query
@@ -74,6 +75,11 @@ class ChatRequest(BaseModel):
     hybrid_alpha: Optional[float] = None
     score_threshold: Optional[float] = None
     custom_system_prompt: Optional[str] = None
+
+
+class CreateSessionRequest(BaseModel):
+    session_id: Optional[str] = None
+    title: Optional[str] = "新對話"
 
 
 class SaveMessageRequest(BaseModel):
@@ -350,14 +356,20 @@ async def chat_stream(req: ChatRequest):
 
     if req.enable_rag:
         from rag.retrieval.registry import retriever_registry
-        citations = retriever_registry.retrieve(
-            query=last_user_message,
-            strategy=req.retrieval_strategy,
-            top_k=req.top_k,
-            alpha=req.hybrid_alpha,
-            score_threshold=req.score_threshold or 0.0
-        )
-        context_text = retriever_registry.format_context_prompt(citations)
+        try:
+            citations = await asyncio.to_thread(
+                retriever_registry.retrieve,
+                query=last_user_message,
+                strategy=req.retrieval_strategy,
+                top_k=req.top_k,
+                alpha=req.hybrid_alpha,
+                score_threshold=req.score_threshold or 0.0
+            )
+            context_text = retriever_registry.format_context_prompt(citations)
+        except Exception as e:
+            logger.error(f"RAG retrieval error during chat stream: {e}")
+            citations = []
+            context_text = f"（檢索過程發生異常: {str(e)}）"
 
     base_sys_prompt = req.custom_system_prompt or rag_settings.DEFAULT_SYSTEM_PROMPT
 
@@ -400,30 +412,40 @@ def get_chat_sessions():
     db = get_db()
     with db.session_scope() as session:
         rows = session.query(RAGChatSession).order_by(RAGChatSession.updated_at.desc()).all()
-        return [
-            {
+        results = []
+        for r in rows:
+            title = (r.title or "").strip()
+            if not title or title == "新對話":
+                first_msg = session.query(RAGChatMessage).filter_by(session_id=r.id, role="user").order_by(RAGChatMessage.created_at.asc()).first()
+                if first_msg and first_msg.content:
+                    title = first_msg.content.strip().split("\n")[0][:28]
+                    r.title = title
+            msg_count = session.query(RAGChatMessage).filter_by(session_id=r.id).count()
+            results.append({
                 "id": r.id,
-                "title": r.title,
+                "title": title or "未命名對話",
+                "message_count": msg_count,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
                 "updated_at": r.updated_at.isoformat() if r.updated_at else None
-            }
-            for r in rows
-        ]
+            })
+        return results
 
 
 @router.post("/chat/sessions")
-def create_or_update_session(session_id: Optional[str] = None, title: Optional[str] = "新對話"):
-    s_id = session_id or str(uuid.uuid4())
-    s_title = title or "新對話"
+def create_or_update_session(req: Optional[CreateSessionRequest] = None):
+    req = req or CreateSessionRequest()
+    s_id = req.session_id or str(uuid.uuid4())
+    s_title = (req.title or "新對話").strip()
     db = get_db()
     with db.session_scope() as session:
         existing = session.query(RAGChatSession).filter_by(id=s_id).first()
         now = get_local_now()
         if existing:
-            existing.title = s_title
+            if s_title and s_title != "新對話":
+                existing.title = s_title
             existing.updated_at = now
         else:
-            new_s = RAGChatSession(id=s_id, title=s_title, created_at=now, updated_at=now)
+            new_s = RAGChatSession(id=s_id, title=s_title or "新對話", created_at=now, updated_at=now)
             session.add(new_s)
 
     return {"session_id": s_id, "title": s_title}
@@ -472,8 +494,14 @@ def save_chat_message(req: SaveMessageRequest):
             created_at=get_local_now()
         )
         session.add(msg)
-        # Touch session updated_at
         sess = session.query(RAGChatSession).filter_by(id=req.session_id).first()
         if sess:
             sess.updated_at = get_local_now()
+            if req.role == "user" and (not sess.title or sess.title == "新對話"):
+                sess.title = req.content.strip().split("\n")[0][:28]
+        else:
+            title = req.content.strip().split("\n")[0][:28] if req.role == "user" else "新對話"
+            now = get_local_now()
+            new_sess = RAGChatSession(id=req.session_id, title=title, created_at=now, updated_at=now)
+            session.add(new_sess)
     return {"success": True}

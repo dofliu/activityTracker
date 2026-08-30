@@ -482,6 +482,21 @@ Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 4. **可觀察性**：來源檔案、切片、最新 worker 實測向量／BM25 數量與空間以 receipt 回報；主服務不直接讀取大型 Chroma 或 BM25。若 BM25 不一致，可從既有 Chroma 重建，不需重掃來源資料夾。
 5. **驗收邊界**：已通過 migration、API confirmation 與 RAG retrieval contract tests；大型正式索引重建屬 worker runtime，完成後才可宣稱 BM25 與 Chroma 一致。
 
+### ✅ P7.2：DeskRAG 離線模型精選選單與對話歷史自動標題管理（2026-08-30）
+
+1. **本機模型下拉選單（Ollama Model Selector）**：
+   - 前端輸入框升級為直覺下拉選單，預設提供 4 款本機精選模型（`llama3.1:8b` 預設推薦、`mistral:7b`、`gemma4:e4b`、`qwen3:4b`），全離線免聯網。
+   - 支援隨提供者動態切換雲端模型（Google Gemini 3.7 / Anthropic Claude 3.5 / OpenAI GPT-4o）。
+2. **對話工作階段生命週期與自動標題（Chat Sessions Lifecycle & Auto-Titling）**：
+   - 建立 `CreateSessionRequest` Pydantic 模型，修復 `/api/v1/rag/chat/sessions` 與 `/messages` 的 Request Body 解析問題。
+   - 每次新提問自動擷取首句精華作為主題標題（如 `💬 OPC UA 時間序列 預測`），選單首項提供明確的 `➕ 建立新對話`。
+   - 點選歷史對話即時還原當次完整問答歷史、引文切片卡片與模型來源。
+3. **日常專案活動索引（Activity Indexer）**：
+   - 修正 `ProjectState` 與 `OpenLoop` 欄位映射，將近期專案狀態與未結事項轉化為標準虛擬切片供統一語意檢索。
+4. **檢索異步化（Async Retrieval）**：
+   - 檢索調用改以 `asyncio.to_thread` 異步包裝，避免 475k+ 巨量切片檢索時阻塞 FastAPI 事件循環。
+5. **全量測試驗收**：全專案自動化測試 135/135 PASS（含 API boundary、RAG API、Worker 與 Repo Sync）。
+
 ---
 
 ## 9. ✅ P8：系統基礎穩健化工程（生命週期維護、自我修復守護與 Web 維護面板）(Completed)

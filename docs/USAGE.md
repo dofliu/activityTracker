@@ -60,7 +60,7 @@ project_resolution:
 
 ### 1.3 本機 Git 同步中心
 
-Dashboard「監控配置 → 本機 Git 同步中心」與 GitHub 雲端整合是兩套不同功能：
+Dashboard「監控配置 → 本機 Git 同步中心」與 GitHub 雲端整合是兩套不同功能。同步中心先以最後一筆本機 commit 時間選出最近的 10 個 repo（可由設定調整），再讀取這些 repo 的完整 worktree 與同步狀態；畫面會另外顯示目前項目的 worktree 修改時間：
 
 - **GitHub 雲端整合**只讀取 GitHub repo／PR metadata，不會對本機檔案或 branch 執行 Git 指令。
 - **本機 Git 同步中心**只管理 `watchers.git_watcher.repositories` 明示設定 root 下發現的 repositories；頁面初次載入只讀取本機 cached remote-tracking refs，不會自動連網。
@@ -92,6 +92,7 @@ repository_sync:
   status_timeout_seconds: 5
   status_parallelism: 8
   max_repositories: 80
+  dashboard_recent_limit: 10
 ```
 
 ## 2. 啟動與確認服務
@@ -318,15 +319,15 @@ Dashboard「進行中工作」會同步顯示 `RECENT WORK SESSIONS` 與 `RELATE
 
 若本機 Ollama 或 semantic index 不可用，Related History 會明確顯示 unavailable，不改送 cloud。Session 的 span 只是首末事件時間差，不代表實際工時、專注度或任務連續性。
 
-### 管理 DeskRAG 索引
+### 管理 DeskRAG 知識庫與索引
 
 在 Dashboard 的「03 · 知識庫與 RAG」中，掃描按鈕會建立一個獨立本機 worker；主頁、採集器與 Health API 不會在同一個 process 內等待文件解析或 embedding。
 
-1. 新增資料夾或按「掃描索引」前，設定本次檔案上限與每檔間隔。預設為 500 檔、25 ms、單檔最多 50 MB；大型資料夾請分批執行。
-2. 執行中可按「暫停／恢復／取消」。取消會在目前單一檔案或向量批次完成後生效，不會強制中斷寫入。
-3. 「移除索引」只移除選定資料夾的 RAG metadata、Chroma vectors 與 BM25 chunks；原始檔案與 RAG 對話不會被刪除。作業完成後會執行 SQLite checkpoint、`VACUUM` 與一致性檢查。
-4. 「清空所有 RAG 索引」需確認並輸入 `CLEAR`。它只清空 RAG 資料夾／檔案／向量／BM25，不會刪除來源檔與對話。
-5. 容量卡片的向量、BM25 與 Chroma 空間來自獨立 worker 的最近驗證收據；初次升級或尚未驗證時顯示「待驗證」。按「驗證索引與空間」可取得實測計數。若 BM25 顯示不一致，可按「從 Chroma 重建 BM25」，此作業不會重新掃描來源資料夾。
+1. **新增目錄與掃描**：新增資料夾或按「掃描索引」前，設定本次檔案上限與每檔間隔。預設為 500 檔、25 ms、單檔最多 50 MB；大型資料夾請分批執行。
+2. **執行控制**：執行中可按「暫停／恢復／取消」。取消會在目前單一檔案或向量批次完成後生效，不會強制中斷寫入。
+3. **安全移除**：「移除索引」只移除選定資料夾的 RAG metadata、Chroma vectors 與 BM25 chunks；原始檔案與 RAG 對話不會被刪除。作業完成後會執行 SQLite checkpoint、`VACUUM` 與一致性檢查。
+4. **空間清空**：「清空所有 RAG 索引」需確認並輸入 `CLEAR`。它只清空 RAG 資料夾／檔案／向量／BM25，不會刪除來源檔與對話。
+5. **一致性驗證**：容量卡片的向量、BM25 與 Chroma 空間來自獨立 worker 的最近驗證收據；初次升級或尚未驗證時顯示「待驗證」。按「驗證索引與空間」可取得實測計數。若 BM25 顯示不一致，可按「從 Chroma 重建 BM25」，此作業不會重新掃描來源資料夾。
 
 API 也可用於本機自動化：
 
@@ -341,6 +342,24 @@ Invoke-RestMethod "http://127.0.0.1:8765/api/v1/rag/storage"
 ```
 
 不要以「索引完成」推論所有來源均已處理；若工作顯示 `completed_limited`，表示仍有檔案留待下一批。資料夾層的檔案數是掃描時看到的候選數，已索引檔案數與切片數則是已實際寫入的 metadata。
+
+### 使用 DeskRAG 智慧文件問答與對話
+
+DeskRAG 支援結合本機知識庫（PDF、Word、PPTX、Excel、代碼/Markdown）與專案日常活動的即時串流問答：
+
+1. **模型提供者與下拉選單**：
+   - **Ollama (本機離線)**：提供 4 款精選本機模型下拉切換，包含 `llama3.1:8b`（預設推薦）、`mistral:7b`、`gemma4:e4b`、`qwen3:4b`，完全離線運作。
+   - **雲端 LLM**：可切換為 `Google Gemini`（`gemini-3.7-flash`）、`Anthropic Claude`（`claude-3-5-sonnet`）或 `OpenAI`（`gpt-4o`）。
+2. **檢索融合策略**：
+   - `Hybrid RRF (向量 + BM25 倒數排名融合)`（預設）：兼具語意概念理解與專有名詞精準匹配。
+   - `Weighted Fusion (線性加權)`、`Vector Only (純向量)`、`BM25 Only (純關鍵字)`。
+3. **對話工作階段（Chat Sessions）管理**：
+   - **自動提問命名**：發送提問後，系統會自動擷取問題首句作為對話標題（如 `💬 OPC UA 時間序列 預測`），不再產生「新對話」泛稱。
+   - **歷史切換**：點選下拉選單可隨時切換歷史對話，即時還原問答脈絡與引文卡片。
+   - **開新與刪除**：點選 `➕ 建立新對話` 開啟新提問；點選垃圾桶 `🗑` 可刪除當前對話。
+4. **來源引文與 Windows 總管開啟**：
+   - 每筆回答皆會標註參考來源切片（包含 PDF 頁碼、PPT 投影片、Excel 工作表及關聯度評分）。
+   - 點擊「`📂 在總管開啟`」可在 Windows 檔案總管中直接開啟並反白選中該實體檔案。
 
 ### 查看 Proposal-only 主動秘書建議
 

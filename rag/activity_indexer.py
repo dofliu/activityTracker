@@ -51,17 +51,15 @@ class ActivityIndexer:
             project_rows = p_query.all()
 
             for pr in project_rows:
-                if not matches_project(pr.project_key, pr.canonical_name):
+                if not matches_project(pr.project_key, pr.display_name):
                     continue
                 content = (
                     f"【專案狀態】\n"
                     f"專案代碼: {pr.project_key}\n"
-                    f"標準名稱: {pr.canonical_name}\n"
+                    f"標準名稱: {pr.display_name}\n"
                     f"分類: {pr.category or '未分類'}\n"
-                    f"當前焦點: {pr.current_focus or '進行中'}\n"
-                    f"專案摘要: {pr.summary or '無'}\n"
+                    f"最後動作摘要: {pr.last_action_summary or '無'}\n"
                     f"活躍狀態: {pr.status}\n"
-                    f"未結事項數: {pr.open_loops_count}\n"
                     f"最後活動時間: {pr.last_activity_at.isoformat() if pr.last_activity_at else '未知'}"
                 )
                 ts = pr.last_activity_at.isoformat() if pr.last_activity_at else ""
@@ -72,7 +70,7 @@ class ActivityIndexer:
                     file_type=".project_state",
                     content=content,
                     chunk_index=0,
-                    section_title=f"專案狀態: {pr.canonical_name}",
+                    section_title=f"專案狀態: {pr.display_name}",
                     metadata={
                         "source_domain": "activity",
                         "source_type": "project_state",
@@ -98,7 +96,7 @@ class ActivityIndexer:
                     f"所屬專案: {proj}\n"
                     f"事項標題: {lp.title}\n"
                     f"狀態: {lp.status}\n"
-                    f"緊急度: {lp.urgency}\n"
+                    f"置信度: {lp.confidence}\n"
                     f"解決備註: {lp.resolution_note or '尚未解決'}\n"
                     f"最後觀察時間: {lp.last_seen_at.isoformat() if lp.last_seen_at else '未知'}"
                 )

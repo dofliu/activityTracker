@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css?v=1.3.0a9-repository-sync">
+  <link rel="stylesheet" href="/static/style.css?v=1.3.0a12-home-work-guide">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
@@ -105,21 +105,11 @@
           <div class="resume-body"><div class="placeholder" data-i18n="ph_loading_projects">載入進行中工作…</div></div>
         </div>
 
-        <section class="panel secretary-panel mb-14">
-          <div class="panel-head">
-            <span class="mono-label accent" data-i18n="secretary_title">SECRETARY SUGGESTIONS</span>
-            <span class="trust noisy">PROPOSAL ONLY</span>
-            <span id="secretary-proposals-badge" class="trust noisy">LOADING</span>
-            <button id="btn-refresh-proposals" class="btn btn-ghost btn-sm head-right" data-i18n="btn_refresh_proposals">重新整理</button>
-          </div>
-          <div id="secretary-proposals-list" class="secretary-proposals-list"><div class="placeholder" data-i18n="ph_loading_proposals">正在整理可追溯建議…</div></div>
-          <div class="context-memory-boundary" data-i18n="secretary_boundary">只呈現本機 evidence 衍生建議；不保存、不呼叫 cloud LLM，也不會自動執行。</div>
-        </section>
-
         <div class="context-memory-grid mb-14">
           <section class="panel context-sessions-panel">
             <div class="panel-head">
               <span class="mono-label accent" data-i18n="context_sessions_title">RECENT WORK SESSIONS</span>
+              <span class="context-sessions-hint" data-i18n="context_sessions_hint">剛剛做到哪裡 · 點選回到專案</span>
               <span id="context-sessions-badge" class="trust noisy">LOADING</span>
               <button id="btn-refresh-sessions" class="btn btn-ghost btn-sm head-right" data-i18n="btn_refresh_sessions">重新整理</button>
             </div>
@@ -140,6 +130,23 @@
             <div class="context-memory-boundary" data-i18n="related_memory_boundary">查詢只送往本機 Ollama 且不保存；similarity 不代表工作重複或歷史結論正確。</div>
           </section>
         </div>
+
+        <details id="secretary-inbox" class="panel secretary-inbox mb-14">
+          <summary class="panel-head secretary-inbox-summary">
+            <span class="mono-label accent" data-i18n="secretary_title">SUGGESTION INBOX</span>
+            <span class="trust noisy">PROPOSAL ONLY</span>
+            <span id="secretary-proposals-badge" class="trust noisy">LOADING</span>
+            <span class="secretary-inbox-toggle head-right" data-i18n="secretary_inbox_toggle">展開建議</span>
+          </summary>
+          <div class="secretary-inbox-body">
+            <div class="secretary-inbox-tools">
+              <span data-i18n="secretary_inbox_hint">待您判斷的建議；不等於現在需要處理。</span>
+              <button id="btn-refresh-proposals" class="btn btn-ghost btn-sm" data-i18n="btn_refresh_proposals">重新整理</button>
+            </div>
+            <div id="secretary-proposals-list" class="secretary-proposals-list"><div class="placeholder" data-i18n="ph_loading_proposals">正在整理可追溯建議…</div></div>
+            <div class="context-memory-boundary" data-i18n="secretary_boundary">只呈現本機 evidence 衍生建議；不保存、不呼叫 cloud LLM，也不會自動執行。</div>
+          </div>
+        </details>
 
         <div class="row-between mb-8">
           <span id="projects-count" class="mono-label muted">ACTIVE WORKSTREAMS</span>
@@ -266,8 +273,8 @@
                   <option value="openai">OpenAI</option>
                 </select>
 
-                <!-- 模型名稱 -->
-                <input type="text" id="input-rag-model" placeholder="模型名稱" value="llama3.2:latest" style="width: 120px; font-size: 11px; padding: 3px 6px;">
+                <!-- 模型選擇 -->
+                <select id="select-rag-model" style="font-size: 12px; padding: 3px 8px; min-width: 120px;"></select>
 
                 <!-- 檢索策略 -->
                 <select id="select-rag-strategy" style="font-size: 12px; padding: 3px 8px;" title="選擇檢索融合演算法">
@@ -657,6 +664,6 @@
   </div>
 
   <div id="toast-container"></div>
-  <script src="/static/app.js?v=1.3.0a8-repository-sync"></script>
+  <script src="/static/app.js?v=1.3.0a12-home-work-guide"></script>
 </body>
 </html>

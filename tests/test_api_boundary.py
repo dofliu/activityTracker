@@ -356,12 +356,14 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     assert "llm-key-status-badge" in dashboard.text
     assert "context-sessions-list" in dashboard.text
     assert "input-related-question" in dashboard.text
+    assert "secretary-inbox" in dashboard.text
     assert "secretary-proposals-list" in dashboard.text
+    assert "SUGGESTION INBOX" in dashboard.text
     assert "PROPOSAL ONLY" in dashboard.text
     assert "DATA CAPTURE" in dashboard.text
     assert "extension-capture-badge" not in dashboard.text
-    assert "style.css?v=1.3.0a9-repository-sync" in dashboard.text
-    assert "app.js?v=1.3.0a8-repository-sync" in dashboard.text
+    assert "style.css?v=1.3.0a12-home-work-guide" in dashboard.text
+    assert "app.js?v=1.3.0a12-home-work-guide" in dashboard.text
     assert "focus-carousel" in dashboard.text
     assert "repo-sync-panel" in dashboard.text
     assert "data-trust-runtime-badge" in dashboard.text

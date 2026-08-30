@@ -191,9 +191,12 @@ input, select, button { font-family: inherit; }
 /* ---------- P3 Context memory ---------- */
 .context-memory-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr); gap: 14px; }
 .context-sessions-panel, .related-memory-panel { min-width: 0; }
-.context-sessions-list { max-height: 310px; overflow: auto; }
+.context-sessions-list { max-height: 270px; overflow: auto; }
 .context-session { padding: 10px 14px; border-bottom: 1px solid var(--bd); }
 .context-session:last-child { border-bottom: none; }
+.context-session-action { cursor: pointer; transition: background 0.15s ease, box-shadow 0.15s ease; }
+.context-session-action:hover { background: var(--s2); box-shadow: inset 3px 0 0 var(--orange); }
+.context-session-action:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
 .context-session-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .context-session-project { font-size: 12px; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .context-session-time { margin-left: auto; flex: none; color: var(--mu); font-family: "JetBrains Mono", monospace; font-size: 9.5px; }
@@ -208,9 +211,20 @@ input, select, button { font-family: inherit; }
 .related-memory-match { padding: 9px 14px; border-bottom: 1px solid var(--bd); }
 .related-memory-match:last-child { border-bottom: none; }
 .related-memory-match-title { font-size: 11.5px; font-weight: 800; line-height: 1.4; }
+.context-sessions-hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--mu); font-size: 10px; }
 
 /* ---------- P5-1 proposal-only secretary ---------- */
-.secretary-proposals-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.secretary-inbox { overflow: hidden; }
+.secretary-inbox-summary { list-style: none; cursor: pointer; user-select: none; }
+.secretary-inbox-summary::-webkit-details-marker { display: none; }
+.secretary-inbox-summary:hover { background: var(--s2); }
+.secretary-inbox-summary:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
+.secretary-inbox-toggle { display: inline-flex; align-items: center; gap: 7px; color: var(--orange); font-family: "JetBrains Mono", monospace; font-size: 10px; font-weight: 700; }
+.secretary-inbox-toggle::after { content: "▾"; transition: transform 0.16s ease; }
+.secretary-inbox[open] .secretary-inbox-toggle::after { transform: rotate(180deg); }
+.secretary-inbox-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-top: 1px solid var(--bd); color: var(--mu); font-size: 10.5px; line-height: 1.45; }
+.secretary-inbox-tools span { min-width: 0; }
+.secretary-proposals-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); max-height: 560px; overflow: auto; }
 .proposal-card { min-width: 0; padding: 12px 14px; border-right: 1px solid var(--bd); border-bottom: 1px solid var(--bd); }
 .proposal-card-top { display: flex; align-items: center; gap: 8px; }
 .proposal-project { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--orange); font-family: "JetBrains Mono", monospace; font-size: 9.5px; font-weight: 700; }

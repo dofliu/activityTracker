@@ -2461,7 +2461,44 @@ let currentRagSessionId = "";
 let ragChatHistory = [];
 let isRagStreaming = false;
 
+const RAG_PROVIDER_MODELS = {
+  ollama: [
+    { value: "llama3.1:8b", label: "llama3.1:8b (預設)" },
+    { value: "mistral:7b", label: "mistral:7b" },
+    { value: "gemma4:e4b", label: "gemma4:e4b" },
+    { value: "qwen3:4b", label: "qwen3:4b" }
+  ],
+  gemini: [
+    { value: "gemini-3.7-flash", label: "gemini-3.7-flash (推薦)" },
+    { value: "gemini-2.5-flash", label: "gemini-2.5-flash" },
+    { value: "gemini-2.5-pro", label: "gemini-2.5-pro" }
+  ],
+  claude: [
+    { value: "claude-3-5-sonnet-20241022", label: "claude-3-5-sonnet (推薦)" },
+    { value: "claude-3-5-haiku-20241022", label: "claude-3-5-haiku" }
+  ],
+  openai: [
+    { value: "gpt-4o", label: "gpt-4o (推薦)" },
+    { value: "gpt-4o-mini", label: "gpt-4o-mini" }
+  ]
+};
+
+function updateRAGModelSelect(provider) {
+  const modelSelect = $("select-rag-model") || $("input-rag-model");
+  if (!modelSelect) return;
+  const prov = provider || ($("select-rag-provider") ? $("select-rag-provider").value : "ollama");
+  const models = RAG_PROVIDER_MODELS[prov] || RAG_PROVIDER_MODELS.ollama;
+  if (modelSelect.tagName === "SELECT") {
+    modelSelect.innerHTML = models.map((m, idx) => `
+      <option value="${esc(m.value)}" ${idx === 0 ? "selected" : ""}>${esc(m.label || m.value)}</option>
+    `).join("");
+  } else {
+    modelSelect.value = models[0] ? models[0].value : "llama3.1:8b";
+  }
+}
+
 function initRAGTab() {
+  updateRAGModelSelect("ollama");
   // 新增目錄
   const addBtn = $("btn-rag-add-folder");
   if (addBtn) {
@@ -2630,17 +2667,11 @@ function initRAGTab() {
     });
   }
 
-  // 切換提供者自動帶出預設模型
+  // 切換提供者自動帶出模型選單
   const providerSelect = $("select-rag-provider");
   if (providerSelect) {
     providerSelect.addEventListener("change", (e) => {
-      const prov = e.target.value;
-      const modelInput = $("input-rag-model");
-      if (!modelInput) return;
-      if (prov === "gemini") modelInput.value = "gemini-3.7-flash";
-      else if (prov === "claude") modelInput.value = "claude-3-5-sonnet-20241022";
-      else if (prov === "openai") modelInput.value = "gpt-4o";
-      else if (prov === "ollama") modelInput.value = "llama3.2:latest";
+      updateRAGModelSelect(e.target.value);
     });
   }
 
@@ -2871,13 +2902,18 @@ async function openRAGFileInExplorer(path) {
 async function loadRAGSessions() {
   try {
     const sessions = await getJSON("/api/v1/rag/chat/sessions");
-    ragSessionsCache = sessions;
+    ragSessionsCache = Array.isArray(sessions) ? sessions : [];
     const select = $("select-rag-session");
     if (!select) return;
 
-    select.innerHTML = '<option value="">新對話</option>' + sessions.map(s => `
-      <option value="${esc(s.id)}" ${s.id === currentRagSessionId ? "selected" : ""}>${esc(s.title)}</option>
-    `).join("");
+    select.innerHTML = '<option value="">➕ 建立新對話</option>' + ragSessionsCache.map(s => {
+      const title = (s.title || "").trim();
+      const displayTitle = title && title !== "新對話" ? title : (currentLang === "zh-TW" ? "對話紀錄" : "Chat");
+      return `<option value="${esc(s.id)}" ${s.id === currentRagSessionId ? "selected" : ""}>💬 ${esc(displayTitle)}</option>`;
+    }).join("");
+    if (currentRagSessionId) {
+      select.value = currentRagSessionId;
+    }
   } catch (e) {}
 }
 
@@ -2975,10 +3011,11 @@ async function sendRAGChatMessage() {
   if (!prompt) return;
 
   promptInput.value = "";
-  const provider = $("select-rag-provider").value;
-  const model = $("input-rag-model").value;
-  const strategy = $("select-rag-strategy").value;
-  const enableRag = $("toggle-enable-rag").checked;
+  const provider = $("select-rag-provider") ? $("select-rag-provider").value : "ollama";
+  const modelSelect = $("select-rag-model") || $("input-rag-model");
+  const model = modelSelect ? modelSelect.value : "llama3.1:8b";
+  const strategy = $("select-rag-strategy") ? $("select-rag-strategy").value : "hybrid_rrf";
+  const enableRag = $("toggle-enable-rag") ? $("toggle-enable-rag").checked : true;
 
   // 1. 建立或確保 Session
   if (!currentRagSessionId) {
@@ -3098,7 +3135,7 @@ async function sendRAGChatMessage() {
       citations: assistantMsg.citations,
       provider,
       model
-    }).catch(() => {});
+    }).then(() => loadRAGSessions()).catch(() => {});
 
   } catch (e) {
     assistantMsg.content += `\n\n[串流發生錯誤: ${e.message}]`;

@@ -14,6 +14,7 @@ import subprocess
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -94,6 +95,15 @@ class LocalRepositorySync:
         except (TypeError, ValueError):
             return 80
 
+    @property
+    def dashboard_recent_limit(self) -> int:
+        """Dashboard 只保留可讀的近期工作清單，完整範圍仍供 action allowlist 使用。"""
+        configured = self.cfg.get("repository_sync.dashboard_recent_limit", 10)
+        try:
+            return max(1, min(int(configured), 50))
+        except (TypeError, ValueError):
+            return 10
+
     def _configured_roots(self) -> list[Path]:
         return [path.expanduser().resolve() for path in self.cfg.get_paths(
             "watchers.git_watcher.repositories"
@@ -155,7 +165,19 @@ class LocalRepositorySync:
         result = self._run(repo, args, timeout_seconds=self.status_timeout_seconds)
         return result.stdout.strip() if result.returncode == 0 else None
 
-    def _worktree_counts(self, repo: RepositoryReference) -> dict[str, int]:
+    @staticmethod
+    def _changed_path_mtime(repo: RepositoryReference, raw_path: bytes) -> float:
+        """只讀取 Git 回報的相對路徑；避免把解析出的 path 帶出 repo root。"""
+        try:
+            relative = Path(raw_path.decode("utf-8", errors="replace"))
+            candidate = (repo.path / relative).resolve()
+            if not candidate.is_relative_to(repo.path) or not candidate.is_file():
+                return 0.0
+            return candidate.stat().st_mtime
+        except (OSError, ValueError):
+            return 0.0
+
+    def _worktree_counts(self, repo: RepositoryReference) -> tuple[dict[str, int], float]:
         result = self._run(
             repo,
             ("status", "--porcelain=v1", "-z", "--untracked-files=all"),
@@ -165,13 +187,27 @@ class LocalRepositorySync:
             raise RepositorySyncRejected("無法讀取 Git worktree 狀態")
 
         staged = unstaged = untracked = conflicted = 0
+        latest_worktree_mtime = 0.0
+        previous_was_rename_or_copy = False
         for raw_record in result.stdout.encode("utf-8", errors="replace").split(b"\0"):
             if len(raw_record) < 2:
                 continue
             status = raw_record[:2].decode("ascii", errors="replace")
-            # rename/copy 的第二個 path record 沒有 XY status，略過即可。
             if len(raw_record) < 3 or raw_record[2:3] != b" ":
+                # rename/copy 的第二個 path record 同樣要計入最近修改時間。
+                if previous_was_rename_or_copy:
+                    latest_worktree_mtime = max(
+                        latest_worktree_mtime,
+                        self._changed_path_mtime(repo, raw_record),
+                    )
+                previous_was_rename_or_copy = False
                 continue
+            raw_path = raw_record[3:]
+            latest_worktree_mtime = max(
+                latest_worktree_mtime,
+                self._changed_path_mtime(repo, raw_path),
+            )
+            previous_was_rename_or_copy = status[0] in {"R", "C"} or status[1] in {"R", "C"}
             if status == "??":
                 untracked += 1
                 continue
@@ -183,12 +219,32 @@ class LocalRepositorySync:
                 staged += 1
             if status[1] != " ":
                 unstaged += 1
-        return {
+        return ({
             "staged_files": staged,
             "unstaged_files": unstaged,
             "untracked_files": untracked,
             "conflicted_files": conflicted,
-        }
+        }, latest_worktree_mtime)
+
+    def _last_activity(self, repo: RepositoryReference, worktree_mtime: float) -> tuple[str | None, str, float]:
+        """以 dirty worktree 優先、最後 commit 次之，讓排序反映近期實際編修。"""
+        commit_epoch = 0.0
+        commit_text = self._git_text(repo, "log", "-1", "--format=%ct")
+        if commit_text and commit_text.isdigit():
+            commit_epoch = float(commit_text)
+        if worktree_mtime > commit_epoch:
+            epoch, source = worktree_mtime, "worktree_change"
+        elif commit_epoch:
+            epoch, source = commit_epoch, "local_commit"
+        else:
+            epoch, source = 0.0, "unknown"
+        timestamp = datetime.fromtimestamp(epoch).astimezone().isoformat() if epoch else None
+        return timestamp, source, epoch
+
+    def _last_commit_epoch(self, repo: RepositoryReference) -> float:
+        """第一階段只讀取最後 commit，快速決定 Dashboard 的近期候選清單。"""
+        commit_text = self._git_text(repo, "log", "-1", "--format=%ct")
+        return float(commit_text) if commit_text and commit_text.isdigit() else 0.0
 
     def _operation_in_progress(self, repo: RepositoryReference) -> str | None:
         git_dir_text = self._git_text(repo, "rev-parse", "--git-dir")
@@ -212,8 +268,11 @@ class LocalRepositorySync:
             repo, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"
         ) if branch else None
         remote = self._git_text(repo, "config", "--get", f"branch.{branch}.remote") if branch else None
-        counts = self._worktree_counts(repo)
+        counts, worktree_mtime = self._worktree_counts(repo)
         operation = self._operation_in_progress(repo)
+        last_activity_at, last_activity_source, activity_epoch = self._last_activity(
+            repo, worktree_mtime
+        )
 
         ahead = behind = None
         if upstream:
@@ -263,6 +322,9 @@ class LocalRepositorySync:
             "operation_in_progress": operation,
             "worktree": counts,
             "clean": clean,
+            "last_activity_at": last_activity_at,
+            "last_activity_source": last_activity_source,
+            "_sort_last_activity_epoch": activity_epoch,
             "actions": actions,
         }
 
@@ -315,13 +377,44 @@ class LocalRepositorySync:
                     "actions": {},
                 }
 
+        # 先用單一 log query 排定候選，避免為 60+ 個未顯示 repo 做昂貴的 worktree
+        # 掃描；完整 status 僅限近期清單。這個 ranking 不會改變 action allowlist。
+        with ThreadPoolExecutor(max_workers=min(self.status_parallelism, len(references) or 1)) as executor:
+            ranking_epochs = list(executor.map(self._last_commit_epoch, references))
+        ranked_references = [
+            repo for repo, _ in sorted(
+                zip(references, ranking_epochs),
+                key=lambda item: (-item[1], item[0].path.name.casefold(), str(item[0].path).casefold()),
+            )
+        ]
+        selected_references = ranked_references[: self.dashboard_recent_limit]
+
         # subprocess 的 status 查詢可受大型 untracked tree 拖慢；有限並行讓單一
         # repo 的 timeout 不會阻塞整個 Dashboard，也不會不受控地大量啟動 Git。
-        with ThreadPoolExecutor(max_workers=min(self.status_parallelism, len(references) or 1)) as executor:
-            repositories = list(executor.map(inspect, references))
+        with ThreadPoolExecutor(max_workers=min(self.status_parallelism, len(selected_references) or 1)) as executor:
+            repositories = list(executor.map(inspect, selected_references))
+        repositories.sort(
+            key=lambda item: (
+                -float(item.get("_sort_last_activity_epoch") or 0),
+                str(item.get("name") or "").casefold(),
+            )
+        )
+        repository_count = len(references)
+        attention_count = sum(
+            1 for repository in repositories
+            if repository.get("sync_state") != "synced" or not repository.get("clean", False)
+        )
+        displayed = repositories[: self.dashboard_recent_limit]
+        for repository in displayed:
+            repository.pop("_sort_last_activity_epoch", None)
         return {
-            "repositories": repositories,
-            "repository_count": len(repositories),
+            "repositories": displayed,
+            "repository_count": repository_count,
+            "displayed_count": len(displayed),
+            "recent_limit": self.dashboard_recent_limit,
+            "attention_count": attention_count,
+            "attention_scope": "displayed_repositories",
+            "recent_ranking_basis": "last_local_commit_then_displayed_worktree_activity",
             "truncated": truncated,
             "remote_tracking_basis": "cached_local_remote_tracking_ref",
             "automatic_sync": False,

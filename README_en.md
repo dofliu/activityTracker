@@ -127,11 +127,20 @@ It is purpose-built to answer three fundamental questions at any moment:
 * The localhost smoke produced two suggestions with three evidence references, blocked a hostile Origin with 403, and passed desktop plus 494px responsive rendering. This receipt does not authorize an executor.
 
 ### 11. 📚 DeskRAG Local Knowledge Base & Document Chat (Single-Server Embedded)
-* **Single Server Integration**: Seamlessly integrated into the single OmniContext daemon (`http://127.0.0.1:8765`), eliminating dual-server operational overhead.
-* **Universal Parser Hub**: High-precision text extraction with page/slide/sheet metadata for PDF (PyMuPDF), Word (`.docx`), PowerPoint (`.pptx`), Excel (`.xlsx`), and source/markdown text files.
+* **Single Server Integration**: Seamlessly integrated into the single OmniContext daemon (`http://127.0.0.1:8765`), eliminating dual-server operational overhead while executing indexing and storage maintenance in background workers.
+* **Curated Local & Cloud Model Dropdowns**:
+  * **Ollama Local Offline**: Dedicated dropdown selection across 4 curated offline models (`llama3.1:8b` default, `mistral:7b`, `gemma4:e4b`, `qwen3:4b`) for 100% private, offline inference.
+  * **Cloud LLMs**: Optional integration with Google Gemini (`gemini-3.7-flash`), Anthropic Claude (`claude-3-5-sonnet`), and OpenAI (`gpt-4o`).
+* **Intelligent Chat Session Lifecycle**:
+  * **Auto-Titling**: First prompt sentence is automatically extracted as the session title (e.g. `💬 OPC UA Time Series Forecasting`), replacing generic titles.
+  * **Seamless Session Switching & History**: Instant recall of past QA histories, cited chunk cards, and metadata.
+  * **Session Management**: One-click new chat creation (`➕ Create New Chat`) and session deletion.
+* **Universal Parser Hub & Activity Indexing**:
+  * **Documents**: High-precision text extraction with page/slide/sheet metadata for PDF (PyMuPDF), Word (`.docx`), PowerPoint (`.pptx`), Excel (`.xlsx`), and source code/markdown text files.
+  * **Project Activity Slices**: Maps local Project States and Open Loops into virtual chunks for unified semantic retrieval across work history and static documents.
 * **Sliding Window Hierarchical Chunker**: Preserves paragraph headers, page numbers, slide titles, and sheet names.
-* **Hybrid Retrieval Engine**: Combines FastEmbed (ONNX) + ChromaDB vector embeddings with Jieba + BM25 keyword matching using Reciprocal Rank Fusion (RRF) and Weighted Fusion.
-* **Multi-LLM SSE Streaming Chat**: Interactive chat with token-level SSE streams and interactive citation source cards (with page/sheet badges).
+* **Hybrid Retrieval Engine**: Combines FastEmbed (ONNX, 512-dim `BAAI/bge-small-zh-v1.5`) + ChromaDB vector embeddings with Jieba + BM25Okapi keyword matching using Reciprocal Rank Fusion (RRF), Weighted Fusion, Vector Only, and BM25 Only.
+* **Multi-LLM SSE Streaming Chat**: Interactive chat with token-level SSE streams and citation source cards (with page/slide/sheet badges).
 * **Native Windows Explorer Reveal**: One-click opening and highlighting of cited source documents in Windows File Explorer.
 
 ---

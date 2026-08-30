@@ -134,16 +134,24 @@
 
 ### 11. 📚 DeskRAG 本地知識庫與文件智慧問答系統（Single Server 整合版）
 * **單一 Web 入口、獨立索引 worker**：Dashboard 與 API 維持於 `http://127.0.0.1:8765`；檔案掃描、解析、embedding、刪除與空間維護改由另一個本機 process 執行，長時間索引不佔用主服務。
+* **本機離線與雲端模型下拉選單**：
+  * **Ollama 本機離線**：精選 4 款本地模型選單切換（`llama3.1:8b` 預設推薦、`mistral:7b`、`gemma4:e4b`、`qwen3:4b`），全離線運算免連網、隱私零外洩。
+  * **雲端 LLM**：亦支援 Google Gemini (`gemini-3.7-flash`)、Anthropic Claude (`claude-3-5-sonnet`)、OpenAI (`gpt-4o`)。
+* **智慧對話工作階段管理（Chat Sessions）**：
+  * **自動擷取提問標題**：每次新提問自動擷取首句精華作為主題標題（如 `💬 OPC UA 時間序列 預測`），不再產生無意義的「新對話」清單。
+  * **完整歷史回溯**：下拉即可隨時切換歷史對話，即時還原當次所有問答脈絡、參考切片卡片與模型來源。
+  * **獨立管理**：支援隨時點選 `➕ 建立新對話` 與一鍵刪除當前對話。
 * **全方位檔案解析器（Parser Hub）**：
   * **PDF**：以 PyMuPDF 擷取文字並保留頁碼（Page Number）。
   * **Office 文件**：支援 Word（`.docx` 段落與標題）、PowerPoint（`.pptx` 投影片）、Excel（`.xlsx` 工作表數據）。
   * **文字與程式碼**：Markdown、`.py`、`.js`、`.json` 等，支援多種編碼自動探測。
+  * **日常活動虛擬切片**：將本機專案狀態（Project State）與未結事項（Open Loops）整合為標準虛擬切片，使日常開發行為亦可被語意檢索。
 * **階層滑動切分器（Sliding Window Chunker）**：提供可配置大小與重疊長度的切分機制，完整保留段落標題、頁碼、投影片與工作表中繼資料。
 * **混合檢索引掣（Hybrid Retrieval Engine）**：
-  * **語意向量**：採用 FastEmbed（ONNX 本地極速推論）+ 本地 ChromaDB 向量庫。
+  * **語意向量**：採用 FastEmbed（ONNX 本地極速推論，512 維度 `BAAI/bge-small-zh-v1.5`）+ 本地 ChromaDB 向量庫。
   * **關鍵字匹配**：採用 Jieba 繁簡中文分詞 + BM25Okapi 演算法與 Pickle 持久化。
-  * **融合演算法**：支援 **Hybrid RRF（倒數排名融合）** 與 **Weighted Fusion（線性加權融合）**。
-* **多模型問答與 SSE 串流**：支援 Ollama 本機離線模型、Google Gemini、Anthropic Claude、OpenAI，提供 SSE 逐字串流輸出與來源引文卡片。
+  * **融合演算法**：支援 **Hybrid RRF（倒數排名融合）**、**Weighted Fusion（線性加權融合）**、**Vector Only** 與 **BM25 Only**，檢索異步化不阻塞服務。
+* **多模型問答與 SSE 串流**：提供 SSE 逐字串流輸出與來源引文卡片。
 * **Windows 原生檔案總管喚起**：引文卡片點擊「📂 在總管開啟」即可在 Windows 檔案總管精準定位並選中該檔案。
 * **受控索引生命週期**：每次可設定檔案上限與間隔，支援暫停、恢復、取消；「移除資料夾索引」與「清空所有 RAG 索引」都必須明確確認，且不會刪除來源檔案或 RAG 對話。
 * **可回查容量與一致性**：介面顯示來源檔案、來源大小、SQLite 切片、最近 worker 驗證的向量／BM25 數量與索引空間。驗證、BM25 重建、SQLite `VACUUM` 均在 worker 執行；未驗證時顯示 `待驗證`，不以估算值冒充實測。

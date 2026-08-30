@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from core.repo_sync import LocalRepositorySync, RepositorySyncRejected
+from core.repo_sync import LocalRepositorySync, RepositoryReference, RepositorySyncRejected
 from core.server import app
 
 
@@ -24,6 +24,7 @@ class _Config:
             "watchers.git_watcher.max_depth": 2,
             "repository_sync.command_timeout_seconds": 20,
             "repository_sync.max_repositories": 20,
+            "repository_sync.dashboard_recent_limit": 10,
         }
         return values.get(key, default)
 
@@ -120,3 +121,37 @@ def test_api_uses_repo_id_and_rejects_arbitrary_path_field(synced_repo: Path, mo
         "path": "C:/not-allowed",
     })
     assert rejected.status_code == 422
+
+
+def test_status_returns_only_recent_limit_in_descending_activity_order(monkeypatch, tmp_path: Path):
+    root = tmp_path / "roots"
+    root.mkdir()
+    service = LocalRepositorySync(_Config(root))
+    references = [
+        RepositoryReference(f"{index:016x}", root / f"repo-{index:02d}")
+        for index in range(12)
+    ]
+    monkeypatch.setattr(service, "_discover_references", lambda: (references, False))
+    monkeypatch.setattr(service, "_last_commit_epoch", lambda repo: int(repo.path.name[-2:]))
+    monkeypatch.setattr(
+        service,
+        "_status_for",
+        lambda repo: {
+            "repo_id": repo.repo_id,
+            "name": repo.path.name,
+            "path": str(repo.path),
+            "last_activity_at": f"2026-08-29T{int(repo.path.name[-2:]):02d}:00:00+08:00",
+            "last_activity_source": "local_commit",
+            "_sort_last_activity_epoch": int(repo.path.name[-2:]),
+            "actions": {},
+        },
+    )
+
+    payload = service.list_statuses()
+
+    assert payload["repository_count"] == 12
+    assert payload["displayed_count"] == 10
+    assert payload["attention_scope"] == "displayed_repositories"
+    assert [item["name"] for item in payload["repositories"]] == [
+        f"repo-{index:02d}" for index in range(11, 1, -1)
+    ]

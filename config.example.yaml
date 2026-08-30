@@ -61,6 +61,8 @@ repository_sync:
   status_timeout_seconds: 5
   status_parallelism: 8
   max_repositories: 80
+  # Dashboard 只顯示依本機最近活動排序的近期 repo；不影響允許操作的全體範圍。
+  dashboard_recent_limit: 10
   window_watcher:
     enabled: true
     heartbeat_minutes: 5
