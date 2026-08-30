@@ -1,13 +1,23 @@
 name: Release
 
-# 推送 v* tag 即自動：建置 wheel/sdist → 驗證內容與隱私排除 → 檢查 tag 與
+# 兩種觸發方式，行為一致：建置 wheel/sdist → 驗證內容與隱私排除 → 檢查 tag 與
 # package 版本一致 → 建立 GitHub Release（alpha/beta/rc 自動標記 pre-release），
 # 附件含安裝檔與 SHA-256 receipt。Release notes 取自 docs/RELEASE_NOTES-<tag>.md，
 # 檔案不存在時退回 GitHub 自動產生的 notes。
+#
+# 1. 推送 v* tag。
+# 2. workflow_dispatch 手動觸發並輸入 tag：tag 不存在時由 gh 在本次 checkout 的
+#    commit 上建立（適用於推不了 tag、只能推分支的受限憑證）。
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag（如 v1.3.0a5）；不存在時建立於觸發分支 HEAD"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -15,6 +25,8 @@ permissions:
 jobs:
   build-verify-release:
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,9 +37,9 @@ jobs:
       - name: Check tag matches package version
         run: |
           VERSION="$(python -c 'import core; print(core.__version__)')"
-          TAG="${GITHUB_REF_NAME#v}"
+          TAG="${RELEASE_TAG#v}"
           if [ "$VERSION" != "$TAG" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match core.__version__ $VERSION" >&2
+            echo "Tag $RELEASE_TAG does not match core.__version__ $VERSION" >&2
             exit 1
           fi
 
@@ -44,16 +56,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           PRERELEASE=""
-          case "$GITHUB_REF_NAME" in
+          case "$RELEASE_TAG" in
             *a*|*b*|*rc*) PRERELEASE="--prerelease" ;;
           esac
-          NOTES_FILE="docs/RELEASE_NOTES-$GITHUB_REF_NAME.md"
+          NOTES_FILE="docs/RELEASE_NOTES-$RELEASE_TAG.md"
           if [ -f "$NOTES_FILE" ]; then
             NOTES_ARGS=(--notes-file "$NOTES_FILE")
           else
             NOTES_ARGS=(--generate-notes)
           fi
-          gh release create "$GITHUB_REF_NAME" dist/* \
-            --title "OmniContext $GITHUB_REF_NAME" \
+          TARGET_ARGS=()
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TARGET_ARGS=(--target "$GITHUB_SHA")
+          fi
+          gh release create "$RELEASE_TAG" dist/* \
+            --title "OmniContext $RELEASE_TAG" \
             "${NOTES_ARGS[@]}" \
+            "${TARGET_ARGS[@]}" \
             $PRERELEASE
