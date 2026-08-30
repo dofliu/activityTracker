@@ -131,9 +131,49 @@ def fetch_events_in_range(start_dt: datetime, end_dt: datetime) -> Dict[str, Any
         }
 
 
+# Prompt 大小防線：單筆 prompt 節錄、各分段行數上限與總長硬上限。
+# 沒有這些限制，單日幾筆巨型貼文式 prompt 就會超過 provider 的 token 上限
+# （實測：Gemini 400 INVALID_ARGUMENT，input tokens > 1,048,576）。
+PROMPT_SNIPPET_CHARS = 300
+RESPONSE_SNIPPET_CHARS = 250
+SECTION_LINE_LIMITS = {"ai": 200, "file": 300, "git": 200}
+DEFAULT_MAX_PROMPT_CHARS = 180_000
+
+
+def _clip_text(value: Any, limit: int) -> str:
+    text = str(value or "").replace("\r", " ").replace("\n", " ").strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit] + f"…(截斷，原 {len(text)} 字)"
+
+
+def _cap_lines(lines: list, limit: int, label: str) -> list:
+    """超過上限時保留頭尾並明確標示省略筆數，不得無聲丟資料。"""
+    if len(lines) <= limit:
+        return lines
+    head = max(1, int(limit * 0.7))
+    tail = max(1, limit - head)
+    omitted = len(lines) - head - tail
+    return (
+        lines[:head]
+        + [f"…（{label}過多，中間省略 {omitted} 筆；以下為區間最末段）…"]
+        + lines[-tail:]
+    )
+
+
+def _max_prompt_chars() -> int:
+    try:
+        configured = int(
+            get_config().get("synthesizer.max_prompt_chars", DEFAULT_MAX_PROMPT_CHARS)
+        )
+    except (TypeError, ValueError):
+        configured = DEFAULT_MAX_PROMPT_CHARS
+    return max(20_000, min(configured, 2_000_000))
+
+
 def format_context_for_prompt(day_data: Dict[str, Any], time_range_str: str) -> str:
     """將資料庫事件轉換為適合 LLM 閱讀的專案中心格式 (嚴格限於該區間內真實推進的專案)"""
-    
+
     # 找出區間內真正有活動的專案名稱集合
     active_project_names: Set[str] = set()
     for g in day_data["git_events"]:
@@ -166,14 +206,20 @@ def format_context_for_prompt(day_data: Dict[str, Any], time_range_str: str) -> 
         loop_lines.append(f"- [{ol['project_key']}] {ol['title']} (建立於 {ol['created_at']})")
     loop_text = "\n".join(loop_lines) if loop_lines else "（目前無待辦事項）"
 
-    # 3. AI Events (嚴格排除佔位字串，僅注入真實結論)
+    # 3. AI Events (嚴格排除佔位字串，僅注入真實結論；prompt/response 一律節錄)
     ai_lines = []
     for item in day_data["ai_events"]:
         tag_info = f" [{item['tag']}]" if item['tag'] else ""
         resp = (item.get('response') or "").strip()
         is_placeholder = resp.startswith("[Executed") or resp.startswith("[Codex CLI") or resp.startswith("<")
-        resp_snippet = f"\n  -> AI 回應結論: {resp[:250]}..." if resp and len(resp) > 10 and not is_placeholder else ""
-        ai_lines.append(f"- [{item['time']}] [{item['platform'].upper()}]{tag_info} 問: {item['prompt']}{resp_snippet}")
+        resp_snippet = (
+            f"\n  -> AI 回應結論: {_clip_text(resp, RESPONSE_SNIPPET_CHARS)}"
+            if resp and len(resp) > 10 and not is_placeholder
+            else ""
+        )
+        prompt_snippet = _clip_text(item['prompt'], PROMPT_SNIPPET_CHARS)
+        ai_lines.append(f"- [{item['time']}] [{item['platform'].upper()}]{tag_info} 問: {prompt_snippet}{resp_snippet}")
+    ai_lines = _cap_lines(ai_lines, SECTION_LINE_LIMITS["ai"], "AI 互動")
     ai_text = "\n".join(ai_lines) if ai_lines else "（該時段無 AI 互動紀錄）"
 
     # 4. File Events
@@ -181,6 +227,7 @@ def format_context_for_prompt(day_data: Dict[str, Any], time_range_str: str) -> 
     for item in day_data["file_events"]:
         diff_str = f" ({item['diff']})" if item['diff'] else ""
         file_lines.append(f"- [{item['time']}] [{item['action'].upper()}] {item['file_name']} [{item['file_type']}]{diff_str}")
+    file_lines = _cap_lines(file_lines, SECTION_LINE_LIMITS["file"], "檔案異動")
     file_text = "\n".join(file_lines) if file_lines else "（該時段無檔案異動紀錄）"
 
     # 5. Git Events & PRs
@@ -191,6 +238,7 @@ def format_context_for_prompt(day_data: Dict[str, Any], time_range_str: str) -> 
         state_str = "已合併 (Merged)" if pr["state"] == "merged" else ("開啟中 (Open)" if pr["state"] == "open" else pr["state"])
         ci_str = f" [CI: {pr['ci_status']}]" if pr.get("ci_status") != "neutral" else ""
         git_lines.append(f"- [GitHub PR] [{pr['repo']}] PR #{pr['number']}: {pr['title']} ({state_str}){ci_str} 分支: {pr['branch']}")
+    git_lines = _cap_lines(git_lines, SECTION_LINE_LIMITS["git"], "Git/PR 紀錄")
     git_text = "\n".join(git_lines) if git_lines else "（該時段無代碼提交或 PR 紀錄）"
 
 
@@ -204,7 +252,7 @@ def format_context_for_prompt(day_data: Dict[str, Any], time_range_str: str) -> 
     window_lines = [f"- {app}: 約 {int(sec // 60)} 分鐘" for app, sec in sorted(app_durations.items(), key=lambda x: x[1], reverse=True)[:8] if sec >= 60]
     window_text = "\n".join(window_lines) if window_lines else "（該時段無有效視窗焦點紀錄 / 服務於背景執行中）"
 
-    return RANGE_PROJECT_SYNTHESIS_USER.format(
+    rendered = RANGE_PROJECT_SYNTHESIS_USER.format(
         time_range_str=time_range_str,
         active_projects_text=proj_text,
         open_loops_text=loop_text,
@@ -213,6 +261,19 @@ def format_context_for_prompt(day_data: Dict[str, Any], time_range_str: str) -> 
         git_activities_text=git_text,
         window_activities_text=window_text
     )
+    # 總長硬上限：即使各分段都已節錄，仍不得超過 provider 可接受範圍。
+    max_chars = _max_prompt_chars()
+    if len(rendered) > max_chars:
+        logger.warning(
+            "Summary prompt truncated from %d to %d chars to respect provider limits.",
+            len(rendered),
+            max_chars,
+        )
+        rendered = (
+            rendered[:max_chars]
+            + "\n\n…（活動資料量過大，已於此截斷；統計以上方內容為準）"
+        )
+    return rendered
 
 
 def save_summary_to_file(label_str: str, markdown_content: str) -> Path:

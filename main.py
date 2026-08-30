@@ -757,6 +757,16 @@ def main():
     init_parser.add_argument("--show-token", action="store_true", help="顯示既有 browser ingest token")
     init_parser.add_argument("--rotate-token", action="store_true", help="旋轉 browser ingest token")
 
+    llm_test_parser = subparsers.add_parser(
+        "llm-test", help="診斷 LLM provider 連線與設定（ollama/gemini/anthropic/openai）"
+    )
+    llm_test_parser.add_argument(
+        "--provider", default=None, help="要測試的 provider；預設用 synthesizer.provider"
+    )
+    llm_test_parser.add_argument(
+        "--no-generate", action="store_true", help="只檢查連線與設定，不送測試生成請求"
+    )
+
     # run / web
     run_parser = subparsers.add_parser("run", help="啟動 Web 儀表板與後台監控服務")
     run_parser.add_argument("--no-autostart", action="store_true")
@@ -941,6 +951,16 @@ def main():
         cmd_restore_drill(
             getattr(args, "backup", None),
             getattr(args, "receipt_dir", None),
+        )
+    elif args.command == "llm-test":
+        from synthesizer.llm_client import diagnose_provider
+
+        print(
+            json.dumps(
+                diagnose_provider(args.provider, generate_test=not args.no_generate),
+                ensure_ascii=False,
+                indent=2,
+            )
         )
     elif args.command == "migration-status":
         cmd_migration_status(getattr(args, "db", None))
