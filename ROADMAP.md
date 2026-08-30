@@ -271,7 +271,8 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 - [x] Contract tests 覆蓋 start-only、explicit final、重疊 union、異常時長、migration 與 API privacy。
 - [x] localhost service restart 後，取得 Codex 7 筆 completed receipt、5 筆 awaiting-final receipt；API 以 3,076.659 秒的 interval union 回傳 51.3 分鐘。
 - [x] Live receipt 驗收腳本 `scripts/background_task_live_acceptance.py`（2026-08-30）：逐平台檢查當日 completed receipt、輸出非敏感 JSON receipt 與 STATUS.yaml 建議段落；已於 localhost API 完成 E2E（無 receipt 時正確 FAIL）。
-- [ ] 在 Windows 實機以真實任務執行 `python scripts/background_task_live_acceptance.py --platforms claude_code,claude_desktop` 取得 live completed receipt；此項未完成前不宣稱平台全天背景工作 coverage。
+- [x] Codex live 驗收 PASS（2026-08-31 執行，target date 2026-08-29：29 筆 completed／14,882.249 秒；全平台 union 28,838.971 秒、48 筆 completed）。
+- [ ] claude_code／claude_desktop 逐平台驗收確認（2026-08-29 已有 19 筆非 codex completed receipt 待歸屬確認：`--platforms claude_code,claude_desktop --date 2026-08-29`）；此項未完成前不宣稱平台全天背景工作 coverage。
 
 ---
 
@@ -570,7 +571,8 @@ P2.5-S1 API 安全邊界
    ▶ 2026-08-30：驗收腳本 `scripts/extension_live_acceptance.py` 已完成並通過 localhost E2E。
    ▶ ✅ 2026-08-31 01:03：實機 PASS 取得——heartbeat 驗證通過，ChatGPT／Claude.ai 各 3 event／2 response delta（見 P2.5-B2 與 STATUS.yaml）。
 2. **P2.7 Claude Code／Claude Desktop local-agent live receipt**：目前僅 Codex 有 live completed receipt，補齊其餘兩個來源。
-   ▶ 2026-08-30：驗收腳本 `scripts/background_task_live_acceptance.py` 已完成並通過 localhost E2E；剩實機執行。
+   ▶ 2026-08-30：驗收腳本 `scripts/background_task_live_acceptance.py` 已完成並通過 localhost E2E。
+   ▶ 2026-08-31：**codex 驗收 PASS**（2026-08-29 當日 29 筆 completed／14,882 秒）；同日 DB 另有 19 筆非 codex completed receipt，claude_code／claude_desktop 逐平台確認待跑（`--platforms claude_code,claude_desktop --date 2026-08-29`）。
 3. **P2.6 continuous coverage ledger**：讓每日使用時間的 coverage 脫離永久 `partial` 標示。
    ▶ 2026-08-30：已實作（migration 013 + `core/coverage_ledger.py` + scheduler heartbeat + `/api/v1/usage/coverage`），contract tests 通過；剩 Windows 實機全天 receipt。
 

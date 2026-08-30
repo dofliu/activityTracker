@@ -112,14 +112,21 @@ evidence_snapshot:
     action_contract_tests: passed
     claim_boundary: "此 receipt 僅證明設定範圍內的本機 status 聚合與安全 action contract；未執行 live fetch/pull/commit/push，不代表所有遠端 repository 已即時同步。"
   background_task_receipts:
-    captured_at: "2026-08-29 05:05 Asia/Taipei"
-    sqlite_schema_migration: "12/12 applied on controlled localhost restart"
+    captured_at: "2026-08-31 01:15 Asia/Taipei"
+    acceptance_script: scripts/background_task_live_acceptance.py
+    target_date: "2026-08-29"
     local_api: passed
-    codex_completed_receipts_today: 7
-    codex_awaiting_final_today: 5
-    verified_union_seconds_today: 3076.659
-    verified_union_minutes_today: 51.3
-    claim_boundary: "僅代表本機 Codex session 中成對的 prompt start 與 explicit final completion receipt；不代表 Claude、generic CLI、所有背景工作、前景使用或生產力。"
+    codex_acceptance: passed
+    codex_completed_receipts: 29
+    codex_verified_seconds: 14882.249
+    all_platform_completed_receipts: 48
+    all_platform_verified_union_seconds: 28838.971
+    awaiting_final: 17
+    untrusted_duration: 0
+    non_codex_completed_receipts: 19
+    non_codex_note: "2026-08-29 的 48 筆 completed 中僅 29 筆為 codex；其餘 19 筆屬 claude_code／claude_desktop（recording 僅限這三平台），逐平台驗收待執行確認"
+    previous_snapshot: "2026-08-29 05:05 捕捉時 codex 當日 7 completed／5 awaiting、union 3076.659 秒（schema 12/12）"
+    claim_boundary: "僅代表本機成對 prompt start 與 explicit final completion receipt；不代表前景使用、生產力或全天 coverage。"
   rag_worker_hardening:
     captured_at: "2026-08-29 Asia/Taipei"
     main_service_restart: passed
@@ -431,7 +438,7 @@ quality_gates:
   open_loop_lifecycle: passed_local_db_reconciliation
   automated_tests: passed_85_contract_tests
   usage_milestone_alpha: passed_contract_and_windows_dashboard_api_smoke
-  background_task_receipts: passed_contract_tests_and_localhost_live_codex_receipt
+  background_task_receipts: passed_contract_tests_and_codex_acceptance_29_completed_on_2026_08_29
   repository_sync: passed_contract_tests_and_localhost_read_only_status_smoke
   documentation_current: passed_readme_usage_roadmap_status_sync
   backup_lifecycle: passed_online_backup_and_isolated_restore_drill
@@ -450,7 +457,7 @@ quality_gates:
 known_blockers:
   - "Extension live PASS 已於 2026-08-31 01:03 取得（ChatGPT＋Claude.ai，heartbeat 已驗證，各 3 event／2 response delta）；殘餘範圍：Gemini 未在本輪驗證，且單輪 PASS 不代表連續或全天 Browser capture coverage"
   - "P2.6 continuous coverage ledger 已於 2026-08-30 實作（migration 013、coverage_ledger_job heartbeat、/api/v1/usage/coverage，contract tests 通過）；Windows 實機全天 ledger receipt 尚未取得，正式環境 coverage 仍為 partial 直到實測達門檻"
-  - "P2.7 已取得 Codex live completed receipt，但尚未取得 Claude Code 與 Claude Desktop local-agent live receipt；2026-08-30 已提供 scripts/background_task_live_acceptance.py 驗收腳本（localhost E2E 通過），待實機執行。generic Terminal、cloud-only、未完成任務與平台全天 coverage 均不宣稱已覆蓋"
+  - "P2.7 codex live 驗收已於 2026-08-31 以 acceptance script 通過（2026-08-29 當日 29 筆 completed／14882 秒）；同日另有 19 筆非 codex completed receipt 存在於 DB，claude_code／claude_desktop 的逐平台驗收確認待執行（--platforms claude_code,claude_desktop --date 2026-08-29）。generic Terminal、cloud-only、未完成任務與平台全天 coverage 均不宣稱已覆蓋"
   - "337 筆 legacy AI rows 無 response_status，僅保留為歷史資料，不進入 canonical synthesis/handoff 結論"
   - "Windows wheel/sdist install/upgrade/assets、formal rollback 與 1.3.0a4 candidate packaging 已驗證；2026-08-30 於 Linux container 重新驗證 build、artifact content receipt、fresh venv 安裝、schema 13/13 與 HTTP smoke（verify_installed_package checks 全數通過）；public publish/tag 尚未執行"
   - "Windows/Ubuntu/macOS × Python 3.10/3.12 CI run 32757498004 已通過；window/notification 實機能力仍限 Windows，其他平台採明確降級"
