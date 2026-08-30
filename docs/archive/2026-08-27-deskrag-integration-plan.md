@@ -1,3 +1,5 @@
+> **📦 歸檔文件**（2026-08-30 歸檔）：本文件為 DeskRAG 整合（P7）動工前的一次性規劃書，內容反映 2026-08-27 時點的提案狀態，僅供歷史參考。實際完成成果見 [完成報告](2026-08-27-deskrag-integration-walkthrough.md) 與 [ROADMAP.md P7 章節](../../ROADMAP.md)。
+
 # DeskRAG 整合至 OmniContext (activityTracker) 單一伺服器規劃書
 
 本規劃書旨在將 `D:\Project_CodingSimulation\PersonalHelper\deskRAG` 完整的本地文件 RAG 知識庫系統無縫重構並整合至目前的 `OmniContext (activityTracker)` 專案中，**達成單一進程、單一伺服器（Single Server）同時提供「工作脈絡追蹤」與「實體知識庫檢索」的統一智慧助理系統**。

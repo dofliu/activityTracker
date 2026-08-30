@@ -9,7 +9,7 @@
 
 > **目前狀態：Personal Alpha。** Windows milestone WinRT Toast E2E、schema 7/7、formal package+DB rollback、P3-2～P3-5、P5-1 proposal-only、collector runtime diagnostics、Extension 1.3.1 live-verification harness 與跨平台 CI 已通過；ChatGPT 真實 DOM selectors 已修復，Claude Desktop Cowork／local-agent transcript 已完成 Windows E2E。Claude.ai 尚未取得本輪 PASS receipt，Extension live heartbeat 也仍待已登入 Chrome 實機驗證，因此尚非 release-ready。
 
-**文件入口：**[完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
+**文件入口：**[📚 文件總覽](docs/INDEX.md) · [完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
 
 ![OmniContext 架構與未來 Roadmap](docs/assets/omnicontext-architecture-roadmap-card-v1.png)
 
@@ -42,15 +42,16 @@
 │                    [ 本機 SQLite 資料庫儲存 ]                            │
 │             (omni_context.db · 本機儲存；cloud LLM 為 opt-in)            │
 │                                  │                                       │
-│          ┌───────────────────────┴───────────────────────┐               │
-│          ▼                                               ▼               │
-│  [ Web 視覺化儀表板 ]                        [ AI 摘要與排程回顧 ]       │
-│  • 01 · 進行中工作 (Workstreams)             • 多日自訂區間日報回顧      │
-│  • 02 · 即時情報流 (Live Feed)               • 週期性 Checkpoint 快照    │
-│  • 03 · 監控配置 (Settings)                  • Telegram 晨間簡報與停滯警示 │
-│  • 04 · 每日摘要 (Summaries)                 • 多供應商 (Gemini 3.7 /    │
-│  • 05 · 活動快照 (Checkpoints)                 Claude / OpenAI / Ollama) │
-│  • 🌐 中英文 i18n 動態切換 / 深淺色主題                                  │
+│          ┌───────────────────────┼───────────────────────┐               │
+│          ▼                       ▼                       ▼               │
+│  [ Web 視覺化儀表板 ]    [ DeskRAG 知識庫 ]      [ AI 摘要與主動提醒 ]   │
+│  • 01 · 進行中工作       • PDF/Office/Md 解析    • 多日自訂區間日報回顧  │
+│  • 02 · 即時情報流       • FastEmbed + ChromaDB  • 週期性 Checkpoint     │
+│  • 03 · 知識庫與 RAG     • Jieba + BM25 關鍵字   • 桌面通知 / Telegram   │
+│  • 04 · 監控配置         • Hybrid RRF 混合檢索   • 多供應商 (Gemini /    │
+│  • 05 · 每日摘要         • 多模型 SSE 串流問答     Claude/OpenAI/Ollama) │
+│  • 06 · 活動快照         • 檔案總管精準定位                              │
+│  • 07 · 系統健康與維護 · 🌐 中英文 i18n 動態切換 / 深淺色主題            │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -122,17 +123,17 @@
 * `content_hash + embedding_model` 增量更新；每筆保留原始 SQLite `source_ref`、project、timestamp、trust status 與 embedding input 降級模式。
 * `omni ask` 可先 retrieval-only，也可由本機 Ollama 生成含 `[S1]` 引用的答案；similarity 不是來源真實性或 coverage 證明。
 
-### 9. 🧭 Related History 與 Work Sessions（P3-4 / P3-5 Alpha）
+### 10. 🧭 Related History 與 Work Sessions（P3-4 / P3-5 Alpha）
 * 主頁將已歸戶的 AI、Git 與檔案事件依 project + inactivity gap 整理為 derived work session；每段保留穩定 session ID、來源計數與 SQLite `source_ref`，不新增資料表、不改寫原始事件。
 * `omni recall` 與主頁 `RELATED HISTORY` 使用 loopback Ollama 尋找相似歷史；查詢不保存，Ollama 不可用時不 fallback 到 cloud。
 * Session 是 temporal inference，不代表實際工時、連續專注或成果品質；similarity 也不能證明工作重複、歷史答案正確或仍然適用。架構決策見 [ADR-006](docs/ADR-006-derived-context-sessions-and-related-history.md)。
 
-### 10. 🧩 Proposal-only 主動秘書（P5-1 Alpha）
+### 11. 🧩 Proposal-only 主動秘書（P5-1 Alpha）
 * 第一版只把本機 Project State、actionable Open Loops 與 Extension diagnostics 整理成附 evidence refs 的下一步建議。
 * 不呼叫 cloud LLM、不寫入 SQLite、不修改檔案、不執行 command，也不提供批准執行；完整安全契約見 [ADR-007](docs/ADR-007-proposal-only-secretary.md)。
 * 正式 localhost 已產生 2 張建議與 3 個 evidence refs，惡意 Origin 為 403；桌面與 494px 介面 smoke 通過。此 receipt 不授權後續 executor。
 
-### 11. 📚 DeskRAG 本地知識庫與文件智慧問答系統（Single Server 整合版）
+### 12. 📚 DeskRAG 本地知識庫與文件智慧問答系統（Single Server 整合版）
 * **單一 Web 入口、獨立索引 worker**：Dashboard 與 API 維持於 `http://127.0.0.1:8765`；檔案掃描、解析、embedding、刪除與空間維護改由另一個本機 process 執行，長時間索引不佔用主服務。
 * **本機離線與雲端模型下拉選單**：
   * **Ollama 本機離線**：精選 4 款本地模型選單切換（`llama3.1:8b` 預設推薦、`mistral:7b`、`gemma4:e4b`、`qwen3:4b`），全離線運算免連網、隱私零外洩。
@@ -335,41 +336,60 @@ integrations:
 
 ```text
 activityTracker/
-├── config.yaml                     # 系統設定檔（支援 Web UI 熱更新）
+├── config.yaml                     # 系統設定檔（支援 Web UI 熱更新；由 config.example.yaml 產生）
 ├── main.py                         # 主入口與 CLI 命令列分發
 ├── pyproject.toml                  # 跨平台安裝、CLI entry point 與 pytest 設定
 ├── MANIFEST.in                     # sdist assets 與 privacy exclusions
 ├── requirements.txt                # 專案相依套件清單
-├── README.md                       # 繁體中文說明文件
-├── README_en.md                    # English Documentation
-├── docs/USAGE.md                   # 安裝、配對、日常操作、備份與故障排查
-├── docs/ADR-003-versioned-sqlite-migrations.md  # Schema migration 架構決策
-├── docs/ADR-004-packaged-runtime-layout.md       # Wheel/sdist runtime layout 決策
+├── README.md / README_en.md        # 繁體中文 / English 說明文件
+├── ROADMAP.md / STATUS.yaml        # 開發規劃紀錄與機器可讀現況快照
+│
+├── docs/                           # 📚 文件目錄（入口見 docs/INDEX.md）
+│   ├── INDEX.md                    # 文件總覽與導讀地圖
+│   ├── USAGE.md                    # 使用手冊：安裝、配對、日常操作、備份與故障排查
+│   ├── PRODUCT_POSITIONING.md      # 產品定位與證據邊界
+│   ├── TEST_STRATEGY.md / RELEASE_CHECKLIST.md  # 測試策略與發佈檢查
+│   ├── ADR-001 ~ ADR-011           # 架構決策紀錄（ADR-008 從缺）
+│   └── archive/                    # 已歸檔的一次性規劃書與完成報告
 │
 ├── core/                           # 核心服務模組
-│   ├── database.py                 # SQLite 連線與 Session 管理
-│   ├── migrations.py               # Append-only schema registry、checksum 與升級守門
-│   ├── runtime_paths.py            # Source/wheel application home 與 packaged assets
-│   ├── models.py                   # SQLAlchemy 資料庫模型 (Events, Projects, PRs)
 │   ├── server.py                   # FastAPI REST API 與靜態伺服器
-│   ├── security.py                 # Origin、secret redaction 與 extension token boundary
-│   ├── platform_services.py        # Windows/macOS/Linux argv 型 OS 整合
-│   ├── data_lifecycle.py           # SQLite online backup 與 integrity receipt
-│   ├── project_engine.py           # 專案智能歸戶、多檔案聚合與未結事項引擎
-│   ├── project_paths.py            # 設定驅動的專案根目錄定位
+│   ├── manager.py                  # 採集器統籌與 supervise_and_heal 自我修復守護
+│   ├── database.py / migrations.py # SQLite 連線與 append-only schema migration
+│   ├── models.py                   # SQLAlchemy 資料庫模型 (Events, Projects, PRs, RAG)
+│   ├── security.py / secret_resolver.py  # Origin 邊界、secret redaction 與金鑰解析
+│   ├── data_lifecycle.py           # 線上備份、WAL checkpoint、歷史修剪與 integrity receipt
+│   ├── project_engine.py / project_paths.py  # 專案智能歸戶與根目錄定位
 │   ├── semantic_index.py           # 本機 embeddings、provenance retrieval 與 omni ask
 │   ├── context_memory.py           # Related History 與 derived work-session grouping
-│   ├── fs_utils.py                 # 本機原生檔案總管/瀏覽對話框工具
-│   └── time_utils.py               # 統一本地時區解析工具
+│   ├── handoff_engine.py           # Provider-neutral Context Handoff 產生器
+│   ├── proactive_secretary.py      # Proposal-only 主動秘書（ADR-007）
+│   ├── repo_sync.py                # 受控本機 Git 同步中心（ADR-011）
+│   ├── background_tasks.py         # 可驗證背景 Agent 任務時間（ADR-010）
+│   ├── usage_analytics.py / capture_coverage.py  # 使用時間統計與 coverage 訊號
+│   ├── extension_monitor.py / extension_verification.py  # Extension 診斷與 live 驗證
+│   ├── triage_signals.py           # 跨專案 triage 訊號（GitHub PR/Issue）
+│   ├── platform_services.py        # Windows/macOS/Linux argv 型 OS 整合
+│   └── runtime_paths.py / fs_utils.py / time_utils.py  # 執行路徑、檔案總管與時區工具
+│
+├── rag/                            # 📚 DeskRAG 本地知識庫子系統
+│   ├── router.py                   # /api/v1/rag/* REST API 與 SSE 串流問答
+│   ├── scanner.py / index_worker.py / jobs.py / lifecycle.py  # 受控索引 worker 生命週期
+│   ├── parsers/                    # PDF / Office / 文字 / 圖片解析中樞（Parser Hub）
+│   ├── chunker.py                  # 階層滑動窗口切分器
+│   ├── embeddings.py / vector_store.py  # FastEmbed (ONNX) + ChromaDB 向量庫
+│   ├── retriever.py / retrieval/   # Jieba+BM25 與 Hybrid RRF / Weighted Fusion 檢索
+│   ├── activity_indexer.py         # 專案狀態與 Open Loops 虛擬切片
+│   └── llm_gateway.py              # Ollama / Gemini / Claude / OpenAI 多模型網關
 │
 ├── integrations/                   # 外部雲端整合
 │   └── github_client.py            # GitHub API Client (Public/Private Repos, PRs, CI)
 │
 ├── watchers/                       # 多源活動數據採集器
 │   ├── file_watcher.py             # Watchdog 檔案異動監控與字數統計
-│   ├── git_watcher.py              # Git 遞迴多倉庫掃描與 Commit 追蹤
+│   ├── git_watcher.py              # Git 遞迴多倉庫掃描與 Commit 追蹤（損壞倉庫局部隔離）
 │   ├── window_watcher.py           # 視窗焦點切換與時間分配統計
-│   ├── agent_log_watcher.py        # Claude Code / Codex / Antigravity 日誌解析
+│   ├── agent_log_watcher.py        # Claude Code/Desktop、Codex、Antigravity 日誌解析
 │   └── browser_extension/          # Chrome MV3 擴充套件 (ChatGPT/Gemini/Claude)
 │
 ├── synthesizer/                    # AI 摘要與排程回顧引擎
@@ -379,18 +399,17 @@ activityTracker/
 │   └── scheduler.py                # 每日定時總結與週期快照定時器
 │
 ├── notifiers/                      # 通知推播模組
-│   └── telegram_notifier.py        # Telegram Bot 每日摘要與停滯專案警示
+│   ├── desktop_notifier.py         # Windows WinRT Toast 桌面通知（零依賴）
+│   └── telegram_notifier.py        # Telegram Bot 每日摘要與停滯專案警示（選用）
+├── exporters/
+│   └── daily_brief.py              # OMNICONTEXT_TODAY.md/.html 每日入口簡報
 │
-├── web/                            # Web 儀表板前端
-│   ├── index.html                  # 儀表板主結構 (支援 i18n 標籤)
-│   ├── app.js                      # 前端控制器 (i18n 多語言引擎、GitHub 狀態、手風琴視圖)
-│   └── style.css                   # 暗橘風格主題與雙欄版型
+├── web/                            # Web 儀表板前端（01~07 分頁 + extension-monitor）
+│   ├── index.html / app.js / style.css  # 主結構、i18n 控制器與暗橘主題
+│   └── extension-monitor.html      # Browser Extension 進階診斷頁
 │
-├── scripts/                        # 自動化與維護腳本
-│   ├── install_autostart.ps1       # Windows 開機自動啟動註冊腳本
-│   └── uninstall_autostart.ps1     # 移除開機自動啟動腳本
-├── tests/                          # security/data/lifecycle/portability contract tests
-├── docs/                           # ADR、test strategy 與 hardening acceptance 文件
+├── scripts/                        # 自動化、驗證與維護腳本（autostart、E2E、資料清理）
+├── tests/                          # 31 個 contract test 模組（security/data/RAG/sync/lifecycle）
 │
 ├── logs/checkpoints/               # 週期性活動快照儲存目錄
 └── reports/                        # 每日/區間 Markdown 報告儲存目錄

@@ -1,4 +1,4 @@
-# OmniContext 開發規劃與成果紀錄 — P0 ~ P6
+# OmniContext 開發規劃與成果紀錄 — P0 ~ P8
 
 > 最新更新日期：2026-08-29　｜　目前狀態：**personal alpha / P2.6 + P3 context memory + P4.2 local Git sync + P5-1 proposal-only alpha**。P3-1～P3-5、Windows Toast E2E、formal rollback、Windows/macOS/Linux CI、P5-1、collector runtime diagnostics、Extension 1.3.1 live-verification harness 與本機 Git 同步中心已完成；ChatGPT live selectors 已修復。Claude.ai 本輪 PASS receipt 與 Extension live heartbeat 尚未完成，整體不具 release-ready 或 autonomous-ready 資格。
 > 本文件記錄 OmniContext 從 0 到 1 的缺陷修復歷程、已完成之架構改造與未來的維運與延伸規劃。
@@ -536,13 +536,41 @@ P2.5-S1 API 安全邊界
   → ✅ P3-3 omni ask（retrieval + local synthesis）
   → ✅ P3-4 Related History（local advisory）
   → ✅ P3-5 Derived Session 敘事層
-  → P5-1 Proposal-only 主動建議（不執行修改）
-  → P5 executor 獨立安全驗收
-  → P4 收集層補完
-  → P6 開源整備
+  → ✅ P5-1 Proposal-only 主動建議（不執行修改；executor 於 871ee29 實作後已 revert 回 ADR-007 契約）
+  → ✅ P7 DeskRAG 知識庫深度整合（含 P7.1 worker 隔離、P7.2 模型選單與對話自動標題）
+  → ✅ P8 系統基礎穩健化（WAL Checkpoint／歷史修剪／自我修復／健康維護面板）
+  → ✅ P4.2 受控本機 Git 同步中心
+  → P4.3 Repo Onboarding／Reconciliation（下一里程碑）
+  → Extension live PASS receipt 與 P2.6 continuous coverage ledger
+  → P5-2+ executor 獨立安全驗收（維持 blocked by P2.5 gate）
+  → P4 其餘收集層補完（能改變決策者優先）
+  → P6 開源發佈（tag、release、README quickstart 乾淨環境驗證）
 ```
 
 理由：
 1. P3-1 已證明 Context Handoff 的產品價值，但 final-response 與 Open Loop 仍需可信度 gate。
 2. P3-2 + P3-3 只有建立在可追溯 turn contract 上，語意檢索結果才可被引用與回查。
 3. P5 先做 proposal-only；任何自主修改都必須具備 allowlist、dirty-worktree check、timeout、cancel、audit receipt 與分級批准。
+
+---
+
+## 11. 2026-08-30 專案檢視後的下一步提案（待討論）
+
+> 背景：本日已完成 repository 整理——所有分支收斂於 `main`（`wip/p5-2-agent-executor` 內容已完整包含於 main 歷史，分支指標移除；如需回溯 executor 實作，checkout `871ee29`），並補齊文件索引（`docs/INDEX.md`）與 README 修訂。以下依「先把已實作變成已驗證，再擴張」原則排序。
+
+### 短期（1–2 週）：清除 known_blockers 的驗證債
+1. **Extension live PASS receipt**：在已登入的實機 Chrome 完成 Extension 1.3.1 heartbeat 與 ChatGPT／Claude.ai 本輪 capture 收據（STATUS `known_blockers` 首項，也是 release-ready 的最大缺口）。
+2. **P2.7 Claude Code／Claude Desktop local-agent live receipt**：目前僅 Codex 有 live completed receipt，補齊其餘兩個來源。
+3. **P2.6 continuous coverage ledger**：讓每日使用時間的 coverage 脫離永久 `partial` 標示。
+
+### 中期（2–6 週）：P4.3 Repo Onboarding／Reconciliation（既定 next milestone）
+- 依 ADR-011 與 FEATURE-009 trust boundary 實作三種情境的單一 repo 確認式流程：本機資料夾尚未 `git init`、本機 repo 無 remote、GitHub repo 尚未 clone。
+- 禁止事項維持：不同名自動配對、不自動初始化／發布、不覆寫非空目錄、不批次 create/clone、不 force reset/push。
+
+### 中期（可平行）：P6 發佈整備收尾
+- Wheel/sdist、formal rollback、3-OS × 2-Python CI 均已通過：走完 `docs/RELEASE_CHECKLIST.md`，打 `v1.3.0aX` tag 併發布 GitHub Release（可先不上 PyPI）。
+- 在乾淨環境（或另一台機器）照 README 快速開始逐步驗證一次，修正安裝文件落差。
+
+### 長期（>6 週）：P5-2 executor 重啟與 P4 收集層
+- P5-2 executor 曾於 `871ee29` 實作、`f8f5400` revert 回 ADR-007 proposal-only 契約；重啟條件：P2.5 gate 全綠 + allowlist、dirty-worktree check、timeout/cancel、audit receipt、L0/L1/L2 分級批准全數就位，並以獨立 ADR 驗收。
+- P4 其餘來源（瀏覽器閱讀、行事曆、terminal history、未 commit 狀態）維持「能否改變決策」檢驗，逐項評估後才納入。

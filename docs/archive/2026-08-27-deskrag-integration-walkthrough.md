@@ -1,3 +1,5 @@
+> **📦 歸檔文件**（2026-08-30 歸檔）：本文件為 DeskRAG 整合（P7）完成當下的一次性報告，測試數字為 2026-08-27 時點快照，僅供歷史參考。後續強化（P7.1 worker 隔離、P7.2 模型選單與對話標題）見 [ROADMAP.md](../../ROADMAP.md)；架構邊界見 [ADR-009](../ADR-009-deskrag-worker-index-lifecycle.md)。
+
 # DeskRAG 與 activityTracker (OmniContext) 單一伺服器整合完成報告
 
 本專案已成功將 `deskRAG` 本地知識庫與 RAG 對話問答系統**無縫整合**至 `activityTracker`（OmniContext），達成**單一伺服器（Single Server）架構**，無需啟動兩個獨立服務或多個連接埠。

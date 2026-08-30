@@ -1,0 +1,74 @@
+# 📚 OmniContext 文件總覽（Documentation Index）
+
+> 最後整理：2026-08-30。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
+
+## 我該從哪裡開始？
+
+| 你想做的事 | 請看 |
+| :--- | :--- |
+| 快速了解專案是什麼、能做什麼 | [README.md](../README.md)（繁中）/ [README_en.md](../README_en.md)（English） |
+| 安裝、Extension 配對、日常操作、備份與故障排查 | [USAGE.md](USAGE.md) —— **使用手冊** |
+| 了解目前開發到哪、下一步是什麼 | [ROADMAP.md](../ROADMAP.md) + [STATUS.yaml](../STATUS.yaml) |
+| 了解產品定位與「不宣稱什麼」的證據邊界 | [PRODUCT_POSITIONING.md](PRODUCT_POSITIONING.md) |
+| 修改架構前先看相關決策 | 下方 ADR 一覽 |
+| 發佈前檢查 | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) |
+
+## 入門與使用
+
+| 文件 | 說明 |
+| :--- | :--- |
+| [../README.md](../README.md) | 繁體中文主說明：特色、快速開始、CLI 指令、設定檔、隱私邊界 |
+| [../README_en.md](../README_en.md) | English documentation（與繁中版對應） |
+| [USAGE.md](USAGE.md) | **使用手冊**：安裝初始化、Git 同步中心、Extension 安裝配對與 live 驗證、使用時間與里程碑、常用操作（semantic index / DeskRAG / 秘書建議 / 快照）、備份與 migration、平台能力、FAQ |
+| [../config.example.yaml](../config.example.yaml) | 設定檔範本（`main.py init` 會據此建立本機 `config.yaml`） |
+
+## 規劃與現況
+
+| 文件 | 說明 |
+| :--- | :--- |
+| [../ROADMAP.md](../ROADMAP.md) | P0–P8 開發規劃與成果紀錄、建議執行順序、下一步提案 |
+| [../STATUS.yaml](../STATUS.yaml) | 機器可讀的現況快照：feature 清單、evidence receipts、quality gates、known blockers |
+| [PRODUCT_POSITIONING.md](PRODUCT_POSITIONING.md) | 產品定位：跨 AI、應用與 Repository 的個人工作脈絡層，以及能力／證據邊界 |
+
+## 架構決策紀錄（ADR）
+
+> ADR 記錄「為什麼這樣設計、邊界在哪裡」。編號 ADR-008 從缺（未曾使用），非文件遺失。
+
+| 編號 | 標題 | 主題 |
+| :--- | :--- | :--- |
+| [ADR-001](ADR-001-p2-5-trust-boundary.md) | P2.5 可信資料與本機安全邊界 | API 安全、ingestion provenance、資料可信度 |
+| [ADR-002](ADR-002-extension-monitor-and-usage-milestones.md) | Extension Monitor 與每日使用里程碑的介面邊界 | Extension 診斷頁、使用時間呈現 |
+| [ADR-003](ADR-003-versioned-sqlite-migrations.md) | Append-only SQLite Versioned Migration | Schema migration、checksum、fail-closed |
+| [ADR-004](ADR-004-packaged-runtime-layout.md) | Wheel/SDist Packaged Runtime Layout | 安裝後的 application home 與 assets |
+| [ADR-005](ADR-005-local-semantic-index-and-ask.md) | Local Semantic Index 與 `omni ask` | 本機 embeddings、retrieval、引用 |
+| [ADR-006](ADR-006-derived-context-sessions-and-related-history.md) | Derived Context Sessions 與 Related History | 衍生工作階段、相似歷史 |
+| [ADR-007](ADR-007-proposal-only-secretary.md) | Proposal-only 主動秘書安全邊界 | 秘書只提案不執行的契約（P5-2 executor 曾實作後 revert 回此契約） |
+| [ADR-009](ADR-009-deskrag-worker-index-lifecycle.md) | DeskRAG worker 索引生命週期 | RAG 索引 worker 隔離、資源與刪除邊界 |
+| [ADR-010](ADR-010-verified-background-agent-task-time.md) | 可驗證背景 Agent 任務時間 | 成對 receipt 才計時的邊界 |
+| [ADR-011](ADR-011-safe-local-repository-sync.md) | 受控本機 Repository 同步 | Git 同步中心安全預設與 P4.3 Onboarding 邊界 |
+
+## 功能規格與驗證
+
+| 文件 | 說明 |
+| :--- | :--- |
+| [FEATURE-001](FEATURE-001-daily-interface-usage-milestone-coach.md) | 每日主要介面使用時間與里程碑教練規格 |
+| [TEST_STRATEGY.md](TEST_STRATEGY.md) | P2.5 測試策略與 contract test 設計 |
+| [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) | 發佈前檢查清單 |
+| [VERIFICATION-2026-08-25-next-stage.md](VERIFICATION-2026-08-25-next-stage.md) | 2026-08-25 下一階段驗證紀錄 |
+
+## 歸檔工作文件（docs/archive/）
+
+> 一次性的規劃書與完成報告，內容為當時快照，不再更新；現況請以 ROADMAP.md 與 STATUS.yaml 為準。
+
+| 文件 | 說明 |
+| :--- | :--- |
+| [archive/2026-08-27-deskrag-integration-plan.md](archive/2026-08-27-deskrag-integration-plan.md) | DeskRAG 整合（P7）動工前規劃書 |
+| [archive/2026-08-27-deskrag-integration-walkthrough.md](archive/2026-08-27-deskrag-integration-walkthrough.md) | DeskRAG 整合（P7）完成報告與當時測試結果 |
+
+## 其他
+
+| 位置 | 說明 |
+| :--- | :--- |
+| [assets/](assets/) | 文件用圖片（架構與 roadmap 卡片等） |
+| `../tests/` | 31 個 contract test 模組；執行 `python -m pytest tests/ -v` |
+| `../scripts/` | 驗證、清理、autostart 與 E2E 腳本 |

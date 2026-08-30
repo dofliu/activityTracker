@@ -5,7 +5,7 @@ progress: 99
 progress_basis: "依 P0-P8 加權里程碑估計；不是 release readiness 百分比"
 status: active_hardening
 release_ready: false
-last_updated: "2026-08-29"
+last_updated: "2026-08-30"
 current_phase: "P2.6/P2.7 Time Evidence Hardening + P3 Memory + P4.2 Safe Local Git Sync + P7 DeskRAG worker lifecycle + P8 System Health & Maintenance Hub"
 next_milestone: "設計並實作 P4.3 Repo Onboarding／Reconciliation：安全處理本機資料夾、無 upstream repo 與尚未 clone 的 GitHub repo"
 planned_features:
@@ -43,14 +43,14 @@ planned_features:
     priority: must_have
     scope: "Watchdog Observer 自動重啟、Git 損壞倉庫隔離、Agent 多來源熔斷、系統自動 WAL Checkpoint 與線上輪替備份"
     trust_boundary: "單一採集器或單一倉庫損毀不得導致全系統崩潰；自動恢復收據保留於本機診斷端點"
-    specification: "walkthrough.md"
+    specification: "ROADMAP.md（P8 系統基礎穩健化工程章節）"
   - id: FEATURE-006
     name: "Web 儀表板系統健康燈號與一鍵維護面板"
     stage: implemented_integrated
     priority: must_have
     scope: "在 Web 前端呈現 5 大採集器即時狀態矩陣、損壞倉庫隔離警告、一鍵主動自我修復、立即 WAL Checkpoint、完整資料庫維護與即時終端輸出"
     trust_boundary: "所有操作透明輸出結構化 JSON 收據；狀態即時從後端探測並呈現真實健康度"
-    specification: "walkthrough.md"
+    specification: "ROADMAP.md（P8 系統基礎穩健化工程章節）"
   - id: FEATURE-007
     name: "可驗證背景 Agent／CLI 任務時間"
     stage: implemented_alpha_live_codex_receipt
@@ -90,6 +90,7 @@ outputs:
   - local_tool
   - web_dashboard
 documentation:
+  docs_index: docs/INDEX.md
   readme: README.md
   usage_guide: docs/USAGE.md
   roadmap: ROADMAP.md

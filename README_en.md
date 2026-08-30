@@ -9,7 +9,7 @@
 
 > **Current status: Personal Alpha.** Windows milestone WinRT Toast E2E, schema 7/7, formal package+database rollback, P3-2 through P3-5 Context Memory Alpha, P5-1 proposal-only Alpha, collector runtime diagnostics, the Extension 1.3.1 live-verification harness, and the cross-platform CI matrix have passed. ChatGPT live DOM selectors were repaired, and Claude Desktop Cowork/local-agent transcript capture passed a Windows E2E. Claude.ai still lacks a current-run PASS receipt, and a live Extension heartbeat still requires logged-in Chrome verification, so this is not release-ready.
 
-**Documentation:** [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
+**Documentation:** [📚 Documentation index](docs/INDEX.md) · [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
 
 ![OmniContext architecture and future roadmap](docs/assets/omnicontext-architecture-roadmap-card-v1.png)
 
@@ -51,7 +51,7 @@ It is purpose-built to answer three fundamental questions at any moment:
 │  • 04 · Settings         • Hybrid RRF Retrieval    • Multi-LLM (Gemini/  │
 │  • 05 · Summaries        • Multi-LLM SSE Chat        Claude/OpenAI/Ollama│
 │  • 06 · Checkpoints      • Native Explorer Reveal                        │
-│  • 🌐 Bilingual (EN/ZH)                                                  │
+│  • 07 · System Health & Maintenance  · 🌐 Bilingual (EN/ZH)              │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -116,17 +116,17 @@ It is purpose-built to answer three fundamental questions at any moment:
 * Incremental updates use content hashes and retain SQLite source references, project, time, trust status, and embedding-input degradation provenance.
 * `omni ask` supports retrieval-only mode or a local Ollama answer with `[S1]` citations. Similarity is not source validation or proof of coverage.
 
-### 9. 🔗 Related History and Derived Work Sessions (P3-4 / P3-5 Alpha)
+### 10. 🔗 Related History and Derived Work Sessions (P3-4 / P3-5 Alpha)
 * `Recent Work Sessions` derives project-scoped clusters from AI turns, Git commits, and file events using a configurable inactivity gap. It is a read-only view and adds no new session table.
 * `Related History` searches the local semantic index from the dashboard or CLI, returns traceable source references and trust status, and does not persist the query.
 * Session grouping is not actual work time, focus, or productivity. Similarity is not proof that work is duplicated, correct, or reusable.
 
-### 10. 🧩 Proposal-only Secretary (P5-1 Alpha)
+### 11. 🧩 Proposal-only Secretary (P5-1 Alpha)
 * The first Alpha derives traceable next-step suggestions from local Project State, actionable Open Loops, and non-sensitive Extension diagnostics.
 * It does not call a cloud LLM, persist proposals, modify files, execute commands, or expose an approval action. See [ADR-007](docs/ADR-007-proposal-only-secretary.md) for the safety contract.
 * The localhost smoke produced two suggestions with three evidence references, blocked a hostile Origin with 403, and passed desktop plus 494px responsive rendering. This receipt does not authorize an executor.
 
-### 11. 📚 DeskRAG Local Knowledge Base & Document Chat (Single-Server Embedded)
+### 12. 📚 DeskRAG Local Knowledge Base & Document Chat (Single-Server Embedded)
 * **Single Server Integration**: Seamlessly integrated into the single OmniContext daemon (`http://127.0.0.1:8765`), eliminating dual-server operational overhead while executing indexing and storage maintenance in background workers.
 * **Curated Local & Cloud Model Dropdowns**:
   * **Ollama Local Offline**: Dedicated dropdown selection across 4 curated offline models (`llama3.1:8b` default, `mistral:7b`, `gemma4:e4b`, `qwen3:4b`) for 100% private, offline inference.
@@ -313,38 +313,60 @@ integrations:
 
 ```text
 activityTracker/
-├── config.yaml                     # System configuration with hot reload
+├── config.yaml                     # System configuration with hot reload (created from config.example.yaml)
 ├── main.py                         # Main entry point and CLI dispatcher
 ├── pyproject.toml                  # Packaging, CLI entry point, and pytest config
+├── MANIFEST.in                     # sdist assets and privacy exclusions
 ├── requirements.txt                # Python package dependencies
-├── README.md                       # Traditional Chinese Documentation
-├── README_en.md                    # English Documentation
-├── docs/USAGE.md                   # Setup, pairing, daily operation, backups, troubleshooting
-├── docs/ADR-003-versioned-sqlite-migrations.md  # Schema migration decision record
+├── README.md / README_en.md        # Traditional Chinese / English documentation
+├── ROADMAP.md / STATUS.yaml        # Development record and machine-readable status snapshot
+│
+├── docs/                           # 📚 Documentation (start at docs/INDEX.md)
+│   ├── INDEX.md                    # Documentation index and reading map
+│   ├── USAGE.md                    # User guide: setup, pairing, daily operation, backups, troubleshooting
+│   ├── PRODUCT_POSITIONING.md      # Product positioning and evidence boundaries
+│   ├── TEST_STRATEGY.md / RELEASE_CHECKLIST.md
+│   ├── ADR-001 ~ ADR-011           # Architecture decision records (ADR-008 unused)
+│   └── archive/                    # Archived one-off plans and completion reports
 │
 ├── core/                           # Core service modules
-│   ├── database.py                 # SQLite session & engine management
-│   ├── migrations.py               # Append-only registry, checksums, and upgrade guard
-│   ├── models.py                   # SQLAlchemy models (Events, Projects, PRs)
 │   ├── server.py                   # FastAPI REST API & static file server
-│   ├── security.py                 # Origin, secret redaction, and extension token boundary
-│   ├── platform_services.py        # Cross-platform argv-based OS integration
-│   ├── data_lifecycle.py           # SQLite online backup and integrity receipt
-│   ├── project_engine.py           # Canonical project resolver & open loop engine
-│   ├── project_paths.py            # Config-driven project-root resolution
+│   ├── manager.py                  # Collector orchestration and supervise_and_heal self-healing
+│   ├── database.py / migrations.py # SQLite sessions and append-only schema migration
+│   ├── models.py                   # SQLAlchemy models (Events, Projects, PRs, RAG)
+│   ├── security.py / secret_resolver.py  # Origin boundary, secret redaction, key resolution
+│   ├── data_lifecycle.py           # Online backup, WAL checkpoint, history pruning, receipts
+│   ├── project_engine.py / project_paths.py  # Canonical project resolver and root resolution
 │   ├── semantic_index.py           # Local embeddings, provenance retrieval, and omni ask
-│   ├── context_memory.py            # Derived work sessions and related-history retrieval
-│   ├── fs_utils.py                 # Native Windows folder picker utilities
-│   └── time_utils.py               # Unified timezone helpers
+│   ├── context_memory.py           # Derived work sessions and related-history retrieval
+│   ├── handoff_engine.py           # Provider-neutral Context Handoff generator
+│   ├── proactive_secretary.py      # Proposal-only secretary (ADR-007)
+│   ├── repo_sync.py                # Safe local Git sync center (ADR-011)
+│   ├── background_tasks.py         # Verified background agent task time (ADR-010)
+│   ├── usage_analytics.py / capture_coverage.py  # Usage statistics and coverage signals
+│   ├── extension_monitor.py / extension_verification.py  # Extension diagnostics and live verification
+│   ├── triage_signals.py           # Cross-project triage signals (GitHub PRs/issues)
+│   ├── platform_services.py        # Cross-platform argv-based OS integration
+│   └── runtime_paths.py / fs_utils.py / time_utils.py  # Runtime paths, explorer, timezone helpers
+│
+├── rag/                            # 📚 DeskRAG local knowledge-base subsystem
+│   ├── router.py                   # /api/v1/rag/* REST API and SSE streaming chat
+│   ├── scanner.py / index_worker.py / jobs.py / lifecycle.py  # Controlled index worker lifecycle
+│   ├── parsers/                    # PDF / Office / text / image Parser Hub
+│   ├── chunker.py                  # Sliding-window hierarchical chunker
+│   ├── embeddings.py / vector_store.py  # FastEmbed (ONNX) + ChromaDB vector store
+│   ├── retriever.py / retrieval/   # Jieba+BM25 and Hybrid RRF / Weighted Fusion retrievers
+│   ├── activity_indexer.py         # Project State and Open Loop virtual chunks
+│   └── llm_gateway.py              # Ollama / Gemini / Claude / OpenAI gateway
 │
 ├── integrations/                   # External integrations
 │   └── github_client.py            # GitHub API client (Repos, PRs, CI, Reviews)
 │
 ├── watchers/                       # Data collection watchers
 │   ├── file_watcher.py             # Watchdog file activity tracker with word counts
-│   ├── git_watcher.py              # Recursive Git scanner & commit tracker
+│   ├── git_watcher.py              # Recursive Git scanner with per-repo fault isolation
 │   ├── window_watcher.py           # Active window focus & time tracker
-│   ├── agent_log_watcher.py        # Claude Code / Codex / Antigravity log parser
+│   ├── agent_log_watcher.py        # Claude Code/Desktop, Codex, Antigravity log parser
 │   └── browser_extension/          # Chrome MV3 extension (ChatGPT/Gemini/Claude)
 │
 ├── synthesizer/                    # AI synthesis & scheduling engine
@@ -354,23 +376,27 @@ activityTracker/
 │   └── scheduler.py                # Daily synthesis & periodic checkpoint timer
 │
 ├── notifiers/                      # Notification modules
-│   └── telegram_notifier.py        # Telegram bot for briefings & stagnation alerts
+│   ├── desktop_notifier.py         # Windows WinRT Toast desktop notifications (zero-dependency)
+│   └── telegram_notifier.py        # Telegram bot for briefings & stagnation alerts (optional)
+├── exporters/
+│   └── daily_brief.py              # OMNICONTEXT_TODAY.md/.html daily entry brief
 │
-├── web/                            # Web UI Dashboard
-│   ├── index.html                  # Dashboard HTML with i18n data tags
-│   ├── app.js                      # UI controller (i18n engine, GitHub badges, accordions)
-│   └── style.css                   # Dark orange aesthetic theme
+├── web/                            # Web UI Dashboard (tabs 01–07 + extension-monitor)
+│   ├── index.html / app.js / style.css  # Layout, i18n controller, dark-orange theme
+│   └── extension-monitor.html      # Browser Extension advanced diagnostics page
 │
-├── scripts/                        # Automation scripts
-│   ├── install_autostart.ps1       # Windows startup scheduler installer
-│   └── uninstall_autostart.ps1     # Uninstaller script
-├── tests/                          # Security/data/lifecycle/portability contracts
-├── docs/                           # ADR, usage, and test strategy
-│   └── ADR-006-derived-context-sessions-and-related-history.md
+├── scripts/                        # Automation, verification, and maintenance scripts
+├── tests/                          # 31 contract test modules (security/data/RAG/sync/lifecycle)
 │
 ├── logs/checkpoints/               # Periodic activity checkpoint logs
 └── reports/                        # Daily & range Markdown reports
 ```
+
+---
+
+## 🗺️ Roadmap & Status
+
+Development is tracked in [ROADMAP.md](ROADMAP.md) (Traditional Chinese, phases P0–P8) with a machine-readable snapshot in [STATUS.yaml](STATUS.yaml). As of 2026-08-30: the P0–P2 daily-usable core, P3 memory layer (Alpha), P4.2 safe local Git sync, P5-1 proposal-only secretary (Alpha), P7 DeskRAG knowledge base, and P8 self-healing/maintenance hub are complete. The next milestone is P4.3 Repo Onboarding/Reconciliation, and the project is **not yet release-ready** — see `known_blockers` in STATUS.yaml for what remains (Extension live PASS receipt, coverage ledger, publish/tag).
 
 ---
 
