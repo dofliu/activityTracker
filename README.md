@@ -180,12 +180,12 @@ python main.py init --watch "/your/project/root"
 若使用已建置的 Alpha wheel：
 
 ```console
-python -m pip install omnicontext-1.3.0a4-py3-none-any.whl
+python -m pip install omnicontext-1.3.0a5-py3-none-any.whl
 omnicontext init --watch "/your/project/root"
 omnicontext assets-status
 ```
 
-Wheel 尚未公開發布。Installed wheel 預設將 config、database 與 reports 放在使用者可寫的 `~/OmniContext`，不寫入 `site-packages`；可用 `OMNICONTEXT_HOME` 或 `OMNICONTEXT_CONFIG` 覆寫。
+Alpha wheel 由 [GitHub Releases](https://github.com/dofliu/activityTracker/releases) 提供下載（pre-release；附 SHA-256 receipt）。Installed wheel 預設將 config、database 與 reports 放在使用者可寫的 `~/OmniContext`，不寫入 `site-packages`；可用 `OMNICONTEXT_HOME` 或 `OMNICONTEXT_CONFIG` 覆寫。
 
 ### 2. 設定 LLM API 金鑰
 

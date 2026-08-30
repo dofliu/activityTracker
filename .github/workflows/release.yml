@@ -1,0 +1,59 @@
+name: Release
+
+# 推送 v* tag 即自動：建置 wheel/sdist → 驗證內容與隱私排除 → 檢查 tag 與
+# package 版本一致 → 建立 GitHub Release（alpha/beta/rc 自動標記 pre-release），
+# 附件含安裝檔與 SHA-256 receipt。Release notes 取自 docs/RELEASE_NOTES-<tag>.md，
+# 檔案不存在時退回 GitHub 自動產生的 notes。
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-verify-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check tag matches package version
+        run: |
+          VERSION="$(python -c 'import core; print(core.__version__)')"
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match core.__version__ $VERSION" >&2
+            exit 1
+          fi
+
+      - name: Build wheel and sdist
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Verify artifact contents and privacy exclusions
+        run: python scripts/verify_release_artifacts.py dist --receipt dist/release-artifacts-receipt.json
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRERELEASE=""
+          case "$GITHUB_REF_NAME" in
+            *a*|*b*|*rc*) PRERELEASE="--prerelease" ;;
+          esac
+          NOTES_FILE="docs/RELEASE_NOTES-$GITHUB_REF_NAME.md"
+          if [ -f "$NOTES_FILE" ]; then
+            NOTES_ARGS=(--notes-file "$NOTES_FILE")
+          else
+            NOTES_ARGS=(--generate-notes)
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "OmniContext $GITHUB_REF_NAME" \
+            "${NOTES_ARGS[@]}" \
+            $PRERELEASE

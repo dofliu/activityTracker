@@ -166,7 +166,7 @@ python main.py init --watch "/your/project/root"
 For a locally built Alpha wheel:
 
 ```bash
-python -m pip install omnicontext-1.3.0a4-py3-none-any.whl
+python -m pip install omnicontext-1.3.0a5-py3-none-any.whl
 omnicontext init --watch "/your/project/root"
 omnicontext assets-status
 ```

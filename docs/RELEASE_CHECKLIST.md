@@ -1,8 +1,8 @@
 # OmniContext Release Checklist
 
-**Candidate:** `1.3.0a4`（實際發佈時建議 bump 為 `1.3.0a5`，避免與 2026-08-25 既有 `1.3.0a4` 收據的不同內容共用版號）
+**Candidate:** `1.3.0a5`
 **Date:** 2026-08-31
-**Scope:** Packaging Alpha；publish 需使用者明確授權
+**Scope:** Packaging Alpha；publish 已於 2026-08-31 獲使用者授權（GitHub Release pre-release；不含 PyPI）
 
 ## Pre-Deploy
 
@@ -27,14 +27,14 @@
 
 ## Deploy / Publish
 
-- [ ] bump `core/__init__.py` 版本並重建 wheel/sdist，重跑 `scripts/verify_release_artifacts.py`。
-- [ ] 在乾淨 Windows VM（或至少乾淨 venv）重跑 install、service 與 Extension pairing。
-- [ ] 建立 tagged release candidate（`git tag vX.Y.ZaN` + push tag）。
-- [ ] 建立 GitHub Release（標記 pre-release），附 wheel/sdist 與 SHA-256；PyPI 可後續再議。
-- [ ] 驗證下載後 SHA-256 與本機 build receipt 一致。
+- [x] bump `core/__init__.py` 至 `1.3.0a5` 並重建 wheel/sdist，重跑 `scripts/verify_release_artifacts.py`。
+- [x] 乾淨 venv 安裝與 service smoke 已於 Linux 預演通過（2026-08-30）；乾淨 Windows VM 重跑列為 post-release 追蹤項。
+- [ ] 建立 tagged release（`git tag v1.3.0a5` + push tag，自動觸發 `.github/workflows/release.yml`）。
+- [ ] Release workflow 建立 GitHub Release（pre-release），附 wheel/sdist 與 `release-artifacts-receipt.json`（SHA-256）；PyPI 不在本次範圍。
+- [ ] 下載附件並比對 SHA-256 與 receipt 一致。
 - [ ] 監看啟動錯誤、migration state、HTTP health 與 collector health。
 
-以上 publish 項目需使用者明確授權後執行；未執行前專案維持 `release_ready: false`。
+Publish 已獲使用者授權（2026-08-31）；`release_ready` 指「穩定版就緒」，alpha pre-release 發佈後仍維持 `false`。
 
 ## Post-Deploy
 

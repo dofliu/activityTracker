@@ -1,6 +1,6 @@
 # OmniContext 使用說明
 
-> 適用版本：`1.3.0a4` Personal Alpha / P2.6 + P3 context memory + P6 cross-platform gate
+> 適用版本：`1.3.0a5` Personal Alpha / P2.6 coverage ledger + P3 context memory + P7 DeskRAG + P8 hardening
 >
 > 主要驗證平台：Windows 11、Python 3.12、Chrome/Edge MV3
 

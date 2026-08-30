@@ -1,7 +1,6 @@
-# OmniContext v1.3.0a5 Release Notes（草稿）
+# OmniContext v1.3.0a5
 
-> **狀態：草稿，尚未發佈。** 發佈前流程：bump `core/__init__.py` 版本 → 重建 wheel/sdist → `scripts/verify_release_artifacts.py` → `git tag v1.3.0a5` → GitHub Release（標記 **pre-release**）。詳見 [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)。
-> 建議採 `1.3.0a5`：既有 `1.3.0a4` 版號已對應過兩份不同內容的 build 收據（2026-08-25 Windows、2026-08-30 Linux 含 schema 013），發佈用新版號避免 SHA 混淆。
+> **Personal Alpha（pre-release）**，2026-08-31。這是 OmniContext 第一個公開的 GitHub Release；wheel/sdist 由 CI 於 tag 建置，附 `release-artifacts-receipt.json`（含 SHA-256 與隱私排除驗證）。
 
 ## 這是什麼
 
@@ -65,4 +64,4 @@ omnicontext            # 開啟 http://127.0.0.1:8765
 
 ## Artifact 校驗
 
-發佈時附上 `verify_release_artifacts` 產出的 SHA-256；下載後請比對一致（草稿階段暫留 2026-08-30 Linux 預演值供參考：wheel `c76c66a8…`、sdist `18cec735…`，正式發佈以新 build 收據為準）。
+本 Release 附件包含 CI 建置時由 `scripts/verify_release_artifacts.py` 產出的 `release-artifacts-receipt.json`：內含 wheel/sdist 的 SHA-256 與「不含 config.yaml、資料庫或本機 secrets」的隱私排除驗證結果。下載安裝檔後請比對 SHA-256 一致。
