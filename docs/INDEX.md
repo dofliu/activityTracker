@@ -54,6 +54,7 @@
 | [FEATURE-001](FEATURE-001-daily-interface-usage-milestone-coach.md) | 每日主要介面使用時間與里程碑教練規格 |
 | [TEST_STRATEGY.md](TEST_STRATEGY.md) | P2.5 測試策略與 contract test 設計 |
 | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) | 發佈前檢查清單 |
+| [RELEASE_NOTES_DRAFT.md](RELEASE_NOTES_DRAFT.md) | v1.3.0a5 release notes 草稿（發佈時定稿） |
 | [VERIFICATION-2026-08-25-next-stage.md](VERIFICATION-2026-08-25-next-stage.md) | 2026-08-25 下一階段驗證紀錄 |
 
 ## 歸檔工作文件（docs/archive/）

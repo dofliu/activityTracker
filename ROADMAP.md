@@ -272,7 +272,8 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 - [x] localhost service restart 後，取得 Codex 7 筆 completed receipt、5 筆 awaiting-final receipt；API 以 3,076.659 秒的 interval union 回傳 51.3 分鐘。
 - [x] Live receipt 驗收腳本 `scripts/background_task_live_acceptance.py`（2026-08-30）：逐平台檢查當日 completed receipt、輸出非敏感 JSON receipt 與 STATUS.yaml 建議段落；已於 localhost API 完成 E2E（無 receipt 時正確 FAIL）。
 - [x] Codex live 驗收 PASS（2026-08-31 執行，target date 2026-08-29：29 筆 completed／14,882.249 秒；全平台 union 28,838.971 秒、48 筆 completed）。
-- [ ] claude_code／claude_desktop 逐平台驗收確認（2026-08-29 已有 19 筆非 codex completed receipt 待歸屬確認：`--platforms claude_code,claude_desktop --date 2026-08-29`）；此項未完成前不宣稱平台全天背景工作 coverage。
+- [x] claude_code／claude_desktop 逐平台驗收 PASS（2026-08-31 01:18 確認 2026-08-29 資料：claude_code 7 筆／3,922.661 秒、claude_desktop 12 筆／16,091.775 秒）。**P2.7 三平台 live receipt 全數取得。**
+- 邊界不變：單日 receipt 不代表全天背景工作 coverage；generic Terminal、cloud-only 與未完成任務不覆蓋。
 
 ---
 
@@ -570,9 +571,9 @@ P2.5-S1 API 安全邊界
 1. ✅ **Extension live PASS receipt**：在已登入的實機 Chrome 完成 Extension 1.3.1 heartbeat 與 ChatGPT／Claude.ai 本輪 capture 收據（STATUS `known_blockers` 首項，也是 release-ready 的最大缺口）。
    ▶ 2026-08-30：驗收腳本 `scripts/extension_live_acceptance.py` 已完成並通過 localhost E2E。
    ▶ ✅ 2026-08-31 01:03：實機 PASS 取得——heartbeat 驗證通過，ChatGPT／Claude.ai 各 3 event／2 response delta（見 P2.5-B2 與 STATUS.yaml）。
-2. **P2.7 Claude Code／Claude Desktop local-agent live receipt**：目前僅 Codex 有 live completed receipt，補齊其餘兩個來源。
+2. ✅ **P2.7 Claude Code／Claude Desktop local-agent live receipt**：目前僅 Codex 有 live completed receipt，補齊其餘兩個來源。
    ▶ 2026-08-30：驗收腳本 `scripts/background_task_live_acceptance.py` 已完成並通過 localhost E2E。
-   ▶ 2026-08-31：**codex 驗收 PASS**（2026-08-29 當日 29 筆 completed／14,882 秒）；同日 DB 另有 19 筆非 codex completed receipt，claude_code／claude_desktop 逐平台確認待跑（`--platforms claude_code,claude_desktop --date 2026-08-29`）。
+   ▶ ✅ 2026-08-31：**三平台全數 PASS**（2026-08-29 資料：codex 29 筆／14,882 秒、claude_code 7 筆／3,923 秒、claude_desktop 12 筆／16,092 秒；union 28,839 秒）。
 3. **P2.6 continuous coverage ledger**：讓每日使用時間的 coverage 脫離永久 `partial` 標示。
    ▶ 2026-08-30：已實作（migration 013 + `core/coverage_ledger.py` + scheduler heartbeat + `/api/v1/usage/coverage`），contract tests 通過；剩 Windows 實機全天 receipt。
 

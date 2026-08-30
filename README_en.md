@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **Current status: Personal Alpha.** Windows milestone WinRT Toast E2E, schema 13/13, formal package+database rollback, P3-2 through P3-5 Context Memory Alpha, P5-1 proposal-only Alpha, collector runtime diagnostics, the P2.6 continuous coverage ledger, and the cross-platform CI matrix have passed. **Extension 1.3.1 obtained a real logged-in-Chrome current-run PASS receipt for ChatGPT and Claude.ai on 2026-08-31 (heartbeat verified).** Remaining gaps: Claude Code / Claude Desktop background-task live receipts, a real full-day coverage-ledger receipt, and the actual tag/release — so this is not yet release-ready.
+> **Current status: Personal Alpha.** Windows milestone WinRT Toast E2E, schema 13/13, formal package+database rollback, P3-2 through P3-5 Context Memory Alpha, P5-1 proposal-only Alpha, collector runtime diagnostics, the P2.6 continuous coverage ledger, and the cross-platform CI matrix have passed. **Extension 1.3.1 obtained a real logged-in-Chrome current-run PASS receipt for ChatGPT and Claude.ai on 2026-08-31 (heartbeat verified), and the P2.7 background-task live acceptance passed for all three platforms (codex / claude_code / claude_desktop).** Remaining gaps: a real full-day coverage-ledger receipt and the actual tag/release — so this is not yet release-ready.
 
 **Documentation:** [📚 Documentation index](docs/INDEX.md) · [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
 

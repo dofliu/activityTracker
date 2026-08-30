@@ -1,37 +1,40 @@
 # OmniContext Release Checklist
 
-**Candidate:** `1.3.0a3`
-**Date:** 2026-08-25
-**Scope:** Packaging Alpha；不是公開 release 授權
+**Candidate:** `1.3.0a4`（實際發佈時建議 bump 為 `1.3.0a5`，避免與 2026-08-25 既有 `1.3.0a4` 收據的不同內容共用版號）
+**Date:** 2026-08-31
+**Scope:** Packaging Alpha；publish 需使用者明確授權
 
 ## Pre-Deploy
 
-- [x] 85 個 contract tests 通過；Python compile、Extension JS syntax、TOML/YAML parse 與 diff check 通過。
-- [x] SQLite migration fresh/legacy/live upgrade 為 `7/7`。
-- [x] Wheel/sdist build 在隔離 PEP 517 environment 通過。
+- [x] 147 個 contract tests 通過（含 coverage ledger 與 live-acceptance script 測試）；Python compile、Extension JS syntax、TOML/YAML parse 通過。
+- [x] SQLite migration fresh/legacy/live upgrade 為 `13/13`（013 = continuous coverage ledger）。
+- [x] Wheel/sdist build 在隔離 PEP 517 environment 通過（Windows 2026-08-25；Linux container 2026-08-30 重演）。
 - [x] Artifact receipt 確認 config template、Dashboard、Extension assets 與 CLI entry point 均存在。
 - [x] Artifact 不含 `config.yaml`、SQLite database 或 local secrets。
-- [x] Fresh wheel install 使用 package 外的 writable application home。
+- [x] Fresh wheel install 使用 package 外的 writable application home（Windows 與 Linux 均驗）。
 - [x] `1.2.0 → 1.3.0a2` isolated upgrade smoke 通過。
-- [x] `1.3.0a3` wheel/sdist content/privacy receipt、fresh installed writable-home、schema 7/7 與 HTTP assets smoke 通過。
+- [x] Linux container 發佈預演：build、artifact content/privacy receipt、fresh venv 安裝、schema 13/13、HTTP smoke 與 `verify_installed_package` checks 全數通過（2026-08-30）。
 - [x] Windows／Ubuntu／macOS × Python 3.10／3.12 GitHub Actions matrix 六個 jobs 通過（run `32757498004`）。
-- [x] Gemini Browser ingestion 已觀察 3 筆 event，其中 2 筆有 response。
-- [ ] Extension `1.3.2` 重新載入後的 Claude.ai live verification PASS receipt 通過；需同時具備開始後 heartbeat、Content Ready、event 與非空 response delta。
-- [x] ChatGPT 真實 DOM prompt/response selector probe 與繁中 send click 修復通過；該測試瀏覽器未載入 Extension，因此不等於 DB capture receipt。
-- [ ] Claude.ai authenticated real-browser ingestion 尚未完成驗證。
+- [x] Gemini Browser ingestion 已觀察 3 筆 event，其中 2 筆有 response（歷史觀察；本輪 live 驗證未含 Gemini）。
+- [x] Extension 1.3.1 已登入 Chrome live verification PASS receipt（2026-08-31 01:03：開始後 heartbeat、Content Ready、event 與非空 response delta，ChatGPT 與 Claude.ai 均通過；verification `857027de…`）。
+- [x] Claude.ai authenticated real-browser ingestion 已隨上述 PASS 驗證（本輪 3 event／2 response delta）。
+- [x] ChatGPT 真實 DOM prompt/response selector 與繁中 send click 修復，且本輪 live PASS 已含 DB capture delta。
 - [x] 真實 Windows WinRT milestone Toast E2E、DB receipt 與 duplicate suppression 通過。
 - [x] Formal package + SQLite rollback rehearsal 通過，包含 WAL/SHM handling。
-- [x] P3-2 4,102/4,102 local semantic index 與 P3-3 local `omni ask` 通過。
+- [x] P3-2 local semantic index 與 P3-3 local `omni ask` 通過（4,380/4,380）。
+- [x] P2.7 三平台背景任務 live 驗收 PASS（2026-08-29 資料：codex 29／claude_code 7／claude_desktop 12 筆 completed，union 28,838.971 秒）。
+- [ ] P2.6 coverage ledger 的 Windows 實機全天 receipt（服務跑滿一日、dashboard coverage 轉 `observed`）。
 
 ## Deploy / Publish
 
-- [ ] 在乾淨 Windows VM 重跑 install、service 與 Extension pairing。
-- [ ] 建立 signed/tagged release candidate。
-- [ ] 發布 wheel/sdist 到目標 registry。
+- [ ] bump `core/__init__.py` 版本並重建 wheel/sdist，重跑 `scripts/verify_release_artifacts.py`。
+- [ ] 在乾淨 Windows VM（或至少乾淨 venv）重跑 install、service 與 Extension pairing。
+- [ ] 建立 tagged release candidate（`git tag vX.Y.ZaN` + push tag）。
+- [ ] 建立 GitHub Release（標記 pre-release），附 wheel/sdist 與 SHA-256；PyPI 可後續再議。
 - [ ] 驗證下載後 SHA-256 與本機 build receipt 一致。
 - [ ] 監看啟動錯誤、migration state、HTTP health 與 collector health。
 
-目前以上 publish 項目未獲授權也未執行，因此專案仍為 `release_ready: false`。
+以上 publish 項目需使用者明確授權後執行；未執行前專案維持 `release_ready: false`。
 
 ## Post-Deploy
 
@@ -44,7 +47,7 @@
 
 - Runtime 寫入 `site-packages` 或其他非 application-home 目錄。
 - Config、database 或 secret 被打入 artifact。
-- Schema state 不是 `up_to_date 7/7`，或出現 checksum/newer-version error。
+- Schema state 不是 `up_to_date 13/13`，或出現 checksum/newer-version error。
 - Health、Dashboard、Extension Monitor 或 static assets 任一無法讀取。
 - Upgrade 後既有 config/database 不可讀或 row-count/schema contract 失敗。
 
