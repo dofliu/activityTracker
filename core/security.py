@@ -114,3 +114,21 @@ def extension_ingest_authorized(provided_token: str | None, cfg: Any) -> bool:
     if not expected or not provided_token:
         return False
     return hmac.compare_digest(str(provided_token), expected)
+
+
+def get_execution_token(cfg: Any) -> str:
+    """ADR-008 D4：executor 專用憑證，與 extension ingest token 分開管理。"""
+    env_name = cfg.get("security.execution_token_env", "OMNICONTEXT_EXECUTION_TOKEN")
+    return str(
+        os.environ.get(str(env_name), "")
+        or cfg.get("security.execution_token", "")
+        or ""
+    )
+
+
+def execution_authorized(provided_token: str | None, cfg: Any) -> bool:
+    """未設定 token 一律拒絕（fail-closed）；比較採 constant-time。"""
+    expected = get_execution_token(cfg)
+    if not expected or not provided_token:
+        return False
+    return hmac.compare_digest(str(provided_token), expected)

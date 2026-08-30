@@ -132,6 +132,7 @@
 * 第一版只把本機 Project State、actionable Open Loops 與 Extension diagnostics 整理成附 evidence refs 的下一步建議。
 * 規則引擎不寫入 SQLite、不修改檔案、不執行 command，也不提供批准執行；完整安全契約見 [ADR-007](docs/ADR-007-proposal-only-secretary.md)，executor 重啟契約見 [ADR-008](docs/ADR-008-gated-agent-executor.md)。
 * **P5-R1 LLM 參考註解（選用，預設關閉）**：啟用後由 LLM（預設本機 Ollama；cloud 為明確 opt-in）為既有建議附加一句判斷提示與今日 summary——只能註解、不能增刪或執行任何項目，LLM 不可用時自動回退純規則結果。
+* **P5-R2 Gated Executor（選用，預設關閉）**：啟用後可在您**逐項批准**下代辦白名單動作（產生 Handoff、`git fetch`、將未結事項標記 stale）——execute API 只接受 proposal_id、動作由 server 白名單 template 決定且不開 shell、需獨立 execution token、每次執行留 audit receipt，evidence 改變的提案自動失效。
 * 正式 localhost 已產生 2 張建議與 3 個 evidence refs，惡意 Origin 為 403；桌面與 494px 介面 smoke 通過。此 receipt 不授權後續 executor。
 
 ### 12. 📚 DeskRAG 本地知識庫與文件智慧問答系統（Single Server 整合版）

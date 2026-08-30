@@ -414,6 +414,28 @@ proactive_secretary:
 
 模型沿用 `synthesizer.<provider>.model` 設定（Ollama 預設 `llama3.1:8b`）。送入 LLM 的內容僅限建議卡片本身的白名單欄位（標題、理由、建議行動、優先序等），不含 prompt 全文、evidence 路徑、URL 或 token。
 
+**P5-R2 Gated Executor（選用，預設關閉；[ADR-008](ADR-008-gated-agent-executor.md)）**：啟用後，部分建議卡會出現「⚡ 批准執行」按鈕，讓秘書在您逐項批准下代辦白名單動作。首批動作全部是內部函式呼叫（不開 shell）：
+
+| 動作 | 等級 | 觸發的建議類型 |
+| :--- | :--- | :--- |
+| 產生 Context Handoff（唯讀，自動複製到剪貼簿） | L0 | 停滯專案／多項未結事項等 |
+| `git fetch` 更新本機 repo 的 remote-tracking | L1 | PR／issue 類建議（專案名可對應到唯一本機 repo 時） |
+| 將單一未結事項標記為 `stale`（可用 open 復原） | L1 | 只含一筆 open loop 的停滯建議 |
+
+啟用與使用：
+
+```yaml
+proactive_secretary:
+  executor:
+    enabled: true
+```
+
+1. 執行 `python main.py init` 產生 execution token（`--show-token` 顯示；與 Extension token 分開）。
+2. 重啟服務後，按下建議卡的「⚡ 批准執行」，首次會要求貼上 execution token（只存於瀏覽器 sessionStorage，關分頁即清除）。
+3. 每次執行寫入 audit receipt，可由 `GET /api/v1/secretary/executions` 回查（只含模板、狀態、時間與輸出 digest，不含內容全文）。
+
+安全邊界：execute API **只接受 proposal_id**——任何呼叫端夾帶的 command／path 都沒有效果；提案的 evidence 一旦改變（例如 loop 已被處理），同一 proposal_id 會直接失效（404），不會執行過期提案；沒有設定 token 時一律 401。
+
 ### 建立工作快照與摘要
 
 ```powershell

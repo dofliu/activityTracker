@@ -125,6 +125,7 @@ It is purpose-built to answer three fundamental questions at any moment:
 * The first Alpha derives traceable next-step suggestions from local Project State, actionable Open Loops, and non-sensitive Extension diagnostics.
 * The rule engine never persists proposals, modifies files, executes commands, or exposes an approval action. See [ADR-007](docs/ADR-007-proposal-only-secretary.md) for the safety contract and [ADR-008](docs/ADR-008-gated-agent-executor.md) for the executor-restart contract.
 * **P5-R1 LLM advisory notes (optional, off by default)**: when enabled, an LLM (local Ollama by default; cloud is an explicit opt-in) adds one advisory note per existing suggestion plus a daily summary — annotate-only, it can never add, remove, or execute anything, and any LLM failure falls back to the pure rule output.
+* **P5-R2 Gated Executor (optional, off by default)**: with per-item user approval the secretary can carry out whitelisted actions (generate a Handoff, `git fetch`, mark a stale open loop) — the execute API accepts only a proposal_id, actions come from server-side templates with no shell involved, a dedicated execution token is required, every run leaves an audit receipt, and proposals whose evidence changed expire automatically.
 * The localhost smoke produced two suggestions with three evidence references, blocked a hostile Origin with 403, and passed desktop plus 494px responsive rendering. This receipt does not authorize an executor.
 
 ### 12. 📚 DeskRAG Local Knowledge Base & Document Chat (Single-Server Embedded)

@@ -471,6 +471,51 @@ def _migration_013_coverage_ledger(connection: Connection) -> None:
     ))
 
 
+def _migration_014_agent_execution_receipts(connection: Connection) -> None:
+    """ADR-008 gated executor audit receipts。
+
+    刻意使用新表名 agent_execution_receipts：wip/p5-2 遺留的
+    agent_execution_jobs（含自由字串 command 欄位）若存在則原樣保留為
+    歷史遺留，不遷移、不刪除、不再由 ORM 管理。
+    """
+    connection.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS agent_execution_receipts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            proposal_id VARCHAR(64) NOT NULL,
+            template_id VARCHAR(64) NOT NULL,
+            risk_level VARCHAR(20) NOT NULL,
+            project_key VARCHAR(255),
+            action_call VARCHAR(500) NOT NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'queued',
+            approved_via VARCHAR(40) NOT NULL DEFAULT 'web_click',
+            requested_at DATETIME NOT NULL,
+            started_at DATETIME,
+            finished_at DATETIME,
+            duration_seconds FLOAT,
+            output_digest VARCHAR(64),
+            output_summary VARCHAR(500),
+            error_code VARCHAR(80),
+            created_at DATETIME NOT NULL
+        );
+        """
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_agent_exec_receipts_status_requested "
+        "ON agent_execution_receipts(status, requested_at);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_agent_exec_receipts_proposal_requested "
+        "ON agent_execution_receipts(proposal_id, requested_at);"
+    ))
+    # 一個 proposal 同時間只允許一個 active job（fail-closed dedup）。
+    connection.execute(text(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_agent_exec_receipts_active_proposal "
+        "ON agent_execution_receipts(proposal_id) "
+        "WHERE status IN ('queued', 'running');"
+    ))
+
+
 MIGRATIONS: tuple[MigrationDefinition, ...] = (
     MigrationDefinition(
         1,
@@ -559,6 +604,14 @@ MIGRATIONS: tuple[MigrationDefinition, ...] = (
         "coverage_ledger_intervals:create;indexes:collector_started,collector_open;"
         "claim:observed_collector_runtime_only;end:last_heartbeat_never_extrapolated",
         _migration_013_coverage_ledger,
+    ),
+    MigrationDefinition(
+        14,
+        "agent_execution_receipts",
+        "agent_execution_receipts:create;indexes:status_requested,proposal_requested,"
+        "unique_active_proposal;privacy:no_command_no_content_no_token;"
+        "legacy:agent_execution_jobs_left_untouched",
+        _migration_014_agent_execution_receipts,
     ),
 )
 

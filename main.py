@@ -394,6 +394,14 @@ def cmd_init(
         security["browser_extension_ingest_token"] = token
         token_created = True
 
+    # ADR-008 D4：executor 專用憑證，與 ingest token 分開；只在空白時產生。
+    execution_token = str(security.get("execution_token", "") or "")
+    execution_token_created = False
+    if not execution_token or rotate_token:
+        execution_token = secrets.token_urlsafe(32)
+        security["execution_token"] = execution_token
+        execution_token_created = True
+
     if watch_directories:
         watcher = config_data.setdefault("watchers", {}).setdefault("file_watcher", {})
         normalized = []
@@ -421,10 +429,17 @@ def cmd_init(
     if show_token:
         print("browser extension ingest token（請貼到擴充套件設定）:")
         print(token)
-    elif token_created:
-        print("browser extension ingest token: generated（以 --show-token 明確顯示）")
+        print("executor execution token（批准執行秘書白名單動作時使用）:")
+        print(execution_token)
     else:
-        print("browser extension ingest token: configured")
+        print(
+            "browser extension ingest token: "
+            + ("generated（以 --show-token 明確顯示）" if token_created else "configured")
+        )
+        print(
+            "executor execution token: "
+            + ("generated（以 --show-token 明確顯示）" if execution_token_created else "configured")
+        )
 
 
 def cmd_assets_status():

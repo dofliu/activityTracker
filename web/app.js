@@ -955,6 +955,15 @@ function renderSecretaryProposals() {
     const llmNote = item.llm_note
       ? `<div class="proposal-llm-note">🧠 ${esc(item.llm_note)}${llmHint}</div>`
       : "";
+    // P5-R2：executor 啟用且此 proposal 有白名單動作時才出現批准按鈕；
+    // 動作內容由 server 端 template 決定，前端只傳 proposal_id。
+    const action = item.execution_available && item.action ? item.action : null;
+    const execTag = action
+      ? `<button class="btn btn-ghost btn-sm proposal-exec-btn" onclick="window.executeProposal('${esc(item.proposal_id)}')">⚡ ${zh ? "批准執行" : "Approve"}（${esc(String(action.risk_level || "").split("_")[0] || "L?")}）</button>`
+      : `<span>${zh ? "不執行" : "NOT EXECUTABLE"}</span>`;
+    const actionLabel = action
+      ? `<div class="proposal-exec-label">${zh ? "可代辦" : "Available action"}：${esc(action.label || action.template_id)}</div>`
+      : "";
     const link = item.url
       ? `<a class="proposal-link" href="${esc(item.url)}" target="_blank" rel="noopener">${zh ? "在 GitHub 開啟 →" : "Open on GitHub →"}</a>`
       : "";
@@ -975,9 +984,10 @@ function renderSecretaryProposals() {
         <div class="proposal-reason">${esc(item.reason)}</div>
         <div class="proposal-action"><span>${zh ? "建議" : "Suggested"}</span>${esc(item.suggested_action)}</div>
         ${llmNote}
+        ${actionLabel}
         <div class="proposal-meta">
           <span>${esc(item.risk_level || "L0_READ_ONLY")}</span>
-          <span>${zh ? "不執行" : "NOT EXECUTABLE"}</span>
+          ${execTag}
           ${pending}
           ${link}
           <button class="btn btn-ghost btn-sm" onclick="window.snoozeProposal(${snoozeArgs}, 7)">${zh ? "7 天內不再提醒" : "Snooze 7d"}</button>
@@ -1012,6 +1022,58 @@ window.snoozeProposal = async function (proposalType, projectKey, subjectRef, da
     await loadSecretaryProposals();
   } catch (err) {
     alert((zh ? "設定失敗：" : "Failed: ") + err.message);
+  }
+};
+
+// P5-R2：批准執行白名單動作。前端只送 proposal_id + execution token；
+// 執行什麼由 server 端 template 決定，token 只留在 sessionStorage（關分頁即失效）。
+window.executeProposal = async function (proposalId) {
+  const zh = currentLang === "zh-TW";
+  const item = ((secretaryProposalsCache || {}).proposals || [])
+    .find(p => p.proposal_id === proposalId);
+  const label = item && item.action ? (item.action.label || item.action.template_id) : proposalId;
+  if (!confirm((zh ? "批准執行：" : "Approve action: ") + label + (zh ? "？" : "?"))) return;
+
+  let token = sessionStorage.getItem("omni_execution_token") || "";
+  if (!token) {
+    token = prompt(zh
+      ? "輸入 execution token（在終端機執行 `omnicontext init --show-token` 取得）："
+      : "Enter execution token (shown by `omnicontext init --show-token`):") || "";
+    token = token.trim();
+    if (!token) return;
+    sessionStorage.setItem("omni_execution_token", token);
+  }
+
+  try {
+    const res = await fetch(`/api/v1/secretary/proposals/${encodeURIComponent(proposalId)}/execute`, {
+      method: "POST",
+      headers: { "x-omnicontext-execution-token": token },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      sessionStorage.removeItem("omni_execution_token");
+      alert(zh ? "execution token 無效，請重試。" : "Invalid execution token.");
+      return;
+    }
+    if (!res.ok) {
+      alert((zh ? "未執行：" : "Rejected: ") + (data.detail || `HTTP ${res.status}`));
+      return;
+    }
+    const receipt = data.receipt || {};
+    let message = (zh ? "執行狀態：" : "Execution status: ") + (receipt.status || "?");
+    if (data.result && data.result.handoff_markdown) {
+      try {
+        await navigator.clipboard.writeText(data.result.handoff_markdown);
+        message += zh ? "\nContext Handoff 已複製到剪貼簿。" : "\nContext Handoff copied to clipboard.";
+      } catch (e) {
+        message += zh ? "\n（Handoff 產生成功，請由回應複製）" : "\n(Handoff generated.)";
+      }
+    }
+    if (receipt.error_code) message += `\n(${receipt.error_code})`;
+    alert(message);
+    await loadSecretaryProposals();
+  } catch (err) {
+    alert((zh ? "執行失敗：" : "Execution failed: ") + err.message);
   }
 };
 

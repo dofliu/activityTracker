@@ -209,6 +209,12 @@ proactive_secretary:
     provider: ollama
     timeout_seconds: 20
     cache_minutes: 10
+  # P5-R2 gated executor（預設關閉；ADR-008）：啟用後可在您逐項批准下
+  # 代辦白名單動作（產 Handoff、repo fetch、open loop 標記 stale）。
+  # 只接受 proposal_id，動作由 server 白名單 template 決定；每次批准需
+  # execution token（init 產生，--show-token 顯示），每次執行留 audit receipt。
+  executor:
+    enabled: false
 
 notifiers:
   desktop:

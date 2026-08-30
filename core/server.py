@@ -20,6 +20,7 @@ from .manager import get_manager
 from .platform_services import open_local_path, open_web_url
 from .security import (
     configured_allowed_origins,
+    execution_authorized,
     extension_ingest_authorized,
     is_extension_origin,
     is_loopback_host,
@@ -31,6 +32,13 @@ from .extension_monitor import build_extension_status, record_extension_heartbea
 from .extension_verification import extension_verification_registry
 from .capture_coverage import build_capture_coverage
 from .context_memory import build_recent_work_sessions, find_related_work
+from .agent_executor import (
+    ExecutionRejected,
+    attach_execution_actions,
+    cancel_execution,
+    execute_proposal,
+    list_execution_receipts,
+)
 from .proactive_secretary import build_action_proposals, snooze_proposal
 from .secretary_advisor import annotate_action_proposals
 from .background_tasks import get_background_task_summary
@@ -376,12 +384,16 @@ def get_related_context(payload: RelatedMemoryRequest):
 def get_secretary_proposals(
     limit: int = Query(6, ge=1, le=12),
 ):
-    """P5-1 proposal-only derived view；不保存、不執行任何建議。
+    """P5-1 proposal-only derived view；不保存任何建議。
 
     P5-R1：可選的 LLM advisory 層只能對既有 proposal 附加唯讀註解
     （預設關閉；本機 Ollama 優先；失敗自動回退 deterministic）。
+    P5-R2：executor 啟用時（預設關閉）標記白名單動作；執行仍需
+    execution token 與使用者逐項批准（ADR-008）。
     """
-    return annotate_action_proposals(build_action_proposals(limit=limit))
+    return attach_execution_actions(
+        annotate_action_proposals(build_action_proposals(limit=limit))
+    )
 
 
 class SnoozeProposalRequest(BaseModel):
@@ -407,6 +419,45 @@ def snooze_secretary_proposal(payload: SnoozeProposalRequest):
         dismissed=payload.dismissed,
         note=payload.note,
     )
+
+
+def _require_execution_token(request: Request) -> None:
+    """ADR-008 D4：executor endpoints 需獨立 execution token（fail-closed）。"""
+    if not execution_authorized(
+        request.headers.get("x-omnicontext-execution-token"), get_config()
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="execution token is missing or invalid",
+        )
+
+
+@app.post("/api/v1/secretary/proposals/{proposal_id}/execute")
+def execute_secretary_proposal(proposal_id: str, request: Request):
+    """ADR-008 D1：只接受 proposal_id，動作由 server 端白名單 template 決定。
+
+    body 一律忽略——任何呼叫端提供的 command / path / argv 都沒有效果。
+    """
+    _require_execution_token(request)
+    try:
+        return execute_proposal(proposal_id, approved_via="web_click")
+    except ExecutionRejected as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
+
+
+@app.get("/api/v1/secretary/executions")
+def get_secretary_executions(limit: int = Query(20, ge=1, le=100)):
+    """Audit receipts（非敏感摘要與 digest）；唯讀，不需 execution token。"""
+    return list_execution_receipts(limit)
+
+
+@app.post("/api/v1/secretary/executions/{receipt_id}/cancel")
+def cancel_secretary_execution(receipt_id: int, request: Request):
+    _require_execution_token(request)
+    try:
+        return cancel_execution(receipt_id)
+    except ExecutionRejected as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
 
 
 @app.post("/api/v1/usage/milestones/evaluate")

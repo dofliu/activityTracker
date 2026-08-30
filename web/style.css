@@ -242,6 +242,9 @@ input, select, button { font-family: inherit; }
 .advisor-boundary { display: block; margin-top: 5px; color: var(--mu); font-size: 9px; }
 .proposal-llm-note { margin-top: 7px; padding: 7px 9px; border-left: 2px dashed var(--bd); color: var(--mu); font-size: 11px; line-height: 1.5; font-style: italic; }
 .advisor-hint { font-style: normal; color: var(--orange); font-family: "JetBrains Mono", monospace; font-size: 9px; }
+/* P5-R2 executor：可代辦動作與批准按鈕 */
+.proposal-exec-label { margin-top: 7px; padding: 6px 9px; border-left: 2px solid var(--bd); color: var(--mu); font-size: 10px; }
+.proposal-exec-btn { color: var(--orange); border-color: var(--orange); }
 .related-memory-match-meta { margin-top: 4px; color: var(--mu); font-family: "JetBrains Mono", monospace; font-size: 9px; }
 
 /* ---------- Projects ---------- */

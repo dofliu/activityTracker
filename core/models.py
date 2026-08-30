@@ -223,6 +223,39 @@ class BackgroundTaskRun(Base):
     )
 
 
+class AgentExecutionReceipt(Base):
+    """ADR-008 gated executor 的 audit receipt。
+
+    表名刻意避開 wip/p5-2 遺留的 ``agent_execution_jobs``（含自由字串
+    command 欄位的被 revert 舊 schema），避免與使用者 DB 內的歷史遺留表
+    衝突。此表不保存 command 字串、prompt/response 全文、token 或金鑰；
+    ``action_call`` 是 server 端白名單 template 正規化後的呼叫描述。
+    """
+    __tablename__ = "agent_execution_receipts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    proposal_id = Column(String(64), nullable=False, index=True)
+    template_id = Column(String(64), nullable=False, index=True)
+    risk_level = Column(String(20), nullable=False)
+    project_key = Column(String(255), nullable=True, index=True)
+    action_call = Column(String(500), nullable=False)
+    status = Column(String(20), nullable=False, default="queued", index=True)
+    approved_via = Column(String(40), nullable=False, default="web_click")
+    requested_at = Column(DateTime, nullable=False, index=True)
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
+    duration_seconds = Column(Float, nullable=True)
+    output_digest = Column(String(64), nullable=True)
+    output_summary = Column(String(500), nullable=True)
+    error_code = Column(String(80), nullable=True)
+    created_at = Column(DateTime, default=get_local_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_agent_exec_receipts_status_requested", "status", "requested_at"),
+        Index("ix_agent_exec_receipts_proposal_requested", "proposal_id", "requested_at"),
+    )
+
+
 class CoverageLedgerInterval(Base):
     """P2.6 continuous coverage ledger：視窗採集器被觀測為運作中的時間段。
 
