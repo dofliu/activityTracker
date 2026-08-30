@@ -58,6 +58,8 @@ execute/jobs endpoints、`AgentExecutionJob` model 與前端 Execute 按鈕；
    對照 browser extension 寫入單筆 AI event 需 `x-omnicontext-ingest-token`，
    執行 shell 的門檻反而更低。
 
+**後續**：executor 重啟契約已於 2026-08-31 定稿為 [ADR-008](ADR-008-gated-agent-executor.md)；其階段 P5-R1（預設關閉的 annotate-only LLM advisory 層）已實作，`build_action_proposals` 本身維持本 ADR 的「不呼叫 LLM、不執行」契約不變。
+
 **ADR-008 若要恢復 executor，至少需滿足：**
 
 - endpoint 只接受 `proposal_id`，command 由 server 從白名單模板產生，不接受自由字串。

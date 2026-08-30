@@ -85,7 +85,7 @@ const I18N = {
     secretary_title: "SECRETARY SUGGESTIONS",
     btn_refresh_proposals: "重新整理",
     ph_loading_proposals: "正在整理可追溯建議…",
-    secretary_boundary: "只呈現本機 evidence 衍生建議；不保存、不呼叫 cloud LLM，也不會自動執行。",
+    secretary_boundary: "只呈現本機 evidence 衍生建議；不保存、不會自動執行。LLM 註解（若啟用）僅供參考，預設使用本機模型。",
     btn_reindex_projects: "🔄 重新歸戶",
     ph_loading_projects: "載入進行中工作…",
     ph_no_projects: "尚未識別到專案活動。進行程式開發、論文寫作或在 Claude / Codex 發問後將自動建立。",
@@ -268,7 +268,7 @@ const I18N = {
     secretary_title: "SECRETARY SUGGESTIONS",
     btn_refresh_proposals: "Refresh",
     ph_loading_proposals: "Deriving traceable suggestions…",
-    secretary_boundary: "Local evidence-derived suggestions only; not persisted, sent to a cloud LLM, or executed automatically.",
+    secretary_boundary: "Local evidence-derived suggestions; never persisted or auto-executed. Optional LLM notes are advisory only (local model by default).",
     btn_reindex_projects: "🔄 Re-index",
     ph_loading_projects: "Loading active workstreams…",
     ph_no_projects: "No active projects detected yet. Edits, commits, and Claude / Codex / Antigravity sessions will populate this view.",
@@ -934,11 +934,27 @@ function renderSecretaryProposals() {
     return;
   }
   const zh = currentLang === "zh-TW";
-  box.innerHTML = proposals.map(item => {
+  // P5-R1 advisory：LLM 只能註解，不能增刪或執行；fallback 時完全不顯示
+  const advisor = secretaryProposalsCache.advisor || null;
+  const advisorActive = advisor && (advisor.status === "annotated" || advisor.status === "cached");
+  const advisorBanner = advisorActive
+    ? `<div class="advisor-summary">
+         <span class="advisor-tag">🧠 ${zh ? "LLM 參考註解" : "LLM ADVISORY"} · ${esc(advisor.provider || "")}${advisor.model ? ` / ${esc(advisor.model)}` : ""}</span>
+         ${advisor.summary ? `<div class="advisor-text">${esc(advisor.summary)}</div>` : ""}
+         <span class="advisor-boundary">${zh ? "僅供參考；不會執行任何動作，也不保存" : "Advisory only; nothing is executed or persisted"}</span>
+       </div>`
+    : "";
+  box.innerHTML = advisorBanner + proposals.map(item => {
     const refs = (item.evidence_refs || []).map(ref => `<span class="proposal-ref">${esc(ref)}</span>`).join("");
     const priority = String(item.priority || "medium").toUpperCase();
     // detail 是 PR/issue 標題；title 只有 repo#number，兩者都要顯示才看得懂是什麼事
     const detail = item.detail ? `<div class="proposal-detail">${esc(item.detail)}</div>` : "";
+    const llmHint = item.llm_priority_hint && item.llm_priority_hint !== item.priority
+      ? ` <span class="advisor-hint">${zh ? "LLM 建議優先序" : "LLM hint"}: ${esc(String(item.llm_priority_hint).toUpperCase())}</span>`
+      : "";
+    const llmNote = item.llm_note
+      ? `<div class="proposal-llm-note">🧠 ${esc(item.llm_note)}${llmHint}</div>`
+      : "";
     const link = item.url
       ? `<a class="proposal-link" href="${esc(item.url)}" target="_blank" rel="noopener">${zh ? "在 GitHub 開啟 →" : "Open on GitHub →"}</a>`
       : "";
@@ -958,6 +974,7 @@ function renderSecretaryProposals() {
         ${detail}
         <div class="proposal-reason">${esc(item.reason)}</div>
         <div class="proposal-action"><span>${zh ? "建議" : "Suggested"}</span>${esc(item.suggested_action)}</div>
+        ${llmNote}
         <div class="proposal-meta">
           <span>${esc(item.risk_level || "L0_READ_ONLY")}</span>
           <span>${zh ? "不執行" : "NOT EXECUTABLE"}</span>

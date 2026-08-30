@@ -77,7 +77,7 @@ ADR-007 Addendum 記錄了第一次 executor 嘗試被 revert 的三個漏洞：
 
 ## 實作階段（每階段獨立驗收）
 
-1. **P5-R1（不受本 ADR 閘門限制，先行）**：proposal 內容接上 LLM（預設本機 Ollama、cloud opt-in），仍為唯讀；deterministic fallback 保留。
+1. ✅ **P5-R1（2026-08-31 已實作）**：`core/secretary_advisor.py` annotate-only advisory 層——LLM 只能為既有 `proposal_id` 附加 `llm_note`／`llm_priority_hint` 與 envelope `summary`，不得增刪改任何 deterministic 欄位；預設關閉（`proactive_secretary.llm_advisor.enabled: false`）、本機 Ollama 優先、prompt 僅含白名單欄位、cloud 使用時 `cloud_llm_used` 如實轉 true；任何失敗（含 LLMClient 備援 markdown 夾帶 payload 的情境）回退 deterministic 且不寫 cache。11 項 contract tests + localhost fallback E2E 通過。
 2. **P5-R2**：D1–D6 落地 + 首批 L0/L1 內部函式 templates + Web 單鍵批准。驗收：contract tests 覆蓋「自由字串必拒」「無 token 必拒」「L2 未二次確認必拒」「path 逃逸必拒」「timeout/cancel receipt」。
 3. **P5-R3**：subprocess dispatcher（Claude Code／Codex CLI，L2）+ 沙盒 cwd + 環境清理。
 4. **P5-R4**：Telegram inline 批准（同一 execution token 邊界）、秘書晨報／晚間交接。

@@ -235,6 +235,13 @@ input, select, button { font-family: inherit; }
 .proposal-action span { display: block; margin-bottom: 3px; color: var(--orange); font-family: "JetBrains Mono", monospace; font-size: 8px; letter-spacing: 1.5px; }
 .proposal-meta, .proposal-refs { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .proposal-meta span, .proposal-ref { padding: 2px 5px; background: var(--s2); color: var(--mu); font-family: "JetBrains Mono", monospace; font-size: 8px; }
+/* P5-R1 LLM advisory：唯讀註解，樣式刻意與 deterministic 內容區隔 */
+.advisor-summary { grid-column: 1 / -1; padding: 10px 14px; border-bottom: 1px dashed var(--bd); background: var(--s2); }
+.advisor-tag { display: inline-block; color: var(--orange); font-family: "JetBrains Mono", monospace; font-size: 9px; letter-spacing: 1px; }
+.advisor-text { margin-top: 5px; font-size: 12px; line-height: 1.6; }
+.advisor-boundary { display: block; margin-top: 5px; color: var(--mu); font-size: 9px; }
+.proposal-llm-note { margin-top: 7px; padding: 7px 9px; border-left: 2px dashed var(--bd); color: var(--mu); font-size: 11px; line-height: 1.5; font-style: italic; }
+.advisor-hint { font-style: normal; color: var(--orange); font-family: "JetBrains Mono", monospace; font-size: 9px; }
 .related-memory-match-meta { margin-top: 4px; color: var(--mu); font-family: "JetBrains Mono", monospace; font-size: 9px; }
 
 /* ---------- Projects ---------- */

@@ -128,9 +128,10 @@
 * `omni recall` 與主頁 `RELATED HISTORY` 使用 loopback Ollama 尋找相似歷史；查詢不保存，Ollama 不可用時不 fallback 到 cloud。
 * Session 是 temporal inference，不代表實際工時、連續專注或成果品質；similarity 也不能證明工作重複、歷史答案正確或仍然適用。架構決策見 [ADR-006](docs/ADR-006-derived-context-sessions-and-related-history.md)。
 
-### 11. 🧩 Proposal-only 主動秘書（P5-1 Alpha）
+### 11. 🧩 Proposal-only 主動秘書（P5-1 Alpha + P5-R1 LLM 註解）
 * 第一版只把本機 Project State、actionable Open Loops 與 Extension diagnostics 整理成附 evidence refs 的下一步建議。
-* 不呼叫 cloud LLM、不寫入 SQLite、不修改檔案、不執行 command，也不提供批准執行；完整安全契約見 [ADR-007](docs/ADR-007-proposal-only-secretary.md)。
+* 規則引擎不寫入 SQLite、不修改檔案、不執行 command，也不提供批准執行；完整安全契約見 [ADR-007](docs/ADR-007-proposal-only-secretary.md)，executor 重啟契約見 [ADR-008](docs/ADR-008-gated-agent-executor.md)。
+* **P5-R1 LLM 參考註解（選用，預設關閉）**：啟用後由 LLM（預設本機 Ollama；cloud 為明確 opt-in）為既有建議附加一句判斷提示與今日 summary——只能註解、不能增刪或執行任何項目，LLM 不可用時自動回退純規則結果。
 * 正式 localhost 已產生 2 張建議與 3 個 evidence refs，惡意 Origin 為 403；桌面與 494px 介面 smoke 通過。此 receipt 不授權後續 executor。
 
 ### 12. 📚 DeskRAG 本地知識庫與文件智慧問答系統（Single Server 整合版）

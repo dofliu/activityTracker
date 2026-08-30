@@ -196,10 +196,19 @@ context_memory:
 proactive_secretary:
   max_per_project: 2
   unfinished_recent_min_idle_hours: 12
-  # Alpha 僅產生 read-only proposals；不保存、不執行，也不呼叫 cloud LLM。
+  # 僅產生 read-only proposals；不保存、不執行。
   enabled: true
   max_proposals: 6
   stalled_open_loop_hours: 48
+  # P5-R1 LLM advisory（預設關閉）：只能為既有建議附加唯讀註解與排序提示，
+  # 不能新增/刪除/執行任何項目；失敗自動回退純規則結果。
+  # provider 選 ollama 為全本機；選 gemini/anthropic/openai 代表同意將建議的
+  # 非敏感欄位送往該供應商（模型沿用 synthesizer.<provider>.model 設定）。
+  llm_advisor:
+    enabled: false
+    provider: ollama
+    timeout_seconds: 20
+    cache_minutes: 10
 
 notifiers:
   desktop:

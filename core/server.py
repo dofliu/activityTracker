@@ -32,6 +32,7 @@ from .extension_verification import extension_verification_registry
 from .capture_coverage import build_capture_coverage
 from .context_memory import build_recent_work_sessions, find_related_work
 from .proactive_secretary import build_action_proposals, snooze_proposal
+from .secretary_advisor import annotate_action_proposals
 from .background_tasks import get_background_task_summary
 from .coverage_ledger import get_daily_coverage
 from .usage_analytics import evaluate_daily_milestones, get_usage_summary
@@ -375,8 +376,12 @@ def get_related_context(payload: RelatedMemoryRequest):
 def get_secretary_proposals(
     limit: int = Query(6, ge=1, le=12),
 ):
-    """P5-1 proposal-only derived view；不保存、不執行任何建議。"""
-    return build_action_proposals(limit=limit)
+    """P5-1 proposal-only derived view；不保存、不執行任何建議。
+
+    P5-R1：可選的 LLM advisory 層只能對既有 proposal 附加唯讀註解
+    （預設關閉；本機 Ollama 優先；失敗自動回退 deterministic）。
+    """
+    return annotate_action_proposals(build_action_proposals(limit=limit))
 
 
 class SnoozeProposalRequest(BaseModel):

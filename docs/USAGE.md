@@ -399,7 +399,20 @@ DeskRAG 支援結合本機知識庫（PDF、Word、PPTX、Excel、代碼/Markdow
 Invoke-RestMethod http://127.0.0.1:8765/api/v1/secretary/proposals
 ```
 
-P5-1 Alpha 沒有批准或執行功能，不保存 proposal、不呼叫 cloud LLM，也不修改檔案、Git 或外部系統。
+P5-1 沒有批准或執行功能，不保存 proposal，也不修改檔案、Git 或外部系統。
+
+**P5-R1 LLM 參考註解（選用，預設關閉）**：啟用後，秘書會請 LLM 對既有建議附加一句判斷提示與整體 summary——只能註解，不能新增、刪除或執行任何項目；LLM 不可用時自動回退純規則結果，卡片照常顯示。在 `config.yaml` 開啟：
+
+```yaml
+proactive_secretary:
+  llm_advisor:
+    enabled: true
+    provider: ollama    # 全本機。選 gemini/anthropic/openai 代表同意外送建議的非敏感欄位
+    timeout_seconds: 20
+    cache_minutes: 10
+```
+
+模型沿用 `synthesizer.<provider>.model` 設定（Ollama 預設 `llama3.1:8b`）。送入 LLM 的內容僅限建議卡片本身的白名單欄位（標題、理由、建議行動、優先序等），不含 prompt 全文、evidence 路徑、URL 或 token。
 
 ### 建立工作快照與摘要
 

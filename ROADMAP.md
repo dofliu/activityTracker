@@ -590,4 +590,5 @@ P2.5-S1 API 安全邊界
 ### 長期（>6 週）：P5-2 executor 重啟與 P4 收集層
 - P5-2 executor 曾於 `871ee29` 實作、`f8f5400` revert 回 ADR-007 proposal-only 契約；重啟條件：P2.5 gate 全綠 + allowlist、dirty-worktree check、timeout/cancel、audit receipt、L0/L1/L2 分級批准全數就位，並以獨立 ADR 驗收。
   ▶ 2026-08-31：重啟契約已定稿於 [ADR-008](docs/ADR-008-gated-agent-executor.md)（Proposed）——白名單 action template、三級實質分級、獨立 execution token、L2 一次性 confirm code、audit receipt（migration 014）、失敗封閉；實作依 P5-R1～R5 分階段。
+  ▶ ✅ 2026-08-31：**P5-R1 已實作**——`core/secretary_advisor.py` annotate-only LLM 註解層（預設關閉、Ollama 優先、白名單 prompt 欄位、失敗回退 deterministic），11 項 contract tests 與 localhost fallback E2E 通過。下一步：P5-R2（L1 白名單 executor MVP，動工前先與使用者確認 ADR-008 內容）。
 - P4 其餘來源（瀏覽器閱讀、行事曆、terminal history、未 commit 狀態）維持「能否改變決策」檢驗，逐項評估後才納入。
