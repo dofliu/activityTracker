@@ -444,6 +444,33 @@ def _migration_012_background_task_receipts(connection: Connection) -> None:
     ))
 
 
+def _migration_013_coverage_ledger(connection: Connection) -> None:
+    """P2.6 continuous coverage ledger：記錄採集器實際被觀測運作的時間段。"""
+    connection.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS coverage_ledger_intervals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            collector VARCHAR(64) NOT NULL,
+            started_at DATETIME NOT NULL,
+            last_heartbeat_at DATETIME NOT NULL,
+            heartbeat_count INTEGER NOT NULL DEFAULT 1,
+            closed_at DATETIME,
+            close_reason VARCHAR(40),
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME
+        );
+        """
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_coverage_ledger_collector_started "
+        "ON coverage_ledger_intervals(collector, started_at);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_coverage_ledger_collector_open "
+        "ON coverage_ledger_intervals(collector, closed_at);"
+    ))
+
+
 MIGRATIONS: tuple[MigrationDefinition, ...] = (
     MigrationDefinition(
         1,
@@ -525,6 +552,13 @@ MIGRATIONS: tuple[MigrationDefinition, ...] = (
         "background_task_runs:create;indexes:unique_key,status_started,platform_started;"
         "privacy:no_prompt_no_response;contract:paired_local_agent_start_end",
         _migration_012_background_task_receipts,
+    ),
+    MigrationDefinition(
+        13,
+        "continuous_coverage_ledger",
+        "coverage_ledger_intervals:create;indexes:collector_started,collector_open;"
+        "claim:observed_collector_runtime_only;end:last_heartbeat_never_extrapolated",
+        _migration_013_coverage_ledger,
     ),
 )
 

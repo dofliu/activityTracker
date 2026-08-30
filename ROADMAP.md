@@ -204,7 +204,9 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 
 > 需求來源：2026-08-24 使用者臨時需求。完整規格見 [`docs/FEATURE-001-daily-interface-usage-milestone-coach.md`](docs/FEATURE-001-daily-interface-usage-milestone-coach.md)。本項為 **MoSCoW: Should Have**，不得取代 P2.5 的資料可靠性與 release blockers。
 
-**2026-08-25 實作證據：**localhost 主頁與 `/extension-monitor` 已完成 live smoke；usage API coverage 維持 `partial`。Windows 隔離 milestone E2E 已走過真實 WinRT Toast submission、SQLite sent receipt 與 duplicate suppression；正式資料庫未寫入測試 event。coverage ledger 尚未完成，因此維持 Alpha。
+**2026-08-25 實作證據：**localhost 主頁與 `/extension-monitor` 已完成 live smoke；usage API coverage 維持 `partial`。Windows 隔離 milestone E2E 已走過真實 WinRT Toast submission、SQLite sent receipt 與 duplicate suppression；正式資料庫未寫入測試 event。
+
+**2026-08-30 更新：continuous coverage ledger 已實作**（migration 013 `coverage_ledger_intervals`、`core/coverage_ledger.py`、scheduler `coverage_ledger_job` heartbeat、`/api/v1/usage/coverage`）。interval 結束時間永遠取最後一次 heartbeat，中斷、休眠或當機不回補；當日 ledger 覆蓋率達 `usage_tracking.coverage.full_coverage_ratio`（預設 0.95）時 usage API 的 coverage 才由 `partial` 升級為 `observed`。contract tests 已通過；**Windows 實機的全天 ledger receipt 尚未取得**，取得前仍維持 Alpha。
 
 ### 產品目的
 
@@ -237,6 +239,8 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 - [x] Gemini 真實 Browser ingestion 已觀察 3 筆 event／2 筆非空 response。
 - [ ] 新版 Extension heartbeat 實機 receipt、ChatGPT/Claude、真實達標 Toast、macOS/Linux CI/實機仍待完成。
 - [x] Contract tests 已覆蓋 interval merge、跨午夜、缺失平台、通知去重與內建 scheduler job contract。
+- [x] Continuous coverage ledger：heartbeat 開啟/延長/中斷分段、時鐘倒退防護、當日 union 覆蓋率與 `observed` 升級條件均有 contract tests（2026-08-30）。
+- [ ] Windows 實機全天 ledger receipt（讓正式環境的 usage coverage 實際脫離 `partial`）。
 - [ ] DST 與完整 retention/privacy matrix 仍待補。
 
 ---
@@ -264,7 +268,8 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 - [x] Dashboard 獨立顯示 VERIFIED／WAITING、完成件數、等待 final 件數與最近完成 receipt。
 - [x] Contract tests 覆蓋 start-only、explicit final、重疊 union、異常時長、migration 與 API privacy。
 - [x] localhost service restart 後，取得 Codex 7 筆 completed receipt、5 筆 awaiting-final receipt；API 以 3,076.659 秒的 interval union 回傳 51.3 分鐘。
-- [ ] 取得 Claude Code 與 Claude Desktop local-agent 的 live completed receipt；此項未完成前不宣稱平台全天背景工作 coverage。
+- [x] Live receipt 驗收腳本 `scripts/background_task_live_acceptance.py`（2026-08-30）：逐平台檢查當日 completed receipt、輸出非敏感 JSON receipt 與 STATUS.yaml 建議段落；已於 localhost API 完成 E2E（無 receipt 時正確 FAIL）。
+- [ ] 在 Windows 實機以真實任務執行 `python scripts/background_task_live_acceptance.py --platforms claude_code,claude_desktop` 取得 live completed receipt；此項未完成前不宣稱平台全天背景工作 coverage。
 
 ---
 
@@ -560,8 +565,11 @@ P2.5-S1 API 安全邊界
 
 ### 短期（1–2 週）：清除 known_blockers 的驗證債
 1. **Extension live PASS receipt**：在已登入的實機 Chrome 完成 Extension 1.3.1 heartbeat 與 ChatGPT／Claude.ai 本輪 capture 收據（STATUS `known_blockers` 首項，也是 release-ready 的最大缺口）。
+   ▶ 2026-08-30：驗收腳本 `scripts/extension_live_acceptance.py` 已完成並通過 localhost E2E；剩實機執行。
 2. **P2.7 Claude Code／Claude Desktop local-agent live receipt**：目前僅 Codex 有 live completed receipt，補齊其餘兩個來源。
+   ▶ 2026-08-30：驗收腳本 `scripts/background_task_live_acceptance.py` 已完成並通過 localhost E2E；剩實機執行。
 3. **P2.6 continuous coverage ledger**：讓每日使用時間的 coverage 脫離永久 `partial` 標示。
+   ▶ 2026-08-30：已實作（migration 013 + `core/coverage_ledger.py` + scheduler heartbeat + `/api/v1/usage/coverage`），contract tests 通過；剩 Windows 實機全天 receipt。
 
 ### 中期（2–6 週）：P4.3 Repo Onboarding／Reconciliation（既定 next milestone）
 - 依 ADR-011 與 FEATURE-009 trust boundary 實作三種情境的單一 repo 確認式流程：本機資料夾尚未 `git init`、本機 repo 無 remote、GitHub repo 尚未 clone。

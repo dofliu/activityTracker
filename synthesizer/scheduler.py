@@ -30,8 +30,12 @@ class SynthesisScheduler:
             self.cfg.get("usage_tracking.enabled", False)
             and self.cfg.get("usage_tracking.notifications.enabled", False)
         )
+        coverage_enabled = bool(self.cfg.get("usage_tracking.enabled", False))
 
-        if not daily_enabled and not checkpoint_enabled and not telegram_enabled and not desktop_enabled and not usage_milestones_enabled:
+        if (
+            not daily_enabled and not checkpoint_enabled and not telegram_enabled
+            and not desktop_enabled and not usage_milestones_enabled and not coverage_enabled
+        ):
             logger.info("Schedulers are disabled in config.")
             return
 
@@ -117,6 +121,22 @@ class SynthesisScheduler:
                     f"Usage milestone evaluation scheduled every {usage_interval} minutes."
                 )
 
+            if coverage_enabled:
+                # P2.6 coverage ledger heartbeat：記錄視窗採集器實際觀測時間段
+                from core.coverage_ledger import heartbeat_interval_seconds
+
+                coverage_seconds = heartbeat_interval_seconds(self.cfg)
+                self._apscheduler.add_job(
+                    func=self._run_coverage_ledger_job,
+                    trigger="interval",
+                    seconds=coverage_seconds,
+                    id="coverage_ledger_job",
+                    replace_existing=True,
+                )
+                logger.info(
+                    f"Coverage ledger heartbeat scheduled every {coverage_seconds} seconds."
+                )
+
             # SQLite WAL 每小時自動 Checkpoint
             wal_interval_hours = max(1, int(self.cfg.get("data_lifecycle.wal_checkpoint_interval_hours", 1)))
             self._apscheduler.add_job(
@@ -171,9 +191,13 @@ class SynthesisScheduler:
         desktop_enabled: bool,
         usage_milestones_enabled: bool,
     ):
+        from core.coverage_ledger import heartbeat_interval_seconds
+
         last_executed_day = None
         last_cp_time = time.time()
         last_usage_time = 0.0
+        last_coverage_time = 0.0
+        coverage_enabled = bool(self.cfg.get("usage_tracking.enabled", False))
         last_desktop_morning_day = None
         last_desktop_evening_day = None
         last_telegram_morning_day = None
@@ -213,6 +237,12 @@ class SynthesisScheduler:
                 if (time.time() - last_usage_time) >= usage_interval * 60:
                     last_usage_time = time.time()
                     self._run_usage_milestone_job()
+
+            if coverage_enabled and (
+                time.time() - last_coverage_time
+            ) >= heartbeat_interval_seconds(self.cfg):
+                last_coverage_time = time.time()
+                self._run_coverage_ledger_job()
 
             if (
                 desktop_enabled
@@ -265,6 +295,8 @@ class SynthesisScheduler:
             and self.cfg.get("usage_tracking.notifications.enabled", False)
         ):
             jobs.append("usage_milestone_job")
+        if self.cfg.get("usage_tracking.enabled", False):
+            jobs.append("coverage_ledger_job")
         return sorted(jobs)
 
     def active_job_ids(self) -> list[str]:
@@ -341,6 +373,15 @@ class SynthesisScheduler:
             logger.info(f"Usage milestone evaluation: {result.get('status')}")
         except Exception as e:
             logger.error(f"Error evaluating usage milestone: {e}", exc_info=True)
+
+    def _run_coverage_ledger_job(self):
+        try:
+            from core.manager import get_manager
+
+            receipt = get_manager().record_coverage_heartbeat()
+            logger.debug(f"Coverage ledger heartbeat: {receipt.get('action')}")
+        except Exception as e:
+            logger.error(f"Error recording coverage ledger heartbeat: {e}", exc_info=True)
 
     def _run_morning_briefing_job(self):
         logger.info("Triggering scheduled morning briefing...")

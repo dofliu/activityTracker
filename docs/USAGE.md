@@ -191,6 +191,14 @@ $run = Invoke-RestMethod -Method Post `
 Invoke-RestMethod "http://127.0.0.1:8765/api/v1/extension/verification/$($run.verification_id)"
 ```
 
+或使用一鍵驗收腳本：它會建立 baseline、把 harness 的 `next_actions` 翻成逐步指示並輪詢到 PASS／逾時，最後輸出非敏感 JSON receipt（不含 token、URL、Prompt、Response）：
+
+```powershell
+python scripts/extension_live_acceptance.py --platforms chatgpt,claude --timeout 600
+```
+
+PASS（exit code 0）代表本輪已取得新 heartbeat 與各平台的 Content Ready、event、非空 response，可將 receipt 記入 `STATUS.yaml`。
+
 ### 3.2 Claude Desktop 對話採集範圍
 
 Claude Desktop 有兩種不同資料面：
@@ -213,11 +221,19 @@ watchers:
 
 主頁的「今日前景使用與里程碑」依 `WindowEvent` 計算已觀察到的 foreground active time，並以 canonical AI turns 顯示互動次數。
 
-這些數值不代表生產力、專注度或實際工時。coverage 顯示：
+這些數值不代表生產力、專注度或實際工時。coverage 由 **continuous coverage ledger** 判定：排程器每 5 分鐘（可調）記錄一次「視窗採集器實際被觀測運作」的 heartbeat，interval 的結束時間永遠取最後一次 heartbeat，中斷、休眠或當機的時間不會回補。
 
-- `partial`：有資料，但無法證明整日連續覆蓋。
+- `observed`：當日 ledger 覆蓋率達 `usage_tracking.coverage.full_coverage_ratio`（預設 0.95）。這只證明採集器在觀測，不證明使用者在場。
+- `partial`：有資料但 ledger 覆蓋率不足（會顯示實際比例，如 `ledger_coverage_62_percent`），或尚無 ledger 資料。
 - `unavailable`：目前平台不支援或 collector 不可用。
-- `complete`：只有具備連續 coverage ledger 後才可使用；目前 Alpha 不宣稱完整覆蓋。
+
+可用本機 API 查看任一天的 ledger 明細：
+
+```powershell
+Invoke-RestMethod "http://127.0.0.1:8765/api/v1/usage/coverage?date=2026-08-30"
+```
+
+ledger 參數在 `config.yaml` 的 `usage_tracking.coverage`（`heartbeat_interval_seconds`、`max_gap_seconds`、`full_coverage_ratio`）。
 
 可直接在 Dashboard Settings 修改，或調整 `config.yaml`：
 
@@ -268,6 +284,14 @@ background_task_tracking:
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8765/api/v1/background-tasks/today
 ```
+
+要驗收「每個平台都取得了成對 live receipt」（P2.7 known blocker），在實際跑過任務的機器上執行：
+
+```powershell
+python scripts/background_task_live_acceptance.py --platforms claude_code,claude_desktop,codex
+```
+
+每個要求的平台當日至少有 1 筆 completed receipt 才會 PASS（exit code 0），並輸出可貼回 `STATUS.yaml` 的建議段落。
 
 預覽今日判定而不發送通知、也不寫入 receipt：
 

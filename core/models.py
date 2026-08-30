@@ -223,6 +223,32 @@ class BackgroundTaskRun(Base):
     )
 
 
+class CoverageLedgerInterval(Base):
+    """P2.6 continuous coverage ledger：視窗採集器被觀測為運作中的時間段。
+
+    interval 的結束時間永遠取最後一次 heartbeat；程序中斷、休眠或當機
+    不會把中斷後的時間補進 coverage。此表刻意不儲存視窗標題、應用
+    名稱或任何事件內容——它證明「採集器何時在觀測」，不證明使用者
+    在場或生產力。
+    """
+    __tablename__ = "coverage_ledger_intervals"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    collector = Column(String(64), nullable=False, index=True)
+    started_at = Column(DateTime, nullable=False, index=True)
+    last_heartbeat_at = Column(DateTime, nullable=False, index=True)
+    heartbeat_count = Column(Integer, nullable=False, default=1)
+    closed_at = Column(DateTime, nullable=True)
+    close_reason = Column(String(40), nullable=True)
+    created_at = Column(DateTime, default=get_local_now, nullable=False)
+    updated_at = Column(DateTime, default=get_local_now, onupdate=get_local_now)
+
+    __table_args__ = (
+        Index("ix_coverage_ledger_collector_started", "collector", "started_at"),
+        Index("ix_coverage_ledger_collector_open", "collector", "closed_at"),
+    )
+
+
 class SemanticDocument(Base):
     """P3-2 本機 semantic index；每筆向量可追溯到原始 SQLite row。"""
     __tablename__ = "semantic_documents"

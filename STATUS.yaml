@@ -420,11 +420,13 @@ quality_gates:
   collector_source_fault_isolation: passed_contract_and_windows_recovery_e2e
   collector_runtime_diagnostics: passed_contract_live_api_and_responsive_dashboard_smoke
   extension_live_verification: passed_contract_and_localhost_running_smoke_real_pass_pending
+  continuous_coverage_ledger: implemented_migration_013_contract_tests_passed_windows_live_receipt_pending
+  live_receipt_acceptance_scripts: passed_localhost_e2e_background_tasks_and_extension
   autonomous_execution: blocked_by_p2_5
 known_blockers:
-  - "Extension 歷史 events_total=10，但 2026-08-26 runtime receipt 的 events_today=0、pairing_verified=false、heartbeat_verified=false；歷史事件不得代表目前在線，Claude.ai authenticated Browser capture 仍未完成"
-  - "P2.6 尚無 continuous coverage ledger，coverage 維持 partial；Windows milestone Toast E2E 已通過但不代表全天 coverage"
-  - "P2.7 已取得 Codex live completed receipt，但尚未取得 Claude Code 與 Claude Desktop local-agent live receipt；generic Terminal、cloud-only、未完成任務與平台全天 coverage 均不宣稱已覆蓋"
+  - "Extension 歷史 events_total=10，但 2026-08-26 runtime receipt 的 events_today=0、pairing_verified=false、heartbeat_verified=false；歷史事件不得代表目前在線，Claude.ai authenticated Browser capture 仍未完成。2026-08-30 已提供 scripts/extension_live_acceptance.py 驗收腳本（localhost E2E 通過），待已登入 Chrome 實機執行取得本輪 PASS receipt"
+  - "P2.6 continuous coverage ledger 已於 2026-08-30 實作（migration 013、coverage_ledger_job heartbeat、/api/v1/usage/coverage，contract tests 通過）；Windows 實機全天 ledger receipt 尚未取得，正式環境 coverage 仍為 partial 直到實測達門檻"
+  - "P2.7 已取得 Codex live completed receipt，但尚未取得 Claude Code 與 Claude Desktop local-agent live receipt；2026-08-30 已提供 scripts/background_task_live_acceptance.py 驗收腳本（localhost E2E 通過），待實機執行。generic Terminal、cloud-only、未完成任務與平台全天 coverage 均不宣稱已覆蓋"
   - "337 筆 legacy AI rows 無 response_status，僅保留為歷史資料，不進入 canonical synthesis/handoff 結論"
   - "Windows wheel/sdist install/upgrade/assets、formal rollback 與 1.3.0a4 candidate packaging 已驗證；public publish/tag 尚未執行"
   - "Windows/Ubuntu/macOS × Python 3.10/3.12 CI run 32757498004 已通過；window/notification 實機能力仍限 Windows，其他平台採明確降級"

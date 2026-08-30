@@ -92,6 +92,12 @@ repository_sync:
     heartbeat_stale_minutes: 5
 usage_tracking:
   enabled: true
+  # P2.6 continuous coverage ledger：記錄視窗採集器實際被觀測運作的時間段。
+  # 當日 ledger 覆蓋率達 full_coverage_ratio 時，usage coverage 才顯示 observed。
+  coverage:
+    heartbeat_interval_seconds: 300
+    max_gap_seconds: 900
+    full_coverage_ratio: 0.95
   goal_label: AI 協作
   goal_interfaces:
   - Claude Code

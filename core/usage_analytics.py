@@ -14,6 +14,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from sqlalchemy.exc import IntegrityError
 
 from core.config import get_config
+from core.coverage_ledger import get_daily_coverage
 from core.database import get_db
 from core.models import AIPromptEvent, MilestoneNotificationReceipt, WindowEvent
 from core.time_utils import get_local_now
@@ -373,6 +374,7 @@ def get_usage_summary(
     enabled = bool(cfg.get("usage_tracking.enabled", False))
     window_enabled = bool(cfg.get("watchers.window_watcher.enabled", True))
     supported = sys.platform == "win32"
+    coverage_ledger = None
     if not enabled or not window_enabled or not supported:
         coverage_status = "unavailable"
         if not enabled:
@@ -382,9 +384,23 @@ def get_usage_summary(
         else:
             coverage_note = "window_collector_not_supported_on_platform"
     else:
-        coverage_status = "partial"
-        coverage_note = "continuous_coverage_ledger_not_available"
-        if manager_status:
+        # P2.6 continuous coverage ledger：只有 ledger 實際觀測到採集器
+        # 運作、且覆蓋率達門檻，才把 coverage 從 partial 升級為 observed。
+        coverage_ledger = get_daily_coverage(
+            local_date, database=database, cfg=cfg, now=now
+        )
+        if coverage_ledger["meets_full_coverage"]:
+            coverage_status = "observed"
+            coverage_note = "continuous_coverage_ledger"
+        elif coverage_ledger["ledger_available"]:
+            coverage_status = "partial"
+            coverage_note = (
+                f"ledger_coverage_{int(round(coverage_ledger['coverage_ratio'] * 100))}_percent"
+            )
+        else:
+            coverage_status = "partial"
+            coverage_note = "continuous_coverage_ledger_not_available"
+        if coverage_status == "partial" and manager_status:
             runtime = (manager_status.get("collector_runtime") or {}).get("window_watcher")
             health = (manager_status.get("collector_health") or {}).get("window_watcher")
             if runtime != "running" or health not in {"healthy", "idle"}:
@@ -430,6 +446,7 @@ def get_usage_summary(
         "claim_boundary": "Observed foreground time; not productivity or actual work hours.",
         "coverage_status": coverage_status,
         "coverage_note": coverage_note,
+        "coverage_ledger": coverage_ledger,
         "data_updated_at": _format_datetime(max(last_values) if last_values else None),
         "observed_total_seconds": round(total_seconds, 3),
         "observed_total_minutes": round(total_seconds / 60.0, 1),

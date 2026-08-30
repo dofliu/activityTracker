@@ -33,6 +33,7 @@ def test_builtin_scheduler_declares_desktop_and_usage_jobs():
         }
     )
     assert scheduler.configured_job_ids() == [
+        "coverage_ledger_job",
         "desktop_evening_job",
         "desktop_morning_job",
         "periodic_checkpoint_job",

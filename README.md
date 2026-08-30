@@ -109,7 +109,7 @@
 ### 7. ⏱️ 每日主要介面使用時間與里程碑（P2.6 Alpha）
 * 主頁顯示 Claude、Codex、ChatGPT、Gemini、Antigravity、VS Code 等介面的每日 **foreground active time** 與 AI turns。
 * 使用者可設定每日目標、里程碑、通知語氣、quiet hours 與 cooldown；SQLite receipt 防止重啟後重複通知。
-* 數值只代表已觀察到的前景時間，不等於生產力或實際工時；coverage ledger 尚未完成前一律標示 `partial`。
+* 數值只代表已觀察到的前景時間，不等於生產力或實際工時。continuous coverage ledger 會記錄採集器實際被觀測運作的時間段：當日 ledger 覆蓋率達門檻（預設 95%）時顯示 `observed`，否則顯示 `partial` 與實際覆蓋率，中斷或休眠的時間永不回補。
 * 主頁 `DATA CAPTURE` 將 `FOCUS`、`WEB`、`LOG` 三種獨立訊號濃縮在同一區塊；任何一欄 `OBSERVED` 都不能替代另外兩欄。
 * `http://127.0.0.1:8765/extension-monitor` 是 Browser Extension 的進階診斷頁，負責 enabled／observed、heartbeat 與逐站狀態；token pairing 仍只能在 Extension popup 完成。
 

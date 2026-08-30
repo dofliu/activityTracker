@@ -102,7 +102,7 @@ It is purpose-built to answer three fundamental questions at any moment:
 ### 7. ⏱️ Daily Interface Usage & Milestones (P2.6 Alpha)
 * The dashboard shows observed foreground time and AI turns for Claude, Codex, ChatGPT, Gemini, Antigravity, VS Code, and other configured interfaces.
 * Daily goals, milestones, notification tone, quiet hours, and cooldown are configurable; SQLite receipts prevent duplicate notifications after restart.
-* Foreground time is not productivity or actual work time. Coverage remains `partial` until a continuous coverage ledger exists.
+* Foreground time is not productivity or actual work time. A continuous coverage ledger records when the window collector was actually observed running: coverage shows `observed` only when the day's ledger coverage meets the configured threshold (default 95%), otherwise `partial` with the measured ratio; interruptions and sleep are never back-filled.
 * The dashboard `DATA CAPTURE` panel condenses three independent signals—`FOCUS`, `WEB`, and `LOG`—without treating one observed channel as proof of another.
 * `http://127.0.0.1:8765/extension-monitor` is the advanced Browser Extension diagnostic page for enabled/observed, heartbeat, and per-site state; token pairing remains inside the Extension popup.
 

@@ -130,6 +130,44 @@ class WatcherManager:
     def is_running(self) -> bool:
         return self._is_running
 
+    def window_observation_state(self) -> Dict[str, Any]:
+        """Coverage ledger 用的觀測狀態：enabled、runtime 存活且 probe 未降級。"""
+        cfg = get_config()
+        enabled = (
+            bool(cfg.get("watchers.window_watcher.enabled", True))
+            and sys.platform == "win32"
+        )
+        if not enabled:
+            return {"observing": False, "reason": "window_collector_disabled_or_unsupported"}
+        if not self._is_running:
+            return {"observing": False, "reason": "monitoring_stopped"}
+        thread = getattr(self.window_watcher, "_thread", None)
+        if not (thread and thread.is_alive()):
+            return {"observing": False, "reason": "window_collector_stopped"}
+        interval = max(1, int(cfg.get("watchers.window_watcher.interval_seconds", 5)))
+        degraded_after = max(
+            interval,
+            int(cfg.get("watchers.window_watcher.probe_degraded_after_seconds", 30)),
+        )
+        if window_probe_is_degraded(
+            self.window_watcher.get_diagnostics(),
+            interval_seconds=interval,
+            degraded_after_seconds=degraded_after,
+        ):
+            return {"observing": False, "reason": "window_probe_degraded"}
+        return {"observing": True, "reason": "window_collector_running"}
+
+    def record_coverage_heartbeat(self) -> Dict[str, Any]:
+        """依目前觀測狀態寫入 coverage ledger heartbeat；失敗不影響採集。"""
+        from core.coverage_ledger import record_observation_heartbeat
+
+        state = self.window_observation_state()
+        receipt = record_observation_heartbeat(
+            observing=state["observing"], reason=state["reason"]
+        )
+        receipt["observing"] = state["observing"]
+        return receipt
+
     def start_all(self) -> Dict[str, Any]:
         with self._lock:
             if self._is_running:
@@ -142,6 +180,10 @@ class WatcherManager:
             self.agent_log_watcher.start()
             self.scheduler.start()
             self._is_running = True
+            try:
+                self.record_coverage_heartbeat()
+            except Exception as e:
+                logger.warning(f"Coverage ledger heartbeat on start failed: {e}")
             return {"status": "started", "message": "全景監控服務已成功啟動"}
 
     def stop_all(self) -> Dict[str, Any]:
@@ -156,6 +198,12 @@ class WatcherManager:
             self.agent_log_watcher.stop()
             self.scheduler.shutdown()
             self._is_running = False
+            try:
+                from core.coverage_ledger import close_open_intervals
+
+                close_open_intervals(reason="monitoring_stopped")
+            except Exception as e:
+                logger.warning(f"Coverage ledger close on stop failed: {e}")
             return {"status": "stopped", "message": "全景監控服務已停止"}
 
     def reload_config(self) -> Dict[str, Any]:
