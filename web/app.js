@@ -159,6 +159,12 @@ const I18N = {
     usage_quiet_end: "QUIET UNTIL",
     usage_cooldown: "COOLDOWN / MIN",
     usage_local_note: "預設只在本機聚合，不呼叫 cloud LLM；介面分類規則可在 config.yaml 調整。",
+    settings_executor_title: "小秘書執行器（ADR-008）",
+    settings_executor_note: "預設關閉；每次執行仍需 execution token 與逐項批准",
+    executor_enabled_label: "啟用執行器（L0/L1 白名單動作）",
+    executor_l2_label: "啟用 L2：調度本機 agent CLI（需一次性確認碼）",
+    executor_cli_label: "AGENT CLI",
+    executor_boundary: "L2 會用您本機已登入的 CLI 消耗訂閱／API 額度；子行程禁 shell、僅限白名單動作與該專案 repo 目錄，不會拿到任何 API key。執行前仍需 execution token（python main.py init --show-token）＋單鍵批准＋回填一次性確認碼。",
     gh_opt1_title: "快捷方式 1 (推薦)：本機 GITHUB CLI",
     btn_gh_auto_connect: "🔑 一鍵從本機 gh CLI 同步認證",
     gh_opt1_sub: "免手動輸入 Token，自動讀取本機登入之 GitHub 帳號",
@@ -348,6 +354,12 @@ const I18N = {
     usage_quiet_end: "QUIET UNTIL",
     usage_cooldown: "COOLDOWN / MIN",
     usage_local_note: "Aggregated locally without a cloud LLM; interface rules remain configurable in config.yaml.",
+    settings_executor_title: "Secretary Executor (ADR-008)",
+    settings_executor_note: "Off by default; every run still needs the execution token and per-item approval",
+    executor_enabled_label: "Enable executor (L0/L1 whitelist actions)",
+    executor_l2_label: "Enable L2: dispatch local agent CLI (one-time confirm code)",
+    executor_cli_label: "AGENT CLI",
+    executor_boundary: "L2 spends your locally signed-in CLI quota; subprocesses are shell-free, restricted to whitelist actions and the project's repo directory, and never receive any API key. Runs still require the execution token (python main.py init --show-token), one-click approval, and a one-time confirm code.",
     gh_opt1_title: "Option 1 (Recommended): Local GITHUB CLI",
     btn_gh_auto_connect: "🔑 1-Click Auth via Local gh CLI",
     gh_opt1_sub: "No manual PAT needed, automatically reads local logged-in GitHub account",
@@ -1987,6 +1999,10 @@ async function loadConfig() {
     $("toggle-chatgpt").checked = browser.chatgpt !== false;
     $("toggle-claude-web").checked = browser.claude_web !== false;
     $("toggle-window-focus").checked = !(w.window_watcher && w.window_watcher.enabled === false);
+    const executor = (currentConfig.proactive_secretary || {}).executor || {};
+    $("toggle-executor-enabled").checked = executor.enabled === true;
+    $("toggle-executor-l2").checked = !!(executor.l2 && executor.l2.enabled === true);
+    $("select-agent-cli").value = (executor.agent_cli && executor.agent_cli.binary) === "codex" ? "codex" : "claude";
     $("toggle-usage-tracking").checked = usage.enabled === true;
     const usageNotifications = usage.notifications || {};
     $("toggle-usage-notifications").checked = usageNotifications.enabled === true;
@@ -2089,6 +2105,21 @@ async function saveSettings() {
     if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(envName)) {
       cfg.synthesizer[provider].api_key_env = envName;
     }
+  }
+
+  // P5-R2/R3 執行器：開關與 CLI 選擇；換 CLI 時同步重設對應的預設 args，
+  // 使用者自訂的 args 只要不換 binary 就原樣保留。
+  cfg.proactive_secretary = cfg.proactive_secretary || {};
+  cfg.proactive_secretary.executor = cfg.proactive_secretary.executor || {};
+  const executorCfg = cfg.proactive_secretary.executor;
+  executorCfg.enabled = $("toggle-executor-enabled").checked;
+  executorCfg.l2 = executorCfg.l2 || {};
+  executorCfg.l2.enabled = $("toggle-executor-l2").checked;
+  executorCfg.agent_cli = executorCfg.agent_cli || {};
+  const cliChoice = $("select-agent-cli").value === "codex" ? "codex" : "claude";
+  if (executorCfg.agent_cli.binary !== cliChoice) {
+    executorCfg.agent_cli.binary = cliChoice;
+    executorCfg.agent_cli.args = cliChoice === "codex" ? ["exec", "{prompt}"] : ["-p", "{prompt}"];
   }
 
   cfg.usage_tracking = cfg.usage_tracking || {};

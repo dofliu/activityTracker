@@ -456,7 +456,29 @@
 
         <div class="panel mb-14">
           <div class="panel-head">
-            <span class="mono-label accent">05</span><span class="panel-title" data-i18n="settings_p4_title">GitHub 雲端整合 (全專案與 PR 追蹤)</span>
+            <span class="mono-label accent">05</span><span class="panel-title" data-i18n="settings_executor_title">小秘書執行器（ADR-008）</span>
+            <span class="muted small" data-i18n="settings_executor_note">預設關閉；每次執行仍需 execution token 與逐項批准</span>
+          </div>
+          <div class="usage-settings-body">
+            <div class="usage-toggle-row">
+              <label class="setting-check"><input type="checkbox" id="toggle-executor-enabled"><span data-i18n="executor_enabled_label">啟用執行器（L0/L1 白名單動作）</span></label>
+              <label class="setting-check"><input type="checkbox" id="toggle-executor-l2"><span data-i18n="executor_l2_label">啟用 L2：調度本機 agent CLI（需一次性確認碼）</span></label>
+            </div>
+            <div class="fields usage-settings-fields">
+              <div><div class="mono-mini muted mb-6" data-i18n="executor_cli_label">AGENT CLI</div>
+                <select id="select-agent-cli">
+                  <option value="claude">claude（Claude Code）</option>
+                  <option value="codex">codex（Codex CLI）</option>
+                </select>
+              </div>
+            </div>
+            <div class="usage-boundary" data-i18n="executor_boundary">L2 會用您本機已登入的 CLI 消耗訂閱／API 額度；子行程禁 shell、僅限白名單動作與該專案 repo 目錄，不會拿到任何 API key。執行前仍需 execution token（python main.py init --show-token）＋單鍵批准＋回填一次性確認碼。</div>
+          </div>
+        </div>
+
+        <div class="panel mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent">06</span><span class="panel-title" data-i18n="settings_p4_title">GitHub 雲端整合 (全專案與 PR 追蹤)</span>
             <span id="gh-auth-badge" class="trust broken">未連線</span>
           </div>
           <div style="padding: 14px;">
@@ -488,7 +510,7 @@
 
         <div class="panel mb-14" id="repo-sync-panel">
           <div class="panel-head">
-            <span class="mono-label accent">06</span><span class="panel-title" data-i18n="repo_sync_title">本機 Git 同步中心</span>
+            <span class="mono-label accent">07</span><span class="panel-title" data-i18n="repo_sync_title">本機 Git 同步中心</span>
             <span id="repo-sync-badge" class="trust neutral" data-i18n="repo_sync_manual">逐項手動確認</span>
           </div>
           <div class="repo-sync-body">

@@ -443,6 +443,8 @@ proactive_secretary:
 
 **P5-R3 L2 Dispatcher（選用，獨立開關，預設關閉）**：啟用後，停滯／未收尾的建議卡會多一顆「🛡️ 批准執行（L2）」，讓秘書調度**你本機已登入的 agent CLI**（預設 `claude -p`，可改 `codex exec`）為該事項起草重啟行動計畫，結果自動複製到剪貼簿並存於 `agent_outputs/execution_<id>.md`。
 
+不想手動編輯 YAML 的話，「07 監控配置」分頁有「小秘書執行器」卡片：兩個開關（執行器／L2）與 agent CLI 下拉選單，按「儲存並套用」即寫回 config.yaml 並熱套用；等效的手動設定如下：
+
 ```yaml
 proactive_secretary:
   executor:

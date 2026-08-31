@@ -363,6 +363,9 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     assert "tab-assistant" in dashboard.text
     assert "input-assistant-prompt" in dashboard.text
     assert "assistant-chat-messages" in dashboard.text
+    assert "toggle-executor-enabled" in dashboard.text
+    assert "toggle-executor-l2" in dashboard.text
+    assert "select-agent-cli" in dashboard.text
     assert "DATA CAPTURE" in dashboard.text
     assert "extension-capture-badge" not in dashboard.text
     assert "style.css?v=1.3.0a12-home-work-guide" in dashboard.text
