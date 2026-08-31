@@ -516,6 +516,34 @@ def _migration_014_agent_execution_receipts(connection: Connection) -> None:
     ))
 
 
+def _migration_015_activity_micro_summaries(connection: Connection) -> None:
+    """兩層增量摘要：checkpoint 時段微摘要（map），日報 reduce 讀取。"""
+    connection.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS activity_micro_summaries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            period_start DATETIME NOT NULL,
+            period_end DATETIME NOT NULL,
+            provider VARCHAR(40) NOT NULL,
+            model VARCHAR(120),
+            summary_text VARCHAR(800) NOT NULL,
+            input_chars INTEGER NOT NULL DEFAULT 0,
+            event_count INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME
+        );
+        """
+    ))
+    connection.execute(text(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_micro_summary_period "
+        "ON activity_micro_summaries(period_start, period_end);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_activity_micro_summaries_period_start "
+        "ON activity_micro_summaries(period_start);"
+    ))
+
+
 MIGRATIONS: tuple[MigrationDefinition, ...] = (
     MigrationDefinition(
         1,
@@ -612,6 +640,13 @@ MIGRATIONS: tuple[MigrationDefinition, ...] = (
         "unique_active_proposal;privacy:no_command_no_content_no_token;"
         "legacy:agent_execution_jobs_left_untouched",
         _migration_014_agent_execution_receipts,
+    ),
+    MigrationDefinition(
+        15,
+        "activity_micro_summaries",
+        "activity_micro_summaries:create;indexes:unique_period,period_start;"
+        "map_reduce:checkpoint_micro_then_daily_reduce;privacy:no_raw_prompt_or_response",
+        _migration_015_activity_micro_summaries,
     ),
 )
 

@@ -160,6 +160,16 @@ synthesizer:
   periodic_checkpoint:
     enabled: true
     interval_hours: 2
+  # 兩層增量摘要：每次 checkpoint 順帶用本機模型把該時段壓成 ≤100 字微摘要
+  # （map，零 API 成本）；日報只讀微摘要＋統計（reduce），token 用量約降一個
+  # 數量級。微摘要失敗或缺漏時段自動回退原始節錄，不影響日報產生。
+  micro_summary:
+    enabled: true
+    provider: ollama
+    timeout_seconds: 90
+  daily_from_micro: true
+  # 日報 prompt 總長硬上限（字元）；使用 Ollama 產日報時建議降至 60000
+  max_prompt_chars: 180000
   provider: ollama
   gemini:
     model: gemini-3.7-flash

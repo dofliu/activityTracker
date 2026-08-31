@@ -339,6 +339,21 @@ class SynthesisScheduler:
         except Exception as e:
             logger.error(f"Error generating checkpoint log: {e}", exc_info=True)
 
+        # 兩層增量摘要（map）：同一時段順帶壓成本機微摘要；失敗靜默跳過，
+        # 日報 reduce 會對缺漏時段回退原始節錄。
+        try:
+            from datetime import timedelta
+
+            from core.time_utils import get_local_now
+            from synthesizer.micro_summarizer import generate_micro_summary
+
+            interval_hours = int(self.cfg.get("synthesizer.periodic_checkpoint.interval_hours", 2))
+            period_end = get_local_now()
+            receipt = generate_micro_summary(period_end - timedelta(hours=interval_hours), period_end)
+            logger.info(f"Micro summary: {receipt.get('status')}")
+        except Exception as e:
+            logger.debug(f"Micro summary skipped: {e}")
+
     def _refresh_daily_brief(self):
         """更新每日入口的簡報檔案（早晚報前都先刷新一次，確保通知與檔案一致）"""
         if not self.cfg.get("exporters.daily_brief.enabled", True):

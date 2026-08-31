@@ -171,8 +171,37 @@ def _max_prompt_chars() -> int:
     return max(20_000, min(configured, 2_000_000))
 
 
-def format_context_for_prompt(day_data: Dict[str, Any], time_range_str: str) -> str:
-    """將資料庫事件轉換為適合 LLM 閱讀的專案中心格式 (嚴格限於該區間內真實推進的專案)"""
+def _outside_micro_periods(
+    items: List[Dict[str, Any]],
+    covered: List[tuple],
+) -> List[Dict[str, Any]]:
+    """留下不在任何微摘要時段內的事件（時間無法解析者保守保留）。"""
+    if not covered:
+        return items
+    kept = []
+    for item in items:
+        try:
+            ts = datetime.strptime(str(item.get("time", "")), "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            kept.append(item)
+            continue
+        if not any(start <= ts < end for start, end in covered):
+            kept.append(item)
+    return kept
+
+
+def format_context_for_prompt(
+    day_data: Dict[str, Any],
+    time_range_str: str,
+    micro_summaries: Optional[List[Dict[str, Any]]] = None,
+) -> str:
+    """將資料庫事件轉換為適合 LLM 閱讀的專案中心格式 (嚴格限於該區間內真實推進的專案)。
+
+    reduce 模式：提供 ``micro_summaries``（checkpoint 時段的本機微摘要）時，
+    AI 互動與檔案異動只保留「未被微摘要涵蓋」的時段原始節錄，其餘以
+    微摘要時間軸取代——token 用量約降一個數量級；統計性內容（專案、
+    open loops、Git/PR、視窗分鐘數）永遠取自資料庫原始資料，不經 LLM。
+    """
 
     # 找出區間內真正有活動的專案名稱集合
     active_project_names: Set[str] = set()
@@ -207,8 +236,14 @@ def format_context_for_prompt(day_data: Dict[str, Any], time_range_str: str) -> 
     loop_text = "\n".join(loop_lines) if loop_lines else "（目前無待辦事項）"
 
     # 3. AI Events (嚴格排除佔位字串，僅注入真實結論；prompt/response 一律節錄)
+    covered_periods = [
+        (m["period_start"], m["period_end"]) for m in (micro_summaries or [])
+    ]
+    ai_source_events = _outside_micro_periods(day_data["ai_events"], covered_periods)
+    file_source_events = _outside_micro_periods(day_data["file_events"], covered_periods)
+
     ai_lines = []
-    for item in day_data["ai_events"]:
+    for item in ai_source_events:
         tag_info = f" [{item['tag']}]" if item['tag'] else ""
         resp = (item.get('response') or "").strip()
         is_placeholder = resp.startswith("[Executed") or resp.startswith("[Codex CLI") or resp.startswith("<")
@@ -219,16 +254,38 @@ def format_context_for_prompt(day_data: Dict[str, Any], time_range_str: str) -> 
         )
         prompt_snippet = _clip_text(item['prompt'], PROMPT_SNIPPET_CHARS)
         ai_lines.append(f"- [{item['time']}] [{item['platform'].upper()}]{tag_info} 問: {prompt_snippet}{resp_snippet}")
-    ai_lines = _cap_lines(ai_lines, SECTION_LINE_LIMITS["ai"], "AI 互動")
-    ai_text = "\n".join(ai_lines) if ai_lines else "（該時段無 AI 互動紀錄）"
+    ai_raw_limit = SECTION_LINE_LIMITS["ai"] if not covered_periods else 100
+    ai_lines = _cap_lines(ai_lines, ai_raw_limit, "AI 互動")
 
-    # 4. File Events
+    if micro_summaries:
+        show_date = len({m["period_start"].date() for m in micro_summaries}) > 1
+        clock = "%m/%d %H:%M" if show_date else "%H:%M"
+        micro_lines = [
+            f"- [{m['period_start'].strftime(clock)}–{m['period_end'].strftime('%H:%M')}] {m['text']}"
+            for m in micro_summaries
+        ]
+        segments = [
+            "【時段微摘要】以下各時段已由本機模型預先壓縮，請以此為主要事實來源：",
+            "\n".join(micro_lines),
+        ]
+        if ai_lines:
+            segments.append("")
+            segments.append("【未被微摘要涵蓋時段的原始 AI 互動節錄】")
+            segments.append("\n".join(ai_lines))
+        ai_text = "\n".join(segments)
+    else:
+        ai_text = "\n".join(ai_lines) if ai_lines else "（該時段無 AI 互動紀錄）"
+
+    # 4. File Events（微摘要已涵蓋的時段不再重複原始清單）
     file_lines = []
-    for item in day_data["file_events"]:
+    for item in file_source_events:
         diff_str = f" ({item['diff']})" if item['diff'] else ""
         file_lines.append(f"- [{item['time']}] [{item['action'].upper()}] {item['file_name']} [{item['file_type']}]{diff_str}")
     file_lines = _cap_lines(file_lines, SECTION_LINE_LIMITS["file"], "檔案異動")
-    file_text = "\n".join(file_lines) if file_lines else "（該時段無檔案異動紀錄）"
+    if micro_summaries and not file_lines:
+        file_text = "（檔案異動已包含於上方時段微摘要）"
+    else:
+        file_text = "\n".join(file_lines) if file_lines else "（該時段無檔案異動紀錄）"
 
     # 5. Git Events & PRs
     git_lines = []
@@ -431,8 +488,19 @@ def generate_summary_pipeline(
     end_dt = datetime.combine(end_date, time.max)
     range_data = fetch_events_in_range(start_dt, end_dt)
 
-    # 2. 構建 Prompt
-    user_prompt = format_context_for_prompt(range_data, range_label)
+    # 2. 構建 Prompt（reduce：優先使用 checkpoint 微摘要，缺漏時段回退原始節錄）
+    micro_rows: List[Dict[str, Any]] = []
+    if bool(get_config().get("synthesizer.daily_from_micro", True)):
+        try:
+            from synthesizer.micro_summarizer import micro_summaries_for_range
+
+            micro_rows = micro_summaries_for_range(start_dt, end_dt)
+        except Exception as exc:
+            logger.warning("Micro summaries unavailable, using raw context: %s", type(exc).__name__)
+            micro_rows = []
+    if micro_rows:
+        logger.info("Daily reduce uses %d micro summaries.", len(micro_rows))
+    user_prompt = format_context_for_prompt(range_data, range_label, micro_summaries=micro_rows)
 
     # 3. 調用 LLM
     client = LLMClient(provider=provider_override)

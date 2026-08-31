@@ -256,6 +256,31 @@ class AgentExecutionReceipt(Base):
     )
 
 
+class ActivityMicroSummary(Base):
+    """兩層增量摘要的 map 產物：單一 checkpoint 時段的本機微摘要。
+
+    只保存壓縮後文字與非敏感統計，不重複保存 prompt/response 原文。
+    日報 reduce 優先讀本表、缺漏時段回退原始節錄，因此本表缺損不影響
+    日報可用性；同一時段重生成採 upsert。
+    """
+    __tablename__ = "activity_micro_summaries"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    period_start = Column(DateTime, nullable=False, index=True)
+    period_end = Column(DateTime, nullable=False)
+    provider = Column(String(40), nullable=False)
+    model = Column(String(120), nullable=True)
+    summary_text = Column(String(800), nullable=False)
+    input_chars = Column(Integer, nullable=False, default=0)
+    event_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=get_local_now, nullable=False)
+    updated_at = Column(DateTime, default=get_local_now, onupdate=get_local_now)
+
+    __table_args__ = (
+        Index("ux_micro_summary_period", "period_start", "period_end", unique=True),
+    )
+
+
 class CoverageLedgerInterval(Base):
     """P2.6 continuous coverage ledger：視窗採集器被觀測為運作中的時間段。
 

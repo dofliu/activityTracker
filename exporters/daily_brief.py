@@ -36,11 +36,21 @@ def _collect() -> Dict[str, Any]:
     active = [p for p in projects if p["status"] == "active"]
     stagnant = [p for p in projects if p["status"] in ("idle", "stale")]
 
+    # P5-R4：帶入秘書 top 建議（唯讀；失敗不阻斷簡報）
+    secretary = None
+    try:
+        from core.proactive_secretary import briefing_proposals
+
+        secretary = briefing_proposals(limit=3)
+    except Exception:
+        secretary = None
+
     return {
         "generated_at": get_local_now(),
         "active": active[:8],
         "stagnant": sorted(stagnant, key=lambda p: -p["idle_days"])[:5],
         "open_loops": get_open_loops_list(),
+        "secretary": secretary,
     }
 
 
@@ -54,9 +64,25 @@ def render_markdown(data: Dict[str, Any]) -> str:
         "",
         f"> 由 OmniContext 於 {ts} 自動更新",
         "",
+    ]
+
+    secretary = data.get("secretary") or {}
+    if secretary.get("proposals"):
+        lines.extend([f"## 🤖 小秘書建議（{secretary.get('total', len(secretary['proposals']))}）", ""])
+        if secretary.get("advisor_summary"):
+            lines.extend([f"> {secretary['advisor_summary']}", ""])
+        for item in secretary["proposals"]:
+            lines.append(f"- **[{item['project_key']}]** {item['title']}")
+            if item.get("suggested_action"):
+                lines.append(f"  - 建議：{item['suggested_action']}")
+            if item.get("llm_note"):
+                lines.append(f"  - 🧠 {item['llm_note']}")
+        lines.extend(["", "*建議僅供判斷，不會自動執行；到儀表板「小秘書」分頁處理。*", ""])
+
+    lines.extend([
         f"## 🔥 進行中（{len(data['active'])}）",
         "",
-    ]
+    ])
 
     if data["active"]:
         for p in data["active"]:
@@ -94,6 +120,33 @@ def render_html_fragment(data: Dict[str, Any]) -> str:
         '<h2 style="margin:0 0 4px;font-size:20px;">📌 我現在在做什麼</h2>',
         f'<p style="margin:0 0 16px;color:#6b7280;font-size:13px;">由 OmniContext 於 {escape(ts)} 自動更新</p>',
     ]
+
+    secretary = data.get("secretary") or {}
+    if secretary.get("proposals"):
+        parts.append(
+            f'<h3 style="font-size:15px;margin:16px 0 8px;">🤖 小秘書建議（{secretary.get("total", len(secretary["proposals"]))}）</h3>'
+        )
+        if secretary.get("advisor_summary"):
+            parts.append(
+                f'<p style="margin:0 0 8px;color:#4b5563;font-size:13px;border-left:3px solid #f59e0b;'
+                f'padding-left:8px;">{escape(str(secretary["advisor_summary"]))}</p>'
+            )
+        parts.append('<ul style="margin:0;padding-left:20px;line-height:1.7;">')
+        for item in secretary["proposals"]:
+            note = (
+                f'<br><span style="color:#92400e;font-size:12px;">🧠 {escape(str(item["llm_note"]))}</span>'
+                if item.get("llm_note") else ""
+            )
+            parts.append(
+                f'<li><span style="background:#fff7ed;color:#c2410c;padding:1px 6px;border-radius:4px;'
+                f'font-size:12px;">{escape(item["project_key"])}</span> '
+                f'<strong>{escape(item["title"])}</strong><br>'
+                f'<span style="color:#4b5563;font-size:13px;">{escape(str(item.get("suggested_action") or ""))}</span>{note}</li>'
+            )
+        parts.append("</ul>")
+        parts.append(
+            '<p style="margin:6px 0 0;color:#9ca3af;font-size:12px;">建議僅供判斷，不會自動執行。</p>'
+        )
 
     parts.append(f'<h3 style="font-size:15px;margin:16px 0 8px;">🔥 進行中（{len(data["active"])}）</h3>')
     if data["active"]:

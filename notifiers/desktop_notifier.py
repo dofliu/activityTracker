@@ -174,6 +174,20 @@ class DesktopNotifier:
         else:
             lines.append("沒有待收尾事項")
 
+        # P5-R4：晨報帶入秘書 top 建議（唯讀；秘書層失敗不阻斷晨報本體）
+        try:
+            from core.proactive_secretary import briefing_proposals
+
+            secretary = briefing_proposals(limit=2)
+            top = secretary.get("proposals") or []
+            if top:
+                suffix = f"（共 {secretary['total']} 項）" if secretary.get("total", 0) > 1 else ""
+                lines.append(f"秘書建議：{str(top[0].get('title') or '')[:36]}{suffix}")
+                if secretary.get("advisor_summary"):
+                    lines.append(str(secretary["advisor_summary"])[:60])
+        except Exception:
+            pass
+
         if dry_run:
             self._preview(title, lines)
             return True

@@ -440,6 +440,21 @@ proactive_secretary:
 
 安全邊界：execute API **只接受 proposal_id**——任何呼叫端夾帶的 command／path 都沒有效果；提案的 evidence 一旦改變（例如 loop 已被處理），同一 proposal_id 會直接失效（404），不會執行過期提案；沒有設定 token 時一律 401。
 
+### 兩層增量摘要（日報 token 效率）
+
+日報現在採 map-reduce：每次週期 checkpoint（預設每 2 小時）會順帶用本機模型（預設 Ollama）把該時段壓成 ≤100 字微摘要存入 SQLite（map，零 API 成本）；23:30 或手動產日報時，prompt 優先讀「微摘要時間軸＋原始統計」（reduce），token 用量約降一個數量級。微摘要失敗（如 Ollama 未啟動）或缺漏的時段自動回退原始節錄，日報永遠可產生。相關設定：
+
+```yaml
+synthesizer:
+  micro_summary:
+    enabled: true        # 關閉則日報一律使用原始節錄
+    provider: ollama
+  daily_from_micro: true
+  max_prompt_chars: 180000   # 用 Ollama 產日報建議降至 60000
+```
+
+**秘書晨報（P5-R4）**：08:30 桌面晨間通知與 `OMNICONTEXT_TODAY.md/.html` 每日入口檔，現在會帶入小秘書的 top 建議（含 LLM 總評，若已啟用註解層）；建議僅供判斷、不會自動執行，秘書層失敗不影響晨報本體。
+
 ### 建立工作快照與摘要
 
 ```powershell

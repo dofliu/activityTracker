@@ -296,6 +296,47 @@ def build_action_proposals(
     }
 
 
+def briefing_proposals(
+    limit: int = 3,
+    *,
+    with_advisor: bool = True,
+    database: Any | None = None,
+    cfg: Any | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """P5-R4：給晨報通知與每日入口檔用的 top 建議摘要。
+
+    仍為唯讀：只是把既有 proposal-only 結果整理成適合通知的欄位；
+    advisor 註解依設定沿用（預設關閉；失敗自動回退純規則）。
+    """
+    result = build_action_proposals(
+        database=database, cfg=cfg, now=now, limit=max(1, min(int(limit), 6))
+    )
+    if with_advisor:
+        from core.secretary_advisor import annotate_action_proposals
+
+        result = annotate_action_proposals(result, cfg=cfg)
+
+    top = [
+        {
+            "title": item.get("title") or "",
+            "detail": item.get("detail") or "",
+            "project_key": item.get("project_key") or "",
+            "priority": item.get("priority") or "medium",
+            "suggested_action": item.get("suggested_action") or "",
+            "llm_note": item.get("llm_note"),
+        }
+        for item in result.get("proposals", [])[: max(1, int(limit))]
+    ]
+    advisor = result.get("advisor") or {}
+    return {
+        "proposals": top,
+        "total": int(result.get("total_candidates") or len(top)),
+        "advisor_summary": advisor.get("summary"),
+        "claim_boundary": "建議僅供判斷，不會自動執行。",
+    }
+
+
 def snooze_proposal(
     *,
     proposal_type: str,

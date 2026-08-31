@@ -358,8 +358,11 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     assert "input-related-question" in dashboard.text
     assert "secretary-inbox" in dashboard.text
     assert "secretary-proposals-list" in dashboard.text
-    assert "SUGGESTION INBOX" in dashboard.text
+    assert "SECRETARY SUGGESTIONS" in dashboard.text
     assert "PROPOSAL ONLY" in dashboard.text
+    assert "tab-assistant" in dashboard.text
+    assert "input-assistant-prompt" in dashboard.text
+    assert "assistant-chat-messages" in dashboard.text
     assert "DATA CAPTURE" in dashboard.text
     assert "extension-capture-badge" not in dashboard.text
     assert "style.css?v=1.3.0a12-home-work-guide" in dashboard.text
