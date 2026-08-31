@@ -1,23 +1,29 @@
-"""ADR-008 gated executor（P5-R2：L0/L1 in-process 白名單動作）。
+"""ADR-008 gated executor（P5-R2 L0/L1 in-process；P5-R3 L2 dispatcher）。
 
 安全契約落地：
 
-- **D1** execute 只接受 ``proposal_id``；proposal 由 server 端即時重建
-  （deterministic id），evidence 已改變的建議自動失效，永不執行過期提案。
-- **D2** 動作來自程式碼註冊的白名單 template；P5-R2 全部為內部函式呼叫
-  （重用 ADR-011 repo_sync、handoff_engine、open-loop lifecycle），
-  **不開 subprocess、不接受任何呼叫端字串**。
+- **D1** execute 只接受 ``proposal_id``（L2 另加 server 產生的 confirm
+  code，與在多動作 proposal 中選擇已註冊 template 的 ``template_id``）；
+  proposal 由 server 端即時重建（deterministic id），evidence 已改變的
+  建議自動失效，永不執行過期提案。呼叫端仍然無法提供任何 command、
+  path 或 argv。
+- **D2** 動作來自程式碼註冊的白名單 template：L0/L1 為內部函式呼叫
+  （重用 ADR-011 repo_sync、handoff_engine、open-loop lifecycle）；
+  P5-R3 的 L2 template 經 ``core.agent_dispatch`` 以 argv-list（禁 shell）
+  調度本機 agent CLI，cwd 限已探索 repo root、環境變數 allowlist 重建。
 - **D3** L0 唯讀可直接執行、L1 需使用者單鍵批准（HTTP 呼叫本身）＋
-  execution token；L2 在 P5-R2 一律拒絕（confirm code 機制屬 P5-R3+）。
+  execution token；L2 需 l2.enabled、一次性 6 碼 confirm code
+  （預設 5 分鐘失效、單次有效）與每 template 冷卻時間，缺一即拒。
 - **D4** token 驗證在 server 層（``security.execution_authorized``）。
 - **D5** 每次執行寫入 ``agent_execution_receipts``（migration 014）；
   receipt 只含白名單摘要欄位與 output digest，不含內容全文或 secrets。
-- **D6** 任何驗證失敗 → 拒絕；executor 總開關預設關閉，關閉時
-  proposals 端點行為與 ADR-007 proposal-only 完全一致。
+- **D6** 任何驗證失敗 → 拒絕；executor 總開關預設關閉、L2 另有獨立
+  開關且同樣預設關閉，關閉時行為分別回到 ADR-007 / P5-R2 樣態。
 
-P5-R2 的執行為請求內同步呼叫並受硬性 timeout；逾時的執行緒無法被中斷
-（in-process），receipt 如實標記 ``timeout``。cancel 只對 ``queued``
-有效（同步模式不產生 queued，介面保留給 P5-R3 subprocess dispatcher）。
+L0/L1 為請求內同步呼叫並受硬性 timeout；逾時的執行緒無法被中斷
+（in-process），receipt 如實標記 ``timeout``，cancel 只對 ``queued``
+有效。L2 dispatcher job 則登記 OS 行程，逾時會真正 kill，執行中也可
+由 cancel endpoint 中止（``cancelled`` 為一級狀態）。
 """
 
 from __future__ import annotations
@@ -25,17 +31,25 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import secrets as py_secrets
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Callable
 
 from sqlalchemy.exc import IntegrityError
 
+from core.agent_dispatch import (
+    DispatchRejected,
+    DispatchTimeout,
+    kill_running,
+    run_agent_subprocess,
+)
 from core.config import get_config
 from core.database import get_db
 from core.models import AgentExecutionReceipt
+from core.runtime_paths import runtime_data_root
 from core.time_utils import get_local_now
 
 logger = logging.getLogger("OmniContext.AgentExecutor")
@@ -53,6 +67,9 @@ EXECUTOR_CLAIM_BOUNDARY = (
 
 RESPONSE_TEXT_LIMIT = 20000
 
+# L2 confirm code：一次性、短效；只存在 server 記憶體，不落庫、不進 log。
+_PENDING_L2_CONFIRMS: dict[str, dict[str, Any]] = {}
+
 
 class ExecutionRejected(RuntimeError):
     """Fail-closed 拒絕；error_code 穩定、message 不含 secrets。"""
@@ -63,9 +80,22 @@ class ExecutionRejected(RuntimeError):
         self.http_status = http_status
 
 
+class AgentCliFailed(RuntimeError):
+    """L2 CLI 以非零 exit code 結束；payload 保留非敏感輸出統計供 receipt。"""
+
+    def __init__(self, exit_code: int, payload: dict[str, Any]):
+        super().__init__(f"agent CLI exited with {exit_code}")
+        self.exit_code = exit_code
+        self.payload = payload
+
+
 @dataclass(frozen=True)
 class ActionPlan:
-    """derive 階段的結果：display 與 execute 共用同一份，確保一致。"""
+    """derive 階段的結果：display 與 execute 共用同一份，確保一致。
+
+    ``runner`` 接收 execution context（目前只含 ``receipt_id``），讓
+    dispatcher 類 template 能把 OS 行程登記到 cancel registry。
+    """
 
     template_id: str
     risk_level: str
@@ -74,7 +104,8 @@ class ActionPlan:
     params: dict[str, Any]
     timeout_seconds: int
     receipt_fields: tuple[str, ...]
-    runner: Callable[[], dict[str, Any]]
+    runner: Callable[[dict[str, Any]], dict[str, Any]]
+    dispatch_mode: str = "in_process"
 
 
 @dataclass
@@ -113,6 +144,30 @@ class ExecutorServices:
 def executor_enabled(cfg: Any | None = None) -> bool:
     cfg = cfg or get_config()
     return bool(cfg.get("proactive_secretary.executor.enabled", False))
+
+
+def l2_enabled(cfg: Any | None = None) -> bool:
+    """L2_MUTATE 獨立開關；預設關閉，且必須疊加在 executor 總開關之上。"""
+    cfg = cfg or get_config()
+    return executor_enabled(cfg) and bool(
+        cfg.get("proactive_secretary.executor.l2.enabled", False)
+    )
+
+
+def _l2_confirm_ttl_seconds(cfg: Any) -> int:
+    try:
+        raw = int(cfg.get("proactive_secretary.executor.l2.confirm_ttl_seconds", 300))
+    except (TypeError, ValueError):
+        return 300
+    return min(900, max(30, raw))
+
+
+def _l2_cooldown_seconds(cfg: Any) -> int:
+    try:
+        raw = int(cfg.get("proactive_secretary.executor.l2.cooldown_seconds", 600))
+    except (TypeError, ValueError):
+        return 600
+    return min(24 * 3600, max(0, raw))
 
 
 _PR_ISSUE_TYPES = {
@@ -170,7 +225,7 @@ def derive_action(
                 params={"repo_id": repo_id, "action": "fetch"},
                 timeout_seconds=120,
                 receipt_fields=("repo_name", "action", "status", "return_code"),
-                runner=lambda: _safe_repo_receipt(
+                runner=lambda _ctx: _safe_repo_receipt(
                     services.repo_execute(repo_id, "fetch")
                 ),
             )
@@ -186,7 +241,7 @@ def derive_action(
                 params={"loop_id": loop_id, "status": "stale"},
                 timeout_seconds=30,
                 receipt_fields=("loop_id", "status"),
-                runner=lambda: _loop_receipt(
+                runner=lambda _ctx: _loop_receipt(
                     services.loop_transition(loop_id, "stale", "via secretary executor"),
                     loop_id,
                 ),
@@ -201,10 +256,162 @@ def derive_action(
             params={"project_key": project_key},
             timeout_seconds=60,
             receipt_fields=("project_key", "handoff_chars"),
-            runner=lambda: _handoff_receipt(services, project_key),
+            runner=lambda _ctx: _handoff_receipt(services, project_key),
         )
 
     return None
+
+
+# ---- P5-R3：L2 subprocess template（調度本機 agent CLI） ----
+
+_DRAFT_PLAN_TYPES = {"stalled_open_loop", "unfinished_recent"}
+_DRAFT_PROMPT_FIELD_LIMITS = {"title": 120, "detail": 300, "suggested_action": 200}
+
+
+def _draft_prompt(proposal: dict[str, Any]) -> str:
+    """server 端組 prompt；只用白名單欄位並截斷，呼叫端無法注入內容。"""
+    parts = {
+        key: str(proposal.get(key) or "").replace("\n", " ")[:limit]
+        for key, limit in _DRAFT_PROMPT_FIELD_LIMITS.items()
+    }
+    project_key = str(proposal.get("project_key") or "")[:80]
+    return (
+        "你是唯讀顧問。針對以下停滯的工作事項，起草一份簡短的重啟行動計畫"
+        "（繁體中文，最多 40 行，條列步驟與第一步的具體切入點）。"
+        "只輸出計畫本身；不要修改任何檔案、不要執行任何工具或命令。\n"
+        f"專案：{project_key}\n"
+        f"事項：{parts['title']}\n"
+        + (f"細節：{parts['detail']}\n" if parts["detail"] else "")
+        + (f"原有建議：{parts['suggested_action']}\n" if parts["suggested_action"] else "")
+    )
+
+
+def _agent_cli_settings(cfg: Any) -> tuple[str, list[str], int]:
+    binary = str(cfg.get("proactive_secretary.executor.agent_cli.binary", "claude") or "claude")
+    raw_args = cfg.get("proactive_secretary.executor.agent_cli.args", ["-p", "{prompt}"])
+    if not isinstance(raw_args, (list, tuple)):
+        raw_args = ["-p", "{prompt}"]
+    args = [str(item) for item in raw_args]
+    try:
+        timeout = int(cfg.get("proactive_secretary.executor.agent_cli.timeout_seconds", 240))
+    except (TypeError, ValueError):
+        timeout = 240
+    return binary, args, min(1800, max(30, timeout))
+
+
+def _run_agent_draft(
+    ctx: dict[str, Any],
+    *,
+    argv: list[str],
+    cwd: str,
+    timeout_seconds: int,
+    project_key: str,
+    binary: str,
+) -> dict[str, Any]:
+    receipt_id = ctx.get("receipt_id")
+    outcome = run_agent_subprocess(
+        argv, cwd=cwd, timeout_seconds=timeout_seconds, receipt_id=receipt_id
+    )
+    stdout = str(outcome.get("stdout") or "").strip()
+    payload: dict[str, Any] = {
+        "project_key": project_key,
+        "binary": binary,
+        "exit_code": outcome.get("exit_code"),
+        "output_chars": len(stdout),
+        "output_path": None,
+    }
+    if outcome.get("exit_code") != 0:
+        logger.warning(
+            "Agent CLI %s exited %s: %s",
+            binary,
+            outcome.get("exit_code"),
+            str(outcome.get("stderr") or "")[:200],
+        )
+        raise AgentCliFailed(int(outcome.get("exit_code") or -1), payload)
+
+    if stdout:
+        output_dir = runtime_data_root() / "agent_outputs"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / f"execution_{receipt_id or 'adhoc'}.md"
+        output_path.write_text(stdout, encoding="utf-8")
+        payload["output_path"] = str(output_path)
+    payload["plan_markdown"] = stdout[:RESPONSE_TEXT_LIMIT]
+    payload["stdout_truncated"] = bool(outcome.get("stdout_truncated"))
+    return payload
+
+
+def _maybe_agent_draft_plan(
+    proposal: dict[str, Any],
+    *,
+    services: ExecutorServices,
+    cfg: Any,
+) -> ActionPlan | None:
+    """L2：調度本機 agent CLI 為停滯事項起草計畫；沒有唯一 repo 即不提供。"""
+    if str(proposal.get("proposal_type") or "") not in _DRAFT_PLAN_TYPES:
+        return None
+    project_key = str(proposal.get("project_key") or "")
+    if not project_key:
+        return None
+    try:
+        references = services.repo_references()
+    except Exception:  # noqa: BLE001 — 探索失敗視為不可執行
+        references = []
+    repo = _matching_repo(project_key, references)
+    if repo is None:
+        return None
+
+    binary, args, timeout_seconds = _agent_cli_settings(cfg)
+    prompt = _draft_prompt(proposal)
+    argv = [binary] + [item.replace("{prompt}", prompt) for item in args]
+    if not any("{prompt}" in item for item in args):
+        argv.append(prompt)
+    cwd = str(repo.path)
+
+    return ActionPlan(
+        template_id="agent_draft_plan",
+        risk_level=RISK_L2,
+        label=f"調度本機 {binary} 為此事項起草行動計畫（唯讀輸出，消耗 CLI 額度）",
+        call_description=f"agent_dispatch.run({binary}, cwd={project_key!r})",
+        params={"project_key": project_key, "binary": binary, "cwd": cwd},
+        timeout_seconds=timeout_seconds,
+        receipt_fields=(
+            "project_key",
+            "binary",
+            "exit_code",
+            "output_chars",
+            "output_path",
+        ),
+        runner=lambda ctx: _run_agent_draft(
+            ctx,
+            argv=argv,
+            cwd=cwd,
+            timeout_seconds=timeout_seconds,
+            project_key=project_key,
+            binary=binary,
+        ),
+        dispatch_mode="subprocess",
+    )
+
+
+def derive_actions(
+    proposal: dict[str, Any],
+    *,
+    services: ExecutorServices,
+    cfg: Any | None = None,
+) -> list[ActionPlan]:
+    """proposal 對應的全部已註冊動作；第一項為既有 primary（向後相容）。"""
+    cfg = cfg or get_config()
+    plans: list[ActionPlan] = []
+    primary = derive_action(proposal, services=services)
+    if primary is not None:
+        plans.append(primary)
+    if l2_enabled(cfg):
+        extra = _maybe_agent_draft_plan(proposal, services=services, cfg=cfg)
+        if extra is not None and all(
+            plan.template_id != extra.template_id for plan in plans
+        ):
+            plans.append(extra)
+    return plans
 
 
 def _safe_repo_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
@@ -247,22 +454,32 @@ def attach_execution_actions(
     services = services or ExecutorServices()
     any_executable = False
     for item in result.get("proposals", []):
-        plan = derive_action(item, services=services)
-        if plan is None:
+        plans = derive_actions(item, services=services, cfg=cfg)
+        if not plans:
             continue
+        primary = plans[0]
         item["action"] = {
-            "template_id": plan.template_id,
-            "risk_level": plan.risk_level,
-            "label": plan.label,
+            "template_id": primary.template_id,
+            "risk_level": primary.risk_level,
+            "label": primary.label,
         }
-        item["risk_level"] = plan.risk_level
+        item["actions"] = [
+            {
+                "template_id": plan.template_id,
+                "risk_level": plan.risk_level,
+                "label": plan.label,
+                "requires_confirmation": plan.risk_level == RISK_L2,
+            }
+            for plan in plans
+        ]
+        item["risk_level"] = primary.risk_level
         item["execution_available"] = True
         any_executable = True
     result["execution_available"] = any_executable
     result["executor"] = {
         "enabled": True,
-        "mode": "whitelist_templates_in_process",
-        "l2_available": False,
+        "mode": "whitelist_templates",
+        "l2_available": l2_enabled(cfg),
         "claim_boundary": EXECUTOR_CLAIM_BOUNDARY,
     }
     return result
@@ -307,17 +524,108 @@ def _receipt_dict(row: AgentExecutionReceipt) -> dict[str, Any]:
     }
 
 
+def _reset_pending_confirms() -> None:
+    """測試用：清空 in-memory confirm code 狀態。"""
+    _PENDING_L2_CONFIRMS.clear()
+
+
+def _check_l2_cooldown(
+    template_id: str, *, cfg: Any, now: datetime, database: Any
+) -> None:
+    """每 template 冷卻：距上次實際執行（rejected 不計）未滿冷卻期即拒絕。"""
+    cooldown = _l2_cooldown_seconds(cfg)
+    if cooldown <= 0:
+        return
+    window_start = now - timedelta(seconds=cooldown)
+    with database.session_scope() as session:
+        recent = (
+            session.query(AgentExecutionReceipt)
+            .filter(
+                AgentExecutionReceipt.template_id == template_id,
+                AgentExecutionReceipt.status != "rejected",
+                AgentExecutionReceipt.requested_at > window_start,
+            )
+            .order_by(AgentExecutionReceipt.requested_at.desc())
+            .first()
+        )
+        if recent is not None:
+            remaining = cooldown - (now - recent.requested_at).total_seconds()
+            raise ExecutionRejected(
+                "l2_cooldown_active",
+                f"template {template_id} 冷卻中，約 {max(1, int(remaining))} 秒後可再執行",
+                http_status=429,
+            )
+
+
+def _issue_confirm_code(
+    proposal_id: str, plan: ActionPlan, *, cfg: Any, now: datetime
+) -> dict[str, Any]:
+    """產生一次性 confirm code（只回傳給呼叫端顯示，不落庫、不進 log）。"""
+    ttl = _l2_confirm_ttl_seconds(cfg)
+    code = f"{py_secrets.randbelow(1_000_000):06d}"
+    _PENDING_L2_CONFIRMS[str(proposal_id)] = {
+        "code_hash": hashlib.sha256(code.encode("utf-8")).hexdigest(),
+        "expires_at": now + timedelta(seconds=ttl),
+        "template_id": plan.template_id,
+    }
+    return {
+        "status": "confirmation_required",
+        "confirm": {
+            "proposal_id": str(proposal_id),
+            "template_id": plan.template_id,
+            "risk_level": plan.risk_level,
+            "label": plan.label,
+            "confirm_code": code,
+            "expires_in_seconds": ttl,
+        },
+        "claim_boundary": EXECUTOR_CLAIM_BOUNDARY,
+    }
+
+
+def _consume_confirm_code(
+    proposal_id: str, template_id: str, confirm_code: str, *, now: datetime
+) -> None:
+    """單次有效：無論驗證成敗都先銷毀 pending 記錄（防重放與暴力嘗試）。"""
+    pending = _PENDING_L2_CONFIRMS.pop(str(proposal_id), None)
+    if pending is None:
+        raise ExecutionRejected(
+            "confirm_code_not_issued",
+            "此 proposal 沒有待確認的 confirm code；請先發起執行取得確認碼",
+        )
+    if now > pending["expires_at"]:
+        raise ExecutionRejected(
+            "confirm_code_expired", "confirm code 已逾期，請重新發起執行"
+        )
+    if pending["template_id"] != template_id:
+        raise ExecutionRejected(
+            "confirm_template_mismatch", "confirm code 與目標動作不符，請重新發起執行"
+        )
+    provided = hashlib.sha256(str(confirm_code).encode("utf-8")).hexdigest()
+    if not py_secrets.compare_digest(provided, pending["code_hash"]):
+        raise ExecutionRejected(
+            "confirm_code_invalid",
+            "confirm code 錯誤；原確認碼已作廢，請重新發起執行",
+            http_status=403,
+        )
+
+
 def execute_proposal(
     proposal_id: str,
     *,
     approved_via: str = "web_click",
+    template_id: str | None = None,
+    confirm_code: str | None = None,
     database: Any | None = None,
     cfg: Any | None = None,
     now: datetime | None = None,
     services: ExecutorServices | None = None,
     proposal_lookup: Callable[..., dict[str, Any] | None] | None = None,
 ) -> dict[str, Any]:
-    """執行一個仍然成立的 proposal 的白名單動作；全程 fail-closed。"""
+    """執行一個仍然成立的 proposal 的白名單動作；全程 fail-closed。
+
+    ``template_id`` 只能在 server 已註冊的動作中選擇（預設 primary）；
+    ``confirm_code`` 僅供 L2 二次確認。兩者都不是命令，D1 不變。
+    """
     cfg = cfg or get_config()
     database = database or get_db()
     now = now or get_local_now()
@@ -338,17 +646,35 @@ def execute_proposal(
         )
 
     services = services or ExecutorServices()
-    plan = derive_action(proposal, services=services)
-    if plan is None:
+    plans = derive_actions(proposal, services=services, cfg=cfg)
+    if not plans:
         raise ExecutionRejected(
             "no_registered_action",
             "此 proposal 沒有對應的白名單動作",
         )
+    if template_id is not None:
+        plan = next((p for p in plans if p.template_id == template_id), None)
+        if plan is None:
+            raise ExecutionRejected(
+                "template_not_available",
+                "此 proposal 沒有這個白名單動作",
+                http_status=404,
+            )
+    else:
+        plan = plans[0]
+
     if plan.risk_level == RISK_L2:
-        raise ExecutionRejected(
-            "l2_confirmation_not_available",
-            "L2_MUTATE 需要二次確認機制（P5-R3+），目前不可執行",
-        )
+        # D3：L2 需獨立開關、每 template 冷卻與一次性 confirm code，缺一即拒。
+        if not l2_enabled(cfg):
+            raise ExecutionRejected(
+                "l2_disabled",
+                "L2_MUTATE 未啟用（proactive_secretary.executor.l2.enabled=false）",
+            )
+        _check_l2_cooldown(plan.template_id, cfg=cfg, now=now, database=database)
+        if not confirm_code:
+            return _issue_confirm_code(proposal_id, plan, cfg=cfg, now=now)
+        _consume_confirm_code(proposal_id, plan.template_id, confirm_code, now=now)
+        approved_via = f"{approved_via}+confirm_code"
 
     with database.session_scope() as session:
         active = (
@@ -388,17 +714,35 @@ def execute_proposal(
     status = "failed"
     error_code: str | None = None
     result_payload: dict[str, Any] | None = None
+    # subprocess template 的 timeout 由 dispatcher 內部處理（會真正 kill），
+    # 外層 future 只是保險絲，多留緩衝避免搶先於內層逾時。
+    outer_timeout = (
+        plan.timeout_seconds + 30
+        if plan.dispatch_mode == "subprocess"
+        else plan.timeout_seconds
+    )
     # 不用 context manager：timeout 後不得等待卡住的執行緒收尾。
     pool = ThreadPoolExecutor(max_workers=1)
     try:
-        future = pool.submit(plan.runner)
+        future = pool.submit(plan.runner, {"receipt_id": receipt_id})
         try:
-            result_payload = future.result(timeout=plan.timeout_seconds)
+            result_payload = future.result(timeout=outer_timeout)
             status = "succeeded"
         except FutureTimeoutError:
             status = "timeout"
             error_code = "execution_timeout"
             future.cancel()
+        except DispatchTimeout as exc:
+            status = "timeout"
+            error_code = "execution_timeout"
+            result_payload = exc.payload
+        except AgentCliFailed as exc:
+            status = "failed"
+            error_code = f"cli_exit_{exc.exit_code}"[:80]
+            result_payload = exc.payload
+        except DispatchRejected as exc:
+            status = "rejected"
+            error_code = exc.error_code[:80]
         except Exception as exc:  # noqa: BLE001 — 一律轉為 receipt，不外洩內部細節
             status = "failed"
             error_code = type(exc).__name__[:80]
@@ -425,6 +769,11 @@ def execute_proposal(
 
     with database.session_scope() as session:
         row = session.get(AgentExecutionReceipt, receipt_id)
+        if row.status == "cancelled":
+            # cancel endpoint 已中止此 job（kill 了 OS 行程）；保留一級狀態，
+            # 只補上輸出摘要與時間，不得覆寫回 failed/timeout。
+            status = "cancelled"
+            error_code = row.error_code or "cancelled_by_user"
         row.status = status
         row.finished_at = finished
         row.duration_seconds = max(0.0, (finished - now).total_seconds())
@@ -469,7 +818,8 @@ def cancel_execution(
     database: Any | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """只有 queued 可取消；P5-R2 同步 in-process 執行無法中斷，如實拒絕。"""
+    """queued 直接取消；running 的 subprocess job（P5-R3）kill OS 行程後取消；
+    running 的 in-process 動作無法中斷，如實拒絕（逾時由 timeout 處理）。"""
     database = database or get_db()
     now = now or get_local_now()
     with database.session_scope() as session:
@@ -482,9 +832,14 @@ def cancel_execution(
             row.error_code = "cancelled_before_start"
             return {"receipt": _receipt_dict(row)}
         if row.status == "running":
+            if kill_running(row.id):
+                row.status = "cancelled"
+                row.finished_at = now
+                row.error_code = "cancelled_by_user"
+                return {"receipt": _receipt_dict(row)}
             raise ExecutionRejected(
                 "not_cancellable_in_process",
-                "P5-R2 的動作為請求內同步執行，無法中斷；逾時將由 timeout 處理",
+                "此動作為請求內同步執行，無法中斷；逾時將由 timeout 處理",
             )
         raise ExecutionRejected(
             "execution_already_finished",

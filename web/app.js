@@ -983,14 +983,23 @@ function renderSecretaryProposals() {
     const llmNote = item.llm_note
       ? `<div class="proposal-llm-note">🧠 ${esc(item.llm_note)}${llmHint}</div>`
       : "";
-    // P5-R2：executor 啟用且此 proposal 有白名單動作時才出現批准按鈕；
-    // 動作內容由 server 端 template 決定，前端只傳 proposal_id。
-    const action = item.execution_available && item.action ? item.action : null;
-    const execTag = action
-      ? `<button class="btn btn-ghost btn-sm proposal-exec-btn" onclick="window.executeProposal('${esc(item.proposal_id)}')">⚡ ${zh ? "批准執行" : "Approve"}（${esc(String(action.risk_level || "").split("_")[0] || "L?")}）</button>`
+    // P5-R2/R3：executor 啟用且此 proposal 有白名單動作時才出現批准按鈕；
+    // 動作內容由 server 端 template 決定，前端只傳 proposal_id（可選 template_id）。
+    // L2 動作需二次確認（server 回 428 + 一次性確認碼）。
+    const actions = item.execution_available
+      ? (item.actions && item.actions.length ? item.actions : (item.action ? [item.action] : []))
+      : [];
+    const execTag = actions.length
+      ? actions.map(act => {
+          const tier = esc(String(act.risk_level || "").split("_")[0] || "L?");
+          const confirmMark = act.requires_confirmation ? "🛡️ " : "⚡ ";
+          return `<button class="btn btn-ghost btn-sm proposal-exec-btn" onclick="window.executeProposal('${esc(item.proposal_id)}', '${esc(act.template_id)}')">${confirmMark}${zh ? "批准執行" : "Approve"}（${tier}）</button>`;
+        }).join("")
       : `<span>${zh ? "不執行" : "NOT EXECUTABLE"}</span>`;
-    const actionLabel = action
-      ? `<div class="proposal-exec-label">${zh ? "可代辦" : "Available action"}：${esc(action.label || action.template_id)}</div>`
+    const actionLabel = actions.length
+      ? actions.map(act =>
+          `<div class="proposal-exec-label">${zh ? "可代辦" : "Available action"}：${esc(act.label || act.template_id)}${act.requires_confirmation ? (zh ? "（L2 需輸入確認碼）" : " (L2 requires confirm code)") : ""}</div>`
+        ).join("")
       : "";
     const link = item.url
       ? `<a class="proposal-link" href="${esc(item.url)}" target="_blank" rel="noopener">${zh ? "在 GitHub 開啟 →" : "Open on GitHub →"}</a>`
@@ -1055,12 +1064,14 @@ window.snoozeProposal = async function (proposalType, projectKey, subjectRef, da
 
 // P5-R2：批准執行白名單動作。前端只送 proposal_id + execution token；
 // 執行什麼由 server 端 template 決定，token 只留在 sessionStorage（關分頁即失效）。
-window.executeProposal = async function (proposalId) {
+window.executeProposal = async function (proposalId, templateId = null, confirmCode = null) {
   const zh = currentLang === "zh-TW";
   const item = ((secretaryProposalsCache || {}).proposals || [])
     .find(p => p.proposal_id === proposalId);
-  const label = item && item.action ? (item.action.label || item.action.template_id) : proposalId;
-  if (!confirm((zh ? "批准執行：" : "Approve action: ") + label + (zh ? "？" : "?"))) return;
+  const acts = item ? (item.actions && item.actions.length ? item.actions : (item.action ? [item.action] : [])) : [];
+  const act = templateId ? acts.find(a => a.template_id === templateId) : acts[0];
+  const label = act ? (act.label || act.template_id) : proposalId;
+  if (!confirmCode && !confirm((zh ? "批准執行：" : "Approve action: ") + label + (zh ? "？" : "?"))) return;
 
   let token = sessionStorage.getItem("omni_execution_token") || "";
   if (!token) {
@@ -1073,14 +1084,31 @@ window.executeProposal = async function (proposalId) {
   }
 
   try {
+    const body = {};
+    if (templateId) body.template_id = templateId;
+    if (confirmCode) body.confirm_code = confirmCode;
     const res = await fetch(`/api/v1/secretary/proposals/${encodeURIComponent(proposalId)}/execute`, {
       method: "POST",
-      headers: { "x-omnicontext-execution-token": token },
+      headers: {
+        "x-omnicontext-execution-token": token,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
     if (res.status === 401) {
       sessionStorage.removeItem("omni_execution_token");
       alert(zh ? "execution token 無效，請重試。" : "Invalid execution token.");
+      return;
+    }
+    if (res.status === 428 && data.confirm) {
+      // P5-R3 L2 二次確認：顯示 server 的一次性確認碼，要求使用者親手回填。
+      const code = data.confirm.confirm_code || "";
+      const typed = prompt(zh
+        ? `此為 L2 動作（${data.confirm.label || ""}）。\n確認碼：${code}\n請輸入上方 6 碼以確認執行（${data.confirm.expires_in_seconds || 300} 秒內有效）：`
+        : `L2 action (${data.confirm.label || ""}).\nConfirm code: ${code}\nType the 6-digit code to proceed:`) || "";
+      if (!typed.trim()) return;
+      await window.executeProposal(proposalId, data.confirm.template_id, typed.trim());
       return;
     }
     if (!res.ok) {
@@ -1095,6 +1123,15 @@ window.executeProposal = async function (proposalId) {
         message += zh ? "\nContext Handoff 已複製到剪貼簿。" : "\nContext Handoff copied to clipboard.";
       } catch (e) {
         message += zh ? "\n（Handoff 產生成功，請由回應複製）" : "\n(Handoff generated.)";
+      }
+    }
+    if (data.result && data.result.plan_markdown) {
+      try {
+        await navigator.clipboard.writeText(data.result.plan_markdown);
+        message += zh ? "\n行動計畫已複製到剪貼簿。" : "\nDraft plan copied to clipboard.";
+      } catch (e) { /* 剪貼簿被拒不影響結果 */ }
+      if (data.result.output_path) {
+        message += zh ? `\n完整輸出：${data.result.output_path}` : `\nFull output: ${data.result.output_path}`;
       }
     }
     if (receipt.error_code) message += `\n(${receipt.error_code})`;

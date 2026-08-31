@@ -296,7 +296,7 @@ def test_timeout_is_a_first_class_receipt_status():
         params={},
         timeout_seconds=1,
         receipt_fields=(),
-        runner=lambda: time.sleep(3) or {},
+        runner=lambda _ctx: time.sleep(3) or {},
     )
     import core.agent_executor as executor_module
 
@@ -316,7 +316,8 @@ def test_timeout_is_a_first_class_receipt_status():
     assert response["receipt"]["error_code"] == "execution_timeout"
 
 
-def test_l2_is_rejected_without_confirmation_mechanism():
+def test_l2_is_rejected_while_l2_switch_is_off():
+    """D3/D6：L2 有獨立開關且預設關閉——executor 開著也不放行 L2。"""
     database = TempDatabase()
     services, _ = _services()
     l2_plan = ActionPlan(
@@ -327,7 +328,7 @@ def test_l2_is_rejected_without_confirmation_mechanism():
         params={},
         timeout_seconds=5,
         receipt_fields=(),
-        runner=lambda: {},
+        runner=lambda _ctx: {},
     )
     import core.agent_executor as executor_module
 
@@ -344,7 +345,7 @@ def test_l2_is_rejected_without_confirmation_mechanism():
             )
     finally:
         executor_module.derive_action = original
-    assert excinfo.value.error_code == "l2_confirmation_not_available"
+    assert excinfo.value.error_code == "l2_disabled"
 
 
 def test_active_execution_is_deduplicated():
@@ -481,3 +482,8 @@ def test_no_shell_subprocess_anywhere_in_core():
     executor_source = (core_dir / "agent_executor.py").read_text(encoding="utf-8")
     assert "import subprocess" not in executor_source
     assert "create_subprocess" not in executor_source
+    # P5-R3：子行程只能出現在 dispatcher 模組，且必須是 exec 形式（argv list）。
+    dispatch_source = (core_dir / "agent_dispatch.py").read_text(encoding="utf-8")
+    assert "create_subprocess_exec" in dispatch_source
+    assert "shell=True" not in dispatch_source
+    assert "os.system" not in dispatch_source

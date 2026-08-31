@@ -425,6 +425,7 @@ proactive_secretary:
 | 產生 Context Handoff（唯讀，自動複製到剪貼簿） | L0 | 停滯專案／多項未結事項等 |
 | `git fetch` 更新本機 repo 的 remote-tracking | L1 | PR／issue 類建議（專案名可對應到唯一本機 repo 時） |
 | 將單一未結事項標記為 `stale`（可用 open 復原） | L1 | 只含一筆 open loop 的停滯建議 |
+| 調度本機 agent CLI 起草重啟行動計畫（P5-R3） | L2 | 停滯／未收尾建議（另需啟用 L2，見下） |
 
 啟用與使用：
 
@@ -438,7 +439,24 @@ proactive_secretary:
 2. 重啟服務後，按下建議卡的「⚡ 批准執行」，首次會要求貼上 execution token（只存於瀏覽器 sessionStorage，關分頁即清除）。
 3. 每次執行寫入 audit receipt，可由 `GET /api/v1/secretary/executions` 回查（只含模板、狀態、時間與輸出 digest，不含內容全文）。
 
-安全邊界：execute API **只接受 proposal_id**——任何呼叫端夾帶的 command／path 都沒有效果；提案的 evidence 一旦改變（例如 loop 已被處理），同一 proposal_id 會直接失效（404），不會執行過期提案；沒有設定 token 時一律 401。
+安全邊界：execute API **只接受 proposal_id**（可選 `template_id` 在已註冊動作中挑選、`confirm_code` 供 L2）——任何呼叫端夾帶的 command／path 都沒有效果；提案的 evidence 一旦改變（例如 loop 已被處理），同一 proposal_id 會直接失效（404），不會執行過期提案；沒有設定 token 時一律 401。
+
+**P5-R3 L2 Dispatcher（選用，獨立開關，預設關閉）**：啟用後，停滯／未收尾的建議卡會多一顆「🛡️ 批准執行（L2）」，讓秘書調度**你本機已登入的 agent CLI**（預設 `claude -p`，可改 `codex exec`）為該事項起草重啟行動計畫，結果自動複製到剪貼簿並存於 `agent_outputs/execution_<id>.md`。
+
+```yaml
+proactive_secretary:
+  executor:
+    enabled: true
+    l2:
+      enabled: true          # L2 獨立開關
+      confirm_ttl_seconds: 300
+      cooldown_seconds: 600  # 同一動作的最小間隔
+    agent_cli:
+      binary: claude           # 或 codex
+      args: ['-p', '{prompt}'] # codex 範例：['exec', '{prompt}']
+```
+
+L2 每次執行都是**三道門**：execution token → 單鍵批准 → 回填 server 產生的一次性 6 碼確認碼（5 分鐘失效、錯一次即作廢）；同一動作有冷卻時間避免連點。子行程以 argv 白名單啟動（禁 shell）、工作目錄限定該專案的本機 repo、環境變數重建為位置類 allowlist——**你的任何 API key 都不會傳給子行程**（CLI 用它自己家目錄的登入憑證）。注意：這會消耗你 Claude Code／Codex 的訂閱或 API 額度；執行中的 job 可由 executions 面板取消（會真正終止行程）。
 
 ### 兩層增量摘要（日報 token 效率）
 

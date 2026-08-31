@@ -225,6 +225,19 @@ proactive_secretary:
   # execution token（init 產生，--show-token 顯示），每次執行留 audit receipt。
   executor:
     enabled: false
+    # P5-R3 L2 dispatcher（獨立開關，預設關閉）：批准後另需回填 server
+    # 產生的一次性 6 碼確認碼；同一 template 有冷卻時間。啟用後秘書可
+    # 調度本機 agent CLI（argv 白名單、禁 shell、cwd 限已探索 repo、
+    # 環境變數 allowlist 重建——不轉發任何 API key）為停滯事項起草計畫。
+    # 注意：CLI 會消耗您本機 Claude Code / Codex 的訂閱或 API 額度。
+    l2:
+      enabled: false
+      confirm_ttl_seconds: 300
+      cooldown_seconds: 600
+    agent_cli:
+      binary: claude          # 或 codex
+      args: ['-p', '{prompt}']  # codex 範例：['exec', '{prompt}']
+      timeout_seconds: 240
 
 notifiers:
   desktop:

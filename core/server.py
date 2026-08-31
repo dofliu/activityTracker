@@ -432,17 +432,37 @@ def _require_execution_token(request: Request) -> None:
         )
 
 
+class ExecuteProposalRequest(BaseModel):
+    template_id: Optional[str] = None
+    confirm_code: Optional[str] = None
+
+
 @app.post("/api/v1/secretary/proposals/{proposal_id}/execute")
-def execute_secretary_proposal(proposal_id: str, request: Request):
+def execute_secretary_proposal(
+    proposal_id: str,
+    request: Request,
+    payload: Optional[ExecuteProposalRequest] = None,
+):
     """ADR-008 D1：只接受 proposal_id，動作由 server 端白名單 template 決定。
 
-    body 一律忽略——任何呼叫端提供的 command / path / argv 都沒有效果。
+    body 只認兩個欄位：``template_id`` 在 server 已註冊的動作中選擇
+    （預設 primary）、``confirm_code`` 供 L2 二次確認（P5-R3）；其餘
+    欄位一律忽略——任何呼叫端提供的 command / path / argv 都沒有效果。
+    L2 第一次呼叫（未附 confirm code）回 428 與一次性確認碼。
     """
     _require_execution_token(request)
     try:
-        return execute_proposal(proposal_id, approved_via="web_click")
+        result = execute_proposal(
+            proposal_id,
+            approved_via="web_click",
+            template_id=payload.template_id if payload else None,
+            confirm_code=payload.confirm_code if payload else None,
+        )
     except ExecutionRejected as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
+    if result.get("status") == "confirmation_required":
+        return JSONResponse(status_code=428, content=result)
+    return result
 
 
 @app.get("/api/v1/secretary/executions")

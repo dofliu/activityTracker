@@ -593,6 +593,7 @@ P2.5-S1 API 安全邊界
   ▶ ✅ 2026-08-31：**P5-R1 已實作**——`core/secretary_advisor.py` annotate-only LLM 註解層（預設關閉、Ollama 優先、白名單 prompt 欄位、失敗回退 deterministic），11 項 contract tests 與 localhost fallback E2E 通過。
   ▶ ✅ 2026-08-31：**P5-R2 已實作**——ADR-008 D1–D6 落地：`core/agent_executor.py` 白名單 templates（Handoff L0／repo fetch L1／open loop 標 stale L1）、migration 014 audit receipts、獨立 execution token、Web 批准按鈕；16 項 contract tests＋完整閉環 E2E（提案→批准→生效→evidence 改變→提案自動過期）。預設關閉。
   ▶ ✅ 2026-08-31：**P5-R4a 秘書晨報已實作**——08:30 桌面晨間通知與每日入口檔（`OMNICONTEXT_TODAY`）帶入 top 建議與 LLM 總評（`briefing_proposals`，唯讀、失敗不阻斷晨報）；Telegram inline 批准與晚間交接留待 P5-R4b。
+  ▶ ✅ 2026-08-31：**P5-R3 已實作**——`core/agent_dispatch.py` subprocess dispatcher（`create_subprocess_exec` argv 白名單、環境變數 allowlist 重建不轉發任何 API key、cwd 限唯一本機 repo、timeout 即 kill、執行中可取消）＋ L2 三道門（獨立開關預設關、一次性 6 碼 confirm code 5 分鐘失效單次有效、每 template 冷卻 429）；首個 L2 template `agent_draft_plan` 調度本機 Claude Code／Codex CLI 為停滯事項起草行動計畫（輸出入 `agent_outputs/`）。9 項新 contract tests。
   ▶ ✅ 2026-08-31：**兩層增量摘要已實作**——migration 015 `activity_micro_summaries`：checkpoint 時段由本機 Ollama 壓成 ≤100 字微摘要（map，失敗靜默跳過），日報 reduce 讀微摘要＋統計、缺漏時段回退原始節錄；token 用量約降一個數量級，Ollama 產日報變為可行。
-  下一步：P5-R3（subprocess dispatcher＋L2 二次確認）或 P5-R4b（Telegram 批准＋晚間交接）。
+  下一步：P5-R4b（Telegram inline 批准＋晚間交接；需使用者提供 bot token）或 P5-R5（使用者自訂排程任務，僅能排程已註冊 template）。
 - P4 其餘來源（瀏覽器閱讀、行事曆、terminal history、未 commit 狀態）維持「能否改變決策」檢驗，逐項評估後才納入。
