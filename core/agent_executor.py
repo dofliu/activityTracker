@@ -43,6 +43,7 @@ from sqlalchemy.exc import IntegrityError
 from core.agent_dispatch import (
     DispatchRejected,
     DispatchTimeout,
+    is_running_registered,
     kill_running,
     run_agent_subprocess,
 )
@@ -1073,6 +1074,7 @@ def cancel_execution(
     running 的 in-process 動作無法中斷，如實拒絕（逾時由 timeout 處理）。"""
     database = database or get_db()
     now = now or get_local_now()
+    receipt: dict[str, Any] | None = None
     with database.session_scope() as session:
         row = session.get(AgentExecutionReceipt, int(receipt_id))
         if row is None:
@@ -1083,16 +1085,22 @@ def cancel_execution(
             row.error_code = "cancelled_before_start"
             return {"receipt": _receipt_dict(row)}
         if row.status == "running":
-            if kill_running(row.id):
-                row.status = "cancelled"
-                row.finished_at = now
-                row.error_code = "cancelled_by_user"
-                return {"receipt": _receipt_dict(row)}
+            if not is_running_registered(row.id):
+                raise ExecutionRejected(
+                    "not_cancellable_in_process",
+                    "此動作為請求內同步執行，無法中斷；逾時將由 timeout 處理",
+                )
+            # 先提交 cancelled、離開 session 之後才 kill：executor 執行緒是被
+            # kill 喚醒的，此順序保證它收尾時必然讀到已提交的 cancelled，
+            # 不會把一級狀態覆寫回 failed/succeeded。
+            row.status = "cancelled"
+            row.finished_at = now
+            row.error_code = "cancelled_by_user"
+            receipt = _receipt_dict(row)
+        else:
             raise ExecutionRejected(
-                "not_cancellable_in_process",
-                "此動作為請求內同步執行，無法中斷；逾時將由 timeout 處理",
+                "execution_already_finished",
+                f"執行已結束（{row.status}），無法取消",
             )
-        raise ExecutionRejected(
-            "execution_already_finished",
-            f"執行已結束（{row.status}），無法取消",
-        )
+    kill_running(int(receipt_id))
+    return {"receipt": receipt}

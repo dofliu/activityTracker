@@ -239,6 +239,13 @@ proactive_secretary:
       # 必須乾淨；agent 永不 commit/push——改動留在 worktree 供您 git diff
       # 檢視，git checkout . 可整批還原。
       allow_write: false
+    # P5-R5 自訂排程任務（預設關閉）：只能排程 server 註冊的 L0 唯讀
+    # template（產 Handoff、週報／月報 rollup、STATUS 維護草稿）；L1/L2
+    # 永不可排程。每次執行寫 audit receipt（approved_via=schedule）；
+    # 任務的新增／修改／刪除／立即執行需 execution token。
+    scheduled_tasks:
+      enabled: false
+      max_tasks: 20
     agent_cli:
       binary: claude          # 或 codex
       args: ['-p', '{prompt}']  # codex 範例：['exec', '{prompt}']

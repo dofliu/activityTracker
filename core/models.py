@@ -492,6 +492,36 @@ class GitHubIssueEvent(Base):
     closed_at = Column(DateTime, nullable=True)
 
 
+class SecretaryScheduledTask(Base):
+    """P5-R5 使用者自訂排程任務（ADR-008 階段 5）。
+
+    只允許排程 server 端已註冊的 L0_READ_ONLY schedulable template；
+    L1/L2 永不可排程（自動執行僅限唯讀動作，見 ADR-008 D3）。此表只存
+    排程設定與最近一次執行的非敏感狀態；每次執行仍寫
+    ``agent_execution_receipts`` audit receipt（approved_via=schedule）。
+    """
+    __tablename__ = "secretary_scheduled_tasks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    template_id = Column(String(64), nullable=False, index=True)
+    params_json = Column(Text, nullable=True)  # 建立時已通過 template 白名單驗證
+    schedule_kind = Column(String(16), nullable=False)  # daily / weekly / monthly
+    run_time = Column(String(5), nullable=False, default="08:30")  # HH:MM 本機時間
+    weekday = Column(Integer, nullable=True)  # weekly：0=週一 … 6=週日
+    day_of_month = Column(Integer, nullable=True)  # monthly：1–28（避開月長歧義）
+    enabled = Column(Boolean, nullable=False, default=True)
+    last_run_at = Column(DateTime, nullable=True)
+    last_status = Column(String(20), nullable=True)
+    last_receipt_id = Column(Integer, nullable=True)
+    last_error_code = Column(String(80), nullable=True)
+    created_at = Column(DateTime, default=get_local_now, nullable=False)
+    updated_at = Column(DateTime, default=get_local_now, onupdate=get_local_now)
+
+    __table_args__ = (
+        Index("ix_secretary_sched_tasks_enabled_template", "enabled", "template_id"),
+    )
+
+
 class ProposalSnooze(Base):
     """秘書提案的回饋：使用者說「這個先不要再提醒我」
 

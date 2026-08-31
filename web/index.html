@@ -464,6 +464,7 @@
               <label class="setting-check"><input type="checkbox" id="toggle-executor-enabled"><span data-i18n="executor_enabled_label">啟用執行器（L0/L1 白名單動作）</span></label>
               <label class="setting-check"><input type="checkbox" id="toggle-executor-l2"><span data-i18n="executor_l2_label">啟用 L2：調度本機 agent CLI（需一次性確認碼）</span></label>
               <label class="setting-check"><input type="checkbox" id="toggle-executor-l2-write"><span data-i18n="executor_l2_write_label">允許 L2 依已批准計畫修改檔案（不 commit）</span></label>
+              <label class="setting-check"><input type="checkbox" id="toggle-scheduled-tasks"><span data-i18n="sched_tasks_enabled_label">啟用自訂排程任務（僅 L0 唯讀動作）</span></label>
             </div>
             <div class="fields usage-settings-fields">
               <div><div class="mono-mini muted mb-6" data-i18n="executor_cli_label">AGENT CLI</div>
@@ -474,6 +475,42 @@
               </div>
             </div>
             <div class="usage-boundary" data-i18n="executor_boundary">L2 會用您本機已登入的 CLI 消耗訂閱／API 額度；子行程禁 shell、僅限白名單動作與該專案 repo 目錄，不會拿到任何 API key。執行前仍需 execution token（python main.py init --show-token）＋單鍵批准＋回填一次性確認碼。</div>
+            <div id="scheduled-tasks-block" style="padding: 0 14px 14px;">
+              <div class="mono-mini muted mb-6" data-i18n="sched_tasks_title">自訂排程任務（P5-R5）</div>
+              <div id="sched-task-list" class="mb-6"><span class="muted small" data-i18n="sched_tasks_loading">載入中…</span></div>
+              <div class="fields usage-settings-fields">
+                <div><div class="mono-mini muted mb-6" data-i18n="sched_template_label">TEMPLATE</div>
+                  <select id="select-sched-template"></select>
+                </div>
+                <div id="sched-project-field" hidden><div class="mono-mini muted mb-6" data-i18n="sched_project_label">PROJECT KEY</div>
+                  <input type="text" id="input-sched-project" class="mono" placeholder="activityTracker">
+                </div>
+                <div><div class="mono-mini muted mb-6" data-i18n="sched_kind_label">SCHEDULE</div>
+                  <select id="select-sched-kind">
+                    <option value="daily" data-i18n="sched_kind_daily">每日</option>
+                    <option value="weekly" data-i18n="sched_kind_weekly">每週</option>
+                    <option value="monthly" data-i18n="sched_kind_monthly">每月</option>
+                  </select>
+                </div>
+                <div id="sched-weekday-field" hidden><div class="mono-mini muted mb-6" data-i18n="sched_weekday_label">WEEKDAY</div>
+                  <select id="select-sched-weekday">
+                    <option value="0">週一</option><option value="1">週二</option><option value="2">週三</option>
+                    <option value="3">週四</option><option value="4">週五</option><option value="5">週六</option>
+                    <option value="6">週日</option>
+                  </select>
+                </div>
+                <div id="sched-day-field" hidden><div class="mono-mini muted mb-6" data-i18n="sched_day_label">DAY (1–28)</div>
+                  <input type="number" id="input-sched-day" min="1" max="28" value="1" class="mono">
+                </div>
+                <div><div class="mono-mini muted mb-6" data-i18n="sched_time_label">TIME</div>
+                  <input type="time" id="input-sched-time" value="08:30" class="mono">
+                </div>
+                <div style="display:flex; align-items:flex-end;">
+                  <button class="btn btn-ghost" id="btn-add-sched-task" data-i18n="btn_add_sched_task">＋ 新增排程</button>
+                </div>
+              </div>
+              <div class="muted small mt-2" data-i18n="sched_tasks_boundary">排程只會自動執行 L0 唯讀白名單動作（Handoff／週報／月報／STATUS 草稿）並寫 audit receipt；L1/L2 永不可排程。管理排程需 execution token。</div>
+            </div>
           </div>
         </div>
 

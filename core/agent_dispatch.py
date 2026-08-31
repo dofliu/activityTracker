@@ -180,6 +180,11 @@ def run_agent_subprocess(
     return asyncio.run(_exec(items, resolved_cwd, env, timeout_seconds, receipt_id))
 
 
+def is_running_registered(receipt_id: int) -> bool:
+    """cancel 前的登記檢查：只有 dispatcher job 會登記 OS 行程。"""
+    return int(receipt_id) in _RUNNING
+
+
 def kill_running(receipt_id: int) -> bool:
     """中止執行中的 subprocess job；in-process job 沒有登記、回 False。"""
     process = _RUNNING.get(int(receipt_id))

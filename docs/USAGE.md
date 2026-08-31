@@ -462,6 +462,30 @@ L2 每次執行都是**三道門**：execution token → 單鍵批准 → 回填
 
 **L2 寫入模式（agent 實際代辦；第三開關 `l2.allow_write`，預設關閉）**：採**兩段式批准**——先用「起草計畫」產出一份你讀得到的計畫檔，24 小時內同一專案的建議卡才會出現「依已批准計畫實際修改檔案」按鈕；執行時把**那份計畫全文**餵給 CLI（Claude Code 以 `--permission-mode acceptEdits` 授權檔案編輯）。dispatch 前 repo worktree 必須乾淨（保護你未提交的工作），agent **永不 commit／push**——改動以未提交變更留在 worktree，回應會列出改了哪些檔案，`git diff` 檢視、滿意再自己 commit，`git checkout .` 可整批還原。receipt 只記檔案數與輸出摘要。
 
+**P5-R5 自訂排程任務（選用，預設關閉）**：讓小秘書按時自動執行**唯讀白名單動作**。可排程的 template 只有四個，全部 L0（L1/L2 需要人在場批准，永遠不可排程）：
+
+| Template | 內容 | 輸出 |
+| :--- | :--- | :--- |
+| `generate_handoff` | 產生指定專案的 Context Handoff | `reports/handoffs/Handoff_<專案>_<日期>.md` |
+| `weekly_report_rollup` | 彙整**上一個完整週**的每日摘要成週報（缺日如實列出、不推測） | `reports/Weekly_Rollup_YYYY-Www.md` |
+| `monthly_report_rollup` | 彙整**上一個完整月**的每日摘要成月報 | `reports/Monthly_Rollup_YYYY-MM.md` |
+| `status_snapshot_draft` | 點名 `STATUS.yaml` 的 `last_updated` 落後觀測活動 ≥7 天的 repo（**草稿，絕不改 repo**） | `reports/status_drafts/Status_Draft_<日期>.md` |
+
+啟用（「07 監控配置 → 小秘書執行器」卡片的第四個開關，或手動設定）：
+
+```yaml
+proactive_secretary:
+  executor:
+    enabled: true            # 排程任務疊加在 executor 總開關之上
+    scheduled_tasks:
+      enabled: true
+      max_tasks: 20
+```
+
+同一張卡片下方即是排程管理：選 template、排程（每日／每週＋星期／每月＋日期 1–28）與時間後按「＋ 新增排程」；每列可停用、刪除或「立即執行」。新增／修改／刪除／立即執行都需要 execution token（與批准執行同一顆，只存 sessionStorage）；清單本身唯讀免 token。
+
+排程語意與收據：任務建立後從**下一個排程時刻**開始生效（不會立刻補跑過去的時段）；服務停機錯過的排程，恢復後**只補跑一次**；rollup 週報／月報只彙整「已存在的每日摘要」（LLM 失敗自動回退 deterministic 拼接並如實標記）。每次執行都寫入與批准執行相同的 audit receipt（`approved_via=schedule`），可在 `GET /api/v1/secretary/executions` 回查。
+
 ### 兩層增量摘要（日報 token 效率）
 
 日報現在採 map-reduce：每次週期 checkpoint（預設每 2 小時）會順帶用本機模型（預設 Ollama）把該時段壓成 ≤100 字微摘要存入 SQLite（map，零 API 成本）；23:30 或手動產日報時，prompt 優先讀「微摘要時間軸＋原始統計」（reduce），token 用量約降一個數量級。微摘要失敗（如 Ollama 未啟動）或缺漏的時段自動回退原始節錄，日報永遠可產生。相關設定：

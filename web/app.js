@@ -166,6 +166,20 @@ const I18N = {
     executor_l2_write_label: "允許 L2 依已批准計畫修改檔案（不 commit）",
     executor_cli_label: "AGENT CLI",
     executor_boundary: "L2 會用您本機已登入的 CLI 消耗訂閱／API 額度；子行程禁 shell、僅限白名單動作與該專案 repo 目錄，不會拿到任何 API key。執行前仍需 execution token（python main.py init --show-token）＋單鍵批准＋回填一次性確認碼。",
+    sched_tasks_enabled_label: "啟用自訂排程任務（僅 L0 唯讀動作）",
+    sched_tasks_title: "自訂排程任務（P5-R5）",
+    sched_tasks_loading: "載入中…",
+    sched_template_label: "TEMPLATE",
+    sched_project_label: "PROJECT KEY",
+    sched_kind_label: "SCHEDULE",
+    sched_kind_daily: "每日",
+    sched_kind_weekly: "每週",
+    sched_kind_monthly: "每月",
+    sched_weekday_label: "WEEKDAY",
+    sched_day_label: "DAY (1–28)",
+    sched_time_label: "TIME",
+    btn_add_sched_task: "＋ 新增排程",
+    sched_tasks_boundary: "排程只會自動執行 L0 唯讀白名單動作（Handoff／週報／月報／STATUS 草稿）並寫 audit receipt；L1/L2 永不可排程。管理排程需 execution token。",
     gh_opt1_title: "快捷方式 1 (推薦)：本機 GITHUB CLI",
     btn_gh_auto_connect: "🔑 一鍵從本機 gh CLI 同步認證",
     gh_opt1_sub: "免手動輸入 Token，自動讀取本機登入之 GitHub 帳號",
@@ -362,6 +376,20 @@ const I18N = {
     executor_l2_write_label: "Allow L2 to edit files per an approved plan (never commits)",
     executor_cli_label: "AGENT CLI",
     executor_boundary: "L2 spends your locally signed-in CLI quota; subprocesses are shell-free, restricted to whitelist actions and the project's repo directory, and never receive any API key. Runs still require the execution token (python main.py init --show-token), one-click approval, and a one-time confirm code.",
+    sched_tasks_enabled_label: "Enable custom scheduled tasks (L0 read-only actions only)",
+    sched_tasks_title: "Custom Scheduled Tasks (P5-R5)",
+    sched_tasks_loading: "Loading…",
+    sched_template_label: "TEMPLATE",
+    sched_project_label: "PROJECT KEY",
+    sched_kind_label: "SCHEDULE",
+    sched_kind_daily: "Daily",
+    sched_kind_weekly: "Weekly",
+    sched_kind_monthly: "Monthly",
+    sched_weekday_label: "WEEKDAY",
+    sched_day_label: "DAY (1–28)",
+    sched_time_label: "TIME",
+    btn_add_sched_task: "＋ Add schedule",
+    sched_tasks_boundary: "Schedules only auto-run L0 read-only whitelist actions (Handoff / weekly / monthly rollup / STATUS draft) and always leave an audit receipt; L1/L2 can never be scheduled. Managing schedules requires the execution token.",
     gh_opt1_title: "Option 1 (Recommended): Local GITHUB CLI",
     btn_gh_auto_connect: "🔑 1-Click Auth via Local gh CLI",
     gh_opt1_sub: "No manual PAT needed, automatically reads local logged-in GitHub account",
@@ -1966,6 +1994,17 @@ function initSettingsForm() {
     $("input-llm-key-env").disabled = p === "ollama";
     renderLLMStatus();
   });
+
+  // P5-R5 自訂排程任務：template／schedule kind 切換對應欄位，新增走 token API。
+  $("select-sched-template").addEventListener("change", () => {
+    $("sched-project-field").hidden = $("select-sched-template").value !== "generate_handoff";
+  });
+  $("select-sched-kind").addEventListener("change", () => {
+    const kind = $("select-sched-kind").value;
+    $("sched-weekday-field").hidden = kind !== "weekly";
+    $("sched-day-field").hidden = kind !== "monthly";
+  });
+  $("btn-add-sched-task").addEventListener("click", addScheduledTask);
 }
 
 function renderTagList(id, list, onRemove) {
@@ -2016,6 +2055,8 @@ async function loadConfig() {
     $("toggle-executor-l2").checked = !!(executor.l2 && executor.l2.enabled === true);
     $("toggle-executor-l2-write").checked = !!(executor.l2 && executor.l2.allow_write === true);
     $("select-agent-cli").value = (executor.agent_cli && executor.agent_cli.binary) === "codex" ? "codex" : "claude";
+    $("toggle-scheduled-tasks").checked = !!(executor.scheduled_tasks && executor.scheduled_tasks.enabled === true);
+    loadScheduledTasks();
     $("toggle-usage-tracking").checked = usage.enabled === true;
     const usageNotifications = usage.notifications || {};
     $("toggle-usage-notifications").checked = usageNotifications.enabled === true;
@@ -2135,6 +2176,8 @@ async function saveSettings() {
     executorCfg.agent_cli.binary = cliChoice;
     executorCfg.agent_cli.args = cliChoice === "codex" ? ["exec", "{prompt}"] : ["-p", "{prompt}"];
   }
+  executorCfg.scheduled_tasks = executorCfg.scheduled_tasks || {};
+  executorCfg.scheduled_tasks.enabled = $("toggle-scheduled-tasks").checked;
 
   cfg.usage_tracking = cfg.usage_tracking || {};
   cfg.usage_tracking.enabled = $("toggle-usage-tracking").checked;
@@ -2164,6 +2207,144 @@ async function saveSettings() {
   } finally {
     setTimeout(() => { btn.disabled = false; btn.textContent = label; }, 1600);
   }
+}
+
+// ------------------------------------------------------ P5-R5 scheduled tasks
+let scheduledTasksCache = null;
+
+function requireExecutionToken() {
+  const zh = currentLang === "zh-TW";
+  let token = sessionStorage.getItem("omni_execution_token") || "";
+  if (!token) {
+    token = (prompt(zh
+      ? "輸入 execution token（在終端機執行 `omnicontext init --show-token` 取得）："
+      : "Enter execution token (shown by `omnicontext init --show-token`):") || "").trim();
+    if (!token) return null;
+    sessionStorage.setItem("omni_execution_token", token);
+  }
+  return token;
+}
+
+async function schedRequest(url, method, body) {
+  const zh = currentLang === "zh-TW";
+  const token = requireExecutionToken();
+  if (!token) return null;
+  const res = await fetch(API + url, {
+    method,
+    headers: { "x-omnicontext-execution-token": token, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    sessionStorage.removeItem("omni_execution_token");
+    alert(zh ? "execution token 無效，請重試。" : "Invalid execution token.");
+    return null;
+  }
+  if (!res.ok) {
+    alert((zh ? "操作被拒絕：" : "Rejected: ") + (data.detail || res.status));
+    return null;
+  }
+  return data;
+}
+
+function schedScheduleLabel(task) {
+  const zh = currentLang === "zh-TW";
+  const weekdays = zh
+    ? ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
+    : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  if (task.schedule_kind === "weekly") {
+    return (zh ? "每週" : "Weekly ") + (weekdays[task.weekday] || "?") + " " + task.run_time;
+  }
+  if (task.schedule_kind === "monthly") {
+    return zh ? `每月 ${task.day_of_month} 日 ${task.run_time}` : `Monthly day ${task.day_of_month} ${task.run_time}`;
+  }
+  return (zh ? "每日 " : "Daily ") + task.run_time;
+}
+
+async function loadScheduledTasks() {
+  const box = $("sched-task-list");
+  if (!box) return;
+  try {
+    scheduledTasksCache = await getJSON("/api/v1/secretary/scheduled-tasks");
+    renderScheduledTasks();
+    const select = $("select-sched-template");
+    const templates = scheduledTasksCache.templates || [];
+    select.innerHTML = templates
+      .map(item => `<option value="${esc(item.template_id)}">${esc(item.label)}</option>`)
+      .join("");
+    $("sched-project-field").hidden = select.value !== "generate_handoff";
+  } catch (e) {
+    box.innerHTML = `<span class="muted small">${esc(String(e.message || e))}</span>`;
+  }
+}
+
+function renderScheduledTasks() {
+  const zh = currentLang === "zh-TW";
+  const box = $("sched-task-list");
+  if (!box || !scheduledTasksCache) return;
+  const tasks = scheduledTasksCache.tasks || [];
+  if (!tasks.length) {
+    box.innerHTML = `<span class="muted small">${zh ? "尚未建立任何排程任務。" : "No scheduled tasks yet."}</span>`;
+    return;
+  }
+  box.innerHTML = tasks.map(task => {
+    const params = task.params && task.params.project_key ? ` · ${esc(task.params.project_key)}` : "";
+    const last = task.last_run_at
+      ? `${zh ? "上次" : "last"} ${esc(task.last_run_at.replace("T", " "))} → ${esc(task.last_status || "?")}`
+      : (zh ? "尚未執行" : "not run yet");
+    const stateLabel = task.enabled ? (zh ? "停用" : "Disable") : (zh ? "啟用" : "Enable");
+    const registered = task.template_registered
+      ? ""
+      : ` <span class="trust broken">${zh ? "TEMPLATE 已下架" : "TEMPLATE UNREGISTERED"}</span>`;
+    return `<div class="tag" style="justify-content: space-between; width: 100%; margin-bottom: 4px;">
+      <span>${task.enabled ? "🟢" : "⚪"} <b>${esc(task.template_label || task.template_id)}</b>${params}
+        · ${esc(schedScheduleLabel(task))} · <span class="muted small">${last}</span>${registered}</span>
+      <span>
+        <button class="btn btn-ghost btn-sm" onclick="runScheduledTaskNow(${task.id})">${zh ? "立即執行" : "Run now"}</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleScheduledTask(${task.id}, ${task.enabled ? "false" : "true"})">${stateLabel}</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteScheduledTask(${task.id})">✕</button>
+      </span>
+    </div>`;
+  }).join("");
+}
+
+window.runScheduledTaskNow = async function (taskId) {
+  const zh = currentLang === "zh-TW";
+  const data = await schedRequest(`/api/v1/secretary/scheduled-tasks/${taskId}/run`, "POST");
+  if (data) {
+    alert((zh ? "已執行：" : "Executed: ") + (data.status || "?")
+      + (data.result && data.result.output_path ? `\n${data.result.output_path}` : ""));
+    loadScheduledTasks();
+  }
+};
+
+window.toggleScheduledTask = async function (taskId, enabled) {
+  const data = await schedRequest(`/api/v1/secretary/scheduled-tasks/${taskId}`, "PATCH", { enabled });
+  if (data) loadScheduledTasks();
+};
+
+window.deleteScheduledTask = async function (taskId) {
+  const zh = currentLang === "zh-TW";
+  if (!confirm(zh ? "刪除此排程任務？" : "Delete this scheduled task?")) return;
+  const data = await schedRequest(`/api/v1/secretary/scheduled-tasks/${taskId}`, "DELETE");
+  if (data) loadScheduledTasks();
+};
+
+async function addScheduledTask() {
+  const kind = $("select-sched-kind").value;
+  const payload = {
+    template_id: $("select-sched-template").value,
+    params: {},
+    schedule_kind: kind,
+    run_time: $("input-sched-time").value || "08:30",
+  };
+  if (payload.template_id === "generate_handoff") {
+    payload.params.project_key = $("input-sched-project").value.trim();
+  }
+  if (kind === "weekly") payload.weekday = parseInt($("select-sched-weekday").value, 10);
+  if (kind === "monthly") payload.day_of_month = parseInt($("input-sched-day").value, 10) || 1;
+  const data = await schedRequest("/api/v1/secretary/scheduled-tasks", "POST", payload);
+  if (data) loadScheduledTasks();
 }
 
 // ------------------------------------------------------ local repository sync

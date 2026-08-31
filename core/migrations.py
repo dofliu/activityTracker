@@ -544,6 +544,38 @@ def _migration_015_activity_micro_summaries(connection: Connection) -> None:
     ))
 
 
+def _migration_016_secretary_scheduled_tasks(connection: Connection) -> None:
+    """P5-R5 使用者自訂排程任務：僅能排程已註冊的 L0 唯讀 template。"""
+    connection.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS secretary_scheduled_tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            template_id VARCHAR(64) NOT NULL,
+            params_json TEXT,
+            schedule_kind VARCHAR(16) NOT NULL,
+            run_time VARCHAR(5) NOT NULL DEFAULT '08:30',
+            weekday INTEGER,
+            day_of_month INTEGER,
+            enabled BOOLEAN NOT NULL DEFAULT 1,
+            last_run_at DATETIME,
+            last_status VARCHAR(20),
+            last_receipt_id INTEGER,
+            last_error_code VARCHAR(80),
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME
+        );
+        """
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_secretary_sched_tasks_template "
+        "ON secretary_scheduled_tasks(template_id);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_secretary_sched_tasks_enabled_template "
+        "ON secretary_scheduled_tasks(enabled, template_id);"
+    ))
+
+
 MIGRATIONS: tuple[MigrationDefinition, ...] = (
     MigrationDefinition(
         1,
@@ -647,6 +679,13 @@ MIGRATIONS: tuple[MigrationDefinition, ...] = (
         "activity_micro_summaries:create;indexes:unique_period,period_start;"
         "map_reduce:checkpoint_micro_then_daily_reduce;privacy:no_raw_prompt_or_response",
         _migration_015_activity_micro_summaries,
+    ),
+    MigrationDefinition(
+        16,
+        "secretary_scheduled_tasks",
+        "secretary_scheduled_tasks:create;indexes:template,enabled_template;"
+        "contract:l0_read_only_templates_only;audit:agent_execution_receipts",
+        _migration_016_secretary_scheduled_tasks,
     ),
 )
 

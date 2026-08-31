@@ -31,10 +31,14 @@ class SynthesisScheduler:
             and self.cfg.get("usage_tracking.notifications.enabled", False)
         )
         coverage_enabled = bool(self.cfg.get("usage_tracking.enabled", False))
+        from core.scheduled_tasks import scheduled_tasks_enabled
+
+        secretary_tasks_enabled = scheduled_tasks_enabled(self.cfg)
 
         if (
             not daily_enabled and not checkpoint_enabled and not telegram_enabled
             and not desktop_enabled and not usage_milestones_enabled and not coverage_enabled
+            and not secretary_tasks_enabled
         ):
             logger.info("Schedulers are disabled in config.")
             return
@@ -137,6 +141,18 @@ class SynthesisScheduler:
                     f"Coverage ledger heartbeat scheduled every {coverage_seconds} seconds."
                 )
 
+            if secretary_tasks_enabled:
+                # P5-R5 自訂排程任務：每分鐘檢查一次到期任務（僅 L0 唯讀
+                # template；due 判定在 core.scheduled_tasks，錯過只補跑一次）。
+                self._apscheduler.add_job(
+                    func=self._run_secretary_scheduled_tasks_job,
+                    trigger="interval",
+                    seconds=60,
+                    id="secretary_scheduled_tasks_job",
+                    replace_existing=True,
+                )
+                logger.info("Secretary scheduled tasks tick scheduled every 60 seconds.")
+
             # SQLite WAL 每小時自動 Checkpoint
             wal_interval_hours = max(1, int(self.cfg.get("data_lifecycle.wal_checkpoint_interval_hours", 1)))
             self._apscheduler.add_job(
@@ -192,12 +208,15 @@ class SynthesisScheduler:
         usage_milestones_enabled: bool,
     ):
         from core.coverage_ledger import heartbeat_interval_seconds
+        from core.scheduled_tasks import scheduled_tasks_enabled
 
         last_executed_day = None
         last_cp_time = time.time()
         last_usage_time = 0.0
         last_coverage_time = 0.0
+        last_secretary_tasks_time = 0.0
         coverage_enabled = bool(self.cfg.get("usage_tracking.enabled", False))
+        secretary_tasks_enabled = scheduled_tasks_enabled(self.cfg)
         last_desktop_morning_day = None
         last_desktop_evening_day = None
         last_telegram_morning_day = None
@@ -243,6 +262,10 @@ class SynthesisScheduler:
             ) >= heartbeat_interval_seconds(self.cfg):
                 last_coverage_time = time.time()
                 self._run_coverage_ledger_job()
+
+            if secretary_tasks_enabled and (time.time() - last_secretary_tasks_time) >= 60:
+                last_secretary_tasks_time = time.time()
+                self._run_secretary_scheduled_tasks_job()
 
             if (
                 desktop_enabled
@@ -297,6 +320,10 @@ class SynthesisScheduler:
             jobs.append("usage_milestone_job")
         if self.cfg.get("usage_tracking.enabled", False):
             jobs.append("coverage_ledger_job")
+        from core.scheduled_tasks import scheduled_tasks_enabled
+
+        if scheduled_tasks_enabled(self.cfg):
+            jobs.append("secretary_scheduled_tasks_job")
         return sorted(jobs)
 
     def active_job_ids(self) -> list[str]:
@@ -397,6 +424,20 @@ class SynthesisScheduler:
             logger.debug(f"Coverage ledger heartbeat: {receipt.get('action')}")
         except Exception as e:
             logger.error(f"Error recording coverage ledger heartbeat: {e}", exc_info=True)
+
+    def _run_secretary_scheduled_tasks_job(self):
+        try:
+            from core.scheduled_tasks import run_due_scheduled_tasks
+
+            receipt = run_due_scheduled_tasks()
+            ran = receipt.get("ran") or []
+            if ran:
+                logger.info(
+                    "Secretary scheduled tasks executed: %s",
+                    ", ".join(f"#{item.get('task_id')}:{item.get('status')}" for item in ran),
+                )
+        except Exception as e:
+            logger.error(f"Error running secretary scheduled tasks: {e}", exc_info=True)
 
     def _run_morning_briefing_job(self):
         logger.info("Triggering scheduled morning briefing...")

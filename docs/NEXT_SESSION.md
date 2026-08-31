@@ -1,17 +1,17 @@
 # 下一個 Session 接手指南
 
-> 最後更新:2026-08-31(session `claude/project-cleanup-planning-2p38pg` 收尾)。
+> 最後更新:2026-08-31(session `claude/next-session-docs-fy0jca`:P5-R5 落地)。
 > 這頁是給「下一個開發 session(人或 AI)」的最短接手路徑;現況以
 > [STATUS.yaml](../STATUS.yaml) 與 [ROADMAP.md](../ROADMAP.md) §11 為準。
 
 ## 一分鐘現況
 
 - **版本**:v1.3.0a5 已發佈為 GitHub pre-release(release workflow 自動建置,SHA-256 receipt 交叉驗證);`release_ready: false`,唯一缺口是全天 coverage ledger 實測。
-- **Schema**:migration 15/15(append-only + checksum;新表勿繞過 registry)。
-- **測試**:197 項 contract tests;容器/雲端環境跑 `pytest tests/` 會有 1 個已知環境失敗(`test_open_command_is_argv_not_shell_string`,缺 xdg-open;Windows 實機會過)。
-- **秘書(P5)**:R1 LLM 註解 → R2 L1 白名單代辦 → R3 L2 subprocess dispatcher(三道門+冷卻)→ 寫入 Addendum(`agent_apply_plan` 兩段式改檔、永不 commit)→ R4a 晨報,全部實作完成、**全部預設關閉**;開關集中在儀表板「07 監控配置 → 小秘書執行器」。契約見 [ADR-008](ADR-008-gated-agent-executor.md)(含 Addendum A1–A4)。
-- **摘要**:兩層增量(checkpoint 微摘要 map @本機 Ollama → 日報 reduce),`synthesizer.daily_from_micro` 預設開;日報 prompt 有逐事件截斷與總量上限。
-- **UI**:01 分頁為小秘書首頁(交辦對話框整合 RAG + 建議收件匣);導覽 01–08 已重排。
+- **Schema**:migration 16/16(append-only + checksum;新表勿繞過 registry)。
+- **測試**:214 項 contract tests;容器/雲端環境跑 `pytest tests/` 會有 1 個已知環境失敗(`test_open_command_is_argv_not_shell_string`,缺 xdg-open;Windows 實機會過)。
+- **秘書(P5)**:R1 LLM 註解 → R2 L1 白名單代辦 → R3 L2 subprocess dispatcher(三道門+冷卻)→ 寫入 Addendum(`agent_apply_plan` 兩段式改檔、永不 commit)→ R4a 晨報 → **R5 自訂排程任務**(僅 L0 唯讀 template 可排程:Handoff/週報/月報 rollup/STATUS 過期點名草稿;migration 016;錯過只補跑一次;每次執行寫 audit receipt),全部實作完成、**全部預設關閉**;開關集中在儀表板「07 監控配置 → 小秘書執行器」。契約見 [ADR-008](ADR-008-gated-agent-executor.md)(含 Addendum 與 R5 條目)。
+- **摘要**:兩層增量(checkpoint 微摘要 map @本機 Ollama → 日報 reduce),`synthesizer.daily_from_micro` 預設開;日報 prompt 有逐事件截斷與總量上限;週/月報 rollup 只彙整既有每日摘要(`synthesizer/rollup.py`,缺日誠實列出、LLM 失敗回退 deterministic)。
+- **UI**:01 分頁為小秘書首頁(交辦對話框整合 RAG + 建議收件匣);導覽 01–08 已重排;執行器卡片含排程任務管理(新增/停用/刪除/立即執行,mutation 需 execution token)。
 - **介紹影片**:3 分鐘 MP4 已交付使用者;場景源檔在 [`promo/`](../promo/)(單景可重渲,見其 README)。
 
 ## 等待中的使用者側收據(不是程式工作)
@@ -25,12 +25,12 @@
 | 候選 | 內容 | 前置 |
 | :--- | :--- | :--- |
 | **P5-R4b** | Telegram inline 批准(同一 execution token 邊界)+ 晚間交接推播 | **需使用者提供 Telegram bot token**(BotFather 建立) |
-| **P5-R5** | 使用者自訂排程任務(僅能排程已註冊 template)、STATUS 自動維護、週/月報 rollup | 無外部前置,可直接動工 |
 | 更多 L2 template | 依 Addendum 模式逐一審查新增(一次一個 template) | 依需求 |
+| 更多 schedulable template | 依 P5-R5 模式新增 L0 唯讀排程動作(一次一個,L1/L2 永不可排程) | 依需求 |
 
 ## 工程慣例(照舊)
 
-- **分支**:在 `claude/project-cleanup-planning-2p38pg` 開發 → push → `main` fast-forward → push(使用者要求所有成果都落在 main)。
+- **分支**:在當次 session 的指定分支開發 → push → `main` fast-forward → push(使用者要求所有成果都落在 main)。
 - **誠實文化**:每個聲明附 receipt/claim boundary;測試失敗如實回報;migration 永遠 append-only;危險能力預設關閉。
 - **文件同步**:功能落地時同步 USAGE / ROADMAP §11 / STATUS(quality gate + known_blockers)/ 必要時 README 與 ADR。
 

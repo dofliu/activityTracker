@@ -40,6 +40,13 @@ from .agent_executor import (
     list_execution_receipts,
 )
 from .proactive_secretary import build_action_proposals, snooze_proposal
+from .scheduled_tasks import (
+    create_scheduled_task,
+    delete_scheduled_task,
+    list_scheduled_tasks,
+    run_scheduled_task_now,
+    update_scheduled_task,
+)
 from .secretary_advisor import annotate_action_proposals
 from .background_tasks import get_background_task_summary
 from .coverage_ledger import get_daily_coverage
@@ -476,6 +483,71 @@ def cancel_secretary_execution(receipt_id: int, request: Request):
     _require_execution_token(request)
     try:
         return cancel_execution(receipt_id)
+    except ExecutionRejected as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
+
+
+class ScheduledTaskCreateRequest(BaseModel):
+    template_id: str
+    params: Dict[str, Any] = Field(default_factory=dict)
+    schedule_kind: str
+    run_time: str = "08:30"
+    weekday: Optional[int] = None
+    day_of_month: Optional[int] = None
+    enabled: bool = True
+
+
+class ScheduledTaskUpdateRequest(BaseModel):
+    enabled: Optional[bool] = None
+    schedule_kind: Optional[str] = None
+    run_time: Optional[str] = None
+    weekday: Optional[int] = None
+    day_of_month: Optional[int] = None
+    params: Optional[Dict[str, Any]] = None
+
+
+@app.get("/api/v1/secretary/scheduled-tasks")
+def get_secretary_scheduled_tasks():
+    """P5-R5 排程任務與可排程 template 清單；唯讀，不需 execution token。"""
+    return list_scheduled_tasks()
+
+
+@app.post("/api/v1/secretary/scheduled-tasks")
+def create_secretary_scheduled_task(payload: ScheduledTaskCreateRequest, request: Request):
+    """只能排程 server 註冊的 L0 唯讀 template；params 需通過白名單驗證。"""
+    _require_execution_token(request)
+    try:
+        return create_scheduled_task(payload.model_dump())
+    except ExecutionRejected as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
+
+
+@app.patch("/api/v1/secretary/scheduled-tasks/{task_id}")
+def update_secretary_scheduled_task(
+    task_id: int, payload: ScheduledTaskUpdateRequest, request: Request
+):
+    _require_execution_token(request)
+    try:
+        return update_scheduled_task(task_id, payload.model_dump(exclude_unset=True))
+    except ExecutionRejected as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
+
+
+@app.delete("/api/v1/secretary/scheduled-tasks/{task_id}")
+def delete_secretary_scheduled_task(task_id: int, request: Request):
+    _require_execution_token(request)
+    try:
+        return delete_scheduled_task(task_id)
+    except ExecutionRejected as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
+
+
+@app.post("/api/v1/secretary/scheduled-tasks/{task_id}/run")
+def run_secretary_scheduled_task(task_id: int, request: Request):
+    """立即執行一次（寫 audit receipt，approved_via=web_click）。"""
+    _require_execution_token(request)
+    try:
+        return run_scheduled_task_now(task_id, approved_via="web_click")
     except ExecutionRejected as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
 
