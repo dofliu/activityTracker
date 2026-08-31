@@ -180,6 +180,18 @@ const I18N = {
     sched_time_label: "TIME",
     btn_add_sched_task: "＋ 新增排程",
     sched_tasks_boundary: "排程只會自動執行 L0 唯讀白名單動作（Handoff／週報／月報／STATUS 草稿）並寫 audit receipt；L1/L2 永不可排程。管理排程需 execution token。",
+    settings_telegram_title: "Telegram 通知（遠端推播）",
+    tg_step1_help: "① 在 Telegram 搜尋 @BotFather → /newbot 建立機器人 → 複製 API Token 貼到下方。",
+    tg_token_label: "BOT TOKEN",
+    tg_chat_label: "CHAT ID",
+    btn_tg_detect: "🔍 偵測 CHAT ID",
+    tg_step2_help: "② 先在 Telegram 對您的 bot 送出任意訊息（如 /start），再按「偵測 CHAT ID」選擇對話。",
+    tg_morning_label: "晨報時間",
+    tg_evening_label: "晚報時間",
+    btn_tg_test: "📡 測試連線",
+    btn_tg_connect: "✅ 測試並儲存啟用",
+    btn_tg_disconnect: "解除",
+    tg_boundary: "③ 「測試連線」會即時呼叫 getMe 驗證 token，並向所選對話實發一則固定內容的測試訊息；全部通過才會寫入本機 config.yaml 並啟用晨報／晚報推播。token 與 chat id 只存在本機，瀏覽器永遠拿不回明文（顯示為 ***REDACTED***）；若已設定環境變數 TELEGRAM_BOT_TOKEN／TELEGRAM_CHAT_ID 則優先使用且不會複製進檔案。",
     gh_opt1_title: "快捷方式 1 (推薦)：本機 GITHUB CLI",
     btn_gh_auto_connect: "🔑 一鍵從本機 gh CLI 同步認證",
     gh_opt1_sub: "免手動輸入 Token，自動讀取本機登入之 GitHub 帳號",
@@ -390,6 +402,18 @@ const I18N = {
     sched_time_label: "TIME",
     btn_add_sched_task: "＋ Add schedule",
     sched_tasks_boundary: "Schedules only auto-run L0 read-only whitelist actions (Handoff / weekly / monthly rollup / STATUS draft) and always leave an audit receipt; L1/L2 can never be scheduled. Managing schedules requires the execution token.",
+    settings_telegram_title: "Telegram Notifications (Remote Push)",
+    tg_step1_help: "① In Telegram, find @BotFather → /newbot to create a bot → paste its API token below.",
+    tg_token_label: "BOT TOKEN",
+    tg_chat_label: "CHAT ID",
+    btn_tg_detect: "🔍 Detect CHAT ID",
+    tg_step2_help: "② Send any message (e.g. /start) to your bot in Telegram first, then press Detect CHAT ID and pick the chat.",
+    tg_morning_label: "MORNING",
+    tg_evening_label: "EVENING",
+    btn_tg_test: "📡 Test connection",
+    btn_tg_connect: "✅ Test, save & enable",
+    btn_tg_disconnect: "Disconnect",
+    tg_boundary: "③ Test connection calls getMe live to validate the token and sends one fixed test message to the selected chat; only when everything passes are the settings written to local config.yaml and the morning/evening pushes enabled. Token and chat id stay on this machine — the browser never gets the plaintext back (shown as ***REDACTED***). If TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID env vars exist they take precedence and are never copied into the file.",
     gh_opt1_title: "Option 1 (Recommended): Local GITHUB CLI",
     btn_gh_auto_connect: "🔑 1-Click Auth via Local gh CLI",
     gh_opt1_sub: "No manual PAT needed, automatically reads local logged-in GitHub account",
@@ -2005,6 +2029,12 @@ function initSettingsForm() {
     $("sched-day-field").hidden = kind !== "monthly";
   });
   $("btn-add-sched-task").addEventListener("click", addScheduledTask);
+
+  // Telegram 設定流程（P5-R4b 前置）：偵測 chat id → 即時測試 → 通過才儲存。
+  $("btn-tg-detect").addEventListener("click", tgDetectChat);
+  $("btn-tg-test").addEventListener("click", tgTest);
+  $("btn-tg-connect").addEventListener("click", tgConnect);
+  $("btn-tg-disconnect").addEventListener("click", tgDisconnect);
 }
 
 function renderTagList(id, list, onRemove) {
@@ -2057,6 +2087,7 @@ async function loadConfig() {
     $("select-agent-cli").value = (executor.agent_cli && executor.agent_cli.binary) === "codex" ? "codex" : "claude";
     $("toggle-scheduled-tasks").checked = !!(executor.scheduled_tasks && executor.scheduled_tasks.enabled === true);
     loadScheduledTasks();
+    loadTelegramStatus();
     $("toggle-usage-tracking").checked = usage.enabled === true;
     const usageNotifications = usage.notifications || {};
     $("toggle-usage-notifications").checked = usageNotifications.enabled === true;
@@ -2345,6 +2376,145 @@ async function addScheduledTask() {
   if (kind === "monthly") payload.day_of_month = parseInt($("input-sched-day").value, 10) || 1;
   const data = await schedRequest("/api/v1/secretary/scheduled-tasks", "POST", payload);
   if (data) loadScheduledTasks();
+}
+
+// ------------------------------------------------------ telegram setup flow
+let telegramStatusCache = null;
+
+async function loadTelegramStatus() {
+  const badge = $("tg-status-badge");
+  if (!badge) return;
+  const zh = currentLang === "zh-TW";
+  try {
+    telegramStatusCache = await getJSON("/api/v1/telegram/status");
+    const st = telegramStatusCache;
+    const sourceLabel = (source) => ({
+      env: zh ? "環境變數" : "env var",
+      config: "config.yaml",
+      provided: zh ? "本次輸入" : "just entered",
+      missing: zh ? "未設定" : "not set",
+    })[source] || source;
+    if (st.enabled && st.token_configured && st.chat_id_configured) {
+      badge.className = "trust ok";
+      badge.textContent = zh ? "已啟用" : "ENABLED";
+    } else if (st.token_configured) {
+      badge.className = "trust noisy";
+      badge.textContent = zh ? "已設定未啟用" : "CONFIGURED";
+    } else {
+      badge.className = "trust broken";
+      badge.textContent = zh ? "未設定" : "NOT SET";
+    }
+    $("input-tg-token").placeholder = st.token_configured
+      ? (zh ? `已設定（${sourceLabel(st.token_source)}）；留空沿用` : `configured (${sourceLabel(st.token_source)}); leave blank to keep`)
+      : "123456789:AA...";
+    $("input-tg-chat").placeholder = st.chat_id_configured
+      ? (zh ? `已設定（${sourceLabel(st.chat_id_source)}）；留空沿用` : `configured (${sourceLabel(st.chat_id_source)}); leave blank to keep`)
+      : "—";
+    $("input-tg-morning").value = st.morning_briefing_time || "09:00";
+    $("input-tg-evening").value = st.evening_summary_time || "23:30";
+  } catch (e) {
+    badge.className = "trust broken";
+    badge.textContent = "UNAVAILABLE";
+  }
+}
+
+function tgRenderResult(receipt) {
+  const zh = currentLang === "zh-TW";
+  const box = $("tg-test-result");
+  if (!box) return;
+  if (!receipt) { box.textContent = ""; return; }
+  if (receipt.ok) {
+    const parts = [
+      (zh ? "✅ token 有效，bot：@" : "✅ token valid, bot: @") + (receipt.bot_username || "?"),
+    ];
+    if (receipt.message_sent === true) {
+      parts.push(zh ? "測試訊息已送達" : "test message delivered");
+    }
+    if (receipt.saved === true) {
+      parts.push(zh ? "已儲存並啟用（排程已重載）" : "saved & enabled (scheduler reloaded)");
+    }
+    if (receipt.hint) parts.push(receipt.hint);
+    box.textContent = parts.join(" · ");
+    box.style.color = "var(--ok, #4caf50)";
+  } else {
+    box.textContent = `❌ ${receipt.error_code || "error"}：${receipt.hint || ""}`;
+    box.style.color = "var(--danger, #e57373)";
+  }
+}
+
+function tgPayload() {
+  const token = $("input-tg-token").value.trim();
+  const chat = $("input-tg-chat").value.trim();
+  return {
+    bot_token: token || null,
+    chat_id: chat || null,
+  };
+}
+
+async function tgDetectChat() {
+  const zh = currentLang === "zh-TW";
+  const box = $("tg-chat-candidates");
+  box.hidden = false;
+  box.innerHTML = `<span class="muted small">${zh ? "偵測中…" : "Detecting…"}</span>`;
+  try {
+    const res = await postJSON("/api/v1/telegram/detect-chat-id", { bot_token: tgPayload().bot_token });
+    if (!res.ok) { tgRenderResult(res); box.hidden = true; return; }
+    const candidates = res.candidates || [];
+    if (!candidates.length) {
+      box.innerHTML = `<span class="muted small">${esc(res.hint || (zh ? "沒有偵測到對話" : "No chats detected"))}</span>`;
+      return;
+    }
+    box.innerHTML = candidates.map(c =>
+      `<button class="btn btn-ghost btn-sm tg-chat-pick" data-chat="${esc(c.chat_id)}">💬 ${esc(c.display_name)}（${esc(c.chat_type)} · ${esc(c.chat_id)}）</button>`
+    ).join(" ");
+    box.querySelectorAll(".tg-chat-pick").forEach(btn => btn.addEventListener("click", () => {
+      $("input-tg-chat").value = btn.dataset.chat;
+      box.hidden = true;
+    }));
+  } catch (e) {
+    box.innerHTML = `<span class="muted small">${esc(String(e.message || e))}</span>`;
+  }
+}
+
+async function tgTest() {
+  const zh = currentLang === "zh-TW";
+  $("tg-test-result").textContent = zh ? "測試中…" : "Testing…";
+  try {
+    tgRenderResult(await postJSON("/api/v1/telegram/test", tgPayload()));
+  } catch (e) {
+    tgRenderResult({ ok: false, error_code: "request_failed", hint: String(e.message || e) });
+  }
+}
+
+async function tgConnect() {
+  const zh = currentLang === "zh-TW";
+  $("tg-test-result").textContent = zh ? "驗證並儲存中…" : "Validating & saving…";
+  try {
+    const payload = tgPayload();
+    payload.enabled = true;
+    payload.morning_briefing_time = $("input-tg-morning").value || "09:00";
+    payload.evening_summary_time = $("input-tg-evening").value || "23:30";
+    const receipt = await postJSON("/api/v1/telegram/connect", payload);
+    tgRenderResult(receipt);
+    if (receipt.saved) {
+      $("input-tg-token").value = "";
+      $("input-tg-chat").value = "";
+      loadTelegramStatus();
+    }
+  } catch (e) {
+    tgRenderResult({ ok: false, error_code: "request_failed", hint: String(e.message || e) });
+  }
+}
+
+async function tgDisconnect() {
+  const zh = currentLang === "zh-TW";
+  if (!confirm(zh ? "停用 Telegram 推播並清除本機保存的 token／chat id？" : "Disable Telegram push and clear the locally stored token / chat id?")) return;
+  try {
+    tgRenderResult(await postJSON("/api/v1/telegram/disconnect"));
+    loadTelegramStatus();
+  } catch (e) {
+    tgRenderResult({ ok: false, error_code: "request_failed", hint: String(e.message || e) });
+  }
 }
 
 // ------------------------------------------------------ local repository sync

@@ -787,6 +787,95 @@ def update_system_config(new_config: Dict[str, Any] = Body(...)):
         raise HTTPException(status_code=500, detail=f"Failed to update config: {e}")
 
 
+class TelegramTestRequest(BaseModel):
+    bot_token: Optional[str] = None
+    chat_id: Optional[str] = None
+    send_test_message: bool = True
+
+
+class TelegramConnectRequest(BaseModel):
+    bot_token: Optional[str] = None
+    chat_id: Optional[str] = None
+    enabled: bool = True
+    morning_briefing_time: Optional[str] = None
+    evening_summary_time: Optional[str] = None
+
+
+class TelegramDetectChatRequest(BaseModel):
+    bot_token: Optional[str] = None
+
+
+@app.get("/api/v1/telegram/status")
+def get_telegram_status():
+    """Telegram 設定現況（僅布林與來源標籤，不回傳 secret 值）。"""
+    from notifiers.telegram_setup import telegram_status
+
+    return telegram_status()
+
+
+@app.post("/api/v1/telegram/test")
+def test_telegram(payload: Optional[TelegramTestRequest] = None):
+    """即時連線測試：getMe 驗 token；已有 chat id 時實發一則測試訊息。
+
+    body 可帶尚未儲存的 bot_token / chat_id（先測後存）；一律不回傳
+    secret 值，失敗以穩定 error_code + hint 呈現。
+    """
+    from notifiers.telegram_setup import test_telegram_connection
+
+    payload = payload or TelegramTestRequest()
+    return test_telegram_connection(
+        bot_token=payload.bot_token,
+        chat_id=payload.chat_id,
+        send_test_message=payload.send_test_message,
+    )
+
+
+@app.post("/api/v1/telegram/detect-chat-id")
+def detect_telegram_chat(payload: Optional[TelegramDetectChatRequest] = None):
+    """getUpdates 列出最近對 bot 傳訊的對話候選，供使用者挑選 chat id。"""
+    from notifiers.telegram_setup import detect_telegram_chat_id
+
+    payload = payload or TelegramDetectChatRequest()
+    return detect_telegram_chat_id(bot_token=payload.bot_token)
+
+
+@app.post("/api/v1/telegram/connect")
+def connect_telegram(payload: TelegramConnectRequest):
+    """設定流程收尾：先即時驗證（getMe＋測試訊息），全部通過才寫入
+    config.yaml 並熱套用排程；驗證失敗時 config 完全不動。"""
+    from notifiers.telegram_setup import save_telegram_settings
+
+    receipt = save_telegram_settings(
+        bot_token=payload.bot_token,
+        chat_id=payload.chat_id,
+        enabled=payload.enabled,
+        morning_briefing_time=payload.morning_briefing_time,
+        evening_summary_time=payload.evening_summary_time,
+    )
+    if receipt.get("saved"):
+        try:
+            get_manager().reload_config()
+            receipt["scheduler_reloaded"] = True
+        except Exception:  # noqa: BLE001 — 設定已保存；重載失敗如實回報
+            logger.warning("Scheduler reload after telegram connect failed", exc_info=True)
+            receipt["scheduler_reloaded"] = False
+            receipt["hint"] = "設定已保存，但排程重載失敗；重啟服務後生效"
+    return receipt
+
+
+@app.post("/api/v1/telegram/disconnect")
+def disconnect_telegram_endpoint():
+    """停用並清除 config 內的 Telegram secret（環境變數不受影響）。"""
+    from notifiers.telegram_setup import disconnect_telegram
+
+    receipt = disconnect_telegram()
+    try:
+        get_manager().reload_config()
+    except Exception:  # noqa: BLE001
+        logger.warning("Scheduler reload after telegram disconnect failed", exc_info=True)
+    return receipt
+
+
 @app.get("/api/v1/llm/status")
 def get_llm_secret_status():
     """Report provider credential availability without returning secret values."""

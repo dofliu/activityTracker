@@ -516,7 +516,45 @@
 
         <div class="panel mb-14">
           <div class="panel-head">
-            <span class="mono-label accent">06</span><span class="panel-title" data-i18n="settings_p4_title">GitHub 雲端整合 (全專案與 PR 追蹤)</span>
+            <span class="mono-label accent">06</span><span class="panel-title" data-i18n="settings_telegram_title">Telegram 通知（遠端推播）</span>
+            <span id="tg-status-badge" class="trust broken">未設定</span>
+          </div>
+          <div style="padding: 14px;">
+            <div class="muted small mb-6" data-i18n="tg_step1_help">① 在 Telegram 搜尋 @BotFather → /newbot 建立機器人 → 複製 API Token 貼到下方。</div>
+            <div class="fields usage-settings-fields mb-6">
+              <div style="grid-column: span 2;"><div class="mono-mini muted mb-6" data-i18n="tg_token_label">BOT TOKEN</div>
+                <input type="password" id="input-tg-token" class="mono" placeholder="123456789:AA..." autocomplete="off">
+              </div>
+              <div><div class="mono-mini muted mb-6" data-i18n="tg_chat_label">CHAT ID</div>
+                <input type="text" id="input-tg-chat" class="mono" placeholder="—">
+              </div>
+              <div style="display:flex; align-items:flex-end;">
+                <button class="btn btn-ghost" id="btn-tg-detect" data-i18n="btn_tg_detect">🔍 偵測 CHAT ID</button>
+              </div>
+            </div>
+            <div class="muted small mb-6" data-i18n="tg_step2_help">② 先在 Telegram 對您的 bot 送出任意訊息（如 /start），再按「偵測 CHAT ID」選擇對話。</div>
+            <div id="tg-chat-candidates" class="mb-6" hidden></div>
+            <div class="fields usage-settings-fields mb-6">
+              <div><div class="mono-mini muted mb-6" data-i18n="tg_morning_label">晨報時間</div>
+                <input type="time" id="input-tg-morning" value="09:00" class="mono">
+              </div>
+              <div><div class="mono-mini muted mb-6" data-i18n="tg_evening_label">晚報時間</div>
+                <input type="time" id="input-tg-evening" value="23:30" class="mono">
+              </div>
+              <div style="display:flex; align-items:flex-end; gap: 8px;">
+                <button class="btn btn-ghost" id="btn-tg-test" data-i18n="btn_tg_test">📡 測試連線</button>
+                <button class="btn btn-primary" id="btn-tg-connect" data-i18n="btn_tg_connect">✅ 測試並儲存啟用</button>
+                <button class="btn btn-ghost" id="btn-tg-disconnect" data-i18n="btn_tg_disconnect">解除</button>
+              </div>
+            </div>
+            <div id="tg-test-result" class="muted small mb-6"></div>
+            <div class="usage-boundary" data-i18n="tg_boundary">③ 「測試連線」會即時呼叫 getMe 驗證 token，並向所選對話實發一則固定內容的測試訊息；全部通過才會寫入本機 config.yaml 並啟用晨報／晚報推播。token 與 chat id 只存在本機，瀏覽器永遠拿不回明文（顯示為 ***REDACTED***）；若已設定環境變數 TELEGRAM_BOT_TOKEN／TELEGRAM_CHAT_ID 則優先使用且不會複製進檔案。</div>
+          </div>
+        </div>
+
+        <div class="panel mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent">07</span><span class="panel-title" data-i18n="settings_p4_title">GitHub 雲端整合 (全專案與 PR 追蹤)</span>
             <span id="gh-auth-badge" class="trust broken">未連線</span>
           </div>
           <div style="padding: 14px;">
@@ -548,7 +586,7 @@
 
         <div class="panel mb-14" id="repo-sync-panel">
           <div class="panel-head">
-            <span class="mono-label accent">07</span><span class="panel-title" data-i18n="repo_sync_title">本機 Git 同步中心</span>
+            <span class="mono-label accent">08</span><span class="panel-title" data-i18n="repo_sync_title">本機 Git 同步中心</span>
             <span id="repo-sync-badge" class="trust neutral" data-i18n="repo_sync_manual">逐項手動確認</span>
           </div>
           <div class="repo-sync-body">

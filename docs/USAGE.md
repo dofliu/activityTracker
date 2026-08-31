@@ -486,6 +486,17 @@ proactive_secretary:
 
 排程語意與收據：任務建立後從**下一個排程時刻**開始生效（不會立刻補跑過去的時段）；服務停機錯過的排程，恢復後**只補跑一次**；rollup 週報／月報只彙整「已存在的每日摘要」（LLM 失敗自動回退 deterministic 拼接並如實標記）。每次執行都寫入與批准執行相同的 audit receipt（`approved_via=schedule`），可在 `GET /api/v1/secretary/executions` 回查。
 
+### Telegram 推播：介面上完成設定與即時連線測試
+
+「07 監控配置 → 06 Telegram 通知」卡片提供完整設定流程，不必手動編輯 config.yaml 或設環境變數：
+
+1. **建 bot**：在 Telegram 搜尋 `@BotFather` → `/newbot` → 複製 API Token 貼到卡片的 BOT TOKEN 欄。
+2. **取得 chat id**：先在 Telegram 對你的 bot 送出任意訊息（例如 `/start`），再按「🔍 偵測 CHAT ID」——系統以 `getUpdates` 列出最近對話，點選即回填。
+3. **即時測試**：「📡 測試連線」會現場呼叫 `getMe` 驗證 token，並向所選對話**實發一則固定內容的測試訊息**；結果（bot 名稱、訊息是否送達）立即顯示，失敗有明確原因（`invalid_token`／`chat_not_found`／`network_unreachable`）與下一步提示。
+4. **儲存啟用**：「✅ 測試並儲存啟用」重跑同一組驗證，**全部通過才**寫入本機 `config.yaml` 並熱套用排程（晨報 09:00／晚報 23:30 可調）；驗證失敗時設定完全不動。
+
+安全邊界：token 與 chat id 只存在本機（config.yaml 或環境變數），瀏覽器永遠拿不回明文——`GET /api/v1/config` 一律回 `***REDACTED***`，狀態 API 只回報「已設定／未設定」與來源；若已設定環境變數 `TELEGRAM_BOT_TOKEN`／`TELEGRAM_CHAT_ID` 則**優先使用且不會複製進檔案**；「解除」只清除 config 內的值，不動環境變數。測試訊息內容固定，不含任何工作資料。
+
 ### 兩層增量摘要（日報 token 效率）
 
 日報現在採 map-reduce：每次週期 checkpoint（預設每 2 小時）會順帶用本機模型（預設 Ollama）把該時段壓成 ≤100 字微摘要存入 SQLite（map，零 API 成本）；23:30 或手動產日報時，prompt 優先讀「微摘要時間軸＋原始統計」（reduce），token 用量約降一個數量級。微摘要失敗（如 Ollama 未啟動）或缺漏的時段自動回退原始節錄，日報永遠可產生。相關設定：
