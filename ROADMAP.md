@@ -596,5 +596,6 @@ P2.5-S1 API 安全邊界
   ▶ ✅ 2026-08-31：**P5-R3 已實作**——`core/agent_dispatch.py` subprocess dispatcher（`create_subprocess_exec` argv 白名單、環境變數 allowlist 重建不轉發任何 API key、cwd 限唯一本機 repo、timeout 即 kill、執行中可取消）＋ L2 三道門（獨立開關預設關、一次性 6 碼 confirm code 5 分鐘失效單次有效、每 template 冷卻 429）；首個 L2 template `agent_draft_plan` 調度本機 Claude Code／Codex CLI 為停滯事項起草行動計畫（輸出入 `agent_outputs/`）。9 項新 contract tests。
   ▶ ✅ 2026-08-31：**兩層增量摘要已實作**——migration 015 `activity_micro_summaries`：checkpoint 時段由本機 Ollama 壓成 ≤100 字微摘要（map，失敗靜默跳過），日報 reduce 讀微摘要＋統計、缺漏時段回退原始節錄；token 用量約降一個數量級，Ollama 產日報變為可行。
   ▶ ✅ 2026-08-31：**L2 寫入型 template 已實作（ADR-008 Addendum）**——`agent_apply_plan`：兩段式批准（24h 內 succeeded 的 draft 計畫為前置、計畫全文即 prompt）、第三開關 `l2.allow_write` 預設關、dispatch 前後 `git status --porcelain`（髒 worktree 發碼前即拒）、agent 永不 commit/push（改動留 worktree 供 git diff 檢視／`git checkout .` 還原）、receipt 只記 files_changed 與輸出摘要；設定分頁第三開關。5 項 contract tests（真 git repo＋會寫檔的假 CLI）。
-  下一步：P5-R4b（Telegram inline 批准＋晚間交接；需使用者提供 bot token）或 P5-R5（使用者自訂排程任務，僅能排程已註冊 template）。
+  ▶ ✅ 2026-08-31：**執行器設定 UI 與介紹影片**——「07 監控配置」新增小秘書執行器卡片（executor／L2／L2 寫入三開關＋agent CLI 下拉，redact/merge 熱套用，Playwright 點擊路徑實測）；3 分鐘 repo 介紹影片（18 景 1080p30）已交付，場景源檔入 `promo/` 可單景重渲。
+  下一步：P5-R4b（Telegram inline 批准＋晚間交接；需使用者提供 bot token）或 P5-R5（使用者自訂排程任務，僅能排程已註冊 template）。交接資訊見 docs/NEXT_SESSION.md。
 - P4 其餘來源（瀏覽器閱讀、行事曆、terminal history、未 commit 狀態）維持「能否改變決策」檢驗，逐項評估後才納入。

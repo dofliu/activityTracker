@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **目前狀態：Personal Alpha。** Windows milestone WinRT Toast E2E、schema 13/13、formal package+DB rollback、P3-2～P3-5、P5-1 proposal-only、collector runtime diagnostics、P2.6 continuous coverage ledger 與跨平台 CI 已通過；**Extension 1.3.1 已於 2026-08-31 在已登入 Chrome 取得 ChatGPT＋Claude.ai 本輪 live PASS receipt（heartbeat 已驗證）；P2.7 三平台背景任務 live 驗收（codex／claude_code／claude_desktop）亦已全數 PASS**。剩餘缺口：全天 coverage ledger 實測與正式 tag／發佈，因此尚非 release-ready。
+> **目前狀態：Personal Alpha（v1.3.0a5 已發佈為 GitHub pre-release）。** Windows milestone WinRT Toast E2E、schema 15/15、formal package+DB rollback、P3-2～P3-5、collector runtime diagnostics、P2.6 continuous coverage ledger 與跨平台 CI 已通過；Extension 1.3.1 已於 2026-08-31 取得 ChatGPT＋Claude.ai live PASS receipt，P2.7 三平台背景任務 live 驗收亦全數 PASS。**秘書已依 [ADR-008](docs/ADR-008-gated-agent-executor.md) 落地至 P5-R3＋寫入 Addendum**（LLM 註解、L0/L1 白名單代辦、L2 調度本機 agent CLI 起草／依批准計畫改檔，全部預設關閉），並有秘書晨報（P5-R4a）、兩層增量摘要與小秘書首頁 UI。剩餘缺口:全天 coverage ledger 實測（release_ready 仍為 false）。
 
 **文件入口：**[📚 文件總覽](docs/INDEX.md) · [完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
 
@@ -128,12 +128,14 @@
 * `omni recall` 與主頁 `RELATED HISTORY` 使用 loopback Ollama 尋找相似歷史；查詢不保存，Ollama 不可用時不 fallback 到 cloud。
 * Session 是 temporal inference，不代表實際工時、連續專注或成果品質；similarity 也不能證明工作重複、歷史答案正確或仍然適用。架構決策見 [ADR-006](docs/ADR-006-derived-context-sessions-and-related-history.md)。
 
-### 11. 🧩 Proposal-only 主動秘書（P5-1 Alpha + P5-R1 LLM 註解）
-* 第一版只把本機 Project State、actionable Open Loops 與 Extension diagnostics 整理成附 evidence refs 的下一步建議。
-* 規則引擎不寫入 SQLite、不修改檔案、不執行 command，也不提供批准執行；完整安全契約見 [ADR-007](docs/ADR-007-proposal-only-secretary.md)，executor 重啟契約見 [ADR-008](docs/ADR-008-gated-agent-executor.md)。
-* **P5-R1 LLM 參考註解（選用，預設關閉）**：啟用後由 LLM（預設本機 Ollama；cloud 為明確 opt-in）為既有建議附加一句判斷提示與今日 summary——只能註解、不能增刪或執行任何項目，LLM 不可用時自動回退純規則結果。
-* **P5-R2 Gated Executor（選用，預設關閉）**：啟用後可在您**逐項批准**下代辦白名單動作（產生 Handoff、`git fetch`、將未結事項標記 stale）——execute API 只接受 proposal_id、動作由 server 白名單 template 決定且不開 shell、需獨立 execution token、每次執行留 audit receipt，evidence 改變的提案自動失效。
-* 正式 localhost 已產生 2 張建議與 3 個 evidence refs，惡意 Origin 為 403；桌面與 494px 介面 smoke 通過。此 receipt 不授權後續 executor。
+### 11. 🧩 主動小秘書：建議 → 批准 → 代辦（P5-1／R1／R2／R3／R4a）
+* **建議收件匣（proposal-only 基座）**：把本機 Project State、actionable Open Loops 與 Extension diagnostics 整理成附 evidence refs 的下一步建議;規則引擎不寫入事件資料、不執行 command。安全契約見 [ADR-007](docs/ADR-007-proposal-only-secretary.md)，executor 契約見 [ADR-008](docs/ADR-008-gated-agent-executor.md)。
+* **P5-R1 LLM 參考註解（選用，預設關閉）**：由 LLM（預設本機 Ollama）為既有建議附一句判斷提示與今日 summary——只能註解、不能增刪或執行，LLM 不可用時自動回退純規則。
+* **P5-R2 Gated Executor（選用，預設關閉）**：逐項批准後代辦白名單動作（產生 Handoff、`git fetch`、標記 stale）——execute API 只接受 proposal_id、動作由 server 白名單 template 決定且不開 shell、需獨立 execution token、每次執行留 audit receipt，evidence 改變的提案自動失效。
+* **P5-R3 L2 Dispatcher（選用，獨立開關，預設關閉）**：三道門（token＋單鍵批准＋一次性 6 碼確認碼）＋冷卻後，調度**你本機已登入的 Claude Code／Codex CLI** 為停滯事項起草行動計畫;子行程 argv 白名單禁 shell、cwd 限該專案 repo、環境變數 allowlist 重建（**任何 API key 都不轉發**）、逾時即 kill、執行中可取消。
+* **L2 寫入模式（第三開關，預設關閉;ADR-008 Addendum）**：兩段式批准——你先讀過 agent 起草的計畫，再讓 CLI 依**那份計畫全文**實際修改檔案;dispatch 前 worktree 必須乾淨，**永不 commit／push**，改動留給你 `git diff` 驗收、`git checkout .` 一鍵還原。
+* **P5-R4a 秘書晨報**：每天 08:30 桌面通知與 `OMNICONTEXT_TODAY` 每日入口檔帶入 top 建議與 LLM 總評（唯讀，失敗不阻斷晨報）。
+* 以上開關都可在儀表板「07 監控配置 → 小秘書執行器」直接切換熱套用，不用手改 YAML。
 
 ### 12. 📚 DeskRAG 本地知識庫與文件智慧問答系統（Single Server 整合版）
 * **單一 Web 入口、獨立索引 worker**：Dashboard 與 API 維持於 `http://127.0.0.1:8765`；檔案掃描、解析、embedding、刪除與空間維護改由另一個本機 process 執行，長時間索引不佔用主服務。
@@ -158,6 +160,11 @@
 * **Windows 原生檔案總管喚起**：引文卡片點擊「📂 在總管開啟」即可在 Windows 檔案總管精準定位並選中該檔案。
 * **受控索引生命週期**：每次可設定檔案上限與間隔，支援暫停、恢復、取消；「移除資料夾索引」與「清空所有 RAG 索引」都必須明確確認，且不會刪除來源檔案或 RAG 對話。
 * **可回查容量與一致性**：介面顯示來源檔案、來源大小、SQLite 切片、最近 worker 驗證的向量／BM25 數量與索引空間。驗證、BM25 重建、SQLite `VACUUM` 均在 worker 執行；未驗證時顯示 `待驗證`，不以估算值冒充實測。
+
+### 13. ⚡ 兩層增量摘要與小秘書首頁
+* **兩層增量（map-reduce）日報**：每次週期 checkpoint 後用本機 Ollama 把該時段壓成 ≤100 字微摘要（零 API 成本），23:30 日報只讀「微摘要時間軸＋缺漏時段原文回退」——雲端 token 用量約降一個數量級，Ollama 不可用時該時段自動回退原文，日報永遠可產生。
+* **小秘書首頁（01 分頁）**：交辦對話框（整合 RAG，與知識庫分頁共用同一條對話）、今日關鍵數字列與建議收件匣同屏;每日摘要 prompt 另有逐事件截斷與總量上限（`synthesizer.max_prompt_chars`），`python main.py llm-test` 可診斷各 provider 連線。
+* **介紹影片**：`promo/` 內含 3 分鐘介紹影片的 18 個場景源檔與分鏡表，可單景改字重渲（見 `promo/README.md`）。
 
 ---
 

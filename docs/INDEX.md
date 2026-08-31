@@ -1,11 +1,12 @@
 # 📚 OmniContext 文件總覽（Documentation Index）
 
-> 最後整理：2026-08-30。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
+> 最後整理：2026-08-31。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
 
 ## 我該從哪裡開始？
 
 | 你想做的事 | 請看 |
 | :--- | :--- |
+| **接手上一個開發 session、繼續往下做** | [NEXT_SESSION.md](NEXT_SESSION.md) —— 現況、等待中的收據、下一步候選、環境備忘 |
 | 快速了解專案是什麼、能做什麼 | [README.md](../README.md)（繁中）/ [README_en.md](../README_en.md)（English） |
 | 安裝、Extension 配對、日常操作、備份與故障排查 | [USAGE.md](USAGE.md) —— **使用手冊** |
 | 了解目前開發到哪、下一步是什麼 | [ROADMAP.md](../ROADMAP.md) + [STATUS.yaml](../STATUS.yaml) |
@@ -43,7 +44,7 @@
 | [ADR-005](ADR-005-local-semantic-index-and-ask.md) | Local Semantic Index 與 `omni ask` | 本機 embeddings、retrieval、引用 |
 | [ADR-006](ADR-006-derived-context-sessions-and-related-history.md) | Derived Context Sessions 與 Related History | 衍生工作階段、相似歷史 |
 | [ADR-007](ADR-007-proposal-only-secretary.md) | Proposal-only 主動秘書安全邊界 | 秘書只提案不執行的契約（P5-2 executor 曾實作後 revert 回此契約） |
-| [ADR-008](ADR-008-gated-agent-executor.md) | Gated Agent Executor 安全契約（Proposed） | P5 executor 重啟條件：白名單 template、三級閘門、execution token、audit receipt |
+| [ADR-008](ADR-008-gated-agent-executor.md) | Gated Agent Executor 安全契約（已實作至 P5-R3＋寫入 Addendum） | 白名單 template、三級閘門、confirm code、subprocess 沙盒、audit receipt |
 | [ADR-009](ADR-009-deskrag-worker-index-lifecycle.md) | DeskRAG worker 索引生命週期 | RAG 索引 worker 隔離、資源與刪除邊界 |
 | [ADR-010](ADR-010-verified-background-agent-task-time.md) | 可驗證背景 Agent 任務時間 | 成對 receipt 才計時的邊界 |
 | [ADR-011](ADR-011-safe-local-repository-sync.md) | 受控本機 Repository 同步 | Git 同步中心安全預設與 P4.3 Onboarding 邊界 |
@@ -71,6 +72,8 @@
 
 | 位置 | 說明 |
 | :--- | :--- |
+| [NEXT_SESSION.md](NEXT_SESSION.md) | 下一個開發 session 的接手指南（現況、待辦、環境備忘） |
+| [../promo/](../promo/) | 3 分鐘介紹影片的 18 個場景源檔、分鏡表與渲染腳本（可單景重渲） |
 | [assets/](assets/) | 文件用圖片（架構與 roadmap 卡片等） |
-| `../tests/` | 31 個 contract test 模組；執行 `python -m pytest tests/ -v` |
+| `../tests/` | 39 個 contract test 模組（197 項）；執行 `python -m pytest tests/ -v` |
 | `../scripts/` | 驗證、清理、autostart 與 E2E 腳本 |
