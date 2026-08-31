@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>Scene15 數字牆</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#0b0716}
+body{font-family:"Noto Sans CJK TC","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:#ece8f7;position:relative}
+.bg{position:absolute;inset:0;background:
+ radial-gradient(1200px 800px at 24% 18%,rgba(139,92,246,.16),transparent 62%),
+ radial-gradient(1100px 760px at 78% 82%,rgba(45,212,191,.11),transparent 60%),
+ linear-gradient(160deg,#180f2e 0%,#0b0716 58%,#070410 100%)}
+.aur{position:absolute;width:1500px;height:1500px;border-radius:50%;filter:blur(90px);opacity:.5;mix-blend-mode:screen}
+.aur.a{background:radial-gradient(circle,rgba(139,92,246,.3),transparent 62%);left:-460px;top:-560px;animation:drift1 22s ease-in-out infinite alternate}
+.aur.b{background:radial-gradient(circle,rgba(45,212,191,.24),transparent 62%);right:-520px;bottom:-620px;animation:drift2 26s ease-in-out infinite alternate}
+@keyframes drift1{to{transform:translate(150px,90px) scale(1.12)}}
+@keyframes drift2{to{transform:translate(-130px,-80px) scale(1.08)}}
+.vig{position:absolute;inset:0;background:radial-gradient(1600px 1000px at 50% 46%,transparent 58%,rgba(0,0,0,.5) 100%);pointer-events:none}
+.grid{position:absolute;inset:0;opacity:.05;background-image:linear-gradient(rgba(236,232,247,.5) 1px,transparent 1px),linear-gradient(90deg,rgba(236,232,247,.5) 1px,transparent 1px);background-size:64px 64px}
+.stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+ --dur:10s;animation:cam var(--dur) ease-in-out both}
+@keyframes cam{from{transform:scale(1)}to{transform:scale(1.055)}}
+.h1{font-size:60px;font-weight:900;text-align:center;
+ background:linear-gradient(100deg,#f6f3ff 20%,#c4b5fd 55%,#9be8db 85%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.in{opacity:0;animation:rise 1s cubic-bezier(.16,1,.3,1) both;animation-delay:var(--d,0s)}
+@keyframes rise{from{opacity:0;transform:translateY(56px)}to{opacity:1;transform:none}}
+/* 本景 */
+.tiles{display:flex;gap:34px;margin-top:64px}
+.tile{width:395px;height:290px;border-radius:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+ background:linear-gradient(165deg,rgba(34,24,58,.92),rgba(16,11,30,.94));border:1.5px solid rgba(196,181,253,.22);
+ box-shadow:0 30px 80px rgba(0,0,0,.55);opacity:0;animation:rise 1s cubic-bezier(.16,1,.3,1) var(--d) both}
+.num{font-size:104px;font-weight:900;color:#e9d5ff;letter-spacing:.02em;
+ filter:drop-shadow(0 6px 26px rgba(139,92,246,.35))}
+.lab{font-size:27px;color:rgba(236,232,247,.8);text-align:center;line-height:1.5;white-space:nowrap}
+.footer{margin-top:56px;font-size:30px;color:rgba(236,232,247,.6)}
+</style></head>
+<body>
+<div class="bg"></div><div class="aur a"></div><div class="aur b"></div><div class="grid"></div>
+<div class="stage" style="--dur:10s;z-index:2">
+ <div class="h1 in" style="--d:.15s">工程紀律,不是口號</div>
+ <div class="tiles">
+  <div class="tile" style="--d:.7s"><div class="num" data-n="197">0</div><div class="lab">自動化契約測試</div></div>
+  <div class="tile" style="--d:.95s"><div class="num" data-n="15">0</div><div class="lab">版資料庫遷移<br>每版附校驗和</div></div>
+  <div class="tile" style="--d:1.2s"><div class="num" data-n="6">0</div><div class="lab">CI 作業<br>3 平台 × 2 個 Python</div></div>
+  <div class="tile" style="--d:1.45s"><div class="num" data-n="2">0</div><div class="lab">發佈產物<br>SHA-256 交叉驗證</div></div>
+ </div>
+ <div class="footer in" style="--d:3.4s">v1.3.0a5 由 release workflow 自動建置,收據與 GitHub 資產逐一比對</div>
+</div>
+<div class="vig" style="z-index:3"></div>
+<script>
+const t0=performance.now();
+function tick(){const t=(performance.now()-t0)/1000;let live=false;
+ document.querySelectorAll('.num').forEach((el,i)=>{
+  const target=parseInt(el.dataset.n,10);const start=.9+i*.25;
+  const k=Math.min(1,Math.max(0,(t-start)/1.6));const e=1-Math.pow(1-k,3);
+  el.textContent=String(Math.round(target*e));if(k<1)live=true;});
+ if(live||t<4)requestAnimationFrame(tick);}
+requestAnimationFrame(tick);
+</script>
+</body></html>

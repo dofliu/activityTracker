@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>Scene05 即時儀表板</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#070d17}
+body{font-family:"Noto Sans CJK TC","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:#e8eef7;position:relative}
+.bg{position:absolute;inset:0;background:
+ radial-gradient(1200px 800px at 24% 18%,rgba(56,189,248,.15),transparent 62%),
+ radial-gradient(1100px 760px at 78% 82%,rgba(45,212,191,.13),transparent 60%),
+ linear-gradient(160deg,#0d1b2e 0%,#070d17 58%,#05070d 100%)}
+.aur{position:absolute;width:1500px;height:1500px;border-radius:50%;filter:blur(90px);opacity:.5;mix-blend-mode:screen}
+.aur.a{background:radial-gradient(circle,rgba(56,189,248,.30),transparent 62%);left:-460px;top:-560px;animation:drift1 22s ease-in-out infinite alternate}
+.aur.b{background:radial-gradient(circle,rgba(45,212,191,.28),transparent 62%);right:-520px;bottom:-620px;animation:drift2 26s ease-in-out infinite alternate}
+@keyframes drift1{to{transform:translate(150px,90px) scale(1.12)}}
+@keyframes drift2{to{transform:translate(-130px,-80px) scale(1.08)}}
+.vig{position:absolute;inset:0;background:radial-gradient(1600px 1000px at 50% 46%,transparent 58%,rgba(0,0,0,.5) 100%);pointer-events:none}
+.grid{position:absolute;inset:0;opacity:.05;background-image:linear-gradient(rgba(232,238,247,.5) 1px,transparent 1px),linear-gradient(90deg,rgba(232,238,247,.5) 1px,transparent 1px);background-size:64px 64px}
+.stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+ --dur:10s;animation:cam var(--dur) ease-in-out both}
+@keyframes cam{from{transform:scale(1)}to{transform:scale(1.055)}}
+.h1{font-size:60px;font-weight:900;text-align:center;
+ background:linear-gradient(100deg,#f4f8ff 20%,#9be8db 50%,#c4b5fd 80%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.card{background:linear-gradient(165deg,rgba(24,38,62,.92),rgba(12,20,36,.94));border:1.5px solid rgba(150,200,255,.20);
+ border-radius:26px;box-shadow:0 30px 80px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08)}
+.in{opacity:0;animation:rise 1s cubic-bezier(.16,1,.3,1) both;animation-delay:var(--d,0s)}
+@keyframes rise{from{opacity:0;transform:translateY(56px)}to{opacity:1;transform:none}}
+.pop{opacity:0;animation:pop .8s cubic-bezier(.2,1.4,.35,1) both;animation-delay:var(--d,0s)}
+@keyframes pop{from{opacity:0;transform:scale(.55)}to{opacity:1;transform:scale(1)}}
+/* 本景 */
+.panel{width:1280px;padding:44px 56px;margin-top:46px}
+.phead{display:flex;align-items:center;gap:24px}
+.mono{font-family:"JetBrains Mono","Consolas",monospace;letter-spacing:.28em;font-size:26px;color:#7dd3fc;font-weight:700}
+.obadge{margin-left:auto;padding:10px 24px;border-radius:10px;font-size:26px;font-weight:800;white-space:nowrap;
+ background:rgba(52,211,153,.15);border:1.5px solid rgba(52,211,153,.55);color:#6ee7b7}
+.bignum{font-size:118px;font-weight:900;margin-top:26px;letter-spacing:.02em;color:#f4f8ff;
+ filter:drop-shadow(0 6px 30px rgba(56,189,248,.25))}
+.biglabel{font-size:30px;color:rgba(232,238,247,.65);margin-top:2px}
+.minirow{display:flex;gap:26px;margin-top:40px}
+.mini{flex:1;padding:26px 30px;border-radius:18px;background:rgba(14,24,42,.85);border:1.5px solid rgba(150,200,255,.16)}
+.mini .name{font-size:30px;font-weight:800}
+.mini .st{font-size:24px;margin-top:10px;color:#6ee7b7;white-space:nowrap}
+.mini.warn .st{color:#fbbf24}
+.bound{font-size:23px;color:rgba(232,238,247,.5);margin-top:34px}
+</style></head>
+<body>
+<div class="bg"></div><div class="aur a"></div><div class="aur b"></div><div class="grid"></div>
+<div class="stage" style="--dur:10s;z-index:2">
+ <div class="h1 in" style="--d:.15s">打開儀表板,一眼看完今天</div>
+ <div class="card panel in" style="--d:.6s">
+  <div class="phead">
+   <span class="mono">OMNICONTEXT · INTEL BOARD</span>
+   <span class="obadge pop" style="--d:3.1s">COVERAGE · OBSERVED</span>
+  </div>
+  <div class="bignum"><span id="n">0 小時 00 分</span></div>
+  <div class="biglabel">今日 AI 協作前景時間(Claude Code · Codex · ChatGPT…)</div>
+  <div class="minirow">
+   <div class="mini pop" style="--d:1.7s"><div class="name">activityTracker</div><div class="st">● 進行中 · 剛剛</div></div>
+   <div class="mini pop" style="--d:1.9s"><div class="name">AI_Papers</div><div class="st">● 等審稿回覆 · 2 天</div></div>
+   <div class="mini warn pop" style="--d:2.1s"><div class="name">課程備課</div><div class="st">● 3 天未動</div></div>
+  </div>
+  <div class="bound in" style="--d:2.7s">邊界寫在介面上:這是「觀測到的前景時間」——不是生產力分數。</div>
+ </div>
+</div>
+<div class="vig" style="z-index:3"></div>
+<script>
+const el=document.getElementById('n');const target=252;const t0=performance.now();
+function tick(){const t=(performance.now()-t0)/1000;const k=Math.min(1,Math.max(0,(t-.9)/2.2));
+ const e=1-Math.pow(1-k,3);const m=Math.round(target*e);
+ el.textContent=`${Math.floor(m/60)} 小時 ${String(m%60).padStart(2,'0')} 分`;
+ if(k<1)requestAnimationFrame(tick);}
+requestAnimationFrame(tick);
+</script>
+</body></html>

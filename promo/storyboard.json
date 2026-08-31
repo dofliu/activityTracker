@@ -1,0 +1,23 @@
+{
+  "fps": 30, "width": 1920, "height": 1080, "xfade": 0.6,
+  "scenes": [
+    {"file": "scene01_hook.html",       "duration": 7,  "transition": "fade"},
+    {"file": "scene02_problem.html",    "duration": 9,  "transition": "smoothup"},
+    {"file": "scene03_title.html",      "duration": 8,  "transition": "fade"},
+    {"file": "scene04_capture.html",    "duration": 12, "transition": "circleopen"},
+    {"file": "scene05_dashboard.html",  "duration": 10, "transition": "fade"},
+    {"file": "scene06_summary.html",    "duration": 12, "transition": "smoothleft"},
+    {"file": "scene07_handoff.html",    "duration": 10, "transition": "circleopen"},
+    {"file": "scene08_projects.html",   "duration": 9,  "transition": "fade"},
+    {"file": "scene09_rag.html",        "duration": 11, "transition": "smoothup"},
+    {"file": "scene10_secretary.html",  "duration": 11, "transition": "fade"},
+    {"file": "scene11_morning.html",    "duration": 9,  "transition": "smoothleft"},
+    {"file": "scene12_executor.html",   "duration": 11, "transition": "fade"},
+    {"file": "scene13_agent.html",      "duration": 12, "transition": "fadeblack"},
+    {"file": "scene14_trust.html",      "duration": 9,  "transition": "fade"},
+    {"file": "scene15_numbers.html",    "duration": 10, "transition": "smoothup"},
+    {"file": "scene16_privacy.html",    "duration": 10, "transition": "fade"},
+    {"file": "scene17_quickstart.html", "duration": 8,  "transition": "circleopen"},
+    {"file": "scene18_cta.html",        "duration": 12}
+  ]
+}

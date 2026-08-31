@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>Scene13 Agent 代辦</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#120d06}
+body{font-family:"Noto Sans CJK TC","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:#f2ecdf;position:relative}
+.bg{position:absolute;inset:0;background:
+ radial-gradient(1200px 800px at 24% 18%,rgba(251,191,36,.13),transparent 62%),
+ radial-gradient(1100px 760px at 78% 82%,rgba(45,212,191,.12),transparent 60%),
+ linear-gradient(160deg,#241708 0%,#120d06 58%,#0a0704 100%)}
+.aur{position:absolute;width:1500px;height:1500px;border-radius:50%;filter:blur(90px);opacity:.5;mix-blend-mode:screen}
+.aur.a{background:radial-gradient(circle,rgba(251,191,36,.24),transparent 62%);left:-460px;top:-560px;animation:drift1 22s ease-in-out infinite alternate}
+.aur.b{background:radial-gradient(circle,rgba(45,212,191,.22),transparent 62%);right:-520px;bottom:-620px;animation:drift2 26s ease-in-out infinite alternate}
+@keyframes drift1{to{transform:translate(150px,90px) scale(1.12)}}
+@keyframes drift2{to{transform:translate(-130px,-80px) scale(1.08)}}
+.vig{position:absolute;inset:0;background:radial-gradient(1600px 1000px at 50% 46%,transparent 58%,rgba(0,0,0,.5) 100%);pointer-events:none}
+.grid{position:absolute;inset:0;opacity:.05;background-image:linear-gradient(rgba(242,236,223,.5) 1px,transparent 1px),linear-gradient(90deg,rgba(242,236,223,.5) 1px,transparent 1px);background-size:64px 64px}
+.stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+ --dur:12s;animation:cam var(--dur) ease-in-out both}
+@keyframes cam{from{transform:scale(1)}to{transform:scale(1.055)}}
+.h1{font-size:60px;font-weight:900;text-align:center;
+ background:linear-gradient(100deg,#fff8ec 20%,#fcd34d 55%,#fdba74 85%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.card{background:linear-gradient(165deg,rgba(46,32,14,.92),rgba(24,16,8,.94));border:1.5px solid rgba(251,191,36,.24);
+ border-radius:24px;box-shadow:0 30px 80px rgba(0,0,0,.55)}
+.chip{display:inline-flex;align-items:center;gap:12px;padding:14px 28px;border-radius:999px;font-size:27px;font-weight:700;white-space:nowrap;
+ background:rgba(30,21,9,.9);border:1.5px solid rgba(251,191,36,.3)}
+.in{opacity:0;animation:rise 1s cubic-bezier(.16,1,.3,1) both;animation-delay:var(--d,0s)}
+@keyframes rise{from{opacity:0;transform:translateY(56px)}to{opacity:1;transform:none}}
+.pop{opacity:0;animation:pop .8s cubic-bezier(.2,1.4,.35,1) both;animation-delay:var(--d,0s)}
+@keyframes pop{from{opacity:0;transform:scale(.55)}to{opacity:1;transform:scale(1)}}
+/* 本景 */
+.flow{display:flex;align-items:stretch;gap:34px;margin-top:52px}
+.plan{width:560px;padding:34px 38px;position:relative}
+.ptitle{font-size:30px;font-weight:900;color:#fcd34d}
+.pline{font-size:26px;line-height:1.8;color:rgba(242,236,223,.85);margin-top:8px}
+.stampwrap{position:absolute;right:30px;bottom:26px;transform:rotate(-12deg)}
+.stamp{padding:10px 22px;border-radius:10px;font-size:28px;font-weight:900;white-space:nowrap;
+ border:3px solid #34d399;color:#6ee7b7;background:rgba(52,211,153,.08)}
+.arrow{display:flex;align-items:center;font-size:46px;color:rgba(242,236,223,.6)}
+.term{width:640px;padding:30px 36px;background:linear-gradient(165deg,rgba(10,16,12,.95),rgba(6,10,8,.97));
+ border:1.5px solid rgba(52,211,153,.3);border-radius:24px;box-shadow:0 30px 80px rgba(0,0,0,.55);
+ font-family:"JetBrains Mono","Consolas",monospace}
+.tl{font-size:25px;line-height:2.0;white-space:nowrap}
+.tl .p{color:#6ee7b7}.tl .c{color:#e8eef7}.tl .g{color:rgba(232,238,247,.5)}
+.tl .ok{color:#6ee7b7;font-weight:700}.tl .no{color:#fca5a5;font-weight:700}
+.chips{display:flex;gap:22px;margin-top:44px}
+</style></head>
+<body>
+<div class="bg"></div><div class="aur a"></div><div class="aur b"></div><div class="grid"></div>
+<div class="stage" style="--dur:12s;z-index:2">
+ <div class="h1 in" style="--d:.15s">你批准的是計畫,不是黑箱</div>
+ <div class="flow">
+  <div class="card plan in" style="--d:.7s">
+   <div class="ptitle">📋 重啟行動計畫(agent 起草)</div>
+   <div class="pline in" style="--d:1.2s">1. 先重跑實驗 B 取得基線</div>
+   <div class="pline in" style="--d:1.45s">2. 補圖 5-3 缺的兩組數據</div>
+   <div class="pline in" style="--d:1.7s">3. 更新第五章統計表</div>
+   <div class="stampwrap"><div class="stamp pop" style="--d:2.4s">你已批准 ✓</div></div>
+  </div>
+  <div class="arrow in" style="--d:2.9s">⟶</div>
+  <div class="term in" style="--d:3.1s">
+   <div class="tl"><span class="p">$</span> <span class="c">claude -p --permission-mode acceptEdits</span></div>
+   <div class="tl in" style="--d:3.9s"><span class="g">依已批准的計畫執行…</span></div>
+   <div class="tl in" style="--d:4.5s"><span class="ok">✏️ files_changed: 2</span><span class="g">(留在 worktree)</span></div>
+   <div class="tl in" style="--d:5.1s"><span class="no">⛔ 永不 commit · 永不 push</span></div>
+  </div>
+ </div>
+ <div class="chips in" style="--d:5.8s">
+  <span class="chip">🔍 git diff 驗收</span>
+  <span class="chip">↩️ git checkout . 一鍵還原</span>
+  <span class="chip">🧾 每次執行都留 audit receipt</span>
+ </div>
+</div>
+<div class="vig" style="z-index:3"></div>
+</body></html>

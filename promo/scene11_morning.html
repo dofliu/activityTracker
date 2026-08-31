@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>Scene11 晨報</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#120d06}
+body{font-family:"Noto Sans CJK TC","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:#f2ecdf;position:relative}
+.bg{position:absolute;inset:0;background:
+ radial-gradient(1200px 800px at 24% 18%,rgba(251,191,36,.14),transparent 62%),
+ radial-gradient(1100px 760px at 78% 82%,rgba(249,115,22,.12),transparent 60%),
+ linear-gradient(160deg,#241708 0%,#120d06 58%,#0a0704 100%)}
+.aur{position:absolute;width:1500px;height:1500px;border-radius:50%;filter:blur(90px);opacity:.5;mix-blend-mode:screen}
+.aur.a{background:radial-gradient(circle,rgba(251,191,36,.26),transparent 62%);left:-460px;top:-560px;animation:drift1 22s ease-in-out infinite alternate}
+.aur.b{background:radial-gradient(circle,rgba(249,115,22,.22),transparent 62%);right:-520px;bottom:-620px;animation:drift2 26s ease-in-out infinite alternate}
+@keyframes drift1{to{transform:translate(150px,90px) scale(1.12)}}
+@keyframes drift2{to{transform:translate(-130px,-80px) scale(1.08)}}
+.vig{position:absolute;inset:0;background:radial-gradient(1600px 1000px at 50% 46%,transparent 58%,rgba(0,0,0,.5) 100%);pointer-events:none}
+.grid{position:absolute;inset:0;opacity:.05;background-image:linear-gradient(rgba(242,236,223,.5) 1px,transparent 1px),linear-gradient(90deg,rgba(242,236,223,.5) 1px,transparent 1px);background-size:64px 64px}
+.stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+ --dur:9s;animation:cam var(--dur) ease-in-out both}
+@keyframes cam{from{transform:scale(1)}to{transform:scale(1.055)}}
+.h1{font-size:62px;font-weight:900;text-align:center;
+ background:linear-gradient(100deg,#fff8ec 20%,#fcd34d 55%,#fdba74 85%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.card{background:linear-gradient(165deg,rgba(46,32,14,.94),rgba(24,16,8,.96));border:1.5px solid rgba(251,191,36,.26);
+ border-radius:22px;box-shadow:0 30px 80px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.07)}
+.chip{display:inline-flex;align-items:center;gap:14px;padding:16px 30px;border-radius:999px;font-size:29px;font-weight:700;white-space:nowrap;
+ background:rgba(30,21,9,.9);border:1.5px solid rgba(251,191,36,.3)}
+.in{opacity:0;animation:rise 1s cubic-bezier(.16,1,.3,1) both;animation-delay:var(--d,0s)}
+@keyframes rise{from{opacity:0;transform:translateY(56px)}to{opacity:1;transform:none}}
+/* 本景 */
+.toast{width:940px;padding:36px 42px;opacity:0;animation:slidein 1.1s cubic-bezier(.16,1,.3,1) 1.1s both;margin-top:52px}
+@keyframes slidein{from{opacity:0;transform:translateX(320px)}to{opacity:1;transform:none}}
+.thead{display:flex;align-items:center;gap:18px;font-size:26px;color:rgba(242,236,223,.6)}
+.tapp{font-weight:800;color:#fde68a}
+.tbody{font-size:33px;line-height:1.65;margin-top:18px}
+.trow{display:flex;gap:24px;margin-top:44px;align-items:center}
+.mut{font-size:27px;color:rgba(242,236,223,.6)}
+</style></head>
+<body>
+<div class="bg"></div><div class="aur a"></div><div class="aur b"></div><div class="grid"></div>
+<div class="stage" style="--dur:9s;z-index:2">
+ <div class="h1 in" style="--d:.15s">不是你去找它,是它來找你</div>
+ <div class="card toast">
+  <div class="thead"><span style="font-size:32px">🌅</span><span class="tapp">OmniContext · 晨間簡報</span><span style="margin-left:auto">08:30</span></div>
+  <div class="tbody">進行中 2 項 · 未結 5 項<br>
+   <b style="color:#fcd34d">秘書建議:先收掉 Extension 驗證</b>(共 3 項建議)</div>
+ </div>
+ <div class="trow in" style="--d:2.9s">
+  <span class="chip">📄 OMNICONTEXT_TODAY.md</span>
+  <span class="mut">每日入口檔同步生成——秘書建議一起寫進去</span>
+ </div>
+</div>
+<div class="vig" style="z-index:3"></div>
+</body></html>

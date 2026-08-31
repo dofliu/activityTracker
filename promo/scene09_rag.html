@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>Scene09 知識庫 RAG</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#06110c}
+body{font-family:"Noto Sans CJK TC","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:#e8eef7;position:relative}
+.bg{position:absolute;inset:0;background:
+ radial-gradient(1200px 800px at 24% 18%,rgba(52,211,153,.16),transparent 62%),
+ radial-gradient(1100px 760px at 78% 82%,rgba(45,212,191,.12),transparent 60%),
+ linear-gradient(160deg,#0c2418 0%,#06110c 58%,#040a07 100%)}
+.aur{position:absolute;width:1500px;height:1500px;border-radius:50%;filter:blur(90px);opacity:.5;mix-blend-mode:screen}
+.aur.a{background:radial-gradient(circle,rgba(52,211,153,.30),transparent 62%);left:-460px;top:-560px;animation:drift1 22s ease-in-out infinite alternate}
+.aur.b{background:radial-gradient(circle,rgba(45,212,191,.26),transparent 62%);right:-520px;bottom:-620px;animation:drift2 26s ease-in-out infinite alternate}
+@keyframes drift1{to{transform:translate(150px,90px) scale(1.12)}}
+@keyframes drift2{to{transform:translate(-130px,-80px) scale(1.08)}}
+.vig{position:absolute;inset:0;background:radial-gradient(1600px 1000px at 50% 46%,transparent 58%,rgba(0,0,0,.5) 100%);pointer-events:none}
+.grid{position:absolute;inset:0;opacity:.05;background-image:linear-gradient(rgba(232,238,247,.5) 1px,transparent 1px),linear-gradient(90deg,rgba(232,238,247,.5) 1px,transparent 1px);background-size:64px 64px}
+.stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+ --dur:11s;animation:cam var(--dur) ease-in-out both}
+@keyframes cam{from{transform:scale(1)}to{transform:scale(1.055)}}
+.h1{font-size:58px;font-weight:900;text-align:center;
+ background:linear-gradient(100deg,#f4f8ff 20%,#9bf0c8 50%,#7ff0df 80%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.card{background:linear-gradient(165deg,rgba(16,36,26,.92),rgba(8,18,13,.94));border:1.5px solid rgba(110,231,183,.22);
+ border-radius:26px;box-shadow:0 30px 80px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08)}
+.badge{display:inline-block;padding:12px 26px;border-radius:12px;font-size:28px;font-weight:700;white-space:nowrap;
+ background:rgba(52,211,153,.14);border:1.5px solid rgba(52,211,153,.45);color:#a7f3d0}
+.in{opacity:0;animation:rise 1s cubic-bezier(.16,1,.3,1) both;animation-delay:var(--d,0s)}
+@keyframes rise{from{opacity:0;transform:translateY(56px)}to{opacity:1;transform:none}}
+.pop{opacity:0;animation:pop .8s cubic-bezier(.2,1.4,.35,1) both;animation-delay:var(--d,0s)}
+@keyframes pop{from{opacity:0;transform:scale(.55)}to{opacity:1;transform:scale(1)}}
+/* 本景 */
+.ask{width:1140px;padding:26px 40px;border-radius:999px;font-size:34px;display:flex;gap:20px;align-items:center;
+ background:rgba(10,26,18,.92);border:1.5px solid rgba(110,231,183,.35);margin-top:48px}
+.ans{width:1140px;padding:34px 44px;margin-top:30px;font-size:31px;line-height:1.7;color:rgba(232,238,247,.92)}
+.cits{display:flex;gap:24px;margin-top:26px}
+.cit{padding:16px 28px;border-radius:14px;font-size:26px;font-weight:700;white-space:nowrap;
+ background:rgba(10,26,18,.92);border:1.5px solid rgba(110,231,183,.3);color:#a7f3d0}
+.foot{display:flex;gap:26px;align-items:center;margin-top:44px}
+.mut{font-size:28px;color:rgba(232,238,247,.6)}
+</style></head>
+<body>
+<div class="bg"></div><div class="aur a"></div><div class="aur b"></div><div class="grid"></div>
+<div class="stage" style="--dur:11s;z-index:2">
+ <div class="h1 in" style="--d:.15s">用你自己的資料,回答你的問題</div>
+ <div class="ask in" style="--d:.7s"><span>🔍</span><span>上學期計畫書的實驗設計,寫在哪一段?</span></div>
+ <div class="card ans in" style="--d:1.7s">在 <b style="color:#a7f3d0">§3.2 研究方法</b>——採兩階段實驗設計:先以模擬資料驗證演算法,
+再於實場域收集六週感測數據交叉比對。
+  <div class="cits">
+   <span class="cit pop" style="--d:2.7s">📄 proposal_2026.docx · §3.2</span>
+   <span class="cit pop" style="--d:2.95s">📄 meeting_0512.md · L88</span>
+  </div>
+ </div>
+ <div class="foot in" style="--d:3.6s">
+  <span class="badge">4,380 份文件 · 已建語意索引</span>
+  <span class="mut">全程本機檢索,不上傳任何檔案</span>
+ </div>
+</div>
+<div class="vig" style="z-index:3"></div>
+</body></html>

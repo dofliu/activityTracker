@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>Scene04 全景採集</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#070d17}
+body{font-family:"Noto Sans CJK TC","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:#e8eef7;position:relative}
+.bg{position:absolute;inset:0;background:
+ radial-gradient(1200px 800px at 24% 18%,rgba(45,212,191,.14),transparent 62%),
+ radial-gradient(1100px 760px at 78% 82%,rgba(139,92,246,.15),transparent 60%),
+ linear-gradient(160deg,#0d1b2e 0%,#070d17 58%,#05070d 100%)}
+.aur{position:absolute;width:1500px;height:1500px;border-radius:50%;filter:blur(90px);opacity:.5;mix-blend-mode:screen}
+.aur.a{background:radial-gradient(circle,rgba(45,212,191,.32),transparent 62%);left:-460px;top:-560px;animation:drift1 22s ease-in-out infinite alternate}
+.aur.b{background:radial-gradient(circle,rgba(139,92,246,.30),transparent 62%);right:-520px;bottom:-620px;animation:drift2 26s ease-in-out infinite alternate}
+@keyframes drift1{to{transform:translate(150px,90px) scale(1.12)}}
+@keyframes drift2{to{transform:translate(-130px,-80px) scale(1.08)}}
+.vig{position:absolute;inset:0;background:radial-gradient(1600px 1000px at 50% 46%,transparent 58%,rgba(0,0,0,.5) 100%);pointer-events:none}
+.grid{position:absolute;inset:0;opacity:.05;background-image:linear-gradient(rgba(232,238,247,.5) 1px,transparent 1px),linear-gradient(90deg,rgba(232,238,247,.5) 1px,transparent 1px);background-size:64px 64px}
+.stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+ --dur:12s;animation:cam var(--dur) ease-in-out both}
+@keyframes cam{from{transform:scale(1)}to{transform:scale(1.055)}}
+.h1{font-size:64px;font-weight:900;text-align:center;
+ background:linear-gradient(100deg,#f4f8ff 20%,#9be8db 50%,#c4b5fd 80%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{font-size:34px;color:rgba(232,238,247,.75);text-align:center}
+.card{background:linear-gradient(165deg,rgba(24,38,62,.92),rgba(12,20,36,.94));border:1.5px solid rgba(150,200,255,.20);
+ border-radius:26px;box-shadow:0 30px 80px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08)}
+.in{opacity:0;animation:rise 1s cubic-bezier(.16,1,.3,1) both;animation-delay:var(--d,0s)}
+@keyframes rise{from{opacity:0;transform:translateY(56px)}to{opacity:1;transform:none}}
+.pop{opacity:0;animation:pop .8s cubic-bezier(.2,1.4,.35,1) both;animation-delay:var(--d,0s)}
+@keyframes pop{from{opacity:0;transform:scale(.55)}to{opacity:1;transform:scale(1)}}
+.glow{animation:glow 2.6s ease-in-out infinite}
+@keyframes glow{0%,100%{filter:drop-shadow(0 0 18px rgba(45,212,191,.25))}50%{filter:drop-shadow(0 0 42px rgba(45,212,191,.55))}}
+.pop.glow{animation:pop .8s cubic-bezier(.2,1.4,.35,1) var(--d,0s) both,glow 2.6s ease-in-out infinite}
+/* 本景 */
+.flyL{opacity:0;animation:flyL 1s cubic-bezier(.16,1,.3,1) both;animation-delay:var(--d,0s)}
+@keyframes flyL{from{opacity:0;transform:translateX(-140px)}to{opacity:1;transform:none}}
+.flyR{opacity:0;animation:flyR 1s cubic-bezier(.16,1,.3,1) both;animation-delay:var(--d,0s)}
+@keyframes flyR{from{opacity:0;transform:translateX(140px)}to{opacity:1;transform:none}}
+.srcchip{padding:22px 34px;border-radius:18px;font-size:32px;font-weight:700;white-space:nowrap;
+ background:rgba(20,32,52,.88);border:1.5px solid rgba(150,200,255,.24);box-shadow:0 14px 40px rgba(0,0,0,.45)}
+.srcsub{font-size:21px;color:rgba(232,238,247,.55);margin-top:8px;white-space:nowrap;text-align:center}
+.row{display:flex;align-items:center;gap:54px;margin-top:56px}
+.col{display:flex;flex-direction:column;gap:38px;align-items:stretch}
+.core{width:470px;height:330px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+ border:1.5px solid rgba(45,212,191,.5)}
+.beam{width:70px;height:4px;border-radius:2px;background:linear-gradient(90deg,transparent,rgba(45,212,191,.9));
+ animation:pulse 1.6s ease-in-out infinite;opacity:0}
+.beam.r{background:linear-gradient(270deg,transparent,rgba(45,212,191,.9))}
+.beamwrap{opacity:0;animation:rise .6s ease both;animation-delay:var(--d,0s);display:flex;flex-direction:column;gap:38px}
+@keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
+</style></head>
+<body>
+<div class="bg"></div><div class="aur a"></div><div class="aur b"></div><div class="grid"></div>
+<div class="stage" style="--dur:12s;z-index:2">
+ <div class="h1 in" style="--d:.15s">十種來源,一個真相庫</div>
+ <div class="row">
+  <div class="col">
+   <div class="flyL" style="--d:.5s"><div class="srcchip">📁 檔案異動</div></div>
+   <div class="flyL" style="--d:.75s"><div class="srcchip">🌿 Git 提交</div></div>
+   <div class="flyL" style="--d:1.0s"><div class="srcchip">🪟 前景視窗</div></div>
+  </div>
+  <div class="beamwrap" style="--d:2.4s">
+   <div class="beam" style="animation-delay:.0s"></div>
+   <div class="beam" style="animation-delay:.3s"></div>
+   <div class="beam" style="animation-delay:.6s"></div>
+  </div>
+  <div class="card core pop glow" style="--d:1.9s">
+   <div style="font-size:76px">🗄️</div>
+   <div style="font-size:44px;font-weight:900">SQLite 本機資料庫</div>
+   <div style="font-size:26px;color:rgba(232,238,247,.65)">全部存在你的電腦,邊採集邊歸戶</div>
+  </div>
+  <div class="beamwrap" style="--d:2.4s">
+   <div class="beam r" style="animation-delay:.15s"></div>
+   <div class="beam r" style="animation-delay:.45s"></div>
+   <div class="beam r" style="animation-delay:.75s"></div>
+  </div>
+  <div class="col">
+   <div class="flyR" style="--d:.6s"><div class="srcchip">🤖 AI CLI 日誌</div>
+    <div class="srcsub">Claude Code · Codex · Desktop · Antigravity</div></div>
+   <div class="flyR" style="--d:.85s"><div class="srcchip">🌐 瀏覽器 Extension</div>
+    <div class="srcsub">ChatGPT · Claude · Gemini</div></div>
+   <div class="flyR" style="--d:1.1s"><div class="srcchip">⏳ 背景任務追蹤</div></div>
+  </div>
+ </div>
+ <div class="sub in" style="--d:3.2s;margin-top:58px">你只管工作——記錄的事,交給它</div>
+</div>
+<div class="vig" style="z-index:3"></div>
+</body></html>

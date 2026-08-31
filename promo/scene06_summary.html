@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>Scene06 兩層增量摘要</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#070d17}
+body{font-family:"Noto Sans CJK TC","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:#e8eef7;position:relative}
+.bg{position:absolute;inset:0;background:
+ radial-gradient(1200px 800px at 24% 18%,rgba(56,189,248,.15),transparent 62%),
+ radial-gradient(1100px 760px at 78% 82%,rgba(45,212,191,.13),transparent 60%),
+ linear-gradient(160deg,#0d1b2e 0%,#070d17 58%,#05070d 100%)}
+.aur{position:absolute;width:1500px;height:1500px;border-radius:50%;filter:blur(90px);opacity:.5;mix-blend-mode:screen}
+.aur.a{background:radial-gradient(circle,rgba(56,189,248,.30),transparent 62%);left:-460px;top:-560px;animation:drift1 22s ease-in-out infinite alternate}
+.aur.b{background:radial-gradient(circle,rgba(45,212,191,.28),transparent 62%);right:-520px;bottom:-620px;animation:drift2 26s ease-in-out infinite alternate}
+@keyframes drift1{to{transform:translate(150px,90px) scale(1.12)}}
+@keyframes drift2{to{transform:translate(-130px,-80px) scale(1.08)}}
+.vig{position:absolute;inset:0;background:radial-gradient(1600px 1000px at 50% 46%,transparent 58%,rgba(0,0,0,.5) 100%);pointer-events:none}
+.grid{position:absolute;inset:0;opacity:.05;background-image:linear-gradient(rgba(232,238,247,.5) 1px,transparent 1px),linear-gradient(90deg,rgba(232,238,247,.5) 1px,transparent 1px);background-size:64px 64px}
+.stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+ --dur:12s;animation:cam var(--dur) ease-in-out both}
+@keyframes cam{from{transform:scale(1)}to{transform:scale(1.055)}}
+.h1{font-size:60px;font-weight:900;text-align:center;
+ background:linear-gradient(100deg,#f4f8ff 20%,#9be8db 50%,#c4b5fd 80%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{font-size:32px;color:rgba(232,238,247,.75);text-align:center}
+.card{background:linear-gradient(165deg,rgba(24,38,62,.92),rgba(12,20,36,.94));border:1.5px solid rgba(150,200,255,.20);
+ border-radius:26px;box-shadow:0 30px 80px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08)}
+.in{opacity:0;animation:rise 1s cubic-bezier(.16,1,.3,1) both;animation-delay:var(--d,0s)}
+@keyframes rise{from{opacity:0;transform:translateY(56px)}to{opacity:1;transform:none}}
+.pop{opacity:0;animation:pop .8s cubic-bezier(.2,1.4,.35,1) both;animation-delay:var(--d,0s)}
+@keyframes pop{from{opacity:0;transform:scale(.55)}to{opacity:1;transform:scale(1)}}
+.glow{animation:glow 2.6s ease-in-out infinite}
+@keyframes glow{0%,100%{filter:drop-shadow(0 0 18px rgba(45,212,191,.25))}50%{filter:drop-shadow(0 0 42px rgba(45,212,191,.55))}}
+.pop.glow{animation:pop .8s cubic-bezier(.2,1.4,.35,1) var(--d,0s) both,glow 2.6s ease-in-out infinite}
+/* 本景 */
+.pipe{display:flex;align-items:center;gap:20px;margin-top:60px}
+.micro{width:250px;padding:24px 22px;border-radius:18px;text-align:center;
+ background:rgba(14,24,42,.88);border:1.5px solid rgba(56,189,248,.3)}
+.micro .t{font-size:28px;font-weight:800;color:#7dd3fc;white-space:nowrap}
+.micro .d{font-size:23px;margin-top:10px;color:rgba(232,238,247,.75);white-space:nowrap}
+.micro .tag{display:inline-block;margin-top:14px;padding:6px 14px;border-radius:8px;font-size:20px;font-weight:700;white-space:nowrap;
+ background:rgba(45,212,191,.14);border:1px solid rgba(45,212,191,.4);color:#7ff0df}
+.arr{font-size:40px;color:rgba(232,238,247,.5)}
+.day{width:330px;padding:34px 28px;text-align:center;border:1.5px solid rgba(45,212,191,.55)}
+.day .t{font-size:34px;font-weight:900;white-space:nowrap}
+.day .d{font-size:24px;margin-top:10px;color:rgba(232,238,247,.7);white-space:nowrap}
+.stat{margin-top:64px;font-size:46px;font-weight:900;color:#7ff0df;letter-spacing:.02em}
+.barwrap{width:1180px;height:8px;border-radius:4px;background:rgba(150,200,255,.12);margin-top:30px;overflow:hidden}
+.bar{height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#38bdf8,#2dd4bf);animation:fill 3s ease-out 1.4s both}
+@keyframes fill{to{width:100%}}
+</style></head>
+<body>
+<div class="bg"></div><div class="aur a"></div><div class="aur b"></div><div class="grid"></div>
+<div class="stage" style="--dur:12s;z-index:2">
+ <div class="h1 in" style="--d:.15s">日報,不再吞掉一整天的 token</div>
+ <div class="sub in" style="--d:.7s;margin-top:22px">每個工作時段先在本機壓成微摘要(map),日報只讀重點(reduce)</div>
+ <div class="pipe">
+  <div class="micro pop" style="--d:1.2s"><div class="t">08–10</div><div class="d">≤100 字微摘要</div><div class="tag">本機 Ollama · $0</div></div>
+  <div class="arr in" style="--d:1.5s">→</div>
+  <div class="micro pop" style="--d:1.6s"><div class="t">10–12</div><div class="d">≤100 字微摘要</div><div class="tag">本機 Ollama · $0</div></div>
+  <div class="arr in" style="--d:1.9s">→</div>
+  <div class="micro pop" style="--d:2.0s"><div class="t">13–15</div><div class="d">≤100 字微摘要</div><div class="tag">本機 Ollama · $0</div></div>
+  <div class="arr in" style="--d:2.3s">→</div>
+  <div class="card day pop glow" style="--d:2.8s"><div class="t">📝 23:30 每日日誌</div><div class="d">微摘要時間軸 + 缺漏回退原文</div></div>
+ </div>
+ <div class="barwrap in" style="--d:1.3s"><div class="bar"></div></div>
+ <div class="stat in" style="--d:3.6s">雲端 token 用量 ↓ 約一個數量級</div>
+</div>
+<div class="vig" style="z-index:3"></div>
+</body></html>
