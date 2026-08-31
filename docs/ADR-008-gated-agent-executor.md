@@ -83,6 +83,29 @@ ADR-007 Addendum 記錄了第一次 executor 嘗試被 revert 的三個漏洞：
 4. **P5-R4**：Telegram inline 批准（同一 execution token 邊界）、秘書晨報／晚間交接。（晨報部分已於 2026-08-31 以 P5-R4a 實作：桌面通知與每日入口檔帶 top 建議，唯讀。）
 5. **P5-R5**：使用者自訂排程任務（僅能排程已註冊 template）、STATUS 自動維護、週／月報 rollup。
 
+## 2026-08-31 Addendum：L2 寫入型 template（agent 實際代辦）
+
+P5-R3 的 `agent_draft_plan` 是唯讀輸出；本 Addendum 定義第一個**會修改使用者
+repo 檔案**的 template `agent_apply_plan`，安全契約在 D1–D6 之上再加四條：
+
+- **A1. 兩段式批准**：apply 的前置條件是同專案 24 小時內存在 `succeeded`
+  的 `agent_draft_plan` receipt 且其輸出檔仍在。使用者批准的不是抽象的
+  「去做事」，而是一份**可先讀過的具體計畫文件**；apply 的 prompt 即該計畫
+  全文（截斷上限）＋邊界指令。沒有可引用的計畫 → 不提供此動作。
+- **A2. 第三開關**：`executor.l2.allow_write`（預設 `false`）。未開啟時
+  寫入型 template 完全不註冊；L2 讀取型（draft）不受影響。三道門
+  （token＋單鍵批准＋一次性 confirm code）與冷卻照常疊加。
+- **A3. worktree 前置與絕不 commit**：dispatch 前 `git status --porcelain`
+  必須乾淨（髒 worktree 一律拒絕，保護使用者未提交的工作；發放 confirm
+  code 前先檢查一次，runner 內再檢查一次）。template **永不執行
+  commit / push**——agent 改完的檔案以未提交變更留在 worktree，使用者用
+  自己的 git 工具檢視、提交或 `git checkout .` 整批還原。
+- **A4. 變更可觀察**：執行後再次 porcelain 統計，receipt 白名單欄位含
+  `files_changed` 與輸出檔路徑；改動的檔名清單只出現在當次 API 回應
+  （使用者當下看），不落 receipt。CLI 寫入權限由其自身旗標約束
+  （Claude Code 預設 `--permission-mode acceptEdits`：允許檔案編輯、
+  不授予 shell）。
+
 ## Acceptance criteria（重啟 executor 的最低門檻，對應 ADR-007 Addendum）
 
 1. Execute endpoint 僅接受 `proposal_id`；任何含自由字串 command 的請求被 422 拒絕並有測試。

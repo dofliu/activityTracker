@@ -460,6 +460,8 @@ proactive_secretary:
 
 L2 每次執行都是**三道門**：execution token → 單鍵批准 → 回填 server 產生的一次性 6 碼確認碼（5 分鐘失效、錯一次即作廢）；同一動作有冷卻時間避免連點。子行程以 argv 白名單啟動（禁 shell）、工作目錄限定該專案的本機 repo、環境變數重建為位置類 allowlist——**你的任何 API key 都不會傳給子行程**（CLI 用它自己家目錄的登入憑證）。注意：這會消耗你 Claude Code／Codex 的訂閱或 API 額度；執行中的 job 可由 executions 面板取消（會真正終止行程）。
 
+**L2 寫入模式（agent 實際代辦；第三開關 `l2.allow_write`，預設關閉）**：採**兩段式批准**——先用「起草計畫」產出一份你讀得到的計畫檔，24 小時內同一專案的建議卡才會出現「依已批准計畫實際修改檔案」按鈕；執行時把**那份計畫全文**餵給 CLI（Claude Code 以 `--permission-mode acceptEdits` 授權檔案編輯）。dispatch 前 repo worktree 必須乾淨（保護你未提交的工作），agent **永不 commit／push**——改動以未提交變更留在 worktree，回應會列出改了哪些檔案，`git diff` 檢視、滿意再自己 commit，`git checkout .` 可整批還原。receipt 只記檔案數與輸出摘要。
+
 ### 兩層增量摘要（日報 token 效率）
 
 日報現在採 map-reduce：每次週期 checkpoint（預設每 2 小時）會順帶用本機模型（預設 Ollama）把該時段壓成 ≤100 字微摘要存入 SQLite（map，零 API 成本）；23:30 或手動產日報時，prompt 優先讀「微摘要時間軸＋原始統計」（reduce），token 用量約降一個數量級。微摘要失敗（如 Ollama 未啟動）或缺漏的時段自動回退原始節錄，日報永遠可產生。相關設定：

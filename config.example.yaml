@@ -234,10 +234,20 @@ proactive_secretary:
       enabled: false
       confirm_ttl_seconds: 300
       cooldown_seconds: 600
+      # 第三開關（ADR-008 Addendum）：允許 agent 依「已批准的 draft 計畫」
+      # 實際修改該專案 repo 內檔案（agent_apply_plan）。dispatch 前 worktree
+      # 必須乾淨；agent 永不 commit/push——改動留在 worktree 供您 git diff
+      # 檢視，git checkout . 可整批還原。
+      allow_write: false
     agent_cli:
       binary: claude          # 或 codex
       args: ['-p', '{prompt}']  # codex 範例：['exec', '{prompt}']
       timeout_seconds: 240
+      # 寫入模式參數（allow_write 用）；不設定時依 binary 採預設：
+      #   claude → ['-p', '{prompt}', '--permission-mode', 'acceptEdits']
+      #   codex  → ['exec', '--full-auto', '{prompt}']
+      # write_args: [...]
+      write_timeout_seconds: 600
 
 notifiers:
   desktop:

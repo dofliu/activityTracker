@@ -163,6 +163,7 @@ const I18N = {
     settings_executor_note: "預設關閉；每次執行仍需 execution token 與逐項批准",
     executor_enabled_label: "啟用執行器（L0/L1 白名單動作）",
     executor_l2_label: "啟用 L2：調度本機 agent CLI（需一次性確認碼）",
+    executor_l2_write_label: "允許 L2 依已批准計畫修改檔案（不 commit）",
     executor_cli_label: "AGENT CLI",
     executor_boundary: "L2 會用您本機已登入的 CLI 消耗訂閱／API 額度；子行程禁 shell、僅限白名單動作與該專案 repo 目錄，不會拿到任何 API key。執行前仍需 execution token（python main.py init --show-token）＋單鍵批准＋回填一次性確認碼。",
     gh_opt1_title: "快捷方式 1 (推薦)：本機 GITHUB CLI",
@@ -358,6 +359,7 @@ const I18N = {
     settings_executor_note: "Off by default; every run still needs the execution token and per-item approval",
     executor_enabled_label: "Enable executor (L0/L1 whitelist actions)",
     executor_l2_label: "Enable L2: dispatch local agent CLI (one-time confirm code)",
+    executor_l2_write_label: "Allow L2 to edit files per an approved plan (never commits)",
     executor_cli_label: "AGENT CLI",
     executor_boundary: "L2 spends your locally signed-in CLI quota; subprocesses are shell-free, restricted to whitelist actions and the project's repo directory, and never receive any API key. Runs still require the execution token (python main.py init --show-token), one-click approval, and a one-time confirm code.",
     gh_opt1_title: "Option 1 (Recommended): Local GITHUB CLI",
@@ -1145,6 +1147,16 @@ window.executeProposal = async function (proposalId, templateId = null, confirmC
       if (data.result.output_path) {
         message += zh ? `\n完整輸出：${data.result.output_path}` : `\nFull output: ${data.result.output_path}`;
       }
+    }
+    if (data.result && typeof data.result.files_changed === "number" && data.result.changed_files) {
+      const changed = data.result.changed_files;
+      message += zh
+        ? `\nAgent 修改了 ${data.result.files_changed} 個檔案（未 commit）`
+        : `\nAgent modified ${data.result.files_changed} file(s) (not committed)`;
+      if (changed.length) message += "\n- " + changed.slice(0, 8).join("\n- ");
+      message += zh
+        ? "\n請用 git diff 檢視；git checkout . 可整批還原。"
+        : "\nReview with git diff; revert everything with git checkout .";
     }
     if (receipt.error_code) message += `\n(${receipt.error_code})`;
     alert(message);
@@ -2002,6 +2014,7 @@ async function loadConfig() {
     const executor = (currentConfig.proactive_secretary || {}).executor || {};
     $("toggle-executor-enabled").checked = executor.enabled === true;
     $("toggle-executor-l2").checked = !!(executor.l2 && executor.l2.enabled === true);
+    $("toggle-executor-l2-write").checked = !!(executor.l2 && executor.l2.allow_write === true);
     $("select-agent-cli").value = (executor.agent_cli && executor.agent_cli.binary) === "codex" ? "codex" : "claude";
     $("toggle-usage-tracking").checked = usage.enabled === true;
     const usageNotifications = usage.notifications || {};
@@ -2115,6 +2128,7 @@ async function saveSettings() {
   executorCfg.enabled = $("toggle-executor-enabled").checked;
   executorCfg.l2 = executorCfg.l2 || {};
   executorCfg.l2.enabled = $("toggle-executor-l2").checked;
+  executorCfg.l2.allow_write = $("toggle-executor-l2-write").checked;
   executorCfg.agent_cli = executorCfg.agent_cli || {};
   const cliChoice = $("select-agent-cli").value === "codex" ? "codex" : "claude";
   if (executorCfg.agent_cli.binary !== cliChoice) {

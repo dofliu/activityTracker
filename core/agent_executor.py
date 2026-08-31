@@ -106,6 +106,9 @@ class ActionPlan:
     receipt_fields: tuple[str, ...]
     runner: Callable[[dict[str, Any]], dict[str, Any]]
     dispatch_mode: str = "in_process"
+    # 執行前置檢查（如 clean worktree）：在發放 confirm code 之前執行，
+    # 失敗即拒絕、不進入確認流程；runner 內仍需自行再檢查一次。
+    precheck: Callable[[], None] | None = None
 
 
 @dataclass
@@ -151,6 +154,14 @@ def l2_enabled(cfg: Any | None = None) -> bool:
     cfg = cfg or get_config()
     return executor_enabled(cfg) and bool(
         cfg.get("proactive_secretary.executor.l2.enabled", False)
+    )
+
+
+def l2_write_enabled(cfg: Any | None = None) -> bool:
+    """ADR-008 Addendum A2：寫入型 L2 template 的第三開關，預設關閉。"""
+    cfg = cfg or get_config()
+    return l2_enabled(cfg) and bool(
+        cfg.get("proactive_secretary.executor.l2.allow_write", False)
     )
 
 
@@ -393,11 +404,228 @@ def _maybe_agent_draft_plan(
     )
 
 
+# ---- ADR-008 Addendum：L2 寫入型 template（agent 依已批准計畫實際改檔） ----
+
+_DRAFT_RECEIPT_MAX_AGE_HOURS = 24
+_APPLY_PLAN_TEXT_LIMIT = 6000
+_APPLY_PROMPT_HEADER = (
+    "你是代辦執行者。以下是使用者已批准的行動計畫，請在目前的 repo 工作目錄內執行它。\n"
+    "約束：只能修改此 repo 內的檔案；不要執行 git commit、git push 或任何版本控制寫入；"
+    "不要碰 repo 以外的路徑。完成後輸出：做了什麼、改了哪些檔案、還剩什麼未完成。\n"
+    "【已批准的計畫】\n"
+)
+
+
+def _agent_cli_write_settings(cfg: Any) -> tuple[str, list[str], int] | None:
+    """寫入模式的 CLI 參數；未知 binary 又沒明示 write_args 時 fail-closed 不提供。"""
+    binary = str(cfg.get("proactive_secretary.executor.agent_cli.binary", "claude") or "claude")
+    defaults = {
+        "claude": ["-p", "{prompt}", "--permission-mode", "acceptEdits"],
+        "codex": ["exec", "--full-auto", "{prompt}"],
+    }
+    raw_args = cfg.get("proactive_secretary.executor.agent_cli.write_args", None)
+    if not isinstance(raw_args, (list, tuple)) or not raw_args:
+        raw_args = defaults.get(binary)
+        if raw_args is None:
+            return None
+    try:
+        timeout = int(cfg.get("proactive_secretary.executor.agent_cli.write_timeout_seconds", 600))
+    except (TypeError, ValueError):
+        timeout = 600
+    return binary, [str(item) for item in raw_args], min(3600, max(60, timeout))
+
+
+def _porcelain_lines(cwd: str) -> list[str]:
+    outcome = run_agent_subprocess(
+        ["git", "status", "--porcelain"], cwd=cwd, timeout_seconds=30
+    )
+    if outcome.get("exit_code") != 0:
+        raise DispatchRejected("git_status_failed", "無法確認 worktree 狀態")
+    return [line for line in str(outcome.get("stdout") or "").splitlines() if line.strip()]
+
+
+def _clean_worktree_precheck(cwd: str) -> Callable[[], None]:
+    def _check() -> None:
+        try:
+            dirty = _porcelain_lines(cwd)
+        except DispatchRejected as exc:
+            raise ExecutionRejected(exc.error_code, str(exc)) from exc
+        if dirty:
+            raise ExecutionRejected(
+                "worktree_not_clean",
+                f"repo 有 {len(dirty)} 筆未提交變更；請先 commit 或 stash，"
+                "避免 agent 的修改與您的工作混在一起",
+            )
+
+    return _check
+
+
+def _recent_draft_plan(
+    project_key: str, *, database: Any, now: datetime
+) -> tuple[int, str] | None:
+    """回傳 (draft receipt id, 計畫全文)；沒有可引用的近期計畫即 None。"""
+    window_start = now - timedelta(hours=_DRAFT_RECEIPT_MAX_AGE_HOURS)
+    with database.session_scope() as session:
+        row = (
+            session.query(AgentExecutionReceipt)
+            .filter(
+                AgentExecutionReceipt.template_id == "agent_draft_plan",
+                AgentExecutionReceipt.status == "succeeded",
+                AgentExecutionReceipt.project_key == project_key,
+                AgentExecutionReceipt.requested_at > window_start,
+            )
+            .order_by(AgentExecutionReceipt.requested_at.desc())
+            .first()
+        )
+        if row is None or not row.output_summary:
+            return None
+        receipt_id = row.id
+        try:
+            output_path = json.loads(row.output_summary).get("output_path")
+        except (ValueError, AttributeError):
+            return None
+    if not output_path:
+        return None
+    try:
+        from pathlib import Path
+
+        text = Path(output_path).read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return (receipt_id, text) if text else None
+
+
+def _run_agent_apply(
+    ctx: dict[str, Any],
+    *,
+    argv: list[str],
+    cwd: str,
+    timeout_seconds: int,
+    project_key: str,
+    binary: str,
+    plan_receipt_id: int,
+) -> dict[str, Any]:
+    # runner 內再驗一次 worktree（confirm 流程與執行之間可能有變化）。
+    if _porcelain_lines(cwd):
+        raise DispatchRejected(
+            "worktree_not_clean", "repo 在確認流程期間出現未提交變更，已中止"
+        )
+    receipt_id = ctx.get("receipt_id")
+    outcome = run_agent_subprocess(
+        argv, cwd=cwd, timeout_seconds=timeout_seconds, receipt_id=receipt_id
+    )
+    try:
+        changed_files = _porcelain_lines(cwd)
+    except DispatchRejected:
+        changed_files = []
+    stdout = str(outcome.get("stdout") or "").strip()
+    payload: dict[str, Any] = {
+        "project_key": project_key,
+        "binary": binary,
+        "exit_code": outcome.get("exit_code"),
+        "files_changed": len(changed_files),
+        "plan_receipt_id": plan_receipt_id,
+        "output_path": None,
+    }
+    if outcome.get("exit_code") != 0:
+        raise AgentCliFailed(int(outcome.get("exit_code") or -1), payload)
+
+    if stdout:
+        output_dir = runtime_data_root() / "agent_outputs"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / f"execution_{receipt_id or 'adhoc'}.md"
+        output_path.write_text(stdout, encoding="utf-8")
+        payload["output_path"] = str(output_path)
+    # 改動檔名只進當次回應（使用者當下檢視），不落 receipt（A4）。
+    payload["changed_files"] = [line[3:] for line in changed_files][:50]
+    payload["report_markdown"] = stdout[:RESPONSE_TEXT_LIMIT]
+    payload["claim_boundary"] = (
+        "Agent 的修改以未提交變更留在 worktree；請用 git diff 檢視後自行 commit，"
+        "或以 git checkout . 整批還原。"
+    )
+    return payload
+
+
+def _maybe_agent_apply_plan(
+    proposal: dict[str, Any],
+    *,
+    services: ExecutorServices,
+    cfg: Any,
+    database: Any,
+    now: datetime,
+) -> ActionPlan | None:
+    """A1 兩段式：只有存在近期已批准（succeeded）的 draft 計畫時才提供。"""
+    if str(proposal.get("proposal_type") or "") not in _DRAFT_PLAN_TYPES:
+        return None
+    project_key = str(proposal.get("project_key") or "")
+    if not project_key:
+        return None
+    settings = _agent_cli_write_settings(cfg)
+    if settings is None:
+        return None
+    try:
+        references = services.repo_references()
+    except Exception:  # noqa: BLE001
+        references = []
+    repo = _matching_repo(project_key, references)
+    if repo is None:
+        return None
+    draft = _recent_draft_plan(project_key, database=database, now=now)
+    if draft is None:
+        return None
+    plan_receipt_id, plan_text = draft
+
+    binary, write_args, timeout_seconds = settings
+    prompt = _APPLY_PROMPT_HEADER + plan_text[:_APPLY_PLAN_TEXT_LIMIT]
+    argv = [binary] + [item.replace("{prompt}", prompt) for item in write_args]
+    if not any("{prompt}" in item for item in write_args):
+        argv.append(prompt)
+    cwd = str(repo.path)
+
+    return ActionPlan(
+        template_id="agent_apply_plan",
+        risk_level=RISK_L2,
+        label=(
+            f"讓本機 {binary} 依已批准的計畫（receipt #{plan_receipt_id}）實際修改此 repo"
+            "（不 commit，改動留給您檢視）"
+        ),
+        call_description=f"agent_dispatch.apply({binary}, cwd={project_key!r}, plan=#{plan_receipt_id})",
+        params={
+            "project_key": project_key,
+            "binary": binary,
+            "cwd": cwd,
+            "plan_receipt_id": plan_receipt_id,
+        },
+        timeout_seconds=timeout_seconds,
+        receipt_fields=(
+            "project_key",
+            "binary",
+            "exit_code",
+            "files_changed",
+            "plan_receipt_id",
+            "output_path",
+        ),
+        runner=lambda ctx: _run_agent_apply(
+            ctx,
+            argv=argv,
+            cwd=cwd,
+            timeout_seconds=timeout_seconds,
+            project_key=project_key,
+            binary=binary,
+            plan_receipt_id=plan_receipt_id,
+        ),
+        dispatch_mode="subprocess",
+        precheck=_clean_worktree_precheck(cwd),
+    )
+
+
 def derive_actions(
     proposal: dict[str, Any],
     *,
     services: ExecutorServices,
     cfg: Any | None = None,
+    database: Any | None = None,
+    now: datetime | None = None,
 ) -> list[ActionPlan]:
     """proposal 對應的全部已註冊動作；第一項為既有 primary（向後相容）。"""
     cfg = cfg or get_config()
@@ -411,6 +639,18 @@ def derive_actions(
             plan.template_id != extra.template_id for plan in plans
         ):
             plans.append(extra)
+        if l2_write_enabled(cfg):
+            apply_plan = _maybe_agent_apply_plan(
+                proposal,
+                services=services,
+                cfg=cfg,
+                database=database or get_db(),
+                now=now or get_local_now(),
+            )
+            if apply_plan is not None and all(
+                plan.template_id != apply_plan.template_id for plan in plans
+            ):
+                plans.append(apply_plan)
     return plans
 
 
@@ -446,6 +686,8 @@ def attach_execution_actions(
     *,
     cfg: Any | None = None,
     services: ExecutorServices | None = None,
+    database: Any | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """在 proposals 回應標記可執行動作；executor 關閉時不改任何內容。"""
     cfg = cfg or get_config()
@@ -454,7 +696,9 @@ def attach_execution_actions(
     services = services or ExecutorServices()
     any_executable = False
     for item in result.get("proposals", []):
-        plans = derive_actions(item, services=services, cfg=cfg)
+        plans = derive_actions(
+            item, services=services, cfg=cfg, database=database, now=now
+        )
         if not plans:
             continue
         primary = plans[0]
@@ -646,7 +890,9 @@ def execute_proposal(
         )
 
     services = services or ExecutorServices()
-    plans = derive_actions(proposal, services=services, cfg=cfg)
+    plans = derive_actions(
+        proposal, services=services, cfg=cfg, database=database, now=now
+    )
     if not plans:
         raise ExecutionRejected(
             "no_registered_action",
@@ -671,10 +917,15 @@ def execute_proposal(
                 "L2_MUTATE 未啟用（proactive_secretary.executor.l2.enabled=false）",
             )
         _check_l2_cooldown(plan.template_id, cfg=cfg, now=now, database=database)
+        # 前置檢查在發放 confirm code 之前跑：不讓使用者走完確認流程才被拒。
+        if plan.precheck is not None:
+            plan.precheck()
         if not confirm_code:
             return _issue_confirm_code(proposal_id, plan, cfg=cfg, now=now)
         _consume_confirm_code(proposal_id, plan.template_id, confirm_code, now=now)
         approved_via = f"{approved_via}+confirm_code"
+    elif plan.precheck is not None:
+        plan.precheck()
 
     with database.session_scope() as session:
         active = (

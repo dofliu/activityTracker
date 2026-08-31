@@ -365,6 +365,7 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     assert "assistant-chat-messages" in dashboard.text
     assert "toggle-executor-enabled" in dashboard.text
     assert "toggle-executor-l2" in dashboard.text
+    assert "toggle-executor-l2-write" in dashboard.text
     assert "select-agent-cli" in dashboard.text
     assert "DATA CAPTURE" in dashboard.text
     assert "extension-capture-badge" not in dashboard.text
