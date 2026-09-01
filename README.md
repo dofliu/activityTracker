@@ -48,7 +48,7 @@
 │  • 01 · 🤖 小秘書首頁    • PDF/Office/Md 解析    • 多日自訂區間日報回顧  │
 │    （對話交辦+建議+概況）• FastEmbed + ChromaDB  • 週期性 Checkpoint     │
 │  • 02 · 進行中工作       • Jieba + BM25 關鍵字   • 桌面通知 / Telegram   │
-│  • 03 · 知識庫與 RAG     • Hybrid RRF 混合檢索   • 多供應商 (Gemini /    │
+│  • 小秘書與知識庫分頁    • Hybrid RRF 混合檢索   • 多供應商 (Gemini /    │
 │  • 04 · 每日摘要         • 多模型 SSE 串流問答     Claude/OpenAI/Ollama) │
 │  • 05 · 快照 · 06 · 情報流 · 檔案總管精準定位                            │
 │  • 07 · 配置 · 08 · 系統健康 · 🌐 中英文 i18n / 深淺色主題               │
@@ -135,7 +135,7 @@
 * **P5-R3 L2 Dispatcher（選用，獨立開關，預設關閉）**：三道門（token＋單鍵批准＋一次性 6 碼確認碼）＋冷卻後，調度**你本機已登入的 Claude Code／Codex CLI** 為停滯事項起草行動計畫;子行程 argv 白名單禁 shell、cwd 限該專案 repo、環境變數 allowlist 重建（**任何 API key 都不轉發**）、逾時即 kill、執行中可取消。
 * **L2 寫入模式（第三開關，預設關閉;ADR-008 Addendum）**：兩段式批准——你先讀過 agent 起草的計畫，再讓 CLI 依**那份計畫全文**實際修改檔案;dispatch 前 worktree 必須乾淨，**永不 commit／push**，改動留給你 `git diff` 驗收、`git checkout .` 一鍵還原。
 * **P5-R4a 秘書晨報**：每天 08:30 桌面通知與 `OMNICONTEXT_TODAY` 每日入口檔帶入 top 建議與 LLM 總評（唯讀，失敗不阻斷晨報）。
-* 以上開關都可在儀表板「06 設定 → 小秘書執行器」直接切換熱套用，不用手改 YAML。
+* 以上開關都可在儀表板「設定 → 小秘書執行器」直接切換熱套用，不用手改 YAML。
 
 ### 12. 📚 DeskRAG 本地知識庫與文件智慧問答系統（Single Server 整合版）
 * **單一 Web 入口、獨立索引 worker**：Dashboard 與 API 維持於 `http://127.0.0.1:8765`；檔案掃描、解析、embedding、刪除與空間維護改由另一個本機 process 執行，長時間索引不佔用主服務。
@@ -198,7 +198,7 @@ Alpha wheel 由 [GitHub Releases](https://github.com/dofliu/activityTracker/rele
 
 ### 2. 設定 LLM API 金鑰
 
-發布範本預設使用本機 `Ollama` 且關閉排程摘要。若主動選用 `Google Gemini`、Anthropic 或 OpenAI，請把金鑰保存在作業系統環境變數；`config.yaml` 只保存 `api_key_env` 變數名稱，不保存明文金鑰。Dashboard「06 設定 → 摘要與 LLM」（較少變動的設定預設收合，點標題展開）會顯示是否已偵測及來源，但不會把金鑰送到瀏覽器。
+發布範本預設使用本機 `Ollama` 且關閉排程摘要。若主動選用 `Google Gemini`、Anthropic 或 OpenAI，請把金鑰保存在作業系統環境變數；`config.yaml` 只保存 `api_key_env` 變數名稱，不保存明文金鑰。Dashboard「設定 → 摘要與 LLM」（較少變動的設定預設收合，點標題展開）會顯示是否已偵測及來源，但不會把金鑰送到瀏覽器。
 
 ```bash
 # Windows PowerShell：持久保存於目前使用者環境

@@ -121,6 +121,15 @@ details.panel-collapsible:not([open]) > summary.panel-head { border-bottom: none
 .settings-actionbar { position: sticky; top: 92px; z-index: 6; display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 14px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08); }
 .mt-14 { margin-top: 14px; }
 
+/* 設定分頁分區標頭 */
+.settings-group-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--mu); margin: 4px 2px 8px; text-transform: uppercase; }
+
+/* 卡片內的巢狀折疊區（排程任務、Telegram 連線設定等） */
+details.sub-collapsible > summary { cursor: pointer; user-select: none; list-style: none; display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+details.sub-collapsible > summary::-webkit-details-marker { display: none; }
+details.sub-collapsible > summary::before { content: "▸"; color: var(--mu); font-size: 11px; transition: transform 0.15s ease; }
+details.sub-collapsible[open] > summary::before { transform: rotate(90deg); }
+
 /* ---------- Shell ---------- */
 .shell { display: grid; grid-template-columns: minmax(0, 1fr) 296px; align-items: start; }
 .main { padding: 18px 22px 40px; min-width: 0; }
@@ -773,4 +782,9 @@ details.trust-panel[open] summary { border-bottom: none; }
   .repo-sync-intro, .repo-sync-row { display: flex; flex-direction: column; }
   .repo-sync-actions { justify-content: flex-start; max-width: none; }
   .repo-sync-action { flex: 1 1 116px; }
+}
+
+/* ---------- 窄版:所有 two-col(含 inline 欄寬的 RAG 區塊)收成單欄 ---------- */
+@media (max-width: 900px) {
+  .two-col { grid-template-columns: 1fr !important; }
 }

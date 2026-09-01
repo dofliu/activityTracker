@@ -50,13 +50,17 @@ const I18N = {
     btn_theme_dark: "☾ 深色",
     btn_quick_checkpoint: "⏱️ 快照",
     btn_quick_summary: "⚡ 生成今日摘要",
-    tab_assistant: "01 · 🤖 小秘書",
+    tab_assistant: "01 · 🤖 小秘書與知識庫",
     tab_projects: "02 · 進行中工作",
-    tab_rag: "03 · 📚 知識庫與 RAG",
-    tab_summaries: "04 · 摘要與快照",
-    tab_dashboard: "05 · 即時情報流",
-    tab_settings: "06 · ⚙️ 設定",
-    tab_system_health: "07 · 🛡️ 系統健康",
+    tab_summaries: "03 · 摘要與快照",
+    tab_dashboard: "04 · 即時情報流",
+    tab_settings: "05 · ⚙️ 設定",
+    tab_system_health: "06 · 🛡️ 系統健康",
+    rag_merged_title: "知識庫與 RAG（完整對話、引用與索引管理）",
+    rag_merged_note: "與上方交辦框共用同一條對話與歷史",
+    settings_group_common: "🤖 秘書與自動化（常用）",
+    settings_group_other: "🧩 其他設定（較少變動，點標題展開）",
+    tg_setup_summary: "連線設定（bot token／chat id／測試）",
     checkpoints_panel_title: "活動快照（週期 checkpoint 日誌）",
     checkpoints_panel_note: "需要回看原始時段紀錄時再展開",
     settings_collapsed_hint: "較少變動的設定已收合，點標題展開。",
@@ -64,7 +68,7 @@ const I18N = {
     assistant_input_ph: "請小秘書查資料、寫摘要、建議下一步…",
     btn_assistant_send: "交辦 ⚡",
     assistant_chat_empty: "問文件、查專案進度、請我建議下一步——回答會引用本機知識庫與工作紀錄。",
-    assistant_chat_boundary: "對話使用本機知識庫（RAG）與所選模型；完整引用卡片與對話歷史在「知識庫與 RAG」分頁。",
+    assistant_chat_boundary: "對話使用本機知識庫（RAG）與所選模型；完整引用卡片與對話歷史在下方「知識庫與 RAG」區塊。",
     system_health_p1_title: "系統運行總覽與生命週期控制",
     system_health_p2_title: "採集器容錯隔離與健康矩陣",
     system_health_p2_note: "各採集器獨立隔離，單一損壞不中斷全域監控",
@@ -280,13 +284,17 @@ const I18N = {
     btn_theme_dark: "☾ Dark",
     btn_quick_checkpoint: "⏱️ Checkpoint",
     btn_quick_summary: "⚡ Today's Summary",
-    tab_assistant: "01 · 🤖 Assistant",
+    tab_assistant: "01 · 🤖 Assistant & Knowledge",
     tab_projects: "02 · Active Workstreams",
-    tab_rag: "03 · 📚 Knowledge & RAG",
-    tab_summaries: "04 · Summaries & Snapshots",
-    tab_dashboard: "05 · Live Feed",
-    tab_settings: "06 · ⚙️ Settings",
-    tab_system_health: "07 · 🛡️ System Health",
+    tab_summaries: "03 · Summaries & Snapshots",
+    tab_dashboard: "04 · Live Feed",
+    tab_settings: "05 · ⚙️ Settings",
+    tab_system_health: "06 · 🛡️ System Health",
+    rag_merged_title: "Knowledge & RAG (full conversation, citations, index management)",
+    rag_merged_note: "Shares the same conversation and history as the chat box above",
+    settings_group_common: "🤖 Secretary & Automation (frequently used)",
+    settings_group_other: "🧩 Other settings (rarely changed — click a title to expand)",
+    tg_setup_summary: "Connection setup (bot token / chat id / test)",
     checkpoints_panel_title: "Activity Snapshots (periodic checkpoint logs)",
     checkpoints_panel_note: "Expand only when you need the raw per-period logs",
     settings_collapsed_hint: "Rarely-changed settings are collapsed — click a title to expand.",
@@ -294,7 +302,7 @@ const I18N = {
     assistant_input_ph: "Ask for documents, summaries, or the next step…",
     btn_assistant_send: "Send ⚡",
     assistant_chat_empty: "Ask about documents or project progress, or request a next step — answers cite the local knowledge base and work history.",
-    assistant_chat_boundary: "Chat runs through the local knowledge base (RAG) and the selected model; full citation cards and history live in the Knowledge & RAG tab.",
+    assistant_chat_boundary: "Chats use the local knowledge base (RAG) and the selected model; full citation cards and history live in the Knowledge & RAG block below.",
     system_health_p1_title: "System Runtime & Lifecycle Control",
     system_health_p2_title: "Collector Fault Isolation & Diagnostics Matrix",
     system_health_p2_note: "Isolated collectors; single failure never halts overall monitoring",
@@ -613,7 +621,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // ---------------------------------------------------- collapsible panels
 function initCollapsiblePanels() {
   let repoSyncLoaded = false;
-  document.querySelectorAll("details.panel-collapsible[id]").forEach(panel => {
+  document.querySelectorAll("details.panel-collapsible[id], details.sub-collapsible[id]").forEach(panel => {
     const key = `omni-panel-open:${panel.id}`;
     try {
       const saved = localStorage.getItem(key);
@@ -660,9 +668,8 @@ function initTabs() {
       tab.classList.add("active");
       const id = tab.dataset.tab;
       $(id).classList.add("active");
-      if (id === "tab-assistant") { loadSecretaryProposals(); loadAssistantStrip(); syncAssistantModelControls(); }
+      if (id === "tab-assistant") { loadSecretaryProposals(); loadAssistantStrip(); syncAssistantModelControls(); loadRAGFolders(); loadRAGSessions(); loadRAGProgress(); }
       if (id === "tab-projects") { loadProjects(); loadUsagePanels(); loadContextSessions(); }
-      if (id === "tab-rag") { loadRAGFolders(); loadRAGFiles(); loadRAGSessions(); loadRAGProgress(); loadRAGStrategies(); }
       if (id === "tab-settings") loadConfig();
       if (id === "tab-summaries") { loadSummaries(); loadCheckpoints(); }
       if (id === "tab-system-health") loadSystemHealth();
@@ -2459,6 +2466,15 @@ async function loadTelegramStatus() {
       : "—";
     $("input-tg-morning").value = st.morning_briefing_time || "09:00";
     $("input-tg-evening").value = st.evening_summary_time || "23:30";
+    const setup = $("panel-tg-setup");
+    if (setup) {
+      let preference = null;
+      try { preference = localStorage.getItem("omni-panel-open:panel-tg-setup"); } catch (_) { /* 保持預設 */ }
+      if (preference === null) {
+        // 已連線且啟用 → 連線設定收合，讓批准區塊成為卡片主體
+        setup.open = !(st.enabled && st.token_configured && st.chat_id_configured);
+      }
+    }
   } catch (e) {
     badge.className = "trust broken";
     badge.textContent = "UNAVAILABLE";

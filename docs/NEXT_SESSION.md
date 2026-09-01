@@ -9,9 +9,9 @@
 - **版本**:v1.3.0a5 已發佈為 GitHub pre-release(release workflow 自動建置,SHA-256 receipt 交叉驗證);`release_ready: false`,唯一缺口是全天 coverage ledger 實測。
 - **Schema**:migration 16/16(append-only + checksum;新表勿繞過 registry)。
 - **測試**:251 項 contract tests;容器/雲端環境跑 `pytest tests/` 會有 1 個已知環境失敗(`test_open_command_is_argv_not_shell_string`,缺 xdg-open;Windows 實機會過)。
-- **秘書(P5)**:R1 LLM 註解 → R2 L1 白名單代辦 → R3 L2 subprocess dispatcher(三道門+冷卻)→ 寫入 Addendum(`agent_apply_plan` 兩段式改檔、永不 commit)→ R4a 晨報 → R4b Telegram inline 批准(getUpdates 長輪詢 outbound-only;批准通道需 execution token 解鎖、in-memory TTL 重啟即失效;只批 L0/L1)→ **R5 自訂排程任務**(僅 L0 唯讀 template 可排程:Handoff/週報/月報 rollup/STATUS 過期點名草稿;migration 016;錯過只補跑一次;每次執行寫 audit receipt),**ADR-008 R1–R5 全階段實作完成、全部預設關閉**;開關集中在儀表板「06 設定」分頁(小秘書執行器 + Telegram 通知兩張常用卡片,其餘設定預設收合)。契約見 [ADR-008](ADR-008-gated-agent-executor.md)。
+- **秘書(P5)**:R1 LLM 註解 → R2 L1 白名單代辦 → R3 L2 subprocess dispatcher(三道門+冷卻)→ 寫入 Addendum(`agent_apply_plan` 兩段式改檔、永不 commit)→ R4a 晨報 → R4b Telegram inline 批准(getUpdates 長輪詢 outbound-only;批准通道需 execution token 解鎖、in-memory TTL 重啟即失效;只批 L0/L1)→ **R5 自訂排程任務**(僅 L0 唯讀 template 可排程:Handoff/週報/月報 rollup/STATUS 過期點名草稿;migration 016;錯過只補跑一次;每次執行寫 audit receipt),**ADR-008 R1–R5 全階段實作完成、全部預設關閉**;開關集中在儀表板「設定」分頁(小秘書執行器 + Telegram 通知兩張常用卡片,其餘設定預設收合)。契約見 [ADR-008](ADR-008-gated-agent-executor.md)。
 - **摘要**:兩層增量(checkpoint 微摘要 map @本機 Ollama → 日報 reduce),`synthesizer.daily_from_micro` 預設開;日報 prompt 有逐事件截斷與總量上限;週/月報 rollup 只彙整既有每日摘要(`synthesizer/rollup.py`,缺日誠實列出、LLM 失敗回退 deterministic)。
-- **UI**(2026-09-01 資訊架構重整):導覽 7 分頁分主次——01 小秘書/02 進行中工作/03 知識庫/04 摘要與快照為主,05 情報流/06 設定/07 系統健康弱化為次要樣式。活動快照併入 04(底部折疊卡);**本機 Git 同步中心+對帳搬到 02 進行中工作**(折疊卡,展開才做 git 掃描);「06 設定」分頁頂部固定「儲存並套用」列,常用卡(執行器含排程任務、Telegram 含解鎖批准)預設展開,設定一次即不動的卡(監控路徑/採集來源/摘要與 LLM/使用時間/GitHub)預設收合並記住展開狀態(localStorage)。折疊卡用原生 details/summary,各分頁桌面與 494px 皆無水平溢出(Playwright 實測)。
+- **UI**(2026-09-01 資訊架構重整,兩輪):導覽 6 分頁分主次——01 小秘書與知識庫(RAG 完整對話/引用/索引管理併入同一分頁的折疊區,共用對話)/02 進行中工作/03 摘要與快照為主,04 情報流/05 設定/06 系統健康弱化為次要樣式。設定分頁分兩區:「秘書與自動化(常用)」預設展開(執行器內的排程任務、Telegram 連線設定為巢狀折疊;Telegram 已連線時連線設定自動收合,批准區塊成為主體)、「其他設定」預設收合。活動快照併入 04(底部折疊卡);**本機 Git 同步中心+對帳搬到 02 進行中工作**(折疊卡,展開才做 git 掃描);「設定」分頁頂部固定「儲存並套用」列,常用卡(執行器含排程任務、Telegram 含解鎖批准)預設展開,設定一次即不動的卡(監控路徑/採集來源/摘要與 LLM/使用時間/GitHub)預設收合並記住展開狀態(localStorage)。折疊卡用原生 details/summary,各分頁桌面與 494px 皆無水平溢出(Playwright 實測)。
 - **P4.3 Repo Onboarding**:已實作(同步中心「掃描對帳」:未 init 資料夾/無 remote repo/未 clone 的 GitHub repo;已 clone 與否只認 remote URL、同名僅提示不自動配對;init/attach/clone/create 皆單一目標確認式、不覆寫非空目錄、永不代為 push;契約在 ADR-011 Addendum)。既定 next milestone 已完成,STATUS `next_milestone` 改為「收使用者側 live 收據後重評 release_ready」。
 - **介紹影片**:3 分鐘 MP4 已交付使用者;場景源檔在 [`promo/`](../promo/)(單景可重渲,見其 README)。
 
@@ -21,7 +21,7 @@
 2. **L2 實機試用**:使用者在自己機器開三個執行器開關 + `python main.py init --show-token`,實跑一次 draft→confirm→(可選 apply)。
 3. Ollama 鏈路已有 live 診斷收據(llm-test:reachable、llama3.1:8b、8.36s),不用再驗。
 4. **P4.3 onboarding 實操**:在實機按「掃描對帳」並各實跑一種動作(init/attach 或 clone),確認對帳分類與拒絕條件符合預期。
-5. **Telegram live 驗收**:使用者在「06 設定 → Telegram 通知」卡片走完設定流程(BotFather 建 bot → 貼 token → 偵測 chat id → 測試訊息送達 → 儲存啟用),再開「inline 批准」+「🔓 解鎖遠端批准」,實批一次 L1 動作取得 approved_via=telegram_inline receipt。
+5. **Telegram live 驗收**:使用者在「設定 → Telegram 通知」卡片走完設定流程(BotFather 建 bot → 貼 token → 偵測 chat id → 測試訊息送達 → 儲存啟用),再開「inline 批准」+「🔓 解鎖遠端批准」,實批一次 L1 動作取得 approved_via=telegram_inline receipt。
 
 ## 下一步候選(依 ADR-008 階段)
 

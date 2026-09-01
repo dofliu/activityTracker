@@ -60,7 +60,7 @@ project_resolution:
 
 ### 1.3 本機 Git 同步中心
 
-Dashboard「02 進行中工作 → 本機 Git 同步中心」（可折疊卡片，展開才會掃描 Git 狀態）與「06 設定」內的 GitHub 雲端整合是兩套不同功能。同步中心先以最後一筆本機 commit 時間選出最近的 10 個 repo（可由設定調整），再讀取這些 repo 的完整 worktree 與同步狀態；畫面會另外顯示目前項目的 worktree 修改時間：
+Dashboard「進行中工作 → 本機 Git 同步中心」（可折疊卡片，展開才會掃描 Git 狀態）與「設定」內的 GitHub 雲端整合是兩套不同功能。同步中心先以最後一筆本機 commit 時間選出最近的 10 個 repo（可由設定調整），再讀取這些 repo 的完整 worktree 與同步狀態；畫面會另外顯示目前項目的 worktree 修改時間：
 
 - **GitHub 雲端整合**只讀取 GitHub repo／PR metadata，不會對本機檔案或 branch 執行 Git 指令。
 - **本機 Git 同步中心**只管理 `watchers.git_watcher.repositories` 明示設定 root 下發現的 repositories；頁面初次載入只讀取本機 cached remote-tracking refs，不會自動連網。
@@ -74,7 +74,7 @@ Dashboard「02 進行中工作 → 本機 Git 同步中心」（可折疊卡片�
 - Commit 必須自行先在 Git/IDE stage 指定檔案並輸入 message；系統不會 `git add`，也不會提交 untracked 或未 staged 的檔案。
 - 不會自動排程 `fetch`、`pull`、`commit` 或 `push`。
 
-同步中心卡片（在「02 進行中工作」分頁）下方是 **Repo Onboarding／對帳（P4.3）**：按「🔍 掃描對帳」列出三種尚未納管的情況，每種都提供一次一個 repository 的確認式動作：
+同步中心卡片（在「進行中工作」分頁）下方是 **Repo Onboarding／對帳（P4.3）**：按「🔍 掃描對帳」列出三種尚未納管的情況，每種都提供一次一個 repository 的確認式動作：
 
 | 情況 | 對帳呈現 | 可執行的確認式動作 |
 | --- | --- | --- |
@@ -99,7 +99,7 @@ repository_sync:
 
 ### 2.1 LLM API key
 
-Cloud LLM key 應保存在作業系統環境變數，不放入 `config.yaml`。設定檔只記錄 `api_key_env` 名稱；Dashboard「06 設定 → 摘要與 LLM」只回報 `DETECTED / MISSING` 與來源，不會取得或顯示 secret value。
+Cloud LLM key 應保存在作業系統環境變數，不放入 `config.yaml`。設定檔只記錄 `api_key_env` 名稱；Dashboard「設定 → 摘要與 LLM」只回報 `DETECTED / MISSING` 與來源，不會取得或顯示 secret value。
 
 ```powershell
 [Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "your-gemini-api-key", "User")
@@ -311,7 +311,7 @@ Invoke-RestMethod `
 
 ### 小秘書首頁（01 分頁）
 
-儀表板第一個分頁是「🤖 小秘書」：最上方的對話框可直接向小秘書提問或交辦（走本機知識庫 RAG 與所選模型，與「知識庫與 RAG」分頁**共用同一條對話與歷史**，完整引用卡片在那裡查看）；其下依序是今日關鍵數字列（AI 協作前景時間、coverage、背景任務、待判斷建議數）與秘書建議卡（啟用 executor 後含「⚡ 批准執行」）。標題列徽章顯示 `RULES`（純規則建議）或 `LLM · 供應商`（已啟用 LLM 註解）。
+儀表板第一個分頁是「🤖 小秘書與知識庫」：最上方的對話框可直接向小秘書提問或交辦（走本機知識庫 RAG 與所選模型）；完整引用卡片、對話歷史與知識庫索引管理就在**同一分頁下方的「知識庫與 RAG」折疊區**（共用同一條對話）；其下依序是今日關鍵數字列（AI 協作前景時間、coverage、背景任務、待判斷建議數）與秘書建議卡（啟用 executor 後含「⚡ 批准執行」）。標題列徽章顯示 `RULES`（純規則建議）或 `LLM · 供應商`（已啟用 LLM 註解）。
 
 ### 查看目前工作
 
@@ -353,7 +353,7 @@ Dashboard「進行中工作」會同步顯示 `RECENT WORK SESSIONS` 與 `RELATE
 
 ### 管理 DeskRAG 知識庫與索引
 
-在 Dashboard 的「03 · 知識庫與 RAG」中，掃描按鈕會建立一個獨立本機 worker；主頁、採集器與 Health API 不會在同一個 process 內等待文件解析或 embedding。
+在 Dashboard「小秘書與知識庫」分頁的知識庫區塊中，掃描按鈕會建立一個獨立本機 worker；主頁、採集器與 Health API 不會在同一個 process 內等待文件解析或 embedding。
 
 1. **新增目錄與掃描**：新增資料夾或按「掃描索引」前，設定本次檔案上限與每檔間隔。預設為 500 檔、25 ms、單檔最多 50 MB；大型資料夾請分批執行。
 2. **執行控制**：執行中可按「暫停／恢復／取消」。取消會在目前單一檔案或向量批次完成後生效，不會強制中斷寫入。
@@ -443,7 +443,7 @@ proactive_secretary:
 
 **P5-R3 L2 Dispatcher（選用，獨立開關，預設關閉）**：啟用後，停滯／未收尾的建議卡會多一顆「🛡️ 批准執行（L2）」，讓秘書調度**你本機已登入的 agent CLI**（預設 `claude -p`，可改 `codex exec`）為該事項起草重啟行動計畫，結果自動複製到剪貼簿並存於 `agent_outputs/execution_<id>.md`。
 
-不想手動編輯 YAML 的話，「06 設定」分頁最上方就是「小秘書執行器」卡片（常用設定預設展開）：兩個開關（執行器／L2）與 agent CLI 下拉選單，按「儲存並套用」即寫回 config.yaml 並熱套用；等效的手動設定如下：
+不想手動編輯 YAML 的話，「設定」分頁最上方就是「小秘書執行器」卡片（常用設定預設展開）：兩個開關（執行器／L2）與 agent CLI 下拉選單，按「儲存並套用」即寫回 config.yaml 並熱套用；等效的手動設定如下：
 
 ```yaml
 proactive_secretary:
@@ -471,7 +471,7 @@ L2 每次執行都是**三道門**：execution token → 單鍵批准 → 回填
 | `monthly_report_rollup` | 彙整**上一個完整月**的每日摘要成月報 | `reports/Monthly_Rollup_YYYY-MM.md` |
 | `status_snapshot_draft` | 點名 `STATUS.yaml` 的 `last_updated` 落後觀測活動 ≥7 天的 repo（**草稿，絕不改 repo**） | `reports/status_drafts/Status_Draft_<日期>.md` |
 
-啟用（「06 設定 → 小秘書執行器」卡片的第四個開關，或手動設定）：
+啟用（「設定 → 小秘書執行器」卡片的第四個開關，或手動設定）：
 
 ```yaml
 proactive_secretary:
@@ -488,7 +488,7 @@ proactive_secretary:
 
 ### Telegram 推播：介面上完成設定與即時連線測試
 
-「06 設定 → Telegram 通知」卡片提供完整設定流程，不必手動編輯 config.yaml 或設環境變數：
+「設定 → Telegram 通知」卡片提供完整設定流程，不必手動編輯 config.yaml 或設環境變數：
 
 1. **建 bot**：在 Telegram 搜尋 `@BotFather` → `/newbot` → 複製 API Token 貼到卡片的 BOT TOKEN 欄。
 2. **取得 chat id**：先在 Telegram 對你的 bot 送出任意訊息（例如 `/start`），再按「🔍 偵測 CHAT ID」——系統以 `getUpdates` 列出最近對話，點選即回填。
