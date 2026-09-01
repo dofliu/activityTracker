@@ -246,6 +246,15 @@ proactive_secretary:
     scheduled_tasks:
       enabled: false
       max_tasks: 20
+    # P5-R4b Telegram inline 批准（預設關閉）：晨報／晚間交接附上建議的
+    # 「✅ 批准」按鈕，在外一鍵批准 L0/L1 白名單動作（L2 一律回儀表板走
+    # 一次性確認碼）。批准通道需先在儀表板以 execution token 解鎖（arm），
+    # armed 狀態只存記憶體、有 TTL、服務重啟即失效；只處理綁定 chat id
+    # 的回呼，全部走 getUpdates 長輪詢（outbound only，不開任何 port）。
+    telegram_approvals:
+      enabled: false
+      arm_ttl_hours: 24
+      max_actions_per_push: 4
     agent_cli:
       binary: claude          # 或 codex
       args: ['-p', '{prompt}']  # codex 範例：['exec', '{prompt}']

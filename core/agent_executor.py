@@ -774,6 +774,12 @@ def _reset_pending_confirms() -> None:
     _PENDING_L2_CONFIRMS.clear()
 
 
+def discard_pending_confirm(proposal_id: str) -> None:
+    """作廢某 proposal 的待確認 confirm code（P5-R4b：Telegram 批准通道
+    不支援 L2，誤觸時立即銷毀剛簽發的碼，確認流程只能回儀表板重走）。"""
+    _PENDING_L2_CONFIRMS.pop(str(proposal_id), None)
+
+
 def _check_l2_cooldown(
     template_id: str, *, cfg: Any, now: datetime, database: Any
 ) -> None:

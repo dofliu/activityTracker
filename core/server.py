@@ -863,6 +863,37 @@ def connect_telegram(payload: TelegramConnectRequest):
     return receipt
 
 
+@app.get("/api/v1/telegram/approvals/status")
+def telegram_approvals_status():
+    """批准通道現況（enabled/armed/poller），無 secret 值。"""
+    from notifiers.telegram_approvals import approvals_status
+
+    return approvals_status()
+
+
+@app.post("/api/v1/telegram/approvals/arm")
+def arm_telegram_approvals(request: Request):
+    """解鎖 Telegram 批准通道（ADR-008 D4：同一 execution token 邊界）。
+
+    armed 狀態只存記憶體且有 TTL；服務重啟即失效，需重新解鎖。
+    """
+    _require_execution_token(request)
+    from notifiers.telegram_approvals import arm_approvals
+
+    try:
+        return arm_approvals()
+    except ExecutionRejected as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
+
+
+@app.post("/api/v1/telegram/approvals/disarm")
+def disarm_telegram_approvals():
+    """上鎖批准通道（降低權限方向，不需 token）。"""
+    from notifiers.telegram_approvals import disarm_approvals
+
+    return disarm_approvals()
+
+
 @app.post("/api/v1/telegram/disconnect")
 def disconnect_telegram_endpoint():
     """停用並清除 config 內的 Telegram secret（環境變數不受影響）。"""

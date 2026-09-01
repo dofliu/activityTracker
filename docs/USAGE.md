@@ -497,6 +497,16 @@ proactive_secretary:
 
 安全邊界：token 與 chat id 只存在本機（config.yaml 或環境變數），瀏覽器永遠拿不回明文——`GET /api/v1/config` 一律回 `***REDACTED***`，狀態 API 只回報「已設定／未設定」與來源；若已設定環境變數 `TELEGRAM_BOT_TOKEN`／`TELEGRAM_CHAT_ID` 則**優先使用且不會複製進檔案**；「解除」只清除 config 內的值，不動環境變數。測試訊息內容固定，不含任何工作資料。
 
+### Telegram inline 批准與晚間交接（P5-R4b，預設關閉）
+
+連線完成後，可讓晨報／晚間交接的建議附上「✅ 批准」按鈕，人在外面也能一鍵批准 L0/L1 白名單動作：
+
+1. 在同一張 Telegram 卡片勾選「啟用 inline 批准」→ 按頁面的「儲存並套用」（這只是開通道，還不能批准）。
+2. 按「🔓 解鎖遠端批准」並輸入 execution token——這就是 ADR-008 的「同一 execution token 邊界」：**解鎖狀態只存記憶體、預設 24 小時失效、服務重啟即自動上鎖**，需要再按一次才恢復。
+3. 之後晨報（09:00）與晚間交接（23:30，皆可調）會推送建議清單；已解鎖時每則可執行建議附一顆「✅ 批准」按鈕，點按即執行並回報結果（寫入 `approved_via=telegram_inline` 的 audit receipt）。隨時可對 bot 送 `/proposals` 取回最新建議。
+
+邊界（如實）：只處理**綁定 chat id** 的按鈕與訊息，其他對話一律靜默忽略；**只批 L0/L1**——L2 需要一次性確認碼，按到會立即作廢剛簽發的碼並提示回儀表板；回呼走 `getUpdates` 長輪詢（純 outbound HTTPS，不開任何本機 port）；晚間交接是唯讀盤點（今日推進專案＋未結事項），不歸檔、不改任何資料；bot 不是聊天介面，除 `/proposals`、`/start` 外的訊息不回應。
+
 ### 兩層增量摘要（日報 token 效率）
 
 日報現在採 map-reduce：每次週期 checkpoint（預設每 2 小時）會順帶用本機模型（預設 Ollama）把該時段壓成 ≤100 字微摘要存入 SQLite（map，零 API 成本）；23:30 或手動產日報時，prompt 優先讀「微摘要時間軸＋原始統計」（reduce），token 用量約降一個數量級。微摘要失敗（如 Ollama 未啟動）或缺漏的時段自動回退原始節錄，日報永遠可產生。相關設定：

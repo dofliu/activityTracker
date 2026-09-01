@@ -116,6 +116,36 @@ class TelegramNotifier:
         lines.append("\n👉 <i>祝今天研究與開發順利！</i>")
         return self.send_message("\n".join(lines), parse_mode="HTML")
 
+    def send_evening_handoff(self) -> bool:
+        """P5-R4b 晚間交接（唯讀推播）：今日推進的專案與未結事項盤點。
+
+        只推觀測到的事實，不歸檔、不改任何資料；待判斷建議（含批准按鈕）
+        由 scheduler 以 telegram_approvals 另行推送。
+        """
+        now = get_local_now()
+        today = now.strftime("%Y-%m-%d")
+        projects = [
+            p for p in get_active_projects_list()
+            if str(p.get("last_activity_at", "")).startswith(today)
+        ]
+        open_loops = get_open_loops_list()
+
+        lines = [f"<b>🌙 OmniContext 晚間交接 ({now.strftime('%Y-%m-%d')})</b>", ""]
+        if projects:
+            lines.append(f"<b>今日推進 {len(projects)} 個專案：</b>")
+            for p in projects[:6]:
+                lines.append(f"• <b>{p['display_name']}</b>: {p['last_action_summary']}")
+        else:
+            lines.append("<i>今天沒有偵測到專案活動。</i>")
+        lines.extend(["", f"<b>📌 未結事項盤點（{len(open_loops)} 項待跟進）：</b>"])
+        if open_loops:
+            for ol in open_loops[:6]:
+                lines.append(f"• [ ] <b>[{ol['project_key']}]</b> {ol['title']}")
+        else:
+            lines.append("• <i>(目前無待辦未結事項)</i>")
+        lines.append("\n<i>此為唯讀盤點；明早晨報會再附上待判斷建議。</i>")
+        return self.send_message("\n".join(lines), parse_mode="HTML")
+
     def send_stagnation_alert(self) -> bool:
         """發送停滯專案警示 (閒置超過 3 天的專案)"""
         projects = get_active_projects_list()

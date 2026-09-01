@@ -191,7 +191,10 @@ const I18N = {
     btn_tg_test: "📡 測試連線",
     btn_tg_connect: "✅ 測試並儲存啟用",
     btn_tg_disconnect: "解除",
-    tg_boundary: "③ 「測試連線」會即時呼叫 getMe 驗證 token，並向所選對話實發一則固定內容的測試訊息；全部通過才會寫入本機 config.yaml 並啟用晨報／晚報推播。token 與 chat id 只存在本機，瀏覽器永遠拿不回明文（顯示為 ***REDACTED***）；若已設定環境變數 TELEGRAM_BOT_TOKEN／TELEGRAM_CHAT_ID 則優先使用且不會複製進檔案。",
+    tg_boundary: "③ 「測試連線」會即時呼叫 getMe 驗證 token，並向所選對話實發一則固定內容的測試訊息；全部通過才會寫入本機 config.yaml 並啟用晨報／晚報推播。token 與 chat id 只存在本機，瀏覽器永遠拿不回明文（顯示為 ***REDACTED***）；若已設定環境變數 TELEGRAM_BOT_TOKEN／TELEGRAM_CHAT_ID 則優先使用且不會複製進檔案。inline 批准只處理綁定 chat 的按鈕、只能執行 L0/L1 白名單動作（L2 一律回儀表板）；批准通道需以 execution token 解鎖，重啟服務即自動上鎖。",
+    tg_approvals_label: "啟用 inline 批准（晨報／晚報附「✅ 批准」按鈕，僅 L0/L1）",
+    btn_tg_arm: "🔓 解鎖遠端批准（需 execution token）",
+    btn_tg_disarm: "🔒 上鎖",
     gh_opt1_title: "快捷方式 1 (推薦)：本機 GITHUB CLI",
     btn_gh_auto_connect: "🔑 一鍵從本機 gh CLI 同步認證",
     gh_opt1_sub: "免手動輸入 Token，自動讀取本機登入之 GitHub 帳號",
@@ -413,7 +416,10 @@ const I18N = {
     btn_tg_test: "📡 Test connection",
     btn_tg_connect: "✅ Test, save & enable",
     btn_tg_disconnect: "Disconnect",
-    tg_boundary: "③ Test connection calls getMe live to validate the token and sends one fixed test message to the selected chat; only when everything passes are the settings written to local config.yaml and the morning/evening pushes enabled. Token and chat id stay on this machine — the browser never gets the plaintext back (shown as ***REDACTED***). If TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID env vars exist they take precedence and are never copied into the file.",
+    tg_boundary: "③ Test connection calls getMe live to validate the token and sends one fixed test message to the selected chat; only when everything passes are the settings written to local config.yaml and the morning/evening pushes enabled. Token and chat id stay on this machine — the browser never gets the plaintext back (shown as ***REDACTED***). If TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID env vars exist they take precedence and are never copied into the file. Inline approvals only accept buttons from the bound chat and only run L0/L1 whitelist actions (L2 always goes back to the dashboard); the approval channel must be unlocked with the execution token and re-locks on every service restart.",
+    tg_approvals_label: "Enable inline approvals (✅ buttons on morning/evening pushes, L0/L1 only)",
+    btn_tg_arm: "🔓 Unlock remote approvals (execution token)",
+    btn_tg_disarm: "🔒 Lock",
     gh_opt1_title: "Option 1 (Recommended): Local GITHUB CLI",
     btn_gh_auto_connect: "🔑 1-Click Auth via Local gh CLI",
     gh_opt1_sub: "No manual PAT needed, automatically reads local logged-in GitHub account",
@@ -2035,6 +2041,9 @@ function initSettingsForm() {
   $("btn-tg-test").addEventListener("click", tgTest);
   $("btn-tg-connect").addEventListener("click", tgConnect);
   $("btn-tg-disconnect").addEventListener("click", tgDisconnect);
+  // P5-R4b inline 批准：解鎖／上鎖批准通道（解鎖需 execution token）。
+  $("btn-tg-arm").addEventListener("click", tgArm);
+  $("btn-tg-disarm").addEventListener("click", tgDisarm);
 }
 
 function renderTagList(id, list, onRemove) {
@@ -2086,8 +2095,10 @@ async function loadConfig() {
     $("toggle-executor-l2-write").checked = !!(executor.l2 && executor.l2.allow_write === true);
     $("select-agent-cli").value = (executor.agent_cli && executor.agent_cli.binary) === "codex" ? "codex" : "claude";
     $("toggle-scheduled-tasks").checked = !!(executor.scheduled_tasks && executor.scheduled_tasks.enabled === true);
+    $("toggle-tg-approvals").checked = !!(executor.telegram_approvals && executor.telegram_approvals.enabled === true);
     loadScheduledTasks();
     loadTelegramStatus();
+    loadTelegramApprovalsStatus();
     $("toggle-usage-tracking").checked = usage.enabled === true;
     const usageNotifications = usage.notifications || {};
     $("toggle-usage-notifications").checked = usageNotifications.enabled === true;
@@ -2209,6 +2220,8 @@ async function saveSettings() {
   }
   executorCfg.scheduled_tasks = executorCfg.scheduled_tasks || {};
   executorCfg.scheduled_tasks.enabled = $("toggle-scheduled-tasks").checked;
+  executorCfg.telegram_approvals = executorCfg.telegram_approvals || {};
+  executorCfg.telegram_approvals.enabled = $("toggle-tg-approvals").checked;
 
   cfg.usage_tracking = cfg.usage_tracking || {};
   cfg.usage_tracking.enabled = $("toggle-usage-tracking").checked;
@@ -2504,6 +2517,39 @@ async function tgConnect() {
   } catch (e) {
     tgRenderResult({ ok: false, error_code: "request_failed", hint: String(e.message || e) });
   }
+}
+
+async function loadTelegramApprovalsStatus() {
+  const box = $("tg-approvals-status");
+  if (!box) return;
+  const zh = currentLang === "zh-TW";
+  try {
+    const st = await getJSON("/api/v1/telegram/approvals/status");
+    const parts = [];
+    if (!st.enabled) {
+      parts.push(zh ? "批准通道：未啟用（勾選上方選項並儲存設定）" : "Approvals: disabled (tick the option above and save settings)");
+    } else if (st.armed) {
+      parts.push((zh ? "🔓 已解鎖至 " : "🔓 unlocked until ") + String(st.armed_until || "").replace("T", " "));
+    } else {
+      parts.push(zh ? "🔒 已上鎖（按「解鎖遠端批准」啟用）" : "🔒 locked (press Unlock to enable)");
+    }
+    parts.push((zh ? "輪詢器：" : "poller: ") + (st.poller_running ? (zh ? "運行中" : "running") : (zh ? "未運行（啟用後重載設定）" : "not running")));
+    box.textContent = parts.join(" · ");
+  } catch (e) {
+    box.textContent = "";
+  }
+}
+
+async function tgArm() {
+  const data = await schedRequest("/api/v1/telegram/approvals/arm", "POST");
+  if (data) loadTelegramApprovalsStatus();
+}
+
+async function tgDisarm() {
+  try {
+    await postJSON("/api/v1/telegram/approvals/disarm");
+    loadTelegramApprovalsStatus();
+  } catch (e) { /* 狀態列會反映實況 */ }
 }
 
 async function tgDisconnect() {

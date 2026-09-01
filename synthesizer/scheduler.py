@@ -20,6 +20,7 @@ class SynthesisScheduler:
         self._apscheduler = None
         self._notifier = TelegramNotifier()
         self._desktop = DesktopNotifier()
+        self._telegram_poller = None
 
     def start(self):
         daily_enabled = self.cfg.get("synthesizer.schedule.enabled", True)
@@ -91,6 +92,21 @@ class SynthesisScheduler:
                     replace_existing=True
                 )
                 logger.info(f"Morning briefing scheduled for {m_h:02d}:{m_m:02d} daily.")
+
+                # P5-R4b 晚間交接（唯讀推播；預設 23:30 可調）
+                te_h, te_m = self._parse_clock(
+                    self.cfg.get("notifiers.telegram.evening_summary_time", "23:30"),
+                    (23, 30),
+                )
+                self._apscheduler.add_job(
+                    func=self._run_telegram_evening_job,
+                    trigger="cron",
+                    hour=te_h,
+                    minute=te_m,
+                    id="telegram_evening_job",
+                    replace_existing=True,
+                )
+                logger.info(f"Telegram evening handoff scheduled for {te_h:02d}:{te_m:02d} daily.")
 
             # 桌面通知：早報與晚報（不需任何帳號或金鑰）
             if self.cfg.get("notifiers.desktop.enabled", True):
@@ -176,6 +192,7 @@ class SynthesisScheduler:
             logger.info("Database daily maintenance scheduled for 03:30 daily.")
 
             self._apscheduler.start()
+            self._maybe_start_telegram_poller(telegram_enabled)
         except ImportError:
             # 原生執行緒排程備援機制
             self._running = True
@@ -194,6 +211,7 @@ class SynthesisScheduler:
                 daemon=True
             )
             self._thread.start()
+            self._maybe_start_telegram_poller(telegram_enabled)
             logger.info("Synthesis scheduler (Built-in Timer) started.")
 
     def _std_scheduler_loop(
@@ -220,6 +238,7 @@ class SynthesisScheduler:
         last_desktop_morning_day = None
         last_desktop_evening_day = None
         last_telegram_morning_day = None
+        last_telegram_evening_day = None
 
         desktop_morning = self._parse_clock(
             self.cfg.get("notifiers.desktop.morning_briefing_time", "08:30"),
@@ -232,6 +251,10 @@ class SynthesisScheduler:
         telegram_morning = self._parse_clock(
             self.cfg.get("notifiers.telegram.morning_briefing_time", "09:00"),
             (9, 0),
+        )
+        telegram_evening = self._parse_clock(
+            self.cfg.get("notifiers.telegram.evening_summary_time", "23:30"),
+            (23, 30),
         )
 
         while self._running:
@@ -291,6 +314,14 @@ class SynthesisScheduler:
                 last_telegram_morning_day = today_str
                 self._run_morning_briefing_job()
 
+            if (
+                telegram_enabled
+                and (now.hour, now.minute) == telegram_evening
+                and last_telegram_evening_day != today_str
+            ):
+                last_telegram_evening_day = today_str
+                self._run_telegram_evening_job()
+
             time.sleep(30)
 
     @staticmethod
@@ -310,7 +341,7 @@ class SynthesisScheduler:
         if self.cfg.get("synthesizer.periodic_checkpoint.enabled", True):
             jobs.append("periodic_checkpoint_job")
         if self.cfg.get("notifiers.telegram.enabled", False):
-            jobs.append("morning_briefing_job")
+            jobs.extend(["morning_briefing_job", "telegram_evening_job"])
         if self.cfg.get("notifiers.desktop.enabled", True):
             jobs.extend(["desktop_morning_job", "desktop_evening_job"])
         if (
@@ -439,11 +470,57 @@ class SynthesisScheduler:
         except Exception as e:
             logger.error(f"Error running secretary scheduled tasks: {e}", exc_info=True)
 
+    def _maybe_start_telegram_poller(self, telegram_enabled: bool):
+        """P5-R4b：批准通道啟用時啟動 getUpdates 長輪詢（outbound only）。
+
+        poller 只在（telegram 通知＋executor＋telegram_approvals 三開關都開）
+        時啟動；批准仍需使用者先在儀表板以 execution token 解鎖（arm）。
+        """
+        try:
+            from notifiers.telegram_approvals import (
+                TelegramApprovalPoller,
+                telegram_approvals_enabled,
+            )
+
+            if telegram_enabled and telegram_approvals_enabled(self.cfg):
+                self._telegram_poller = TelegramApprovalPoller()
+                self._telegram_poller.start()
+        except Exception as e:
+            logger.error(f"Error starting telegram approval poller: {e}", exc_info=True)
+
+    def _push_telegram_proposals(self, header: str):
+        """批准通道啟用時，把待判斷建議（含可批准按鈕）推到綁定 chat。"""
+        try:
+            from notifiers.telegram_approvals import (
+                push_proposals_to_telegram,
+                telegram_approvals_enabled,
+            )
+
+            if telegram_approvals_enabled(self.cfg):
+                receipt = push_proposals_to_telegram(header)
+                logger.info(
+                    "Telegram proposals push: sent=%s buttons=%s",
+                    receipt.get("sent"),
+                    receipt.get("actionable_buttons"),
+                )
+        except Exception as e:
+            logger.error(f"Error pushing telegram proposals: {e}", exc_info=True)
+
+    def _run_telegram_evening_job(self):
+        logger.info("Triggering telegram evening handoff...")
+        try:
+            if self._notifier.is_enabled():
+                self._notifier.send_evening_handoff()
+                self._push_telegram_proposals("🌙 睡前待判斷：")
+        except Exception as e:
+            logger.error(f"Error sending telegram evening handoff: {e}", exc_info=True)
+
     def _run_morning_briefing_job(self):
         logger.info("Triggering scheduled morning briefing...")
         try:
             if self._notifier.is_enabled():
                 self._notifier.send_morning_briefing()
+                self._push_telegram_proposals("☀️ 今日待判斷：")
         except Exception as e:
             logger.error(f"Error sending morning briefing: {e}", exc_info=True)
 
@@ -498,6 +575,9 @@ class SynthesisScheduler:
             return {"status": "error", "error": str(e), "healed": False}
 
     def shutdown(self):
+        if self._telegram_poller is not None:
+            self._telegram_poller.stop()
+            self._telegram_poller = None
         if self._apscheduler and self._apscheduler.running:
             self._apscheduler.shutdown()
         self._running = False

@@ -62,11 +62,12 @@ def _call_api(
     payload: dict[str, Any] | None = None,
     *,
     transport: Optional[Transport] = None,
+    timeout: int = API_TIMEOUT_SECONDS,
 ) -> tuple[int, dict[str, Any]]:
     """呼叫 Bot API；URL 含 token，因此絕不記 log、絕不放進回傳 receipt。"""
     transport = transport or _default_transport
     url = f"{TELEGRAM_API_BASE}/bot{bot_token}/{method}"
-    return transport(url, payload or {}, API_TIMEOUT_SECONDS)
+    return transport(url, payload or {}, timeout)
 
 
 def _resolve_credential(
