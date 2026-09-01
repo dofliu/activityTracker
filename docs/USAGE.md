@@ -402,6 +402,10 @@ DeskRAG 支援結合本機知識庫（PDF、Word、PPTX、Excel、代碼/Markdow
    - 每筆回答皆會標註參考來源切片（包含 PDF 頁碼、PPT 投影片、Excel 工作表及關聯度評分）。
    - 點擊「`📂 在總管開啟`」可在 Windows 檔案總管中直接開啟並反白選中該實體檔案。
 
+選擇 provider 時：**Ollama 是全本機**；選 Gemini／Anthropic／OpenAI 才會把該次問題與檢索到的文件切片送往該供應商。金鑰只由本機後端讀取（環境變數名稱依 `synthesizer.<provider>.api_key_env` 設定，Gemini 也接受 `GOOGLE_API_KEY`），**不會出現在請求 URL、log 或瀏覽器**。若金鑰沒設定，對話會直接回一則明確提示，而不是無回應。
+
+串流保證：知識庫檢索有 60 秒硬性逾時（逾時就不帶文件脈絡、照常回答並註明），且無論檢索或供應商發生什麼錯誤，後端一定送出結束事件；瀏覽器端另有 120 秒閒置逾時做安全網——介面不會停在「回覆中」不動。
+
 ### 查看 Proposal-only 主動秘書建議
 
 主頁 `SECRETARY SUGGESTIONS` 會從 Project State、actionable Open Loops 與 Extension diagnostics 顯示可追溯建議。每張卡片都附 `project_states:<id>`、`open_loops:<id>` 或 `extension_status:live` 等 evidence refs。

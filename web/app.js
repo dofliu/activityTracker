@@ -3375,6 +3375,10 @@ let ragSessionsCache = [];
 let currentRagSessionId = "";
 let ragChatHistory = [];
 let isRagStreaming = false;
+// RAG 串流的介面安全網：閒置逾時上限與目前的 AbortController。
+const RAG_STREAM_IDLE_TIMEOUT_MS = 120000;
+let streamAbort = null;
+let streamTimedOut = false;
 
 const RAG_PROVIDER_MODELS = {
   ollama: [
@@ -3992,7 +3996,21 @@ async function sendRAGChatMessage(fromInput) {
 
   try {
     const apiMessages = ragChatHistory.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
+    // 安全網：後端若完全沒回應（網路卡住、程序被砍），介面也不能永遠停在
+    // 「回覆中」。閒置逾時只在「一段時間沒有任何新位元組」時才觸發，
+    // 正常的長回答會不斷刷新它。
+    streamAbort = new AbortController();
+    let idleTimer = null;
+    const resetIdleTimer = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        streamTimedOut = true;
+        streamAbort.abort();
+      }, RAG_STREAM_IDLE_TIMEOUT_MS);
+    };
+    resetIdleTimer();
     const response = await fetch(API + "/api/v1/rag/chat", {
+      signal: streamAbort.signal,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -4016,6 +4034,7 @@ async function sendRAGChatMessage(fromInput) {
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
+      resetIdleTimer();
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n\n");
@@ -4044,6 +4063,7 @@ async function sendRAGChatMessage(fromInput) {
             renderRAGMessages();
           } catch (e) {}
         } else if (eventType === "done") {
+          if (idleTimer) clearTimeout(idleTimer);
           break;
         }
       }
@@ -4060,9 +4080,16 @@ async function sendRAGChatMessage(fromInput) {
     }).then(() => loadRAGSessions()).catch(() => {});
 
   } catch (e) {
-    assistantMsg.content += `\n\n[串流發生錯誤: ${e.message}]`;
+    const zh = currentLang === "zh-TW";
+    assistantMsg.content += streamTimedOut
+      ? (zh
+        ? `\n\n[逾時：${RAG_STREAM_IDLE_TIMEOUT_MS / 1000} 秒內沒有收到任何回應。請確認所選 provider 的 API key 與網路，或改用本機 Ollama。]`
+        : `\n\n[Timed out: no response for ${RAG_STREAM_IDLE_TIMEOUT_MS / 1000}s. Check the selected provider's API key and network, or switch to local Ollama.]`)
+      : `\n\n[串流發生錯誤: ${e.message}]`;
     renderRAGMessages();
   } finally {
+    if (streamAbort) streamAbort = null;
+    streamTimedOut = false;
     isRagStreaming = false;
     if (sendBtn) {
       sendBtn.disabled = false;

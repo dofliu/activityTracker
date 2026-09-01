@@ -68,7 +68,8 @@ class EmbeddingService:
                 return [self._fallback_dummy_embed(t) for t in texts]
 
         elif provider == "openai":
-            api_key = resolve_secret_env("OPENAI_API_KEY")
+            # 必須取 .value：SecretResolution 物件恆為真值，會讓下方判斷失效。
+            api_key = resolve_secret_env("OPENAI_API_KEY").value
             if api_key:
                 try:
                     import openai

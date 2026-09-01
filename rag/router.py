@@ -21,6 +21,8 @@ from rag.jobs import (
 )
 from rag.storage import storage_report
 
+RETRIEVAL_TIMEOUT_SECONDS = 60
+
 logger = logging.getLogger("OmniContext.RAG.Router")
 router = APIRouter(prefix="/api/v1/rag", tags=["DeskRAG Knowledge & Chat"])
 
@@ -351,50 +353,81 @@ async def chat_stream(req: ChatRequest):
         raise HTTPException(status_code=400, detail="對話訊息不可為空")
 
     last_user_message = req.messages[-1].content
-    citations = []
-    context_text = ""
-
-    if req.enable_rag:
-        from rag.retrieval.registry import retriever_registry
-        try:
-            citations = await asyncio.to_thread(
-                retriever_registry.retrieve,
-                query=last_user_message,
-                strategy=req.retrieval_strategy,
-                top_k=req.top_k,
-                alpha=req.hybrid_alpha,
-                score_threshold=req.score_threshold or 0.0
-            )
-            context_text = retriever_registry.format_context_prompt(citations)
-        except Exception as e:
-            logger.error(f"RAG retrieval error during chat stream: {e}")
-            citations = []
-            context_text = f"（檢索過程發生異常: {str(e)}）"
-
     base_sys_prompt = req.custom_system_prompt or rag_settings.DEFAULT_SYSTEM_PROMPT
-
-    if req.enable_rag and citations:
-        full_system_prompt = f"{base_sys_prompt}\n\n{context_text}"
-    else:
-        full_system_prompt = base_sys_prompt
-
     llm_msgs = [{"role": m.role, "content": m.content} for m in req.messages]
 
     async def event_generator():
+        """SSE 生命週期契約：無論檢索或 LLM 發生什麼事，一定送出 done。
+
+        瀏覽器的「回覆中」狀態只會由 done（或連線中斷）解除，因此任何
+        沒有收尾的例外都會讓介面永遠卡住。這裡把三個階段都包起來：
+        檢索（含硬性逾時）、串流、收尾，失敗一律轉成可讀的訊息事件。
+        """
         from rag.llm_gateway import llm_gateway
-        citation_data = [c.model_dump() for c in citations]
-        yield f"event: citations\ndata: {json.dumps(citation_data, ensure_ascii=False)}\n\n"
 
-        async for token in llm_gateway.stream_chat(
-            messages=llm_msgs,
-            system_prompt=full_system_prompt,
-            provider=req.provider,
-            model=req.model
-        ):
-            data_payload = json.dumps({"token": token}, ensure_ascii=False)
-            yield f"event: message\ndata: {data_payload}\n\n"
+        citations = []
+        context_text = ""
+        try:
+            # 先送一個 status，讓瀏覽器立刻收到位元組：大型索引的首次檢索
+            # 可能要載入 Chroma/BM25，沒有這個事件會被誤認為服務沒回應。
+            yield "event: status\ndata: {\"stage\": \"retrieving\"}\n\n"
 
-        yield "event: done\ndata: [DONE]\n\n"
+            if req.enable_rag:
+                from rag.retrieval.registry import retriever_registry
+                try:
+                    citations = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            retriever_registry.retrieve,
+                            query=last_user_message,
+                            strategy=req.retrieval_strategy,
+                            top_k=req.top_k,
+                            alpha=req.hybrid_alpha,
+                            score_threshold=req.score_threshold or 0.0,
+                        ),
+                        timeout=RETRIEVAL_TIMEOUT_SECONDS,
+                    )
+                    context_text = retriever_registry.format_context_prompt(citations)
+                except asyncio.TimeoutError:
+                    logger.warning("RAG retrieval timed out after %ss", RETRIEVAL_TIMEOUT_SECONDS)
+                    citations = []
+                    context_text = (
+                        f"（知識庫檢索超過 {RETRIEVAL_TIMEOUT_SECONDS} 秒未完成，"
+                        "本次回答不使用文件脈絡）"
+                    )
+                except Exception as e:  # noqa: BLE001 — 檢索失敗不應中止對話
+                    logger.error(f"RAG retrieval error during chat stream: {e}")
+                    citations = []
+                    context_text = f"（檢索過程發生異常: {type(e).__name__}）"
+
+            citation_data = [c.model_dump() for c in citations]
+            yield f"event: citations\ndata: {json.dumps(citation_data, ensure_ascii=False)}\n\n"
+
+            full_system_prompt = (
+                f"{base_sys_prompt}\n\n{context_text}"
+                if (req.enable_rag and citations)
+                else base_sys_prompt
+            )
+
+            async for token in llm_gateway.stream_chat(
+                messages=llm_msgs,
+                system_prompt=full_system_prompt,
+                provider=req.provider,
+                model=req.model
+            ):
+                data_payload = json.dumps({"token": token}, ensure_ascii=False)
+                yield f"event: message\ndata: {data_payload}\n\n"
+        except asyncio.CancelledError:
+            raise  # 使用者關閉分頁／取消請求：不需要再送任何事件
+        except Exception as e:  # noqa: BLE001 — 例外一律轉成可讀訊息，不留下卡住的 UI
+            logger.error(f"Chat stream failed: {e}", exc_info=True)
+            payload = json.dumps(
+                {"token": f"\n\n[對話串流中止：{type(e).__name__}；詳見本機服務日誌]"},
+                ensure_ascii=False,
+            )
+            yield f"event: message\ndata: {payload}\n\n"
+        finally:
+            # 這一行是介面能離開「回覆中」的唯一保證。
+            yield "event: done\ndata: [DONE]\n\n"
 
     return StreamingResponse(
         event_generator(),

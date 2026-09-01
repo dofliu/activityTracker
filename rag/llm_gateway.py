@@ -9,6 +9,18 @@ from rag.config import rag_settings
 logger = logging.getLogger("OmniContext.RAG.LLMGateway")
 
 
+def _resolve_api_key(provider: str, default_env: str, aliases: tuple[str, ...] = ()) -> str:
+    """回傳金鑰字串（沒有則空字串）。
+
+    ``resolve_secret_env`` 回傳的是 SecretResolution 物件，必須取 ``.value``；
+    直接使用物件會讓 ``if not api_key`` 永遠為真值判斷失效，且把物件 repr
+    （內含金鑰）帶進請求。環境變數名稱沿用 config 的 ``api_key_env`` 設定，
+    與 synthesizer 的行為一致。
+    """
+    env_name = str(get_config().get(f"synthesizer.{provider}.api_key_env", default_env) or default_env)
+    return resolve_secret_env(env_name, aliases=aliases).value
+
+
 class LLMGateway:
     def __init__(self):
         self.timeout = httpx.Timeout(90.0, connect=15.0)
@@ -45,7 +57,7 @@ class LLMGateway:
         model: Optional[str]
     ) -> AsyncGenerator[str, None]:
         cfg = get_config()
-        api_key = resolve_secret_env("OPENAI_API_KEY")
+        api_key = _resolve_api_key("openai", "OPENAI_API_KEY")
         model_name = model or cfg.get("synthesizer.openai.model", "gpt-4o")
 
         if not api_key:
@@ -80,7 +92,7 @@ class LLMGateway:
         model: Optional[str]
     ) -> AsyncGenerator[str, None]:
         cfg = get_config()
-        api_key = resolve_secret_env("ANTHROPIC_API_KEY")
+        api_key = _resolve_api_key("anthropic", "ANTHROPIC_API_KEY")
         model_name = model or cfg.get("synthesizer.anthropic.model", "claude-3-5-sonnet-20241022")
 
         if not api_key:
@@ -112,7 +124,7 @@ class LLMGateway:
         model: Optional[str]
     ) -> AsyncGenerator[str, None]:
         cfg = get_config()
-        api_key = resolve_secret_env("GEMINI_API_KEY")
+        api_key = _resolve_api_key("gemini", "GEMINI_API_KEY", aliases=("GOOGLE_API_KEY",))
         model_name = model or cfg.get("synthesizer.gemini.model", "gemini-3.7-flash")
 
         if not api_key:
@@ -120,7 +132,9 @@ class LLMGateway:
             return
 
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:streamGenerateContent?alt=sse&key={api_key}"
+            # 金鑰只走 header：URL 會出現在錯誤訊息與各層 log，不放 secret。
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:streamGenerateContent?alt=sse"
+            headers = {"x-goog-api-key": api_key}
 
             contents = []
             for m in messages:
@@ -133,7 +147,7 @@ class LLMGateway:
             payload["generationConfig"] = {"temperature": 0.3}
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                async with client.stream("POST", url, json=payload) as response:
+                async with client.stream("POST", url, json=payload, headers=headers) as response:
                     if response.status_code != 200:
                         err_text = await response.aread()
                         yield f"\n\n[Gemini API HTTP {response.status_code}]: {err_text.decode('utf-8', errors='replace')[:400]}"
