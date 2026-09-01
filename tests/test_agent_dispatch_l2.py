@@ -164,6 +164,20 @@ def test_subprocess_env_is_allowlisted_and_secrets_never_reach_child(tmp_path, m
     assert child_view == {"gem": False, "tok": False}
 
 
+def test_subprocess_child_emits_utf8_even_under_a_legacy_ansi_locale(tmp_path, monkeypatch):
+    """父行程固定以 UTF-8 解碼，子行程就不能沿用 ANSI code page（Windows cp1252）。"""
+    monkeypatch.setenv("PYTHONIOENCODING", "cp1252")
+    env = build_subprocess_env()
+    assert env["PYTHONIOENCODING"] == "utf-8"
+    assert env["PYTHONUTF8"] == "1"
+
+    outcome = run_agent_subprocess(
+        [sys.executable, "-c", "print('# 行動計畫')"], cwd=tmp_path, timeout_seconds=30
+    )
+    assert outcome["exit_code"] == 0
+    assert outcome["stdout"].strip() == "# 行動計畫"
+
+
 def test_subprocess_rejects_missing_cli_and_bad_cwd(tmp_path):
     with pytest.raises(DispatchRejected) as missing:
         run_agent_subprocess(
