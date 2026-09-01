@@ -7,6 +7,9 @@
   <title>OmniContext Extension Monitor</title>
   <style>
     :root { color-scheme: dark; --bg:#0b0b0c; --panel:#141416; --line:#2c2c31; --text:#f5f5f7; --muted:#9a9aa2; --orange:#f26a0f; --ok:#22c55e; --warn:#eab308; }
+    /* 跟隨主儀表板的配色偏好（同一個 localStorage key，純外觀、不影響診斷資料） */
+    html[data-accent="forest"] { --bg:#080f0b; --panel:#111a14; --line:#26332c; --orange:#35b26c; }
+    html[data-accent="ocean"] { --bg:#070f16; --panel:#0e1922; --line:#22323e; --orange:#2e9bd6; }
     * { box-sizing: border-box; }
     body { margin:0; background:var(--bg); color:var(--text); font-family:"Segoe UI","Microsoft JhengHei",sans-serif; }
     main { max-width:900px; margin:0 auto; padding:32px 22px 48px; }
@@ -40,6 +43,13 @@
     @media(max-width:700px){.grid,.platforms,.verification-platforms{grid-template-columns:1fr 1fr}header{display:block}header nav{margin-top:12px}}
     @media(max-width:480px){.grid,.platforms,.verification-platforms{grid-template-columns:1fr}.verification-controls>*{width:100%}}
   </style>
+  <script>
+    // 與主儀表板共用 omni-palette；讀取失敗時維持預設配色。
+    try {
+      var p = localStorage.getItem("omni-palette");
+      if (p === "forest" || p === "ocean") document.documentElement.dataset.accent = p;
+    } catch (e) { /* private mode 等情境：維持預設 */ }
+  </script>
 </head>
 <body>
   <main>

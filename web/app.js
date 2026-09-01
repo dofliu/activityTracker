@@ -48,6 +48,9 @@ const I18N = {
     btn_pause_monitor: "暫停監控",
     btn_theme_light: "☀ 淺色",
     btn_theme_dark: "☾ 深色",
+    palette_naruto: "🟠 火影橘",
+    palette_forest: "🟢 森林綠",
+    palette_ocean: "🔵 海洋藍",
     btn_quick_checkpoint: "⏱️ 快照",
     btn_quick_summary: "⚡ 生成今日摘要",
     tab_assistant: "01 · 🤖 小秘書與知識庫",
@@ -282,6 +285,9 @@ const I18N = {
     btn_pause_monitor: "Pause Monitoring",
     btn_theme_light: "☀ Light",
     btn_theme_dark: "☾ Dark",
+    palette_naruto: "🟠 Naruto Orange",
+    palette_forest: "🟢 Forest Green",
+    palette_ocean: "🔵 Ocean Blue",
     btn_quick_checkpoint: "⏱️ Checkpoint",
     btn_quick_summary: "⚡ Today's Summary",
     tab_assistant: "01 · 🤖 Assistant & Knowledge",
@@ -643,6 +649,10 @@ function initCollapsiblePanels() {
 }
 
 // ---------------------------------------------------------------- theme
+// 外觀 = 明暗（data-theme）× 配色（data-accent）兩個獨立的軸；
+// 兩者都只存在瀏覽器 localStorage，不寫入 config.yaml、不送往後端。
+const PALETTES = ["naruto", "forest", "ocean"];
+
 function initTheme() {
   const saved = localStorage.getItem("omni-theme");
   if (saved === "light" || saved === "dark") document.documentElement.dataset.theme = saved;
@@ -653,6 +663,26 @@ function initTheme() {
     localStorage.setItem("omni-theme", next);
     paintThemeBtn();
   });
+
+  const select = $("select-palette");
+  let palette = "naruto";
+  try {
+    const savedPalette = localStorage.getItem("omni-palette");
+    if (PALETTES.includes(savedPalette)) palette = savedPalette;
+  } catch (_) { /* localStorage 不可用時維持預設配色 */ }
+  applyPalette(palette);
+  if (select) {
+    select.value = palette;
+    select.addEventListener("change", () => applyPalette(select.value));
+  }
+}
+
+function applyPalette(palette) {
+  const next = PALETTES.includes(palette) ? palette : "naruto";
+  // naruto 是 CSS 的預設值，不需要屬性；移除屬性可讓舊版樣式完全一致。
+  if (next === "naruto") delete document.documentElement.dataset.accent;
+  else document.documentElement.dataset.accent = next;
+  try { localStorage.setItem("omni-palette", next); } catch (_) { /* 同上 */ }
 }
 function paintThemeBtn() {
   const isDark = document.documentElement.dataset.theme === "dark";

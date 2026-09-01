@@ -136,6 +136,7 @@
 * **L2 寫入模式（第三開關，預設關閉;ADR-008 Addendum）**：兩段式批准——你先讀過 agent 起草的計畫，再讓 CLI 依**那份計畫全文**實際修改檔案;dispatch 前 worktree 必須乾淨，**永不 commit／push**，改動留給你 `git diff` 驗收、`git checkout .` 一鍵還原。
 * **P5-R4a 秘書晨報**：每天 08:30 桌面通知與 `OMNICONTEXT_TODAY` 每日入口檔帶入 top 建議與 LLM 總評（唯讀，失敗不阻斷晨報）。
 * 以上開關都可在儀表板「設定 → 小秘書執行器」直接切換熱套用，不用手改 YAML。
+* 介面外觀可在頂列自由組合：深色／淺色 × 火影橘／森林綠／海洋藍三種配色（僅存於瀏覽器 localStorage，不進 config.yaml）。
 
 ### 12. 📚 DeskRAG 本地知識庫與文件智慧問答系統（Single Server 整合版）
 * **單一 Web 入口、獨立索引 worker**：Dashboard 與 API 維持於 `http://127.0.0.1:8765`；檔案掃描、解析、embedding、刪除與空間維護改由另一個本機 process 執行，長時間索引不佔用主服務。
