@@ -10,6 +10,9 @@
 - cwd 必須是實際存在的目錄，並以 ``resolve()`` 後的絕對路徑執行，
   拒絕消失或非目錄的路徑；呼叫端（executor template）另負責把 cwd
   限制在已探索的本機 repo roots 內。
+- 子行程一律以 UTF-8 輸出（``PYTHONUTF8`` / ``PYTHONIOENCODING``）：父行程固定
+  用 UTF-8 解碼 stdout/stderr，若不指定，Windows 的 Python CLI 會沿用 cp1252
+  之類的 ANSI code page，輸出中文時直接 UnicodeEncodeError 而非零退出。
 - 硬性 timeout：逾時即 ``kill()`` 整個行程並如實回報，不留殭屍。
 - 執行中的行程登記於 in-memory registry，供 cancel endpoint 中止；
   這是 P5-R2 in-process 模式做不到、P5-R3 dispatcher 才提供的能力。
@@ -48,6 +51,12 @@ ENV_ALLOWLIST = (
     "XDG_CACHE_HOME",
 )
 
+# 覆寫（不是預設值）：父行程固定用 UTF-8 解碼，子行程就必須用 UTF-8 輸出。
+FORCED_ENV = {
+    "PYTHONUTF8": "1",
+    "PYTHONIOENCODING": "utf-8",
+}
+
 OUTPUT_CAPTURE_LIMIT = 200_000  # 單 stream 保留上限；再長的輸出如實標記截斷。
 
 # receipt_id -> Popen-like process；cancel endpoint 用來中止執行中的 job。
@@ -71,12 +80,19 @@ class DispatchRejected(RuntimeError):
 
 
 def build_subprocess_env() -> dict[str, str]:
-    """以 allowlist 重建環境；API key 類變數（GEMINI_API_KEY…）一律不轉發。"""
-    return {
+    """以 allowlist 重建環境；API key 類變數（GEMINI_API_KEY…）一律不轉發。
+
+    另外強制子行程用 UTF-8 輸出：``_truncate()`` 固定以 UTF-8 解碼，而 Windows
+    的 Python 預設會用 ANSI code page（cp1252/cp950）寫 pipe，agent CLI 一輸出
+    中文就 UnicodeEncodeError。這兩個變數只決定編碼、不帶任何機密。
+    """
+    env = {
         key: value
         for key, value in os.environ.items()
         if key.upper() in ENV_ALLOWLIST and value
     }
+    env.update(FORCED_ENV)
+    return env
 
 
 def _validate_argv(argv: list[str]) -> list[str]:
