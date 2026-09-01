@@ -610,8 +610,17 @@
             <div id="repo-sync-summary" class="repo-sync-summary mono-mini muted" data-i18n="repo_sync_loading">正在讀取設定範圍內的 repositories…</div>
             <div id="repo-sync-list" class="repo-sync-list" aria-live="polite"></div>
             <div id="repo-sync-result" class="repo-sync-result mono-mini muted"></div>
+            <div class="repo-sync-intro" style="margin-top: 14px;">
+              <div>
+                <strong data-i18n="onboarding_title">Repo Onboarding／對帳（P4.3）</strong>
+                <p data-i18n="onboarding_intro">找出尚未 git init 的資料夾、沒有 remote 的 repo、以及尚未 clone 的 GitHub repo。已 clone 與否只以 remote URL 比對；同名僅提示、不自動配對。每個動作都是單一目標、逐一確認。</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="btn-onboarding-scan" data-i18n="btn_onboarding_scan">🔍 掃描對帳</button>
+            </div>
+            <div id="onboarding-report" class="mono-mini" aria-live="polite"></div>
+            <div id="onboarding-result" class="repo-sync-result mono-mini muted"></div>
           </div>
-          <div class="panel-foot repo-sync-foot" data-i18n="repo_sync_boundary">不會自動同步、不會自動 git add、不會 force push；Commit 只會提交您已明確 staged 的檔案。</div>
+          <div class="panel-foot repo-sync-foot" data-i18n="repo_sync_boundary">不會自動同步、不會自動 git add、不會 force push；Commit 只會提交您已明確 staged 的檔案。Onboarding 動作不覆寫非空目錄、不批次 create/clone、永不代為 push。</div>
         </div>
       </section>
 

@@ -74,15 +74,15 @@ Dashboard「監控配置 → 本機 Git 同步中心」與 GitHub 雲端整合�
 - Commit 必須自行先在 Git/IDE stage 指定檔案並輸入 message；系統不會 `git add`，也不會提交 untracked 或未 staged 的檔案。
 - 不會自動排程 `fetch`、`pull`、`commit` 或 `push`。
 
-目前同步中心的工作範圍是「已存在本機 Git repository」；下列情況會顯示為尚未納管或未設定 upstream，而不會自行變更資料夾或雲端：
+同步中心卡片下方是 **Repo Onboarding／對帳（P4.3）**：按「🔍 掃描對帳」列出三種尚未納管的情況，每種都提供一次一個 repository 的確認式動作：
 
-| 情況 | 目前行為 | Repo Onboarding／Reconciliation 規劃 |
+| 情況 | 對帳呈現 | 可執行的確認式動作 |
 | --- | --- | --- |
-| 先建立一般本機資料夾 | 不列入 Git 同步清單 | 使用者確認資料夾後，提供 `git init`、選擇 visibility、建立或連結 GitHub repo 的流程 |
-| 本機已 `git init`、尚無 remote | 顯示 `no_upstream`，不提供 Push | 讓使用者選擇連結既有 GitHub repo，或明確建立新的 remote repo |
-| GitHub 有 repo、電腦尚未 clone | GitHub 卡片可讀 metadata；同步中心沒有本機項目 | 顯示「尚未有本機副本」，選擇目標父資料夾後才執行 clone，並先檢查路徑衝突 |
+| 一般本機資料夾（root 第一層、未 `git init`） | 「① 尚未 git init 的資料夾」 | `git init`——只建立空 `.git`，不 commit、不設 remote、不發布 |
+| 本機已 `git init`、尚無 remote | 「② 沒有 remote 的本機 repo」 | 從**已同步的 GitHub 清單**選一個連結為 origin（不 fetch、不 push），或建立新的 GitHub repo（**預設 private**、遠端保持空 repo） |
+| GitHub 有 repo、電腦尚未 clone | 「③ 尚未 clone 的 GitHub repo」 | 選定要放進哪個設定 root 後執行 clone；目的地已存在（含空目錄）一律拒絕 |
 
-這些操作都會是一次一個 repository 的確認式流程；不會由偵測到同名資料夾或 GitHub repo 就自動執行。
+對帳的邊界（如實）：**已 clone 與否只以 remote URL 正規化比對**（https／ssh／`.git` 變體視為相同）；本機有同名目錄只會顯示「⚠ 同名（不自動配對）」提示，絕不自動關聯。所有動作單一目標、需在對話框明確確認；系統**永不代為 push**——`attach`／`create` 之後的首次發布由你自行 `git push -u origin <branch>` 完成。clone 一律用 https URL 且不夾帶 token，私有 repo 依賴你本機 Git credential manager 的既有認證，失敗會如實回報。
 
 可依設備調整清單與單一指令逾時：
 

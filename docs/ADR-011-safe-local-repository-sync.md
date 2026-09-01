@@ -28,3 +28,15 @@
 - 使用者能在同一儀表板看見 repository 的 branch、upstream、ahead/behind、staged／unstaged／untracked／conflict 狀態並逐一同步。
 - 初次顯示可能與真正遠端有時間差；按 Fetch 後才取得該 repo 最新遠端參照。
 - 此功能不處理 merge conflict、rebase、檔案 staging、force push、credential 設定或排程自動同步；這些保留在使用者的 Git/IDE 工作流程中。
+
+## 2026-09-01 Addendum：P4.3 Repo Onboarding／Reconciliation（FEATURE-009）
+
+`core/repo_onboarding.py` 在同一同步中心之下補齊三種「尚未進入同步範圍」的情境，契約疊加在上述決策之上：
+
+1. **對帳（唯讀）**：`GET /api/v1/repos/onboarding-report` 列出（a）root 第一層尚未 `git init` 的一般資料夾、（b）沒有任何 remote 的本機 repo、（c）已同步 GitHub metadata 中「本機沒有對應 clone」的 repo。**已 clone 與否只以 remote URL 正規化比對（https／ssh／`.git` 變體歸一）為準；名稱相同只作為 `name_match_hint` 顯示，永不自動配對。**
+2. **四個確認式動作**（`POST /api/v1/repos/onboarding-action`；schema `extra=forbid`＋`confirmation: "confirmed"`，一次一個目標）：
+   - `init_folder`：對掃描到的資料夾 `git init`——只建立空 `.git`，不 commit、不設 remote、不發布。
+   - `attach_remote`：把**已同步清單內**的 GitHub repo 設為無 remote repo 的 origin（呼叫端無法注入任意 URL）；不 fetch、不 push。已有任何 remote 的 repo 一律拒絕。
+   - `clone_repo`：clone 到使用者選定的設定 root 之下；目的地路徑已存在（含空目錄）一律拒絕，絕不覆寫；一律使用 https URL 且不夾帶 token（私有 repo 由使用者本機 credential manager 認證，失敗如實回報）。
+   - `create_remote`：為無 remote 的 repo 建立 GitHub repo（**預設 private**）並 `remote add`；遠端保持空 repo，**永不代為 push**——首次發布由使用者自行 `git push -u`。
+3. 延續既有邊界：目標一律以 canonical-path hash id 引用（不接受瀏覽器傳入路徑）、單一目標 lock、argv 禁 shell、`GIT_TERMINAL_PROMPT=0`、輸出長度與 secret 遮蔽、永不 force。

@@ -1337,6 +1337,59 @@ def run_local_repository_sync_action(req: RepositorySyncActionRequest):
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+class RepoOnboardingActionRequest(BaseModel):
+    """P4.3：單一目標、id-based、明確確認；不接受任何本機路徑或 URL。"""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    action: Literal["init_folder", "attach_remote", "clone_repo", "create_remote"]
+    confirmation: Literal["confirmed"]
+    folder_id: Optional[str] = Field(default=None, pattern=r"^[a-f0-9]{16}$")
+    repo_id: Optional[str] = Field(default=None, pattern=r"^[a-f0-9]{16}$")
+    root_id: Optional[str] = Field(default=None, pattern=r"^[a-f0-9]{16}$")
+    github_full_name: Optional[str] = Field(default=None, max_length=200)
+    name: Optional[str] = Field(default=None, max_length=100)
+    private: bool = True
+
+
+@app.get("/api/v1/repos/onboarding-report")
+def get_repo_onboarding_report():
+    """P4.3 對帳（唯讀）：未 git init 的資料夾、無 remote 的 repo、
+    尚未 clone 的 GitHub repo。已 clone 與否只以 remote URL 比對；
+    同名僅提示、不自動配對。"""
+    from core.repo_onboarding import RepoOnboarding
+
+    return RepoOnboarding().build_report()
+
+
+@app.post("/api/v1/repos/onboarding-action")
+def run_repo_onboarding_action(req: RepoOnboardingActionRequest):
+    """執行單一、已確認的 onboarding 動作（init／attach remote／clone／
+    create remote）。不覆寫非空目錄、不批次、永不 force、永不代為 push。"""
+    from core.repo_onboarding import RepoOnboarding, RepoOnboardingRejected
+
+    service = RepoOnboarding()
+    try:
+        if req.action == "init_folder":
+            if not req.folder_id:
+                raise RepoOnboardingRejected("init_folder 需要 folder_id")
+            return service.init_folder(req.folder_id)
+        if req.action == "attach_remote":
+            if not (req.repo_id and req.github_full_name):
+                raise RepoOnboardingRejected("attach_remote 需要 repo_id 與 github_full_name")
+            return service.attach_remote(req.repo_id, req.github_full_name)
+        if req.action == "clone_repo":
+            if not (req.github_full_name and req.root_id):
+                raise RepoOnboardingRejected("clone_repo 需要 github_full_name 與 root_id")
+            return service.clone_repo(req.github_full_name, req.root_id)
+        # create_remote
+        if not req.repo_id:
+            raise RepoOnboardingRejected("create_remote 需要 repo_id")
+        return service.create_remote(req.repo_id, name=req.name, private=req.private)
+    except RepoOnboardingRejected as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @app.get("/api/v1/github/status")
 def get_github_status():
     """取得 GitHub 連線與認證狀態"""

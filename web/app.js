@@ -136,7 +136,10 @@ const I18N = {
     repo_sync_intro_detail: "狀態只讀取本機已保存的 remote-tracking refs。先按 Fetch 更新遠端參照，再依條件執行 fast-forward Pull、staged Commit 或 Push。",
     btn_repo_sync_refresh: "↻ 重讀同步狀態",
     repo_sync_loading: "正在讀取設定範圍內的 repositories…",
-    repo_sync_boundary: "不會自動同步、不會自動 git add、不會 force push；Commit 只會提交您已明確 staged 的檔案。",
+    repo_sync_boundary: "不會自動同步、不會自動 git add、不會 force push；Commit 只會提交您已明確 staged 的檔案。Onboarding 動作不覆寫非空目錄、不批次 create/clone、永不代為 push。",
+    onboarding_title: "Repo Onboarding／對帳（P4.3）",
+    onboarding_intro: "找出尚未 git init 的資料夾、沒有 remote 的 repo、以及尚未 clone 的 GitHub repo。已 clone 與否只以 remote URL 比對；同名僅提示、不自動配對。每個動作都是單一目標、逐一確認。",
+    btn_onboarding_scan: "🔍 掃描對帳",
     usage_title: "TODAY · 前景使用與里程碑",
     btn_refresh_usage: "重新整理",
     usage_goal_label: "AI 協作前景使用時間",
@@ -361,7 +364,10 @@ const I18N = {
     repo_sync_intro_detail: "Status reads locally cached remote-tracking refs only. Fetch refreshes refs, then Fast-forward Pull, staged Commit, or Push is enabled only when safe.",
     btn_repo_sync_refresh: "↻ Refresh sync status",
     repo_sync_loading: "Reading repositories within configured scope…",
-    repo_sync_boundary: "No automatic sync, git add, or force push. Commit only includes files you explicitly staged.",
+    repo_sync_boundary: "No automatic sync, git add, or force push. Commit only includes files you explicitly staged. Onboarding actions never overwrite non-empty directories, never batch create/clone, and never push on your behalf.",
+    onboarding_title: "Repo Onboarding / Reconciliation (P4.3)",
+    onboarding_intro: "Finds folders without git init, repos without a remote, and GitHub repos not cloned locally. Cloned-or-not is decided by remote URL only; same names are just hints, never auto-paired. Every action targets one repo with explicit confirmation.",
+    btn_onboarding_scan: "🔍 Scan & reconcile",
     usage_title: "TODAY · FOREGROUND USE & MILESTONES",
     btn_refresh_usage: "Refresh",
     usage_goal_label: "AI collaboration foreground time",
@@ -2750,7 +2756,128 @@ function initRepositorySyncSection() {
     if (!button || button.disabled) return;
     runRepositorySyncAction(button.dataset.repoId, button.dataset.repoAction);
   });
+  const scan = $("btn-onboarding-scan");
+  if (scan) scan.addEventListener("click", loadOnboardingReport);
 }
+
+// ------------------------------------------------ P4.3 repo onboarding
+let onboardingReportCache = null;
+
+async function loadOnboardingReport() {
+  const zh = currentLang === "zh-TW";
+  const box = $("onboarding-report");
+  if (!box) return;
+  box.innerHTML = `<span class="muted small">${zh ? "掃描中…" : "Scanning…"}</span>`;
+  try {
+    onboardingReportCache = await getJSON("/api/v1/repos/onboarding-report");
+    renderOnboardingReport();
+  } catch (e) {
+    box.innerHTML = `<span class="muted small">${esc(String(e.message || e))}</span>`;
+  }
+}
+
+function renderOnboardingReport() {
+  const zh = currentLang === "zh-TW";
+  const box = $("onboarding-report");
+  const report = onboardingReportCache;
+  if (!box || !report) return;
+  const roots = report.roots || [];
+  const rootOptions = roots.map(r => `<option value="${esc(r.root_id)}">${esc(r.path)}</option>`).join("");
+  const ghOptions = (report.github_not_cloned || [])
+    .map(g => `<option value="${esc(g.full_name)}">${esc(g.full_name)}</option>`).join("");
+  const sections = [];
+
+  const folders = report.plain_folders || [];
+  sections.push(`<div class="mono-mini muted mb-6">${zh ? "① 尚未 git init 的資料夾" : "① Folders without git init"}（${folders.length}${report.plain_folders_truncated ? "+" : ""}）</div>`);
+  sections.push(folders.length ? folders.map(f =>
+    `<div class="tag" style="justify-content: space-between; width: 100%; margin-bottom: 4px;">
+      <span>📁 ${esc(f.path)}</span>
+      <button class="btn btn-ghost btn-sm" onclick="onboardingInit('${esc(f.folder_id)}', '${esc(f.name)}')">${zh ? "git init" : "git init"}</button>
+    </div>`).join("") : `<div class="muted small mb-6">${zh ? "（沒有）" : "(none)"}</div>`);
+
+  const noRemote = report.repos_without_remote || [];
+  sections.push(`<div class="mono-mini muted mb-6" style="margin-top:8px;">${zh ? "② 沒有 remote 的本機 repo" : "② Local repos without a remote"}（${noRemote.length}）</div>`);
+  sections.push(noRemote.length ? noRemote.map(r =>
+    `<div class="tag" style="justify-content: space-between; width: 100%; margin-bottom: 4px; flex-wrap: wrap; gap: 4px;">
+      <span>📦 ${esc(r.path)}</span>
+      <span>
+        <select id="ob-attach-${esc(r.repo_id)}" class="mono" style="max-width: 220px;">${ghOptions}</select>
+        <button class="btn btn-ghost btn-sm" onclick="onboardingAttach('${esc(r.repo_id)}', '${esc(r.name)}')">${zh ? "連結為 origin" : "Attach as origin"}</button>
+        <button class="btn btn-ghost btn-sm" onclick="onboardingCreate('${esc(r.repo_id)}', '${esc(r.name)}')">${zh ? "建立 GitHub repo(private)" : "Create GitHub repo (private)"}</button>
+      </span>
+    </div>`).join("") : `<div class="muted small mb-6">${zh ? "（沒有）" : "(none)"}</div>`);
+
+  const notCloned = report.github_not_cloned || [];
+  sections.push(`<div class="mono-mini muted mb-6" style="margin-top:8px;">${zh ? "③ 尚未 clone 的 GitHub repo（以 remote URL 比對）" : "③ GitHub repos not cloned (matched by remote URL)"}（${notCloned.length}）</div>`);
+  sections.push(notCloned.length ? notCloned.map(g => {
+    const hint = g.name_match_hint
+      ? ` <span class="muted small">${zh ? "⚠ 本機有同名目錄（不自動配對）：" : "⚠ same-name local dir (not auto-paired): "}${esc(g.name_match_hint)}</span>`
+      : "";
+    return `<div class="tag" style="justify-content: space-between; width: 100%; margin-bottom: 4px; flex-wrap: wrap; gap: 4px;">
+      <span>☁️ ${esc(g.full_name)}${g.private ? " 🔒" : ""}${hint}</span>
+      <span>
+        <select id="ob-clone-${esc(g.full_name)}" class="mono" style="max-width: 220px;">${rootOptions}</select>
+        <button class="btn btn-ghost btn-sm" onclick="onboardingClone('${esc(g.full_name)}')">${zh ? "clone 到選定 root" : "Clone into root"}</button>
+      </span>
+    </div>`;
+  }).join("") : `<div class="muted small mb-6">${zh ? "（沒有）" : "(none)"}</div>`);
+
+  box.innerHTML = sections.join("");
+}
+
+async function onboardingAction(payload, confirmText) {
+  const zh = currentLang === "zh-TW";
+  if (!confirm(confirmText)) return;
+  const result = $("onboarding-result");
+  result.textContent = zh ? "執行中…" : "Running…";
+  try {
+    const receipt = await postJSON("/api/v1/repos/onboarding-action", { ...payload, confirmation: "confirmed" });
+    result.textContent = `✅ ${receipt.action}: ${receipt.status}${receipt.note ? " — " + receipt.note : ""}`;
+    await loadOnboardingReport();
+    await loadRepositorySyncStatus();
+  } catch (e) {
+    result.textContent = `❌ ${String(e.message || e)}`;
+  }
+}
+
+window.onboardingInit = function (folderId, name) {
+  const zh = currentLang === "zh-TW";
+  onboardingAction(
+    { action: "init_folder", folder_id: folderId },
+    zh ? `對「${name}」執行 git init？只建立空的 .git，不 commit、不設 remote、不發布。` : `Run git init on "${name}"? Creates an empty .git only.`
+  );
+};
+
+window.onboardingAttach = function (repoId, name) {
+  const zh = currentLang === "zh-TW";
+  const select = $(`ob-attach-${repoId}`);
+  const fullName = select ? select.value : "";
+  if (!fullName) { alert(zh ? "沒有可選的 GitHub repo；請先同步 GitHub 整合。" : "No GitHub repos to pick; sync the GitHub integration first."); return; }
+  onboardingAction(
+    { action: "attach_remote", repo_id: repoId, github_full_name: fullName },
+    zh ? `把 ${fullName} 設為「${name}」的 origin？不會 fetch、不會 push。` : `Set ${fullName} as origin of "${name}"? No fetch, no push.`
+  );
+};
+
+window.onboardingCreate = function (repoId, name) {
+  const zh = currentLang === "zh-TW";
+  onboardingAction(
+    { action: "create_remote", repo_id: repoId, name: name, private: true },
+    zh ? `在 GitHub 建立 private repo「${name}」並設為 origin？遠端為空 repo，本機不會推送任何內容；首次發布由您自行 git push -u。` : `Create private GitHub repo "${name}" and set it as origin? Nothing is pushed; you do the first push yourself.`
+  );
+};
+
+window.onboardingClone = function (fullName) {
+  const zh = currentLang === "zh-TW";
+  const select = document.getElementById(`ob-clone-${fullName}`);
+  const rootId = select ? select.value : "";
+  if (!rootId) { alert(zh ? "請先在監控設定加入 Git root。" : "Add a Git root in settings first."); return; }
+  const rootPath = select ? select.options[select.selectedIndex].textContent : "";
+  onboardingAction(
+    { action: "clone_repo", github_full_name: fullName, root_id: rootId },
+    zh ? `把 ${fullName} clone 到 ${rootPath} 之下？目的地已存在時會拒絕，不覆寫任何目錄。` : `Clone ${fullName} into ${rootPath}? Refused if the destination already exists.`
+  );
+};
 
 // ---------------------------------------------------------------- github
 function initGitHubSection() {

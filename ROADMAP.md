@@ -577,9 +577,10 @@ P2.5-S1 API 安全邊界
 3. **P2.6 continuous coverage ledger**：讓每日使用時間的 coverage 脫離永久 `partial` 標示。
    ▶ 2026-08-30：已實作（migration 013 + `core/coverage_ledger.py` + scheduler heartbeat + `/api/v1/usage/coverage`），contract tests 通過；剩 Windows 實機全天 receipt。
 
-### 中期（2–6 週）：P4.3 Repo Onboarding／Reconciliation（既定 next milestone）
+### ✅ 中期（2–6 週）：P4.3 Repo Onboarding／Reconciliation（既定 next milestone）
 - 依 ADR-011 與 FEATURE-009 trust boundary 實作三種情境的單一 repo 確認式流程：本機資料夾尚未 `git init`、本機 repo 無 remote、GitHub repo 尚未 clone。
 - 禁止事項維持：不同名自動配對、不自動初始化／發布、不覆寫非空目錄、不批次 create/clone、不 force reset/push。
+  ▶ ✅ 2026-09-01：**已實作**——`core/repo_onboarding.py`＋同步中心「掃描對帳」區塊：對帳報告（已 clone 與否只以 remote URL 正規化比對，同名僅 `name_match_hint` 提示、永不自動配對）＋四個確認式動作（`init_folder` 只建空 .git、`attach_remote` 只接受已同步清單內的 GitHub repo、`clone_repo` 目的地存在即拒絕且 URL 不夾帶 token、`create_remote` 預設 private 且永不代為 push）。API schema `extra=forbid`＋confirmation literal、目標一律 hash id（不接受瀏覽器路徑）、單一目標 lock。契約入 ADR-011 Addendum；8 項 contract tests（真實 tmp git repo＋本機 bare clone E2E）。
 
 ### ✅ 中期（可平行）：P6 發佈整備收尾
 - Wheel/sdist、formal rollback、3-OS × 2-Python CI 均已通過：走完 `docs/RELEASE_CHECKLIST.md`，打 `v1.3.0aX` tag 併發布 GitHub Release（可先不上 PyPI）。

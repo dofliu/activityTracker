@@ -102,6 +102,50 @@ class GitHubClient:
         except Exception as e:
             return {"connected": False, "message": f"連線至 GitHub 失敗: {str(e)}"}
 
+    def create_repository(
+        self, name: str, *, private: bool = True, description: str = ""
+    ) -> Dict[str, Any]:
+        """建立一個新的 GitHub repository（P4.3 create_remote 用）。
+
+        單一 repo、呼叫端已取得使用者明確確認才會走到這裡；預設 private，
+        絕不在此推送任何內容。回傳 {created, full_name, html_url} 或
+        {created: False, message}（不含 token）。
+        """
+        token = self.get_token()
+        if not token:
+            return {"created": False, "message": "未檢測到 GitHub 認證 Token"}
+        try:
+            res = requests.post(
+                f"{GITHUB_API_BASE}/user/repos",
+                headers=self._headers(token),
+                json={
+                    "name": name,
+                    "private": bool(private),
+                    "description": description[:200],
+                    "auto_init": False,
+                },
+                timeout=15,
+            )
+        except Exception as e:
+            return {"created": False, "message": f"連線至 GitHub 失敗: {type(e).__name__}"}
+        if res.status_code == 201:
+            data = res.json()
+            return {
+                "created": True,
+                "full_name": data.get("full_name"),
+                "html_url": data.get("html_url"),
+                "private": bool(data.get("private", private)),
+            }
+        detail = ""
+        try:
+            detail = str(res.json().get("errors") or res.json().get("message") or "")[:200]
+        except Exception:
+            pass
+        return {
+            "created": False,
+            "message": f"GitHub 拒絕建立（HTTP {res.status_code}）{detail}",
+        }
+
     def fetch_all_repositories(self, limit: int = 100) -> List[Dict[str, Any]]:
         """讀取所有 Public 與 Private 倉庫 (包含個人擁有與組織協作)"""
         token = self.get_token()
