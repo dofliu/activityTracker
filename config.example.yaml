@@ -273,7 +273,7 @@ notifiers:
     stagnation_days: 5
     launch_url: http://127.0.0.1:8765
   telegram:
-    # 建議直接在儀表板「07 監控配置 → Telegram 通知」完成設定：貼 bot token
+    # 建議直接在儀表板「06 設定 → Telegram 通知」完成設定：貼 bot token
     # → 偵測 chat id → 即時連線測試（getMe＋實發測試訊息）→ 通過才寫入此檔。
     # 環境變數（bot_token_env / chat_id_env）優先於此處的值，且不會被複製進檔案；
     # Web API 讀取設定時 bot_token / chat_id 一律遮蔽為 ***REDACTED***。

@@ -41,11 +41,10 @@
       <button class="tab active" data-tab="tab-assistant" data-i18n="tab_assistant">01 · 🤖 小秘書</button>
       <button class="tab" data-tab="tab-projects" data-i18n="tab_projects">02 · 進行中工作</button>
       <button class="tab" data-tab="tab-rag" data-i18n="tab_rag">03 · 📚 知識庫與 RAG</button>
-      <button class="tab" data-tab="tab-summaries" data-i18n="tab_summaries">04 · 每日摘要</button>
-      <button class="tab" data-tab="tab-checkpoints" data-i18n="tab_checkpoints">05 · 活動快照</button>
-      <button class="tab" data-tab="tab-dashboard" data-i18n="tab_dashboard">06 · 即時情報流</button>
-      <button class="tab" data-tab="tab-settings" data-i18n="tab_settings">07 · 監控配置</button>
-      <button class="tab" data-tab="tab-system-health" data-i18n="tab_system_health">08 · 🛡️ 系統健康與維護</button>
+      <button class="tab" data-tab="tab-summaries" data-i18n="tab_summaries">04 · 摘要與快照</button>
+      <button class="tab tab-secondary" data-tab="tab-dashboard" data-i18n="tab_dashboard">05 · 即時情報流</button>
+      <button class="tab tab-secondary" data-tab="tab-settings" data-i18n="tab_settings">06 · ⚙️ 設定</button>
+      <button class="tab tab-secondary" data-tab="tab-system-health" data-i18n="tab_system_health">07 · 🛡️ 系統健康</button>
     </nav>
   </div>
 
@@ -175,6 +174,35 @@
           <button id="btn-refresh-projects" class="btn btn-ghost btn-sm" data-i18n="btn_reindex_projects">🔄 重新歸戶</button>
         </div>
         <div id="projects-list" class="panel"><div class="placeholder" data-i18n="ph_loading_projects">載入進行中工作…</div></div>
+
+        <details class="panel mb-14 panel-collapsible" id="repo-sync-panel">
+          <summary class="panel-head">
+            <span class="mono-label accent">🔧</span><span class="panel-title" data-i18n="repo_sync_title">本機 Git 同步中心</span>
+            <span id="repo-sync-badge" class="trust neutral" data-i18n="repo_sync_manual">逐項手動確認</span>
+          </summary>
+          <div class="repo-sync-body">
+            <div class="repo-sync-intro">
+              <div>
+                <strong data-i18n="repo_sync_intro_title">檢查本機 branch 與遠端追蹤差異</strong>
+                <p data-i18n="repo_sync_intro_detail">狀態只讀取本機已保存的 remote-tracking refs。先按 Fetch 更新遠端參照，再依條件執行 fast-forward Pull、staged Commit 或 Push。</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="btn-repo-sync-refresh" data-i18n="btn_repo_sync_refresh">↻ 重讀同步狀態</button>
+            </div>
+            <div id="repo-sync-summary" class="repo-sync-summary mono-mini muted" data-i18n="repo_sync_loading">正在讀取設定範圍內的 repositories…</div>
+            <div id="repo-sync-list" class="repo-sync-list" aria-live="polite"></div>
+            <div id="repo-sync-result" class="repo-sync-result mono-mini muted"></div>
+            <div class="repo-sync-intro" style="margin-top: 14px;">
+              <div>
+                <strong data-i18n="onboarding_title">Repo Onboarding／對帳（P4.3）</strong>
+                <p data-i18n="onboarding_intro">找出尚未 git init 的資料夾、沒有 remote 的 repo、以及尚未 clone 的 GitHub repo。已 clone 與否只以 remote URL 比對；同名僅提示、不自動配對。每個動作都是單一目標、逐一確認。</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="btn-onboarding-scan" data-i18n="btn_onboarding_scan">🔍 掃描對帳</button>
+            </div>
+            <div id="onboarding-report" class="mono-mini" aria-live="polite"></div>
+            <div id="onboarding-result" class="repo-sync-result mono-mini muted"></div>
+          </div>
+          <div class="panel-foot repo-sync-foot" data-i18n="repo_sync_boundary">不會自動同步、不會自動 git add、不會 force push；Commit 只會提交您已明確 staged 的檔案。Onboarding 動作不覆寫非空目錄、不批次 create/clone、永不代為 push。</div>
+        </details>
       </section>
 
       <!-- 02 即時情報流 -->
@@ -338,125 +366,15 @@
 
       <!-- 04 監控配置 -->
       <section id="tab-settings" class="pane">
-        <div class="panel mb-14">
-          <div class="panel-head"><span class="mono-label accent">01</span><span class="panel-title" data-i18n="settings_p1_title">監控路徑</span></div>
-          <div class="split">
-            <div class="split-col">
-              <div class="mono-mini muted mb-8" data-i18n="label_file_dirs">FILE DIRS</div>
-              <div id="dir-list" class="taglist"></div>
-              <div class="input-row">
-                <input type="text" id="input-new-dir" placeholder="絕對路徑…" data-i18n-ph="ph_abs_path">
-                <button class="btn btn-ghost" id="btn-browse-dir" title="瀏覽選取本機資料夾" data-i18n="btn_browse">📁 瀏覽…</button>
-                <button class="btn btn-ghost" id="btn-add-dir" data-i18n="btn_add">新增</button>
-              </div>
-              <div id="ext-checkboxes" class="extchips">
-                <label><input type="checkbox" value=".tex" checked>.tex</label>
-                <label><input type="checkbox" value=".docx" checked>.docx</label>
-                <label><input type="checkbox" value=".md" checked>.md</label>
-                <label><input type="checkbox" value=".pdf" checked>.pdf</label>
-                <label><input type="checkbox" value=".py" checked>.py</label>
-                <label><input type="checkbox" value=".txt" checked>.txt</label>
-              </div>
-            </div>
-            <div class="split-col">
-              <div class="mono-mini muted mb-8" data-i18n="label_git_roots">GIT ROOTS</div>
-              <div id="repo-list" class="taglist"></div>
-              <div class="input-row">
-                <input type="text" id="input-new-repo" placeholder="Git 專案根目錄…" data-i18n-ph="ph_git_path">
-                <button class="btn btn-ghost" id="btn-browse-repo" title="瀏覽選取 Git 倉庫目錄" data-i18n="btn_browse">📁 瀏覽…</button>
-                <button class="btn btn-ghost" id="btn-add-repo" data-i18n="btn_add">新增</button>
-              </div>
-              <div class="note" data-i18n="git_recursive_note">已啟用遞迴探索模式，根目錄下所有子倉庫均會自動納入掃描。</div>
-            </div>
-          </div>
+        <div class="panel settings-actionbar">
+          <button class="btn btn-primary" id="btn-save-settings" data-i18n="btn_save_apply">儲存並套用</button>
+          <span class="muted small" data-i18n="settings_save_note">寫回 config.yaml 後即時熱更新</span>
+          <span class="muted small head-right" data-i18n="settings_collapsed_hint">較少變動的設定已收合，點標題展開。</span>
         </div>
 
         <div class="panel mb-14">
           <div class="panel-head">
-            <span class="mono-label accent">02</span><span class="panel-title" data-i18n="settings_p2_title">採集來源</span>
-            <span class="muted small" data-i18n="settings_p2_note">右欄標示目前可信度</span>
-          </div>
-          <div class="sources">
-            <label class="source"><input type="checkbox" id="toggle-claude-code" checked><span class="mono">~/.claude</span><span class="trust ok">OK</span></label>
-            <label class="source"><input type="checkbox" id="toggle-claude-desktop" checked><span class="mono">Claude Desktop Cowork</span><span class="trust noisy">LOCAL</span></label>
-            <label class="source"><input type="checkbox" id="toggle-codex" checked><span class="mono">~/.codex</span><span class="trust ok">OK</span></label>
-            <label class="source"><input type="checkbox" id="toggle-antigravity" checked><span class="mono">antigravity</span><span class="trust ok">OK</span></label>
-            <label class="source"><input type="checkbox" id="toggle-gemini" checked><span class="mono">gemini.google.com</span><span class="trust ok">OK</span></label>
-            <label class="source"><input type="checkbox" id="toggle-chatgpt" checked><span class="mono">chatgpt.com</span><span class="trust ok">OK</span></label>
-            <label class="source"><input type="checkbox" id="toggle-claude-web" checked><span class="mono">claude.ai</span><span class="trust ok">OK</span></label>
-            <label class="source"><input type="checkbox" id="toggle-window-focus" checked><span class="mono">window focus</span><span class="trust ok">OK</span></label>
-          </div>
-        </div>
-
-        <div class="panel mb-14">
-          <div class="panel-head"><span class="mono-label accent">03</span><span class="panel-title" data-i18n="settings_p3_title">摘要與排程</span></div>
-          <div class="fields">
-            <div><div class="mono-mini muted mb-6">DAILY AT</div><input type="text" id="input-schedule-time" value="23:30" class="mono"></div>
-            <div><div class="mono-mini muted mb-6">CHECKPOINT / H</div><input type="number" id="input-checkpoint-interval" value="2" min="1" max="12" class="mono"></div>
-            <div><div class="mono-mini muted mb-6">PROVIDER</div>
-              <select id="select-llm-provider">
-                <option value="gemini">Google Gemini</option>
-                <option value="anthropic">Anthropic Claude</option>
-                <option value="openai">OpenAI</option>
-                <option value="ollama">Ollama</option>
-              </select>
-            </div>
-            <div><div class="mono-mini muted mb-6">MODEL</div><input type="text" id="input-model-name" value="gemini-3.7-flash" class="mono"></div>
-          </div>
-          <div class="llm-key-card">
-            <div class="llm-key-head">
-              <span class="mono-mini" data-i18n="llm_key_status_title">API KEY 狀態</span>
-              <span id="llm-key-status-badge" class="trust noisy">CHECKING</span>
-              <button class="btn btn-ghost btn-sm head-right" id="btn-recheck-llm-key" data-i18n="btn_recheck_llm_key">重新檢查</button>
-            </div>
-            <div class="llm-key-grid">
-              <div>
-                <div class="mono-mini muted mb-6" data-i18n="llm_key_env_label">環境變數名稱</div>
-                <input type="text" id="input-llm-key-env" value="GEMINI_API_KEY" class="mono" autocomplete="off" spellcheck="false">
-              </div>
-              <div id="llm-key-status-text" class="small muted">正在檢查本機後端可用的 API key…</div>
-            </div>
-            <div class="usage-boundary llm-key-boundary" data-i18n="llm_key_boundary">金鑰只由 OmniContext 本機後端讀取；瀏覽器不會取得、顯示或寫入金鑰內容。建議保存在作業系統的使用者環境變數。</div>
-          </div>
-          <div class="panel-foot">
-            <button class="btn btn-primary" id="btn-save-settings" data-i18n="btn_save_apply">儲存並套用</button>
-            <span class="muted small" data-i18n="settings_save_note">寫回 config.yaml 後即時熱更新</span>
-          </div>
-        </div>
-
-        <div class="panel mb-14">
-          <div class="panel-head">
-            <span class="mono-label accent">04</span><span class="panel-title" data-i18n="settings_usage_title">每日使用時間與里程碑</span>
-            <span class="muted small" data-i18n="settings_usage_note">前景時間，不代表生產力或實際工時</span>
-          </div>
-          <div class="usage-settings-body">
-            <div class="usage-toggle-row">
-              <label class="setting-check"><input type="checkbox" id="toggle-usage-tracking"><span data-i18n="usage_tracking_enabled">啟用使用時間統計</span></label>
-              <label class="setting-check"><input type="checkbox" id="toggle-usage-notifications"><span data-i18n="usage_notifications_enabled">啟用里程碑通知</span></label>
-            </div>
-            <div class="fields usage-settings-fields">
-              <div><div class="mono-mini muted mb-6" data-i18n="usage_daily_goal">DAILY GOAL / MIN</div><input type="number" id="input-usage-daily-goal" min="15" max="1440" value="360" class="mono"></div>
-              <div><div class="mono-mini muted mb-6" data-i18n="usage_milestones">MILESTONES / MIN</div><input type="text" id="input-usage-milestones" value="120, 240, 360" class="mono"></div>
-              <div><div class="mono-mini muted mb-6" data-i18n="usage_tone">TONE</div>
-                <select id="select-usage-tone">
-                  <option value="neutral">Neutral</option>
-                  <option value="encouraging">Encouraging</option>
-                  <option value="praise">Praise</option>
-                </select>
-              </div>
-              <div><div class="mono-mini muted mb-6" data-i18n="usage_quiet_start">QUIET FROM</div><input type="time" id="input-usage-quiet-start" value="22:00" class="mono"></div>
-              <div><div class="mono-mini muted mb-6" data-i18n="usage_quiet_end">QUIET UNTIL</div><input type="time" id="input-usage-quiet-end" value="08:00" class="mono"></div>
-              <div><div class="mono-mini muted mb-6" data-i18n="usage_cooldown">COOLDOWN / MIN</div><input type="number" id="input-usage-cooldown" min="0" max="1440" value="60" class="mono"></div>
-            </div>
-          </div>
-          <div class="panel-foot">
-            <span class="muted small" data-i18n="usage_local_note">預設只在本機聚合，不呼叫 cloud LLM；介面分類規則可在 config.yaml 調整。</span>
-          </div>
-        </div>
-
-        <div class="panel mb-14">
-          <div class="panel-head">
-            <span class="mono-label accent">05</span><span class="panel-title" data-i18n="settings_executor_title">小秘書執行器（ADR-008）</span>
+            <span class="mono-label accent">01</span><span class="panel-title" data-i18n="settings_executor_title">小秘書執行器（ADR-008）</span>
             <span class="muted small" data-i18n="settings_executor_note">預設關閉；每次執行仍需 execution token 與逐項批准</span>
           </div>
           <div class="usage-settings-body">
@@ -514,9 +432,10 @@
           </div>
         </div>
 
+
         <div class="panel mb-14">
           <div class="panel-head">
-            <span class="mono-label accent">06</span><span class="panel-title" data-i18n="settings_telegram_title">Telegram 通知（遠端推播）</span>
+            <span class="mono-label accent">02</span><span class="panel-title" data-i18n="settings_telegram_title">Telegram 通知（遠端推播）</span>
             <span id="tg-status-badge" class="trust broken">未設定</span>
           </div>
           <div style="padding: 14px;">
@@ -562,11 +481,124 @@
           </div>
         </div>
 
-        <div class="panel mb-14">
-          <div class="panel-head">
+
+        <details class="panel mb-14 panel-collapsible" id="panel-watch-paths">
+          <summary class="panel-head"><span class="mono-label accent">03</span><span class="panel-title" data-i18n="settings_p1_title">監控路徑</span></summary>
+          <div class="split">
+            <div class="split-col">
+              <div class="mono-mini muted mb-8" data-i18n="label_file_dirs">FILE DIRS</div>
+              <div id="dir-list" class="taglist"></div>
+              <div class="input-row">
+                <input type="text" id="input-new-dir" placeholder="絕對路徑…" data-i18n-ph="ph_abs_path">
+                <button class="btn btn-ghost" id="btn-browse-dir" title="瀏覽選取本機資料夾" data-i18n="btn_browse">📁 瀏覽…</button>
+                <button class="btn btn-ghost" id="btn-add-dir" data-i18n="btn_add">新增</button>
+              </div>
+              <div id="ext-checkboxes" class="extchips">
+                <label><input type="checkbox" value=".tex" checked>.tex</label>
+                <label><input type="checkbox" value=".docx" checked>.docx</label>
+                <label><input type="checkbox" value=".md" checked>.md</label>
+                <label><input type="checkbox" value=".pdf" checked>.pdf</label>
+                <label><input type="checkbox" value=".py" checked>.py</label>
+                <label><input type="checkbox" value=".txt" checked>.txt</label>
+              </div>
+            </div>
+            <div class="split-col">
+              <div class="mono-mini muted mb-8" data-i18n="label_git_roots">GIT ROOTS</div>
+              <div id="repo-list" class="taglist"></div>
+              <div class="input-row">
+                <input type="text" id="input-new-repo" placeholder="Git 專案根目錄…" data-i18n-ph="ph_git_path">
+                <button class="btn btn-ghost" id="btn-browse-repo" title="瀏覽選取 Git 倉庫目錄" data-i18n="btn_browse">📁 瀏覽…</button>
+                <button class="btn btn-ghost" id="btn-add-repo" data-i18n="btn_add">新增</button>
+              </div>
+              <div class="note" data-i18n="git_recursive_note">已啟用遞迴探索模式，根目錄下所有子倉庫均會自動納入掃描。</div>
+            </div>
+          </div>
+        </details>
+
+        <details class="panel mb-14 panel-collapsible" id="panel-capture-sources">
+          <summary class="panel-head">
+            <span class="mono-label accent">04</span><span class="panel-title" data-i18n="settings_p2_title">採集來源</span>
+            <span class="muted small" data-i18n="settings_p2_note">右欄標示目前可信度</span>
+          </summary>
+          <div class="sources">
+            <label class="source"><input type="checkbox" id="toggle-claude-code" checked><span class="mono">~/.claude</span><span class="trust ok">OK</span></label>
+            <label class="source"><input type="checkbox" id="toggle-claude-desktop" checked><span class="mono">Claude Desktop Cowork</span><span class="trust noisy">LOCAL</span></label>
+            <label class="source"><input type="checkbox" id="toggle-codex" checked><span class="mono">~/.codex</span><span class="trust ok">OK</span></label>
+            <label class="source"><input type="checkbox" id="toggle-antigravity" checked><span class="mono">antigravity</span><span class="trust ok">OK</span></label>
+            <label class="source"><input type="checkbox" id="toggle-gemini" checked><span class="mono">gemini.google.com</span><span class="trust ok">OK</span></label>
+            <label class="source"><input type="checkbox" id="toggle-chatgpt" checked><span class="mono">chatgpt.com</span><span class="trust ok">OK</span></label>
+            <label class="source"><input type="checkbox" id="toggle-claude-web" checked><span class="mono">claude.ai</span><span class="trust ok">OK</span></label>
+            <label class="source"><input type="checkbox" id="toggle-window-focus" checked><span class="mono">window focus</span><span class="trust ok">OK</span></label>
+          </div>
+        </details>
+
+        <details class="panel mb-14 panel-collapsible" id="panel-llm">
+          <summary class="panel-head"><span class="mono-label accent">05</span><span class="panel-title" data-i18n="settings_p3_title">摘要與 LLM</span></summary>
+          <div class="fields">
+            <div><div class="mono-mini muted mb-6">DAILY AT</div><input type="text" id="input-schedule-time" value="23:30" class="mono"></div>
+            <div><div class="mono-mini muted mb-6">CHECKPOINT / H</div><input type="number" id="input-checkpoint-interval" value="2" min="1" max="12" class="mono"></div>
+            <div><div class="mono-mini muted mb-6">PROVIDER</div>
+              <select id="select-llm-provider">
+                <option value="gemini">Google Gemini</option>
+                <option value="anthropic">Anthropic Claude</option>
+                <option value="openai">OpenAI</option>
+                <option value="ollama">Ollama</option>
+              </select>
+            </div>
+            <div><div class="mono-mini muted mb-6">MODEL</div><input type="text" id="input-model-name" value="gemini-3.7-flash" class="mono"></div>
+          </div>
+          <div class="llm-key-card">
+            <div class="llm-key-head">
+              <span class="mono-mini" data-i18n="llm_key_status_title">API KEY 狀態</span>
+              <span id="llm-key-status-badge" class="trust noisy">CHECKING</span>
+              <button class="btn btn-ghost btn-sm head-right" id="btn-recheck-llm-key" data-i18n="btn_recheck_llm_key">重新檢查</button>
+            </div>
+            <div class="llm-key-grid">
+              <div>
+                <div class="mono-mini muted mb-6" data-i18n="llm_key_env_label">環境變數名稱</div>
+                <input type="text" id="input-llm-key-env" value="GEMINI_API_KEY" class="mono" autocomplete="off" spellcheck="false">
+              </div>
+              <div id="llm-key-status-text" class="small muted">正在檢查本機後端可用的 API key…</div>
+            </div>
+            <div class="usage-boundary llm-key-boundary" data-i18n="llm_key_boundary">金鑰只由 OmniContext 本機後端讀取；瀏覽器不會取得、顯示或寫入金鑰內容。建議保存在作業系統的使用者環境變數。</div>
+          </div>
+        </details>
+
+        <details class="panel mb-14 panel-collapsible" id="panel-usage-settings">
+          <summary class="panel-head">
+            <span class="mono-label accent">06</span><span class="panel-title" data-i18n="settings_usage_title">每日使用時間與里程碑</span>
+            <span class="muted small" data-i18n="settings_usage_note">前景時間，不代表生產力或實際工時</span>
+          </summary>
+          <div class="usage-settings-body">
+            <div class="usage-toggle-row">
+              <label class="setting-check"><input type="checkbox" id="toggle-usage-tracking"><span data-i18n="usage_tracking_enabled">啟用使用時間統計</span></label>
+              <label class="setting-check"><input type="checkbox" id="toggle-usage-notifications"><span data-i18n="usage_notifications_enabled">啟用里程碑通知</span></label>
+            </div>
+            <div class="fields usage-settings-fields">
+              <div><div class="mono-mini muted mb-6" data-i18n="usage_daily_goal">DAILY GOAL / MIN</div><input type="number" id="input-usage-daily-goal" min="15" max="1440" value="360" class="mono"></div>
+              <div><div class="mono-mini muted mb-6" data-i18n="usage_milestones">MILESTONES / MIN</div><input type="text" id="input-usage-milestones" value="120, 240, 360" class="mono"></div>
+              <div><div class="mono-mini muted mb-6" data-i18n="usage_tone">TONE</div>
+                <select id="select-usage-tone">
+                  <option value="neutral">Neutral</option>
+                  <option value="encouraging">Encouraging</option>
+                  <option value="praise">Praise</option>
+                </select>
+              </div>
+              <div><div class="mono-mini muted mb-6" data-i18n="usage_quiet_start">QUIET FROM</div><input type="time" id="input-usage-quiet-start" value="22:00" class="mono"></div>
+              <div><div class="mono-mini muted mb-6" data-i18n="usage_quiet_end">QUIET UNTIL</div><input type="time" id="input-usage-quiet-end" value="08:00" class="mono"></div>
+              <div><div class="mono-mini muted mb-6" data-i18n="usage_cooldown">COOLDOWN / MIN</div><input type="number" id="input-usage-cooldown" min="0" max="1440" value="60" class="mono"></div>
+            </div>
+          </div>
+          <div class="panel-foot">
+            <span class="muted small" data-i18n="usage_local_note">預設只在本機聚合，不呼叫 cloud LLM；介面分類規則可在 config.yaml 調整。</span>
+          </div>
+        </details>
+
+        <details class="panel mb-14 panel-collapsible" id="panel-github">
+          <summary class="panel-head">
             <span class="mono-label accent">07</span><span class="panel-title" data-i18n="settings_p4_title">GitHub 雲端整合 (全專案與 PR 追蹤)</span>
             <span id="gh-auth-badge" class="trust broken">未連線</span>
-          </div>
+          </summary>
           <div style="padding: 14px;">
             <div id="gh-account-info" class="mb-14" style="font-size: 13px; color: var(--tx); line-height: 1.6;">
               正在偵測 GitHub 憑證…
@@ -592,36 +624,7 @@
               <span id="gh-sync-result" class="mono-mini muted"></span>
             </div>
           </div>
-        </div>
-
-        <div class="panel mb-14" id="repo-sync-panel">
-          <div class="panel-head">
-            <span class="mono-label accent">08</span><span class="panel-title" data-i18n="repo_sync_title">本機 Git 同步中心</span>
-            <span id="repo-sync-badge" class="trust neutral" data-i18n="repo_sync_manual">逐項手動確認</span>
-          </div>
-          <div class="repo-sync-body">
-            <div class="repo-sync-intro">
-              <div>
-                <strong data-i18n="repo_sync_intro_title">檢查本機 branch 與遠端追蹤差異</strong>
-                <p data-i18n="repo_sync_intro_detail">狀態只讀取本機已保存的 remote-tracking refs。先按 Fetch 更新遠端參照，再依條件執行 fast-forward Pull、staged Commit 或 Push。</p>
-              </div>
-              <button class="btn btn-ghost btn-sm" id="btn-repo-sync-refresh" data-i18n="btn_repo_sync_refresh">↻ 重讀同步狀態</button>
-            </div>
-            <div id="repo-sync-summary" class="repo-sync-summary mono-mini muted" data-i18n="repo_sync_loading">正在讀取設定範圍內的 repositories…</div>
-            <div id="repo-sync-list" class="repo-sync-list" aria-live="polite"></div>
-            <div id="repo-sync-result" class="repo-sync-result mono-mini muted"></div>
-            <div class="repo-sync-intro" style="margin-top: 14px;">
-              <div>
-                <strong data-i18n="onboarding_title">Repo Onboarding／對帳（P4.3）</strong>
-                <p data-i18n="onboarding_intro">找出尚未 git init 的資料夾、沒有 remote 的 repo、以及尚未 clone 的 GitHub repo。已 clone 與否只以 remote URL 比對；同名僅提示、不自動配對。每個動作都是單一目標、逐一確認。</p>
-              </div>
-              <button class="btn btn-ghost btn-sm" id="btn-onboarding-scan" data-i18n="btn_onboarding_scan">🔍 掃描對帳</button>
-            </div>
-            <div id="onboarding-report" class="mono-mini" aria-live="polite"></div>
-            <div id="onboarding-result" class="repo-sync-result mono-mini muted"></div>
-          </div>
-          <div class="panel-foot repo-sync-foot" data-i18n="repo_sync_boundary">不會自動同步、不會自動 git add、不會 force push；Commit 只會提交您已明確 staged 的檔案。Onboarding 動作不覆寫非空目錄、不批次 create/clone、永不代為 push。</div>
-        </div>
+        </details>
       </section>
 
       <!-- 04 每日摘要 -->
@@ -668,10 +671,13 @@
             <div id="summary-view-month" class="rangeview" hidden></div>
           </article>
         </div>
-      </section>
 
-      <!-- 05 活動快照 -->
-      <section id="tab-checkpoints" class="pane">
+        <details class="panel panel-collapsible mt-14" id="panel-checkpoints">
+          <summary class="panel-head">
+            <span class="mono-label accent">📸</span><span class="panel-title" data-i18n="checkpoints_panel_title">活動快照（週期 checkpoint 日誌）</span>
+            <span class="muted small" data-i18n="checkpoints_panel_note">需要回看原始時段紀錄時再展開</span>
+          </summary>
+          <div style="padding: 14px;">
         <div class="two-col">
           <div class="side">
             <button class="btn btn-primary btn-block" id="btn-trigger-cp-now" data-i18n="btn_trigger_cp_now">+ 產出快照</button>
@@ -685,6 +691,9 @@
             <div id="checkpoint-markdown-viewer" class="markdown"><p class="muted" data-i18n="ph_cp_click">請從左側點選快照日誌以檢視期間活動細節。</p></div>
           </article>
         </div>
+      
+          </div>
+        </details>
       </section>
 
       <!-- 07 系統健康與維護 -->

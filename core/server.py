@@ -55,6 +55,7 @@ from .time_utils import get_local_now
 from .runtime_paths import resolve_runtime_path, web_assets_dir
 from .secret_resolver import resolve_secret_env
 from .project_engine import (
+    get_active_projects_list,
     get_project_state_count,
     get_open_loops_list,
     refresh_project_states,

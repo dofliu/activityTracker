@@ -53,11 +53,13 @@ const I18N = {
     tab_assistant: "01 · 🤖 小秘書",
     tab_projects: "02 · 進行中工作",
     tab_rag: "03 · 📚 知識庫與 RAG",
-    tab_summaries: "04 · 每日摘要",
-    tab_checkpoints: "05 · 活動快照",
-    tab_dashboard: "06 · 即時情報流",
-    tab_settings: "07 · 監控配置",
-    tab_system_health: "08 · 🛡️ 系統健康與維護",
+    tab_summaries: "04 · 摘要與快照",
+    tab_dashboard: "05 · 即時情報流",
+    tab_settings: "06 · ⚙️ 設定",
+    tab_system_health: "07 · 🛡️ 系統健康",
+    checkpoints_panel_title: "活動快照（週期 checkpoint 日誌）",
+    checkpoints_panel_note: "需要回看原始時段紀錄時再展開",
+    settings_collapsed_hint: "較少變動的設定已收合，點標題展開。",
     assistant_title: "🤖 小秘書 · 交辦與提問",
     assistant_input_ph: "請小秘書查資料、寫摘要、建議下一步…",
     btn_assistant_send: "交辦 ⚡",
@@ -122,7 +124,7 @@ const I18N = {
     git_recursive_note: "已啟用遞迴探索模式，根目錄下所有子倉庫均會自動納入掃描。",
     settings_p2_title: "採集來源",
     settings_p2_note: "右欄標示目前可信度",
-    settings_p3_title: "摘要與排程",
+    settings_p3_title: "摘要與 LLM",
     llm_key_status_title: "API KEY 狀態",
     llm_key_env_label: "環境變數名稱",
     btn_recheck_llm_key: "重新檢查",
@@ -281,11 +283,13 @@ const I18N = {
     tab_assistant: "01 · 🤖 Assistant",
     tab_projects: "02 · Active Workstreams",
     tab_rag: "03 · 📚 Knowledge & RAG",
-    tab_summaries: "04 · Daily Summaries",
-    tab_checkpoints: "05 · Checkpoints",
-    tab_dashboard: "06 · Live Feed",
-    tab_settings: "07 · Settings",
-    tab_system_health: "08 · 🛡️ System Health & Maintenance",
+    tab_summaries: "04 · Summaries & Snapshots",
+    tab_dashboard: "05 · Live Feed",
+    tab_settings: "06 · ⚙️ Settings",
+    tab_system_health: "07 · 🛡️ System Health",
+    checkpoints_panel_title: "Activity Snapshots (periodic checkpoint logs)",
+    checkpoints_panel_note: "Expand only when you need the raw per-period logs",
+    settings_collapsed_hint: "Rarely-changed settings are collapsed — click a title to expand.",
     assistant_title: "🤖 ASSISTANT · ASK OR DELEGATE",
     assistant_input_ph: "Ask for documents, summaries, or the next step…",
     btn_assistant_send: "Send ⚡",
@@ -582,13 +586,14 @@ document.addEventListener("DOMContentLoaded", () => {
   initFocusCarousel();
   initAssistantHome();
 
+  initCollapsiblePanels();
+
   refreshStatus();
   refreshFeed();
   loadProjects();
   loadOpenLoops();
   loadConfig();
   loadGitHubStatus();
-  loadRepositorySyncStatus();
   loadSummaries();
   loadCheckpoints();
   loadUsagePanels();
@@ -604,6 +609,30 @@ document.addEventListener("DOMContentLoaded", () => {
   setInterval(loadUsagePanels, 30000);
   setInterval(loadAssistantStrip, 30000);
 });
+
+// ---------------------------------------------------- collapsible panels
+function initCollapsiblePanels() {
+  let repoSyncLoaded = false;
+  document.querySelectorAll("details.panel-collapsible[id]").forEach(panel => {
+    const key = `omni-panel-open:${panel.id}`;
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved === "1") panel.open = true;
+      if (saved === "0") panel.open = false;
+    } catch (_) { /* localStorage 不可用時維持 HTML 預設 */ }
+    panel.addEventListener("toggle", () => {
+      try { localStorage.setItem(key, panel.open ? "1" : "0"); } catch (_) { /* 同上 */ }
+      if (panel.id === "repo-sync-panel" && panel.open && !repoSyncLoaded) {
+        repoSyncLoaded = true;  // 展開才做 git 掃描，省掉每次開頁的成本
+        loadRepositorySyncStatus();
+      }
+    });
+    if (panel.id === "repo-sync-panel" && panel.open) {
+      repoSyncLoaded = true;
+      loadRepositorySyncStatus();
+    }
+  });
+}
 
 // ---------------------------------------------------------------- theme
 function initTheme() {
@@ -635,8 +664,7 @@ function initTabs() {
       if (id === "tab-projects") { loadProjects(); loadUsagePanels(); loadContextSessions(); }
       if (id === "tab-rag") { loadRAGFolders(); loadRAGFiles(); loadRAGSessions(); loadRAGProgress(); loadRAGStrategies(); }
       if (id === "tab-settings") loadConfig();
-      if (id === "tab-summaries") loadSummaries();
-      if (id === "tab-checkpoints") loadCheckpoints();
+      if (id === "tab-summaries") { loadSummaries(); loadCheckpoints(); }
       if (id === "tab-system-health") loadSystemHealth();
     });
   });
@@ -2888,6 +2916,8 @@ function initGitHubSection() {
     if (tabBtn) tabBtn.classList.add("active");
     $("tab-settings").classList.add("active");
     loadConfig();
+    const githubPanel = $("panel-github");
+    if (githubPanel) githubPanel.open = true;  // 從徽章跳轉時自動展開收合的 GitHub 卡片
     const el = $("btn-gh-auto-connect");
     if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 160, behavior: "smooth" });
   });
