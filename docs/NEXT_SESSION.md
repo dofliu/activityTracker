@@ -2,7 +2,8 @@
 
 > 最後更新:2026-09-01(session `claude/next-session-docs-fy0jca`:P5-R5 + Telegram 設定流程 + P5-R4b + P4.3 Repo Onboarding 落地)。
 > 這頁是給「下一個開發 session(人或 AI)」的最短接手路徑;現況以
-> [STATUS.yaml](../STATUS.yaml) 與 [ROADMAP.md](../ROADMAP.md) §11 為準。
+> [STATUS.yaml](../STATUS.yaml) 與 [ROADMAP.md](../ROADMAP.md) §11 為準,
+> **待辦清單一律以 [TODO.md](TODO.md) 為準**(含每項的完成判準)。
 
 ## 一分鐘現況
 
@@ -16,21 +17,15 @@
 - **RAG 對話契約**(2026-09-01 修):`resolve_secret_env` 回傳 `SecretResolution` 物件,**必須取 `.value`**——rag/ 內 4 處漏取導致 Gemini/OpenAI/Claude 走 RAG 一律失敗(物件恆為真值使「未設金鑰」判斷失效,且 repr 被帶進 URL)。金鑰現改走 header 不進 URL;SSE `event_generator` 全程 try/finally **保證送出 done**(瀏覽器只靠它解除「回覆中」),檢索移入 generator 並有 60 秒逾時,前端另有 120 秒閒置 abort。契約由 `tests/test_rag_chat_stream.py`(10 項)鎖住。
 - **介紹影片**:3 分鐘 MP4 已交付使用者;場景源檔在 [`promo/`](../promo/)(單景可重渲,見其 README)。
 
-## 等待中的使用者側收據(不是程式工作)
+## 待辦與下一步
 
-1. **全天 coverage ledger**:使用者讓 Windows 實機跨午夜連續運行一天 → 儀表板 coverage 轉 `OBSERVED` 或隔日 `GET /api/v1/usage/coverage?date=YYYY-MM-DD` 回 `meets_full_coverage: true`;取得後更新 STATUS(`continuous_coverage_ledger` gate 與 known_blockers、release_ready 評估)。
-2. **L2 實機試用**:使用者在自己機器開三個執行器開關 + `python main.py init --show-token`,實跑一次 draft→confirm→(可選 apply)。
-3. Ollama 鏈路已有 live 診斷收據(llm-test:reachable、llama3.1:8b、8.36s),不用再驗。
-4. **P4.3 onboarding 實操**:在實機按「掃描對帳」並各實跑一種動作(init/attach 或 clone),確認對帳分類與拒絕條件符合預期。
-5. **Telegram live 驗收**:使用者在「設定 → Telegram 通知」卡片走完設定流程(BotFather 建 bot → 貼 token → 偵測 chat id → 測試訊息送達 → 儲存啟用),再開「inline 批准」+「🔓 解鎖遠端批准」,實批一次 L1 動作取得 approved_via=telegram_inline receipt。
+**一律看 [TODO.md](TODO.md)**（每項都附完成判準）。目前的形狀是：
 
-## 下一步候選(依 ADR-008 階段)
+- **A. 等待使用者側 live 收據**(👤 需在 Windows 實機操作,不是程式工作):全天 coverage ledger(唯一還擋 `release_ready` 的能力缺口)、RAG 雲端 provider 複測、Telegram 設定＋inline 批准、L2 執行器試用、P4.3 對帳實操。
+- **B. 已知問題與技術債**:大型 RAG 索引首次檢索仍在主程序載入(已用逾時緩解,根因未解)、容器缺 xdg-open 的已知測試失敗、legacy AI rows、Extension 覆蓋邊界。
+- **C. 功能候選**:更多 L2／可排程 template、P4 其餘採集來源、更多配色。
 
-| 候選 | 內容 | 前置 |
-| :--- | :--- | :--- |
-| **收使用者側 live 收據** | 全天 coverage ledger、Telegram 設定+inline 批准、L2 draft→apply、P4.3 onboarding 一輪實操;齊備後重評 release_ready 與下一個 pre-release | 全部需要使用者在 Windows 實機操作 |
-| 更多 L2 template | 依 ADR-008 Addendum 模式逐一審查新增(一次一個 template) | 依需求 |
-| 更多 schedulable template | 依 P5-R5 模式新增 L0 唯讀排程動作(一次一個,L1/L2 永不可排程) | 依需求 |
+> 這頁只保留「現況與環境」;新增待辦請寫進 TODO.md,不要在這裡另開清單。
 
 ## 工程慣例(照舊)
 

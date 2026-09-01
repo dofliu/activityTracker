@@ -1,12 +1,13 @@
 # 📚 OmniContext 文件總覽（Documentation Index）
 
-> 最後整理：2026-08-31。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
+> 最後整理：2026-09-01。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
 
 ## 我該從哪裡開始？
 
 | 你想做的事 | 請看 |
 | :--- | :--- |
 | **接手上一個開發 session、繼續往下做** | [NEXT_SESSION.md](NEXT_SESSION.md) —— 現況、等待中的收據、下一步候選、環境備忘 |
+| **看還有什麼待辦、已知問題** | [TODO.md](TODO.md) —— 待辦清單（含完成判準）、技術債、功能候選 |
 | 快速了解專案是什麼、能做什麼 | [README.md](../README.md)（繁中）/ [README_en.md](../README_en.md)（English） |
 | 安裝、Extension 配對、日常操作、備份與故障排查 | [USAGE.md](USAGE.md) —— **使用手冊** |
 | 了解目前開發到哪、下一步是什麼 | [ROADMAP.md](../ROADMAP.md) + [STATUS.yaml](../STATUS.yaml) |
@@ -27,7 +28,8 @@
 
 | 文件 | 說明 |
 | :--- | :--- |
-| [../ROADMAP.md](../ROADMAP.md) | P0–P8 開發規劃與成果紀錄、建議執行順序、下一步提案 |
+| [../ROADMAP.md](../ROADMAP.md) | P0–P8 開發規劃與**成果紀錄**（已完成的事寫在這裡） |
+| [TODO.md](TODO.md) | **待辦清單**：等待中的使用者側收據、已知問題與技術債、功能候選；每項都有完成判準 |
 | [../STATUS.yaml](../STATUS.yaml) | 機器可讀的現況快照：feature 清單、evidence receipts、quality gates、known blockers |
 | [PRODUCT_POSITIONING.md](PRODUCT_POSITIONING.md) | 產品定位：跨 AI、應用與 Repository 的個人工作脈絡層，以及能力／證據邊界 |
 

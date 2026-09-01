@@ -6,7 +6,7 @@ progress_basis: "依 P0-P8 加權里程碑估計；不是 release readiness 百�
 status: active_hardening
 release_ready: false
 last_updated: "2026-09-01"
-current_phase: "P2.6/P2.7 Time Evidence Hardening + P3 Memory + P4.2 Safe Local Git Sync + P7 DeskRAG worker lifecycle + P8 System Health & Maintenance Hub"
+current_phase: "ADR-008 P5-R1～R5 全階段完成（秘書執行器／Telegram inline 批准／L0 排程任務，全部預設關閉）+ P4.3 Repo Onboarding + 儀表板資訊架構重整與配色主題；進入等待使用者側 live 收據階段"
 next_milestone: "取得使用者側 live 收據（全天 coverage ledger、Telegram 設定＋inline 批准、L2 draft→apply、P4.3 onboarding 一輪實操）後重評 release_ready；功能面依需求擴充 template 或評估 P4 其餘來源"
 planned_features:
   - id: FEATURE-001
@@ -91,6 +91,8 @@ outputs:
   - web_dashboard
 documentation:
   docs_index: docs/INDEX.md
+  backlog: docs/TODO.md
+  handoff_guide: docs/NEXT_SESSION.md
   readme: README.md
   usage_guide: docs/USAGE.md
   roadmap: ROADMAP.md
@@ -481,6 +483,9 @@ quality_gates:
   telegram_setup_ui: implemented_ui_flow_live_getme_and_test_message_secrets_never_returned_15_contract_tests
   telegram_inline_approvals_p5_r4b: implemented_default_off_arm_with_execution_token_ttl_l0_l1_only_outbound_long_polling_14_contract_tests
   repo_onboarding_p4_3: implemented_url_only_matching_confirmed_single_target_actions_never_push_8_contract_tests
+  dashboard_information_architecture: passed_six_tabs_primary_secondary_collapsible_playwright_zero_overflow_desktop_and_494px
+  appearance_palettes: passed_three_palettes_x_dark_light_contrast_5_37_to_6_99_preference_local_only
+  rag_cloud_provider_chat: fixed_secret_resolution_value_key_in_header_sse_always_emits_done_10_contract_tests
   ollama_chain_live_diagnostic: passed_windows_llm_test_2026_08_31_reachable_llama31_8b_generation_8_36s_default_provider_gemini_by_config
   live_receipt_acceptance_scripts: passed_localhost_e2e_background_tasks_and_extension
   autonomous_execution: blocked_by_p2_5
@@ -491,5 +496,7 @@ known_blockers:
   - "337 筆 legacy AI rows 無 response_status，僅保留為歷史資料，不進入 canonical synthesis/handoff 結論"
   - "v1.3.0a5 已於 2026-08-31 發佈為 GitHub pre-release（tag + wheel/sdist + SHA-256 receipt，由 release workflow 自動建置）；PyPI 不在範圍。stable release 條件（全天 coverage receipt、跨平台實機能力）齊備前 release_ready 維持 false"
   - "Windows/Ubuntu/macOS × Python 3.10/3.12 CI run 32757498004 已通過；window/notification 實機能力仍限 Windows，其他平台採明確降級"
+  - "RAG 雲端 provider 對話曾因 resolve_secret_env 未取 .value 而全數失效（金鑰物件 repr 進 URL、400 失敗且無法顯示未設定提示），已於 2026-09-01 修復並以 10 項 contract tests 守門；殘餘：使用者實機以真實金鑰複測的收據尚未取得（見 docs/TODO.md A2）"
+  - "大型 RAG 索引（475k chunks）首次檢索仍在主服務程序內載入，已用 60 秒逾時與 status 事件避免介面假死，但根因未解（建議移至常駐 worker 或啟動後預熱；見 docs/TODO.md B1）"
   - "P5 executor 已依 ADR-008 分階段落地至 P5-R5（L0/L1 in-process、L2 dispatcher＋confirm code、agent_apply_plan 兩段式寫檔、L0-only 自訂排程任務＋週/月報 rollup＋STATUS 草稿），全部預設關閉且僅限白名單 template；git commit/push 類 template 永不註冊（改動一律留 worktree 供人審）；Telegram 介面化設定流程與 P5-R4b inline 批准＋晚間交接均已實作（批准通道需 execution token 解鎖、in-memory TTL、只批 L0/L1、預設關閉）——ADR-008 P5-R1～R5 全階段完成；殘餘：使用者實機 live 驗收（設定流程＋一輪 inline 批准）尚未取得"
 key_metrics: "P0-P2 可日常運行；P3-1 handoff、P3-2 semantic index 4,380/4,380、P3-3 omni ask、P3-4 Related History、P3-5 derived Session、SQLite schema 7/7、Windows Toast E2E、formal package+DB rollback 與 3-OS/2-Python CI 六個 jobs 已通過。P5-1 proposal-only Alpha 以 2 張 live proposal／3 個 evidence refs 完成 localhost UI/API smoke，無保存、無 cloud LLM、無 execution。2026-08-26 完成 collector runtime diagnostics、Extension 1.3.1 live verifier 與 project_resolution config-driven roots；Verifier 可拒絕歷史事件並要求新 heartbeat、Content Ready、event 與 response。2026-08-30 完成 P2.6 coverage ledger（migration 013）、兩支 live 驗收腳本與 Linux 發佈預演；2026-08-31 01:03 以 extension_live_acceptance 在已登入 Chrome 取得 ChatGPT＋Claude.ai 本輪 real PASS receipt（heartbeat 已驗證）。P2.7 三平台（codex／claude_code／claude_desktop）live 驗收亦已全數 PASS（2026-08-29 共 48 筆 completed、union 28838.971 秒）。v1.3.0a5 已於 2026-08-31 以 release workflow 發佈為 GitHub pre-release（SHA-256 receipt 交叉驗證一致）。剩全天 coverage ledger 實測；P5 executor 依 ADR-008 分階段落地：P5-R1 annotate-only advisory、P5-R2 gated executor（白名單 in-process 動作、獨立 execution token、audit receipt）、P5-R3 subprocess dispatcher（argv 白名單禁 shell、env allowlist 不轉發 API key、L2 一次性 confirm code＋冷卻、執行中可取消）與 P5-R4a 秘書晨報均已實作且預設關閉；P5-R5 自訂排程任務亦已實作（僅 L0 唯讀 template 可排程、migration 016、每次執行寫 audit receipt、錯過只補跑一次；含週/月報 rollup 與 STATUS.yaml 過期點名草稿，17 項 contract tests）。Telegram 介面化設定流程已實作（getMe＋實發測試訊息的即時連線測試、secret 永不回流瀏覽器、驗證通過才寫 config、15 項 contract tests）。P5-R4b Telegram inline 批准＋晚間交接已實作（2026-09-01：getUpdates 長輪詢 outbound-only、批准通道需 execution token 解鎖且 in-memory TTL 重啟即失效、只綁定 chat、只批 L0/L1、L2 立即作廢 confirm code 導回儀表板、approved_via=telegram_inline receipt、14 項 contract tests）——ADR-008 P5-R1～R5 全階段完成，殘餘為使用者實機 live 驗收。P4.3 Repo Onboarding／Reconciliation 已實作（2026-09-01：對帳只認 remote URL、同名僅提示不自動配對；init／attach remote／clone／create remote 皆單一目標確認式、不覆寫非空目錄、永不代為 push；契約入 ADR-011 Addendum、8 項 contract tests 含本機 bare repo clone E2E）。"

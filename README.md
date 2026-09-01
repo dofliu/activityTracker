@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **目前狀態：Personal Alpha（v1.3.0a5 已發佈為 GitHub pre-release）。** Windows milestone WinRT Toast E2E、schema 16/16、formal package+DB rollback、P3-2～P3-5、collector runtime diagnostics、P2.6 continuous coverage ledger 與跨平台 CI 已通過；Extension 1.3.1 已於 2026-08-31 取得 ChatGPT＋Claude.ai live PASS receipt，P2.7 三平台背景任務 live 驗收亦全數 PASS。**秘書已依 [ADR-008](docs/ADR-008-gated-agent-executor.md) 完成 P5-R1～R5 全階段**（LLM 註解、L0/L1 白名單代辦、L2 調度本機 agent CLI 起草／依批准計畫改檔、Telegram inline 批准與晚間交接、L0 唯讀自訂排程任務含週/月報 rollup 與 STATUS 草稿，全部預設關閉），並有秘書晨報（P5-R4a）、兩層增量摘要與小秘書首頁 UI。P4.3 Repo Onboarding／對帳（init／連結 remote／clone／建立 GitHub repo 的單一目標確認式流程）已實作。剩餘缺口:全天 coverage ledger 實測與各功能的使用者實機 live 收據（release_ready 仍為 false）。
+> **目前狀態：Personal Alpha（v1.3.0a5 已發佈為 GitHub pre-release）。** Windows milestone WinRT Toast E2E、schema 16/16、formal package+DB rollback、P3-2～P3-5、collector runtime diagnostics、P2.6 continuous coverage ledger 與跨平台 CI 已通過；Extension 1.3.1 已於 2026-08-31 取得 ChatGPT＋Claude.ai live PASS receipt，P2.7 三平台背景任務 live 驗收亦全數 PASS。**秘書已依 [ADR-008](docs/ADR-008-gated-agent-executor.md) 完成 P5-R1～R5 全階段**（LLM 註解、L0/L1 白名單代辦、L2 調度本機 agent CLI 起草／依批准計畫改檔、Telegram inline 批准與晚間交接、L0 唯讀自訂排程任務含週/月報 rollup 與 STATUS 草稿，全部預設關閉），並有秘書晨報（P5-R4a）、兩層增量摘要與小秘書首頁 UI。P4.3 Repo Onboarding／對帳（init／連結 remote／clone／建立 GitHub repo 的單一目標確認式流程）已實作；儀表板已完成資訊架構重整（6 分頁分主次、少用設定收合）與可選配色主題（火影橘／森林綠／海洋藍 × 深淺）。目前 44 個 contract test 模組共 261 項。剩餘缺口:全天 coverage ledger 實測與各功能的使用者實機 live 收據（release_ready 仍為 false）；完整待辦見 [docs/TODO.md](docs/TODO.md)。
 
 **文件入口：**[📚 文件總覽](docs/INDEX.md) · [完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
 
