@@ -342,6 +342,21 @@
             <div id="repo-sync-result" class="repo-sync-result mono-mini muted"></div>
             <div class="repo-sync-intro" style="margin-top: 14px;">
               <div>
+                <strong data-i18n="repo_overview_title">全覽與批次</strong>
+                <p data-i18n="repo_overview_intro">列出設定範圍內的全部 repo。「全部 Fetch」只更新遠端參照、不動 worktree；批次 Pull／Push 會先列出目前符合條件的清單讓你確認，執行時每個 repo 仍會重檢一次，不符者跳過、永不 force。</p>
+              </div>
+              <div class="repo-overview-toolbar">
+                <button class="btn btn-ghost btn-sm" id="btn-repo-overview-load" data-i18n="btn_repo_overview_load">📋 載入全覽</button>
+                <button class="btn btn-ghost btn-sm" id="btn-repo-fetch-all" data-i18n="btn_repo_fetch_all">🔄 全部 Fetch</button>
+                <button class="btn btn-ghost btn-sm" id="btn-repo-batch-pull" data-i18n="btn_repo_batch_pull">⬇ 批次 Pull (FF only)</button>
+                <button class="btn btn-ghost btn-sm" id="btn-repo-batch-push" data-i18n="btn_repo_batch_push">⬆ 批次 Push</button>
+              </div>
+            </div>
+            <div id="repo-overview-filters" class="repo-overview-filters" hidden></div>
+            <div id="repo-overview-table" class="repo-overview-table" aria-live="polite"></div>
+            <div id="repo-overview-result" class="repo-sync-result mono-mini muted"></div>
+            <div class="repo-sync-intro" style="margin-top: 14px;">
+              <div>
                 <strong data-i18n="onboarding_title">Repo Onboarding／對帳（P4.3）</strong>
                 <p data-i18n="onboarding_intro">找出尚未 git init 的資料夾、沒有 remote 的 repo、以及尚未 clone 的 GitHub repo。已 clone 與否只以 remote URL 比對；同名僅提示、不自動配對。每個動作都是單一目標、逐一確認。</p>
               </div>
@@ -350,7 +365,7 @@
             <div id="onboarding-report" class="mono-mini" aria-live="polite"></div>
             <div id="onboarding-result" class="repo-sync-result mono-mini muted"></div>
           </div>
-          <div class="panel-foot repo-sync-foot" data-i18n="repo_sync_boundary">不會自動同步、不會自動 git add、不會 force push；Commit 只會提交您已明確 staged 的檔案。Onboarding 動作不覆寫非空目錄、不批次 create/clone、永不代為 push。</div>
+          <div class="panel-foot repo-sync-foot" data-i18n="repo_sync_boundary">沒有排程自動同步、不會自動 git add、不會 force push；Commit 只會提交您已明確 staged 的檔案。批次 Pull／Push 只對你確認過的清單執行且逐一重檢；批次 Push 預設關閉。Onboarding 動作不覆寫非空目錄、不批次 create/clone、永不代為 push。</div>
         </details>
       </section>
 

@@ -6,7 +6,7 @@ progress_basis: "依 P0-P8 加權里程碑估計；不是 release readiness 百�
 status: active_hardening
 release_ready: false
 last_updated: "2026-09-02"
-current_phase: "ADR-008 P5-R1～R5 全階段完成（秘書執行器／Telegram inline 批准／L0 排程任務，全部預設關閉）+ P4.3 Repo Onboarding + 儀表板資訊架構重整與配色主題 + RAG 檢索移至常駐 worker（ADR-009 Addendum）；進入等待使用者側 live 收據階段"
+current_phase: "ADR-008 P5-R1～R5 全階段完成（秘書執行器／Telegram inline 批准／L0 排程任務，全部預設關閉）+ P4.3 Repo Onboarding + 儀表板資訊架構重整與配色主題 + RAG 檢索移至常駐 worker（ADR-009 Addendum）+ Repo 同步全覽／批次／秘書同步報告（ADR-011 Addendum B）；進入等待使用者側 live 收據階段"
 next_milestone: "取得使用者側 live 收據（全天 coverage ledger、Telegram 設定＋inline 批准、L2 draft→apply、P4.3 onboarding 一輪實操）後重評 release_ready；功能面依需求擴充 template 或評估 P4 其餘來源"
 planned_features:
   - id: FEATURE-001
@@ -59,11 +59,11 @@ planned_features:
     trust_boundary: "不可與 WindowEvent 前景時間、AI turns、里程碑或生產力混算；generic Terminal、cloud-only、start-only 與異常 duration 一律不補值"
     specification: "docs/ADR-010-verified-background-agent-task-time.md"
   - id: FEATURE-008
-    name: "受控本機 Git Repository 同步中心"
+    name: "受控本機 Git Repository 同步中心（含全覽與批次）"
     stage: implemented_alpha
     priority: should_have
-    scope: "在使用者明示設定的 Git roots 下顯示本機 branch、cached ahead/behind 與 worktree 狀態，並逐一確認 fetch、fast-forward pull、staged-only commit、push"
-    trust_boundary: "狀態初始比較僅為 cached local remote-tracking ref；無自動同步、無 git add、無 force push；pull/push 需 clean worktree 且無分歧；不接受 dashboard 傳入任意本機路徑"
+    scope: "在使用者明示設定的 Git roots 下顯示本機 branch、cached ahead/behind、worktree 狀態與上次 fetch 時間；逐一確認 fetch、fast-forward pull、staged-only commit、push；全覽表格、一鍵全部 fetch、清單確認式批次 pull/push；小秘書 L0 每日同步報告與批准式 L1 fast-forward pull"
+    trust_boundary: "狀態比較僅為 cached local remote-tracking ref（每筆附 last_fetch_at）；無排程自動同步、無 git add、無 force push；pull/push 需 clean worktree 且無分歧且執行前在 lock 內重檢；批次只對使用者確認過的清單執行、批次 push 預設關閉；秘書報告唯讀不連網、pull 需批准、push 不代辦；不接受 dashboard 傳入任意本機路徑"
     specification: "docs/ADR-011-safe-local-repository-sync.md"
   - id: FEATURE-009
     name: "Repo Onboarding／Reconciliation"
@@ -497,6 +497,7 @@ quality_gates:
   dashboard_information_architecture: passed_six_tabs_primary_secondary_collapsible_playwright_zero_overflow_desktop_and_494px
   appearance_palettes: passed_three_palettes_x_dark_light_contrast_5_37_to_6_99_preference_local_only
   rag_cloud_provider_chat: fixed_secret_resolution_value_key_in_header_sse_always_emits_done_10_contract_tests
+  repo_sync_overview_and_batch: implemented_scope_all_fetch_all_list_confirmed_batch_pull_push_default_off_l0_report_l1_pull_ff_9_contract_tests_container_playwright_e2e_live_receipt_pending
   rag_retrieval_worker: implemented_resident_subprocess_main_process_imports_no_index_libraries_timeout_kill_restart_warmup_20_contract_tests_container_e2e_main_88mb_worker_335mb_large_index_live_receipt_pending
   ollama_chain_live_diagnostic: passed_windows_llm_test_2026_08_31_reachable_llama31_8b_generation_8_36s_default_provider_gemini_by_config
   live_receipt_acceptance_scripts: passed_localhost_e2e_background_tasks_and_extension

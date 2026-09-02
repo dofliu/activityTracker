@@ -41,6 +41,9 @@ SUGGESTED_ACTIONS = {
     "stalled_open_loop": "先看 Context Handoff 與來源，再決定要繼續、標記 stale 或結案。",
     "unfinished_recent": "趁脈絡還在，把未收尾的部分收掉或明確標記下一步。",
     "verify_extension_heartbeat": "在 Chrome 重新載入 unpacked Extension，開啟 popup 後檢查 heartbeat 與逐站 Content Ready。",
+    "repo_needs_pull": "確認沒有未保存的工作後批准 fast-forward pull；或先 Fetch 看看遠端是否又有新變更。",
+    "repo_needs_push": "到同步中心確認這些 commit 該發佈後再 Push（不會 force）。",
+    "repo_diverged": "本機與遠端各有新 commit；在 Git/IDE 手動 merge 或 rebase，系統不會代為處理。",
 }
 
 
@@ -254,6 +257,20 @@ def build_action_proposals(
         counters["repo_issue_backlog"] = repo_issue_backlog(session)
 
         signals = pr_signals + issue_signals + loop_signals
+
+    # Repo 同步提案只讀最近一次 L0 排程報告留下的快照（沒有或過期就不提），
+    # 因為 proposals 每次請求都會重建，不能在這裡對數十個 repo 跑 git status。
+    try:
+        from .repo_sync_report import collect_repo_sync_signals
+
+        repo_signals, repo_snapshot_meta = collect_repo_sync_signals(cfg=cfg, now=now)
+    except Exception as exc:  # noqa: BLE001 — 快照損毀不得拖垮整個提案清單
+        repo_signals, repo_snapshot_meta = [], {"used": False, "reason": f"error:{type(exc).__name__}"}
+    counters["repo_sync_snapshot"] = repo_snapshot_meta
+    signals = signals + repo_signals
+
+    with database.session_scope() as session:
+        snoozed = _active_snoozes(session, now)
         for signal in signals:
             key = (signal["signal_type"], signal["project_key"], signal["subject_ref"])
             if key in snoozed:
@@ -285,6 +302,7 @@ def build_action_proposals(
             "open_loop_projects": counters["open_loop_projects"],
             "snoozed_suppressed": counters["snoozed"],
             "repo_issue_backlog": counters.get("repo_issue_backlog", {}),
+            "repo_sync_snapshot": counters.get("repo_sync_snapshot", {}),
             "max_per_project": max_per_project,
             "stalled_open_loop_hours": stalled_hours,
             "unfinished_recent_min_idle_hours": recent_idle_hours,

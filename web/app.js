@@ -382,7 +382,13 @@ const I18N = {
     repo_sync_intro_detail: "Status reads locally cached remote-tracking refs only. Fetch refreshes refs, then Fast-forward Pull, staged Commit, or Push is enabled only when safe.",
     btn_repo_sync_refresh: "↻ Refresh sync status",
     repo_sync_loading: "Reading repositories within configured scope…",
-    repo_sync_boundary: "No automatic sync, git add, or force push. Commit only includes files you explicitly staged. Onboarding actions never overwrite non-empty directories, never batch create/clone, and never push on your behalf.",
+    repo_sync_boundary: "No scheduled automatic sync, git add, or force push. Commit only includes files you explicitly staged. Batch Pull/Push only runs on the list you confirmed and rechecks each repository; batch Push is off by default. Onboarding actions never overwrite non-empty directories, never batch create/clone, and never push on your behalf.",
+    repo_overview_title: "Overview & batch",
+    repo_overview_intro: "Lists every repository in the configured roots. “Fetch all” only refreshes remote-tracking refs; batch Pull/Push first shows the list of repositories that currently qualify, rechecks each one when it runs, skips the rest and never forces.",
+    btn_repo_overview_load: "📋 Load overview",
+    btn_repo_fetch_all: "🔄 Fetch all",
+    btn_repo_batch_pull: "⬇ Batch Pull (FF only)",
+    btn_repo_batch_push: "⬆ Batch Push",
     onboarding_title: "Repo Onboarding / Reconciliation (P4.3)",
     onboarding_intro: "Finds folders without git init, repos without a remote, and GitHub repos not cloned locally. Cloned-or-not is decided by remote URL only; same names are just hints, never auto-paired. Every action targets one repo with explicit confirmation.",
     btn_onboarding_scan: "🔍 Scan & reconcile",
@@ -2665,6 +2671,17 @@ function repoSyncLabels() {
     pull: "Pull (FF only)",
     commit: "Commit staged",
     push: "Push",
+    ovLoading: "正在讀取全部 repo 的本機 Git 狀態（不連網）…",
+    ovEmpty: "沒有符合此篩選的 repo。",
+    ovColumns: ["Repo", "branch → upstream", "狀態", "worktree", "上次 fetch", "動作"],
+    ovFilters: { all: "全部", behind: "需 pull", ahead: "需 push", diverged: "分歧", dirty: "worktree 未提交", no_upstream: "無 upstream", synced: "已同步" },
+    ovNeverFetched: "從未",
+    confirmFetchAll: "對全部 repo 執行 fetch --prune？只更新遠端參照，不改任何 worktree、branch 或遠端。",
+    fetchAllDone: (c) => `全部 Fetch 完成：成功 ${c.success}、失敗 ${c.failed}、跳過 ${c.skipped}`,
+    batchNone: (a) => `目前沒有符合 ${a === "push" ? "Push" : "Pull (FF only)"} 前置條件的 repo。`,
+    batchConfirm: (a, names, excluded) => `將對以下 ${names.length} 個 repo 執行 ${a === "push" ? "Push（不 force）" : "fast-forward Pull"}：\n\n${names.join("\n")}\n\n另有 ${excluded} 個 repo 因前置條件不符會被跳過。執行時每個 repo 仍會重檢一次。繼續？`,
+    batchDone: (a, c) => `批次 ${a === "push" ? "Push" : "Pull"} 完成：成功 ${c.success}、跳過 ${c.skipped}、失敗 ${c.failed}`,
+    pushDisabled: "批次 Push 未啟用（config: repository_sync.batch.allow_push）；單一 repo 的 Push 仍可逐一執行。",
     staged: "staged",
     unstaged: "unstaged",
     untracked: "untracked",
@@ -2697,6 +2714,17 @@ function repoSyncLabels() {
     pull: "Pull (FF only)",
     commit: "Commit staged",
     push: "Push",
+    ovLoading: "Reading local Git status for every repository (offline)…",
+    ovEmpty: "No repository matches this filter.",
+    ovColumns: ["Repo", "branch → upstream", "State", "worktree", "last fetch", "Actions"],
+    ovFilters: { all: "All", behind: "needs pull", ahead: "needs push", diverged: "diverged", dirty: "dirty worktree", no_upstream: "no upstream", synced: "synced" },
+    ovNeverFetched: "never",
+    confirmFetchAll: "Run fetch --prune on every repository? Only remote-tracking refs change; no worktree, branch or remote is modified.",
+    fetchAllDone: (c) => `Fetch all done: ${c.success} ok, ${c.failed} failed, ${c.skipped} skipped`,
+    batchNone: (a) => `No repository currently meets the preconditions for ${a === "push" ? "Push" : "Pull (FF only)"}.`,
+    batchConfirm: (a, names, excluded) => `Run ${a === "push" ? "Push (never force)" : "fast-forward Pull"} on these ${names.length} repositories:\n\n${names.join("\n")}\n\n${excluded} other repositories are excluded by preconditions. Each repository is rechecked before it runs. Continue?`,
+    batchDone: (a, c) => `Batch ${a === "push" ? "Push" : "Pull"} done: ${c.success} ok, ${c.skipped} skipped, ${c.failed} failed`,
+    pushDisabled: "Batch push is disabled (config: repository_sync.batch.allow_push); single-repo Push still works.",
     staged: "staged",
     unstaged: "unstaged",
     untracked: "untracked",
@@ -2821,6 +2849,138 @@ async function runRepositorySyncAction(repoId, action) {
   }
 }
 
+// ------------------------------------------------ ADR-011 Addendum B: overview + batch
+let repoOverviewCache = null;   // null = 尚未載入；[] = 已載入但沒有 repo
+let repoOverviewBatch = { fetch_all: true, pull_ff_only: true, push: false };
+let repoOverviewFilter = "all";
+
+function repoOverviewMatches(repo, filter) {
+  switch (filter) {
+    case "behind": return repo.sync_state === "behind";
+    case "ahead": return repo.sync_state === "ahead";
+    case "diverged": return repo.sync_state === "diverged";
+    case "dirty": return repo.clean === false;
+    case "no_upstream": return ["no_upstream", "detached_head", "upstream_unavailable"].includes(repo.sync_state);
+    case "synced": return repo.sync_state === "synced";
+    default: return true;
+  }
+}
+
+function formatFetchTime(value, labels) {
+  if (!value) return labels.ovNeverFetched;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value).slice(0, 16);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function renderRepoOverview() {
+  const table = $("repo-overview-table");
+  const filters = $("repo-overview-filters");
+  if (!table || !filters || repoOverviewCache === null) return;
+  const labels = repoSyncLabels();
+  const pushBtn = $("btn-repo-batch-push");
+  if (pushBtn) {
+    pushBtn.disabled = !repoOverviewBatch.push;
+    pushBtn.title = repoOverviewBatch.push ? "" : labels.pushDisabled;
+  }
+  filters.hidden = false;
+  filters.innerHTML = Object.entries(labels.ovFilters).map(([key, text]) => {
+    const count = repoOverviewCache.filter(r => repoOverviewMatches(r, key)).length;
+    return `<button type="button" class="repo-overview-chip ${key === repoOverviewFilter ? "is-active" : ""}" data-filter="${key}">${esc(text)} ${count}</button>`;
+  }).join("");
+  const rows = repoOverviewCache.filter(r => repoOverviewMatches(r, repoOverviewFilter));
+  if (!rows.length) {
+    table.innerHTML = `<div class="placeholder" style="padding:10px;">${esc(labels.ovEmpty)}</div>`;
+    return;
+  }
+  const worktreeText = (repo) => {
+    const w = repo.worktree || {};
+    const parts = [
+      w.staged_files ? `${w.staged_files} ${labels.staged}` : "",
+      w.unstaged_files ? `${w.unstaged_files} ${labels.unstaged}` : "",
+      w.untracked_files ? `${w.untracked_files} ${labels.untracked}` : "",
+      w.conflicted_files ? `${w.conflicted_files} ${labels.conflicts}` : "",
+    ].filter(Boolean);
+    return repo.clean ? `<span class="is-clean">${esc(labels.clean)}</span>` : `<span class="is-dirty">${esc(parts.join(" · ") || labels.dirty)}</span>`;
+  };
+  table.innerHTML = `<table><thead><tr>${labels.ovColumns.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${rows.map(repo => {
+    const stateClass = `state-${String(repo.sync_state || "unknown").replace(/[^a-z_]/g, "")}`;
+    return `<tr class="${stateClass}">
+      <td class="repo-overview-name" title="${esc(repo.path || "")}">${esc(repo.name)}</td>
+      <td><code>${esc(repo.branch || "—")}</code> → <code>${esc(repo.upstream || "—")}</code></td>
+      <td>${esc(repoSyncStateText(repo, labels))}${repo.error ? `<div class="repo-sync-warning">${esc(repo.error)}</div>` : ""}</td>
+      <td>${worktreeText(repo)}</td>
+      <td>${esc(formatFetchTime(repo.last_fetch_at, labels))}</td>
+      <td class="repo-overview-actions">${repoSyncActionButton(repo, "fetch", labels.fetch)} ${repoSyncActionButton(repo, "pull_ff_only", labels.pull)} ${repoSyncActionButton(repo, "push", labels.push)}</td>
+    </tr>`;
+  }).join("")}</tbody></table>`;
+}
+
+async function loadRepoOverview() {
+  const table = $("repo-overview-table");
+  const result = $("repo-overview-result");
+  const labels = repoSyncLabels();
+  if (table) table.innerHTML = `<div class="placeholder" style="padding:10px;">${esc(labels.ovLoading)}</div>`;
+  try {
+    const data = await getJSON("/api/v1/repos/sync-status?scope=all");
+    repoOverviewCache = Array.isArray(data.repositories) ? data.repositories : [];
+    repoOverviewBatch = data.batch || repoOverviewBatch;
+    renderRepoOverview();
+    if (result) {
+      const s = data.summary || {};
+      result.textContent = `${data.displayed_count}/${data.repository_count} repositories · ${labels.ovFilters.behind} ${s.behind || 0} · ${labels.ovFilters.ahead} ${s.ahead || 0} · ${labels.ovFilters.diverged} ${s.diverged || 0} · ${labels.ovFilters.dirty} ${s.dirty || 0}${data.truncated ? ` · ${labels.truncated}` : ""}`;
+    }
+  } catch (e) {
+    if (table) table.innerHTML = `<div class="placeholder" style="padding:10px;">${esc(labels.failed)}${esc(e.message)}</div>`;
+  }
+}
+
+async function runRepoFetchAll() {
+  const labels = repoSyncLabels();
+  const result = $("repo-overview-result");
+  if (!window.confirm(labels.confirmFetchAll)) return;
+  if (result) result.textContent = labels.working;
+  try {
+    const receipt = await postJSON("/api/v1/repos/sync-fetch-all", { confirmation: "confirmed" });
+    const failed = (receipt.results || []).filter(r => r.status !== "success");
+    if (result) result.textContent = labels.fetchAllDone(receipt.counts || {}) + (failed.length ? ` · ${failed.map(r => `${r.repo_name}: ${r.reason || r.status}`).slice(0, 5).join(" · ")}` : "");
+    await loadRepoOverview();
+    loadRepositorySyncStatus();
+  } catch (e) {
+    if (result) result.textContent = `${labels.failed}${e.message}`;
+  }
+}
+
+async function runRepoBatch(action) {
+  const labels = repoSyncLabels();
+  const result = $("repo-overview-result");
+  if (result) result.textContent = labels.working;
+  try {
+    const plan = await getJSON(`/api/v1/repos/sync-batch-plan?action=${encodeURIComponent(action)}`);
+    const eligible = plan.eligible || [];
+    if (!eligible.length) {
+      if (result) result.textContent = labels.batchNone(action);
+      return;
+    }
+    const names = eligible.map(r => `• ${r.name} (${r.branch || "—"}${action === "push" ? ` ↑${r.ahead ?? "?"}` : ` ↓${r.behind ?? "?"}`})`);
+    const shown = names.length > 20 ? [...names.slice(0, 20), `… +${names.length - 20}`] : names;
+    if (!window.confirm(labels.batchConfirm(action, shown, plan.excluded_count || 0))) {
+      if (result) result.textContent = "";
+      return;
+    }
+    const receipt = await postJSON("/api/v1/repos/sync-batch", {
+      action, confirmation: "confirmed", repo_ids: eligible.map(r => r.repo_id),
+    });
+    const problems = (receipt.results || []).filter(r => r.status !== "success");
+    if (result) result.textContent = labels.batchDone(action, receipt.counts || {}) + (problems.length ? ` · ${problems.map(r => `${r.repo_name || r.repo_id}: ${r.reason || r.status}`).slice(0, 5).join(" · ")}` : "");
+    await loadRepoOverview();
+    loadRepositorySyncStatus();
+    loadProjects(true);
+  } catch (e) {
+    if (result) result.textContent = `${labels.failed}${e.message}`;
+  }
+}
+
 function initRepositorySyncSection() {
   const refresh = $("btn-repo-sync-refresh");
   if (refresh) refresh.addEventListener("click", () => loadRepositorySyncStatus());
@@ -2830,6 +2990,28 @@ function initRepositorySyncSection() {
     if (!button || button.disabled) return;
     runRepositorySyncAction(button.dataset.repoId, button.dataset.repoAction);
   });
+  const overview = $("repo-overview-table");
+  if (overview) overview.addEventListener("click", async (event) => {
+    const button = event.target.closest(".repo-sync-action");
+    if (!button || button.disabled) return;
+    await runRepositorySyncAction(button.dataset.repoId, button.dataset.repoAction);
+    loadRepoOverview();
+  });
+  const filters = $("repo-overview-filters");
+  if (filters) filters.addEventListener("click", (event) => {
+    const chip = event.target.closest(".repo-overview-chip");
+    if (!chip) return;
+    repoOverviewFilter = chip.dataset.filter || "all";
+    renderRepoOverview();
+  });
+  const load = $("btn-repo-overview-load");
+  if (load) load.addEventListener("click", loadRepoOverview);
+  const fetchAll = $("btn-repo-fetch-all");
+  if (fetchAll) fetchAll.addEventListener("click", runRepoFetchAll);
+  const batchPull = $("btn-repo-batch-pull");
+  if (batchPull) batchPull.addEventListener("click", () => runRepoBatch("pull_ff_only"));
+  const batchPush = $("btn-repo-batch-push");
+  if (batchPush) batchPush.addEventListener("click", () => runRepoBatch("push"));
   const scan = $("btn-onboarding-scan");
   if (scan) scan.addEventListener("click", loadOnboardingReport);
 }

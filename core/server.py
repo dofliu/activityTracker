@@ -1316,13 +1316,61 @@ class RepositorySyncActionRequest(BaseModel):
 # 9. GitHub 雲端專案與 PR 智慧追蹤 API (GitHub Cloud Integration)
 # =====================================================================
 @app.get("/api/v1/repos/sync-status")
-def get_local_repository_sync_status():
+def get_local_repository_sync_status(
+    scope: str = Query("recent", pattern="^(recent|all)$"),
+):
     """列出設定 root 內的本機 Git 狀態。
 
     ahead/behind 只比較目前本機保存的 remote-tracking ref；不會在載入頁面時
-    自動連線、fetch 或改動任何 worktree。
+    自動連線、fetch 或改動任何 worktree。``scope=all`` 回傳全部 repo（全覽表格）。
     """
-    return LocalRepositorySync().list_statuses()
+    return LocalRepositorySync().list_statuses(scope=scope)
+
+
+class RepositorySyncFetchAllRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirmation: Literal["confirmed"]
+
+
+@app.post("/api/v1/repos/sync-fetch-all")
+def run_local_repository_fetch_all(req: RepositorySyncFetchAllRequest):
+    """對全部 repo 執行 fetch --prune：只更新 remote-tracking refs，不改 worktree。"""
+    return LocalRepositorySync().fetch_all()
+
+
+@app.get("/api/v1/repos/sync-batch-plan")
+def get_local_repository_batch_plan(
+    action: str = Query(..., pattern="^(pull_ff_only|push)$"),
+):
+    """列出目前符合前置條件的 repo 清單（唯讀）；使用者確認的是這份清單。"""
+    try:
+        return LocalRepositorySync().batch_plan(action)
+    except RepositorySyncRejected as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+class RepositorySyncBatchRequest(BaseModel):
+    """批次動作只接受清單內的 repo_id；沒有路徑、沒有 force、沒有 commit。"""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    action: Literal["pull_ff_only", "push"]
+    repo_ids: List[str] = Field(..., min_length=1, max_length=200)
+    confirmation: Literal["confirmed"]
+
+
+@app.post("/api/v1/repos/sync-batch")
+def run_local_repository_batch(req: RepositorySyncBatchRequest):
+    """逐一執行已確認清單內的 fast-forward pull 或 push；每個 repo 執行前重檢。"""
+    import re as _re
+
+    if any(not _re.fullmatch(r"[a-f0-9]{16}", item) for item in req.repo_ids):
+        raise HTTPException(status_code=422, detail="repo_ids 必須是同步狀態清單內的 repo_id")
+    try:
+        return LocalRepositorySync().batch_execute(req.action, req.repo_ids)
+    except RepositorySyncRejected as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.post("/api/v1/repos/sync-action")

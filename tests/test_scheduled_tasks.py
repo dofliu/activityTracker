@@ -113,6 +113,7 @@ def test_registry_only_contains_l0_read_only_templates():
         "generate_handoff",
         "weekly_report_rollup",
         "monthly_report_rollup",
+        "repo_sync_report",
         "status_snapshot_draft",
     }
     for template in SCHEDULABLE_TEMPLATES.values():
