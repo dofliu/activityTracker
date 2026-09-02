@@ -56,7 +56,13 @@ const I18N = {
     tab_assistant: "01 · 🤖 小秘書與知識庫",
     tab_projects: "02 · 進行中工作",
     tab_repos: "03 · 🔁 Git 同步中心",
-    tab_summaries: "04 · 摘要與快照",
+    tab_summaries: "04 · 摘要與統計",
+    today_title: "TODAY · 今日行動清單",
+    btn_create_presets: "📦 建立每日排程",
+    today_resume_label: "上次做到哪",
+    why_now_label: "為什麼是現在",
+    related_history_note: "輸入目前的問題，從本機 semantic index 找相似歷史",
+    sec_sessions: "近期工作階段",
     tab_dashboard: "05 · 即時情報流",
     tab_settings: "06 · ⚙️ 設定",
     tab_system_health: "07 · 🛡️ 系統健康",
@@ -294,7 +300,13 @@ const I18N = {
     tab_assistant: "01 · 🤖 Assistant & Knowledge",
     tab_projects: "02 · Active Workstreams",
     tab_repos: "03 · 🔁 Git Sync Center",
-    tab_summaries: "04 · Summaries & Snapshots",
+    tab_summaries: "04 · Summaries & Stats",
+    today_title: "TODAY · Action list",
+    btn_create_presets: "📦 Create daily schedules",
+    today_resume_label: "Resume here",
+    why_now_label: "Why now",
+    related_history_note: "Describe your current question to find similar history in the local semantic index",
+    sec_sessions: "Recent work sessions",
     tab_dashboard: "05 · Live Feed",
     tab_settings: "06 · ⚙️ Settings",
     tab_system_health: "07 · 🛡️ System Health",
@@ -619,9 +631,10 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSummaries();
   loadCheckpoints();
   loadUsagePanels();
-  loadContextSessions();
   loadSecretaryProposals();
   loadAssistantStrip();
+  loadTodayView();
+  loadRepoSnapshot();
   loadRAGFolders();
   loadRAGSessions();
   loadRAGStrategies();
@@ -697,11 +710,11 @@ function initTabs() {
       tab.classList.add("active");
       const id = tab.dataset.tab;
       $(id).classList.add("active");
-      if (id === "tab-assistant") { loadSecretaryProposals(); loadAssistantStrip(); syncAssistantModelControls(); loadRAGFolders(); loadRAGSessions(); loadRAGProgress(); }
-      if (id === "tab-projects") { loadProjects(); loadUsagePanels(); loadContextSessions(); }
+      if (id === "tab-assistant") { loadSecretaryProposals(); loadAssistantStrip(); syncAssistantModelControls(); loadRAGFolders(); loadRAGSessions(); loadRAGProgress(); loadProjects(); loadTodayView(); }
+      if (id === "tab-projects") { loadProjects(); loadRepoSnapshot(); }
       if (id === "tab-repos") loadRepositorySyncStatus();  // 切到分頁才掃描本機 Git，不在開頁時付這個成本
       if (id === "tab-settings") loadConfig();
-      if (id === "tab-summaries") { loadSummaries(); loadCheckpoints(); }
+      if (id === "tab-summaries") { loadSummaries(); loadCheckpoints(); loadUsagePanels(); }
       if (id === "tab-system-health") loadSystemHealth();
     });
   });
@@ -721,7 +734,8 @@ function initControls() {
   $("btn-quick-summary").addEventListener("click", () => generateSummary(null));
   $("btn-refresh-projects").addEventListener("click", () => loadProjects(true));
   $("btn-refresh-usage").addEventListener("click", loadUsagePanels);
-  $("btn-refresh-sessions").addEventListener("click", loadContextSessions);
+  const presetBtn = $("btn-create-presets");
+  if (presetBtn) presetBtn.addEventListener("click", createSchedulePresets);
   $("btn-refresh-proposals").addEventListener("click", loadSecretaryProposals);
   $("btn-related-search").addEventListener("click", searchRelatedContext);
   $("input-related-question").addEventListener("keydown", event => {
@@ -1074,6 +1088,7 @@ async function loadSecretaryProposals() {
   try {
     secretaryProposalsCache = await getJSON("/api/v1/secretary/proposals?limit=6");
     renderSecretaryProposals();
+    if (projectsCache.length) renderProjects();  // 專案卡的 💡 建議 chip 依提案快取更新
   } catch (e) {
     if (box) box.innerHTML = `<div class="placeholder">${currentLang === "zh-TW" ? "建議暫時無法讀取。" : "Suggestions are temporarily unavailable."}</div>`;
   }
@@ -1147,6 +1162,15 @@ function renderSecretaryProposals() {
     const link = item.url
       ? `<a class="proposal-link" href="${esc(item.url)}" target="_blank" rel="noopener">${zh ? "在 GitHub 開啟 →" : "Open on GitHub →"}</a>`
       : "";
+    // 更主動：停滯／未收尾事項若尚無 L2 起草動作，直接告訴使用者開啟 L2 就能請小秘書先起草計畫
+    const executorInfo = secretaryProposalsCache.executor || {};
+    const stalledType = item.proposal_type === "stalled_open_loop" || item.proposal_type === "unfinished_recent";
+    const hasDraft = actions.some(act => act.template_id === "agent_draft_plan");
+    const l2Hint = stalledType && !hasDraft
+      ? `<div class="proposal-l2-hint">🛡️ ${executorInfo.enabled && !executorInfo.l2_available
+          ? (zh ? "開啟 L2（設定 → 小秘書執行器）後，小秘書可先為這件事起草重啟計畫，批准＋確認碼才執行。" : "Enable L2 (Settings → Executor) and the secretary can draft a restart plan for this; runs only after approval + confirm code.")
+          : (zh ? "開啟執行器與 L2 後，小秘書可先為這件事起草重啟計畫（需批准＋確認碼）。" : "With the executor and L2 enabled, the secretary can draft a restart plan (approval + confirm code).")}</div>`
+      : "";
     // 被每專案上限折疊掉的數量：讓使用者知道那裡還有多少事，而不是以為只有這些
     const pending = item.same_project_pending
       ? `<span class="proposal-pending">${zh ? `此專案另有 ${item.same_project_pending} 項` : `+${item.same_project_pending} more here`}</span>`
@@ -1162,9 +1186,11 @@ function renderSecretaryProposals() {
         <div class="proposal-title">${esc(item.title)}</div>
         ${detail}
         <div class="proposal-reason">${esc(item.reason)}</div>
+        ${item.why_now ? `<div class="proposal-why"><span>${esc(t("why_now_label"))}：</span>${esc(item.why_now)}</div>` : ""}
         <div class="proposal-action"><span>${zh ? "建議" : "Suggested"}</span>${esc(item.suggested_action)}</div>
         ${llmNote}
         ${actionLabel}
+        ${l2Hint}
         <div class="proposal-meta">
           <span>${esc(item.risk_level || "L0_READ_ONLY")}</span>
           ${execTag}
@@ -1554,7 +1580,9 @@ async function copyProjectHandoff(projectKey, displayName) {
 }
 
 function renderResume() {
-  const box = document.querySelector("#resume-card .resume-body");
+  // 「上次做到哪」現在住在 01 今日行動清單最上方（02 只留專案卡）。
+  const box = $("today-resume");
+  if (!box) return;
   const p = projectsCache[0];
   if (!p) {
     box.innerHTML = `<div class="placeholder">${t("ph_no_projects")}</div>`;
@@ -1562,11 +1590,12 @@ function renderResume() {
   }
   box.innerHTML = `
     <div style="min-width:0">
-      <div class="resume-title">${esc(p.display_name)}</div>
-      <div class="resume-action">${esc(p.last_action_summary || "無紀錄")}</div>
-      <div class="resume-meta">${esc(p.last_activity_at)} · ${esc(p.category || "")} · ${t("open_loop_count")} ${p.open_loops_count}</div>
+      <div class="today-resume-label">${esc(t("today_resume_label"))}</div>
+      <div class="today-resume-title">${esc(p.display_name)}</div>
+      <div class="today-resume-action">${esc(p.last_action_summary || "無紀錄")}</div>
+      <div class="today-resume-meta">${esc(p.last_activity_at)} · ${esc(p.category || "")} · ${t("open_loop_count")} ${p.open_loops_count}</div>
     </div>
-    <div style="display:flex; align-items:center; gap:8px; flex-shrink:0; flex-wrap:wrap;">
+    <div class="today-resume-buttons">
       ${renderActionGroup(p)}
       <button class="btn" data-copy-handoff="${esc(p.project_key)}" data-name="${esc(p.display_name)}" style="background:var(--s2); border:1px solid var(--bd); color:var(--tx); font-weight:600; font-size:12px; padding:6px 12px; cursor:pointer;" title="${currentLang === 'zh-TW' ? '一鍵複製結構化接續 Prompt 貼入 AI 開工' : 'Copy structured handoff prompt for AI'}">${t("btn_copy_handoff")}</button>
       <button class="btn btn-primary" data-resume="${esc(p.project_key)}">${currentLang === "zh-TW" ? "接續 →" : "Resume →"}</button>
@@ -1580,8 +1609,138 @@ function renderResume() {
     });
   }
   const btn = box.querySelector("[data-resume]");
-  if (btn) btn.addEventListener("click", () => expandProject(p.project_key, true));
+  if (btn) btn.addEventListener("click", () => focusProject(p.project_key));
 }
+
+// ---------------------------------------------------------------- 01 今天：早晨包摘要與預設排程
+let todayViewCache = null;
+
+async function loadTodayView() {
+  const pack = $("today-pack");
+  const presetBtn = $("btn-create-presets");
+  try {
+    todayViewCache = await getJSON("/api/v1/secretary/today");
+  } catch (e) {
+    todayViewCache = null;
+    if (pack) pack.hidden = true;
+    return;
+  }
+  const zh = currentLang === "zh-TW";
+  const sched = todayViewCache.schedules || {};
+  if (pack) {
+    if (todayViewCache.pack_line) {
+      const when = String((todayViewCache.pack || {}).finished_at || "").slice(5, 16).replace("T", " ");
+      pack.innerHTML = `<strong>${esc(todayViewCache.pack_line)}</strong> · ${esc(when)}`;
+      pack.hidden = false;
+    } else if (sched.scheduled_tasks_enabled && !sched.all_present) {
+      pack.textContent = zh
+        ? "尚未建立每日排程；按「📦 建立每日排程」讓小秘書每天 07:30 產同步報告與 Handoff。"
+        : "No daily schedules yet. Click “📦 Create daily schedules” for a 07:30 morning pack.";
+      pack.hidden = false;
+    } else if (!sched.executor_enabled || !sched.scheduled_tasks_enabled) {
+      pack.textContent = zh
+        ? "小秘書排程未啟用（設定 → 小秘書執行器 → 執行器與排程任務開關）；啟用後可一鍵建立每日早晨包。"
+        : "Scheduled tasks are off (Settings → Executor); enable them to create the daily morning pack.";
+      pack.hidden = false;
+    } else {
+      pack.hidden = true;
+    }
+  }
+  if (presetBtn) {
+    if (sched.all_present) {
+      presetBtn.textContent = zh ? "✅ 每日排程已建立" : "✅ Daily schedules ready";
+      presetBtn.disabled = true;
+    } else {
+      presetBtn.textContent = t("btn_create_presets");
+      presetBtn.disabled = false;
+    }
+  }
+}
+
+async function createSchedulePresets() {
+  const zh = currentLang === "zh-TW";
+  if (!confirm(zh
+    ? "建立兩個每日排程？\n• 07:30 早晨包：Repo 同步報告＋STATUS 草稿＋活躍專案 Handoff\n• 21:30 晚間：今天有活動的專案各產一份 Handoff\n全部是 L0 唯讀動作，不會 fetch、不改任何 repo。"
+    : "Create two daily schedules?\n• 07:30 morning pack (repo sync report, STATUS draft, active-project handoffs)\n• 21:30 evening handoffs for today's active projects\nAll L0 read-only.")) return;
+  let token = sessionStorage.getItem("omni_execution_token") || "";
+  if (!token) {
+    token = prompt(zh
+      ? "輸入 execution token（在終端機執行 `omnicontext init --show-token` 取得）："
+      : "Enter execution token (shown by `omnicontext init --show-token`):") || "";
+    token = token.trim();
+    if (!token) return;
+    sessionStorage.setItem("omni_execution_token", token);
+  }
+  try {
+    const res = await fetch("/api/v1/secretary/scheduled-tasks/presets", {
+      method: "POST", headers: { "x-omnicontext-execution-token": token },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) { sessionStorage.removeItem("omni_execution_token"); alert(zh ? "execution token 無效。" : "Invalid execution token."); return; }
+    if (!res.ok) { alert((zh ? "未建立：" : "Not created: ") + (data.detail || `HTTP ${res.status}`)); return; }
+    showToast(zh ? `已建立 ${(data.created || []).length} 個排程（${(data.already_present || []).length} 個原本就有）` : `${(data.created || []).length} schedules created (${(data.already_present || []).length} already existed)`);
+    loadTodayView();
+  } catch (e) {
+    alert((zh ? "建立失敗：" : "Failed: ") + e.message);
+  }
+}
+
+// ---------------------------------------------------------------- 02 專案卡：git 狀態 chip（來自 L0 同步報告快照）
+let repoSnapshotCache = null;
+
+function normalizePathKey(value) {
+  return String(value || "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+async function loadRepoSnapshot() {
+  try {
+    repoSnapshotCache = await getJSON("/api/v1/repos/sync-snapshot");
+  } catch (e) {
+    repoSnapshotCache = null;
+  }
+  if (projectsCache.length) renderProjects();
+}
+
+function repoSnapshotFor(project) {
+  if (!repoSnapshotCache || !repoSnapshotCache.available) return null;
+  const repos = repoSnapshotCache.repositories || [];
+  const pathKey = normalizePathKey(project.local_path);
+  if (pathKey) {
+    const byPath = repos.find(r => normalizePathKey(r.path) === pathKey);
+    if (byPath) return byPath;
+  }
+  const byName = repos.filter(r => r.name === project.display_name || r.name === project.project_key);
+  return byName.length === 1 ? byName[0] : null;  // 同名多個 clone 屬歧義，不亂配
+}
+
+function projectChips(p) {
+  const zh = currentLang === "zh-TW";
+  const chips = [];
+  const repo = repoSnapshotFor(p);
+  if (repo) {
+    const map = {
+      behind: [`↓${repo.behind ?? "?"} ${zh ? "待 pull" : "pull"}`, "pchip-behind"],
+      ahead: [`↑${repo.ahead ?? "?"} ${zh ? "待 push" : "push"}`, "pchip-ahead"],
+      diverged: [`↑${repo.ahead ?? "?"} ↓${repo.behind ?? "?"} ${zh ? "分歧" : "diverged"}`, "pchip-diverged"],
+      synced: [zh ? "已同步" : "synced", "pchip-synced"],
+    };
+    const entry = map[repo.sync_state];
+    if (entry) {
+      const dirty = repo.clean === false ? (zh ? " · 未提交" : " · dirty") : "";
+      const title = (zh ? "來自最近一次同步報告快照（cached remote-tracking ref）" : "From the latest sync report snapshot (cached remote-tracking ref)")
+        + (repo.last_fetch_at ? ` · fetch ${String(repo.last_fetch_at).slice(0, 16)}` : "");
+      chips.push(`<span class="pchip ${entry[1]}" title="${esc(title)}">${esc(entry[0])}${dirty}</span>`);
+    }
+  }
+  const proposals = ((secretaryProposalsCache || {}).proposals || []).filter(
+    item => item.project_key === p.project_key || item.project_key === p.display_name
+  );
+  if (proposals.length) {
+    chips.push(`<span class="pchip pchip-proposals" title="${esc(proposals.map(i => i.title).join(" / "))}">💡 ${proposals.length} ${zh ? "建議" : (proposals.length > 1 ? "suggestions" : "suggestion")}</span>`);
+  }
+  return chips.join("");
+}
+
 
 function renderProjects() {
   const box = $("projects-list");
@@ -1643,7 +1802,7 @@ function renderProjects() {
               ${ghBadge}
               ${idleBadge}
             </div>
-            <div class="pmeta">${esc(p.category || "")} · ${statusLabel(p)}</div>
+            <div class="pmeta">${esc(p.category || "")} · ${statusLabel(p)}${projectChips(p)}</div>
           </div>
           <div class="paction">${esc(p.last_action_summary || "無紀錄")}</div>
           ${renderActionGroup(p)}
@@ -1723,6 +1882,28 @@ async function renderProjectDetail(key) {
 
   let loops = [];
   try { loops = await getJSON(`/api/v1/open-loops?project=${encodeURIComponent(key)}`); } catch (e) {}
+
+  // 近期工作階段（原本是 02 的獨立面板；現在只在該專案展開時顯示，減少重複）
+  let sessions = [];
+  try {
+    const payload = await getJSON(`/api/v1/context/sessions?project=${encodeURIComponent(key)}&limit=5`);
+    sessions = payload.sessions || [];
+  } catch (e) {}
+  const sessionsHtml = sessions.length
+    ? sessions.map(session => {
+        const counts = session.event_counts || {};
+        const chips = [
+          counts.ai_turn ? `AI ${counts.ai_turn}` : "",
+          counts.git_commit ? `GIT ${counts.git_commit}` : "",
+          counts.file_activity ? `FILE ${counts.file_activity}` : "",
+        ].filter(Boolean).map(label => `<span class="context-memory-chip">${esc(label)}</span>`).join("");
+        return `<article class="context-session">
+          <div class="context-session-top"><span class="context-session-time">${esc(formatContextTime(session.started_at || session.ended_at))} → ${esc(formatContextTime(session.ended_at))}</span></div>
+          <div class="context-session-headline">${esc(session.headline || session.narrative || "—")}</div>
+          <div class="context-session-meta">${chips}</div>
+        </article>`;
+      }).join("")
+    : `<div class="placeholder" style="padding:0">${currentLang === "zh-TW" ? "近 72 小時沒有可歸戶的工作階段。" : "No canonical work session in the last 72 hours."}</div>`;
 
   // 提取該專案近期異動的檔案清單
   const fileEvents = events.filter(e => e.type === "file");
@@ -1826,6 +2007,11 @@ async function renderProjectDetail(key) {
         <div class="pdetail-actions">
           <button class="btn btn-primary btn-sm" data-cp>${t("btn_snapshot_now")}</button>
         </div>
+      </div>
+      <div class="pdetail-sessions">
+        <span class="mono-label">${t("sec_sessions")}</span>
+        ${sessionsHtml}
+        <div class="context-memory-boundary">${currentLang === "zh-TW" ? "依專案與事件間隔推定，不代表實際工時。" : "Inferred from event gaps; not actual working time."}</div>
       </div>
       ${ghSection}
     </div>`;

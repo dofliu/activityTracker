@@ -47,6 +47,36 @@ SUGGESTED_ACTIONS = {
 }
 
 
+def why_now(signal_type: str, age_days: float, extra: dict[str, Any] | None = None) -> str:
+    """一句話說明「為什麼是現在」：把排序依據講給使用者聽，而不是只給分數。"""
+    extra = extra or {}
+    days = max(0.0, float(age_days or 0.0))
+    hours = int(round(days * 24))
+    if signal_type == "ci_failing_pr":
+        return "CI 紅燈擋住合併，越晚修越容易和其他改動衝突" + (f"；已 {int(days)} 天" if days >= 1 else "")
+    if signal_type == "review_ready_pr":
+        return "只差一個 review／merge 動作，成本最低、收益立即"
+    if signal_type == "aging_pr":
+        return f"已放 {int(days)} 天，再放下去脈絡會流失、衝突會累積"
+    if signal_type == "assigned_issue":
+        return "指派給你且仍開著" + (f"，已 {int(days)} 天" if days >= 1 else "")
+    if signal_type == "aging_issue":
+        return f"沒人認領 {int(days)} 天；決定要不要做比一直掛著便宜"
+    if signal_type == "unfinished_recent":
+        return f"{hours} 小時前還在動，脈絡還新鮮，現在收尾最省力"
+    if signal_type == "stalled_open_loop":
+        return f"停滯 {int(days)} 天但仍有未結事項，再放就要重新讀脈絡"
+    if signal_type == "verify_extension_heartbeat":
+        return "沒有 heartbeat 就沒有瀏覽器對話收集，今天的紀錄會缺一塊"
+    if signal_type == "repo_needs_pull":
+        return "本機落後遠端，繼續開發前先同步可避免之後合併衝突"
+    if signal_type == "repo_needs_push":
+        return "本機 commit 尚未備份到遠端，其他機器與 CI 都看不到"
+    if signal_type == "repo_diverged":
+        return "本機與遠端各自前進，越久越難合"
+    return ""
+
+
 def _local_naive(value: datetime | None) -> datetime | None:
     if value is None or value.tzinfo is None:
         return value
@@ -157,6 +187,7 @@ def _signal_to_proposal(signal: dict[str, Any], now: datetime) -> dict[str, Any]
         "reason": "；".join(signal["reasons"]),
         "reasons": list(signal["reasons"]),
         "suggested_action": SUGGESTED_ACTIONS.get(signal["signal_type"], ""),
+        "why_now": why_now(signal["signal_type"], signal.get("age_days", 0.0)),
         "priority": _priority_from_score(score),
         "risk_level": "L0_READ_ONLY",
         "execution_available": False,
@@ -217,6 +248,7 @@ def build_action_proposals(
             "reason": "本機服務已有 ingest token，但目前沒有近期 token-authenticated heartbeat receipt。",
             "reasons": ["本機服務已有 ingest token，但目前沒有近期 token-authenticated heartbeat receipt。"],
             "suggested_action": SUGGESTED_ACTIONS["verify_extension_heartbeat"],
+            "why_now": why_now("verify_extension_heartbeat", 0.0),
             "priority": "high",
             "risk_level": "L0_READ_ONLY",
             "execution_available": False,
@@ -342,6 +374,7 @@ def briefing_proposals(
             "project_key": item.get("project_key") or "",
             "priority": item.get("priority") or "medium",
             "suggested_action": item.get("suggested_action") or "",
+            "why_now": item.get("why_now") or "",
             "llm_note": item.get("llm_note"),
         }
         for item in result.get("proposals", [])[: max(1, int(limit))]

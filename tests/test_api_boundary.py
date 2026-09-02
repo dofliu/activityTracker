@@ -354,11 +354,15 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     assert "background-tasks-list" in dashboard.text
     assert "capture-coverage-list" in dashboard.text
     assert "llm-key-status-badge" in dashboard.text
-    assert "context-sessions-list" in dashboard.text
+    # 2026-09-02 整併：近期工作階段併入專案展開卡、Resume 卡移到 01 今日行動清單
+    assert "context-sessions-list" not in dashboard.text
+    assert "today-resume" in dashboard.text
+    assert "panel-related-history" in dashboard.text
     assert "input-related-question" in dashboard.text
     assert "secretary-inbox" in dashboard.text
     assert "secretary-proposals-list" in dashboard.text
-    assert "SECRETARY SUGGESTIONS" in dashboard.text
+    assert "今日行動清單" in dashboard.text
+    assert "btn-create-presets" in dashboard.text
     assert "PROPOSAL ONLY" in dashboard.text
     assert "tab-assistant" in dashboard.text
     assert "input-assistant-prompt" in dashboard.text

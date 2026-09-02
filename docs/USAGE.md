@@ -439,6 +439,18 @@ Invoke-RestMethod -Method Post "http://127.0.0.1:8765/api/v1/rag/retrieval/shutd
 
 狀態卡片只描述 worker 程序狀態與載入計數，不代表檢索結果正確或索引完整；索引一致性仍以「驗證索引與空間」的 worker 收據為準。
 
+### 01「今天」：今日行動清單與每日早晨包（2026-09-02）
+
+「01 · 小秘書與知識庫」分頁的第二張卡是 **TODAY · 今日行動清單**，把原本散在各處的東西收在一起：
+
+1. **上次做到哪**（最上方）：最近有活動的專案、最後一個動作、未結事項數；「接續 →」直接跳到 02 該專案，「複製 Handoff」拿到接續 prompt。
+2. **早晨包摘要**（一行）：若排程有跑，顯示「早晨包：repo 需 pull N、需 push M、STATUS 過期 K、Handoff J 份」與時間；尚未建立排程時會提示。
+3. **秘書提案**：每項多一句 **「為什麼是現在」**（例如「CI 紅燈擋住合併，越晚修越容易衝突」「18 小時前還在動，脈絡還新鮮」），這就是排序依據的白話版。停滯／未收尾事項若尚無 L2 起草動作，會提示開啟 L2 後小秘書可先起草重啟計畫（仍需批准＋確認碼）。
+
+**📦 建立每日排程**（需 execution token；執行器與排程任務開關須先開）：一鍵建立兩個 L0 唯讀排程——07:30 `morning_pack`（Repo 同步報告＋STATUS 過期草稿＋活躍專案 Handoff，三步各自容錯，失敗步驟記在 receipt 的 `errors`）與 21:30 `handoff_active_projects`（今天有活動的專案各產一份 Handoff 到 `reports/handoffs/`）。已存在就不重複建立。晨報（桌面／Telegram）會帶入早晨包摘要與 top 建議的「為什麼是現在」。**沒有任何自動 pull／push**；同步動作仍由你批准。
+
+02「進行中工作」現在只留專案卡：卡上多了 git 狀態 chip（來自最近一次同步報告快照，滑過可見 fetch 時間；沒有快照就不顯示）與「💡 N 建議」chip；展開卡內多了「近期工作階段」。前景使用、資料收集、背景任務三張統計面板移到「04 · 摘要與統計」。
+
 ### 查看 Proposal-only 主動秘書建議
 
 主頁 `SECRETARY SUGGESTIONS` 會從 Project State、actionable Open Loops 與 Extension diagnostics 顯示可追溯建議。每張卡片都附 `project_states:<id>`、`open_loops:<id>` 或 `extension_status:live` 等 evidence refs。
