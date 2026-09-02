@@ -301,6 +301,19 @@ def build_action_proposals(
     counters["repo_sync_snapshot"] = repo_snapshot_meta
     signals = signals + repo_signals
 
+    # 記憶區（ADR-012）：偏好筆記裡的「不要提醒 X」壓掉提案；決定／筆記附在同專案的提案卡上。
+    mutes: set[str] = set()
+    memory_lines: dict[str, list[str]] = {}
+    counters["memory_muted"] = 0
+    try:
+        from .secretary_memory import memory_enabled, preference_mutes, project_memory_lines
+
+        if memory_enabled(cfg):
+            mutes = preference_mutes(database=database)
+            memory_lines = project_memory_lines(database=database)
+    except Exception as exc:  # noqa: BLE001 — 記憶區故障不得拖垮提案清單
+        counters["memory_error"] = type(exc).__name__
+
     with database.session_scope() as session:
         snoozed = _active_snoozes(session, now)
         for signal in signals:
@@ -308,7 +321,17 @@ def build_action_proposals(
             if key in snoozed:
                 counters["snoozed"] += 1
                 continue
-            proposals.append(_signal_to_proposal(signal, now))
+            if mutes and (
+                str(signal["signal_type"]).lower() in mutes
+                or str(signal["project_key"]).lower() in mutes
+            ):
+                counters["memory_muted"] += 1
+                continue
+            proposal = _signal_to_proposal(signal, now)
+            notes = memory_lines.get(str(signal["project_key"]))
+            if notes:
+                proposal["memory_note"] = notes[0]
+            proposals.append(proposal)
 
     priority_rank = {"high": 0, "medium": 1, "low": 2}
     proposals.sort(
@@ -333,6 +356,7 @@ def build_action_proposals(
             "open_issues": counters["open_issues"],
             "open_loop_projects": counters["open_loop_projects"],
             "snoozed_suppressed": counters["snoozed"],
+            "memory_muted": counters.get("memory_muted", 0),
             "repo_issue_backlog": counters.get("repo_issue_backlog", {}),
             "repo_sync_snapshot": counters.get("repo_sync_snapshot", {}),
             "max_per_project": max_per_project,

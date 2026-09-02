@@ -27,6 +27,8 @@ from rag.retrieval_client import (
 )
 
 RETRIEVAL_TIMEOUT_SECONDS = 60
+MEMORY_CONTEXT_TIMEOUT_SECONDS = 8  # 記憶區只讀 SQLite；超過就不帶脈絡照常回答
+
 
 logger = logging.getLogger("OmniContext.RAG.Router")
 router = APIRouter(prefix="/api/v1/rag", tags=["DeskRAG Knowledge & Chat"])
@@ -82,6 +84,8 @@ class ChatRequest(BaseModel):
     hybrid_alpha: Optional[float] = None
     score_threshold: Optional[float] = None
     custom_system_prompt: Optional[str] = None
+    # ADR-012：把小秘書記憶區（今日狀態、top 提案、筆記）注入 system prompt；預設開，可關。
+    include_memory: bool = True
 
 
 class CreateSessionRequest(BaseModel):
@@ -254,6 +258,14 @@ def rag_rebuild_bm25():
     return {"success": True, "job": job, "message": "已交由獨立 worker 從 Chroma 重建 BM25，不會重新掃描來源檔案。"}
 
 
+@router.post("/memory/sync")
+def rag_memory_sync():
+    """ADR-012：把秘書記憶區與工作紀錄（筆記、每日摘要、Handoff、同步報告、STATUS 草稿）
+    併入 RAG activity 領域。跑在獨立 worker，主服務不載入索引套件。"""
+    job = _start_job_or_raise("activity_sync")
+    return {"success": True, "job": job, "message": "已交由獨立 worker 把秘書記憶區與工作紀錄併入知識庫。"}
+
+
 @router.get("/progress")
 def get_progress():
     data = get_latest_job() or {
@@ -412,6 +424,25 @@ async def chat_stream(req: ChatRequest):
     base_sys_prompt = req.custom_system_prompt or rag_settings.DEFAULT_SYSTEM_PROMPT
     llm_msgs = [{"role": m.role, "content": m.content} for m in req.messages]
 
+    # 記憶區只讀 SQLite 與既有收據，不載入索引套件；失敗一律降級為「沒有記憶脈絡」。
+    memory_text = ""
+    memory_receipt: Dict[str, Any] = {"included": False, "reason": "not_requested"}
+    if getattr(req, "include_memory", True):
+        try:
+            from core.secretary_memory import chat_context_enabled, memory_context
+
+            if chat_context_enabled():
+                memory = await asyncio.wait_for(asyncio.to_thread(memory_context), timeout=MEMORY_CONTEXT_TIMEOUT_SECONDS)
+                memory_text = memory["text"]
+                memory_receipt = memory["receipt"]
+            else:
+                memory_receipt = {"included": False, "reason": "disabled"}
+        except asyncio.TimeoutError:
+            memory_receipt = {"included": False, "reason": "timeout"}
+        except Exception as exc:  # noqa: BLE001 — 記憶區故障不得中止對話
+            logger.warning("secretary memory context unavailable: %s", type(exc).__name__)
+            memory_receipt = {"included": False, "reason": f"error:{type(exc).__name__}"}
+
     async def event_generator():
         """SSE 生命週期契約：無論檢索或 LLM 發生什麼事，一定送出 done。
 
@@ -452,12 +483,15 @@ async def chat_stream(req: ChatRequest):
 
             citation_data = [c.model_dump() for c in citations]
             yield f"event: citations\ndata: {json.dumps(citation_data, ensure_ascii=False)}\n\n"
+            # 記憶區收據：讓介面能顯示「這次回答參考了 N 筆記憶」；不含記憶內容本身。
+            yield f"event: memory\ndata: {json.dumps(memory_receipt, ensure_ascii=False)}\n\n"
 
-            full_system_prompt = (
-                f"{base_sys_prompt}\n\n{context_text}"
-                if (req.enable_rag and citations)
-                else base_sys_prompt
-            )
+            prompt_parts = [base_sys_prompt]
+            if memory_text:
+                prompt_parts.append(memory_text)
+            if req.enable_rag and citations:
+                prompt_parts.append(context_text)
+            full_system_prompt = "\n\n".join(prompt_parts)
 
             async for token in llm_gateway.stream_chat(
                 messages=llm_msgs,

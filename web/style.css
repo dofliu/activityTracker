@@ -219,7 +219,7 @@ details.sub-collapsible > summary::before { content: "▸"; color: var(--mu); fo
 details.sub-collapsible[open] > summary::before { transform: rotate(90deg); }
 
 /* ---------- Shell ---------- */
-.shell { display: grid; grid-template-columns: minmax(0, 1fr) 296px; align-items: start; }
+.shell { display: grid; grid-template-columns: minmax(0, 1fr) 272px; align-items: start; }
 .main { padding: 18px 22px 40px; min-width: 0; }
 .rail { position: sticky; top: 100px; padding: 18px 22px 40px 0; display: flex; flex-direction: column; gap: 12px; }
 .pane { display: none; }
@@ -934,3 +934,49 @@ details.trust-panel[open] summary { border-bottom: none; }
   .today-resume .today-resume-buttons { justify-content: flex-start; }
 }
 
+/* 01 小秘書：左＝今日行動清單、中＝交辦與提問；右欄為全站 rail（統計可收合＋Focus Now） */
+.assistant-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 14px; align-items: start; }
+.assistant-col { min-width: 0; }
+.assistant-col-chat .assistant-hero { margin-bottom: 0; }
+.assistant-col-chat .assistant-chat-messages { min-height: 320px; max-height: 60vh; }
+.assistant-col-today .secretary-inbox { margin-bottom: 0; }
+.rail-stats { padding: 0; }
+.rail-stats-head { cursor: pointer; list-style: none; user-select: none; }
+.rail-stats-head::-webkit-details-marker { display: none; }
+.rail-stats .rail-strip { grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px; }
+.rail-stats .assistant-chip { padding: 7px 9px; }
+.rail-stats .assistant-chip-value { font-size: 13px; }
+@media (max-width: 1199px) {
+  .assistant-columns { grid-template-columns: 1fr; }
+}
+
+
+/* ADR-012 小秘書記憶區（01 中欄，對話框下方） */
+.memory-panel { padding: 0; }
+.memory-head { cursor: pointer; list-style: none; user-select: none; }
+.memory-head::-webkit-details-marker { display: none; }
+.memory-head-tools { display: flex; gap: 6px; align-items: center; }
+.memory-body { padding: 0 0 8px; }
+.memory-add-row { display: grid; grid-template-columns: auto minmax(90px, 140px) minmax(0, 1fr) auto; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--bd); align-items: center; }
+.memory-add-row input { min-width: 0; font-size: 12px; padding: 6px 9px; border: 1px solid var(--bd); border-radius: 6px; background: var(--s2); color: var(--tx); }
+.memory-add-row input:focus { outline: none; border-color: var(--accent); }
+.memory-list { display: flex; flex-direction: column; max-height: 300px; overflow-y: auto; }
+.memory-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 14px; border-bottom: 1px solid var(--bd); font-size: 12px; line-height: 1.5; }
+.memory-item:last-child { border-bottom: none; }
+.memory-kind { display: inline-block; padding: 1px 7px; border: 1px solid var(--bd); border-radius: 999px; font-family: "JetBrains Mono", monospace; font-size: 9.5px; color: var(--mu); background: var(--s1); white-space: nowrap; margin-top: 2px; }
+.memory-kind.observation { border-color: var(--accent); color: var(--accent); }
+.memory-kind.preference { border-color: var(--warn, #bd871f); color: var(--warn, #bd871f); }
+.memory-kind.decision { border-color: var(--success, #4b9c5c); color: var(--success, #4b9c5c); }
+.memory-item-body { min-width: 0; overflow-wrap: anywhere; }
+.memory-item-meta { color: var(--mu); font-size: 10.5px; margin-top: 2px; font-family: "JetBrains Mono", monospace; }
+.memory-item .btn-delete { color: var(--mu); padding: 2px 6px; font-size: 12px; }
+.memory-item .btn-delete:hover { color: var(--danger, #b64935); }
+.memory-context { margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--bd); background: var(--s2); color: var(--tx); font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow-y: auto; font-family: "JetBrains Mono", monospace; }
+.memory-panel .context-memory-boundary { margin: 8px 14px 0; }
+.proposal-memory { margin-top: 4px; font-size: 11.5px; color: var(--mu); }
+.proposal-memory span { color: var(--accent); margin-right: 4px; }
+.assistant-memory-chip { display: inline-block; margin-top: 4px; margin-right: 6px; font-size: 10.5px; color: var(--mu); }
+@media (max-width: 720px) {
+  .memory-add-row { grid-template-columns: 1fr 1fr; }
+  .memory-add-row input:nth-child(3) { grid-column: 1 / -1; }
+}

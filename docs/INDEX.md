@@ -50,6 +50,7 @@
 | [ADR-009](ADR-009-deskrag-worker-index-lifecycle.md) | DeskRAG worker 索引生命週期 | RAG 索引 worker 隔離、資源與刪除邊界 |
 | [ADR-010](ADR-010-verified-background-agent-task-time.md) | 可驗證背景 Agent 任務時間 | 成對 receipt 才計時的邊界 |
 | [ADR-011](ADR-011-safe-local-repository-sync.md) | 受控本機 Repository 同步（含 P4.3 Onboarding Addendum） | Git 同步中心安全預設、對帳與 init/attach/clone/create 確認式動作 |
+| [ADR-012](ADR-012-secretary-memory.md) | 小秘書記憶區（大腦） | 筆記表 migration 017、觀察可刪、對話注入有上限附收據、提案讀偏好、報告併入 RAG |
 
 ## 功能規格與驗證
 

@@ -4,7 +4,7 @@
 >
 > 主要驗證平台：Windows 11、Python 3.12、Chrome/Edge MV3
 
-本文件提供可直接執行的安裝、啟動、Browser Extension 配對、每日使用、備份與故障排查流程。架構決策另見 [ADR-001](ADR-001-p2-5-trust-boundary.md)、[ADR-002](ADR-002-extension-monitor-and-usage-milestones.md)、[ADR-003](ADR-003-versioned-sqlite-migrations.md)、[ADR-004](ADR-004-packaged-runtime-layout.md)、[ADR-006](ADR-006-derived-context-sessions-and-related-history.md)、[ADR-007](ADR-007-proposal-only-secretary.md)、[ADR-011](ADR-011-safe-local-repository-sync.md) 與 [Release Checklist](RELEASE_CHECKLIST.md)。
+本文件提供可直接執行的安裝、啟動、Browser Extension 配對、每日使用、備份與故障排查流程。架構決策另見 [ADR-001](ADR-001-p2-5-trust-boundary.md)、[ADR-002](ADR-002-extension-monitor-and-usage-milestones.md)、[ADR-003](ADR-003-versioned-sqlite-migrations.md)、[ADR-004](ADR-004-packaged-runtime-layout.md)、[ADR-006](ADR-006-derived-context-sessions-and-related-history.md)、[ADR-007](ADR-007-proposal-only-secretary.md)、[ADR-011](ADR-011-safe-local-repository-sync.md)、[ADR-012](ADR-012-secretary-memory.md) 與 [Release Checklist](RELEASE_CHECKLIST.md)。
 
 ## 1. 安裝與初始化
 
@@ -60,7 +60,7 @@ project_resolution:
 
 ### 1.3 本機 Git 同步中心
 
-Dashboard「03 · Git 同步中心」分頁（2026-09-02 起獨立成分頁，切到分頁時才掃描 Git 狀態）與「設定」內的 GitHub 雲端整合是兩套不同功能。同步中心先以最後一筆本機 commit 時間選出最近的 10 個 repo（可由設定調整），再讀取這些 repo 的完整 worktree 與同步狀態；畫面會另外顯示目前項目的 worktree 修改時間：
+Dashboard「04 · Git 同步中心」分頁（2026-09-02 起獨立成分頁，切到分頁時才掃描 Git 狀態）與「設定」內的 GitHub 雲端整合是兩套不同功能。同步中心先以最後一筆本機 commit 時間選出最近的 10 個 repo（可由設定調整），再讀取這些 repo 的完整 worktree 與同步狀態；畫面會另外顯示目前項目的 worktree 修改時間：
 
 - **GitHub 雲端整合**只讀取 GitHub repo／PR metadata，不會對本機檔案或 branch 執行 Git 指令。
 - **本機 Git 同步中心**只管理 `watchers.git_watcher.repositories` 明示設定 root 下發現的 repositories；頁面初次載入只讀取本機 cached remote-tracking refs，不會自動連網。
@@ -379,7 +379,7 @@ Dashboard「進行中工作」會同步顯示 `RECENT WORK SESSIONS` 與 `RELATE
 
 ### 管理 DeskRAG 知識庫與索引
 
-在 Dashboard「小秘書與知識庫」分頁的知識庫區塊中，掃描按鈕會建立一個獨立本機 worker；主頁、採集器與 Health API 不會在同一個 process 內等待文件解析或 embedding。
+在 Dashboard「02 · 知識庫」分頁中，掃描按鈕會建立一個獨立本機 worker；主頁、採集器與 Health API 不會在同一個 process 內等待文件解析或 embedding。
 
 1. **新增目錄與掃描**：新增資料夾或按「掃描索引」前，設定本次檔案上限與每檔間隔。預設為 500 檔、25 ms、單檔最多 50 MB；大型資料夾請分批執行。
 2. **執行控制**：執行中可按「暫停／恢復／取消」。取消會在目前單一檔案或向量批次完成後生效，不會強制中斷寫入。
@@ -441,7 +441,7 @@ Invoke-RestMethod -Method Post "http://127.0.0.1:8765/api/v1/rag/retrieval/shutd
 
 ### 01「今天」：今日行動清單與每日早晨包（2026-09-02）
 
-「01 · 小秘書與知識庫」分頁的第二張卡是 **TODAY · 今日行動清單**，把原本散在各處的東西收在一起：
+「01 · 小秘書」分頁採三欄：左欄是 **TODAY · 今日行動清單**、中欄是交辦與提問、右欄是全站側欄（「今日統計」可收合＋Focus Now）。知識庫（完整 RAG 對話、引用、索引管理）自 2026-09-02 起是獨立的「02 · 知識庫」分頁，與 01 的交辦框共用同一條對話。今日行動清單把原本散在各處的東西收在一起：
 
 1. **上次做到哪**（最上方）：最近有活動的專案、最後一個動作、未結事項數；「接續 →」直接跳到 02 該專案，「複製 Handoff」拿到接續 prompt。
 2. **早晨包摘要**（一行）：若排程有跑，顯示「早晨包：repo 需 pull N、需 push M、STATUS 過期 K、Handoff J 份」與時間；尚未建立排程時會提示。
@@ -449,7 +449,32 @@ Invoke-RestMethod -Method Post "http://127.0.0.1:8765/api/v1/rag/retrieval/shutd
 
 **📦 建立每日排程**（需 execution token；執行器與排程任務開關須先開）：一鍵建立兩個 L0 唯讀排程——07:30 `morning_pack`（Repo 同步報告＋STATUS 過期草稿＋活躍專案 Handoff，三步各自容錯，失敗步驟記在 receipt 的 `errors`）與 21:30 `handoff_active_projects`（今天有活動的專案各產一份 Handoff 到 `reports/handoffs/`）。已存在就不重複建立。晨報（桌面／Telegram）會帶入早晨包摘要與 top 建議的「為什麼是現在」。**沒有任何自動 pull／push**；同步動作仍由你批准。
 
-02「進行中工作」現在只留專案卡：卡上多了 git 狀態 chip（來自最近一次同步報告快照，滑過可見 fetch 時間；沒有快照就不顯示）與「💡 N 建議」chip；展開卡內多了「近期工作階段」。前景使用、資料收集、背景任務三張統計面板移到「04 · 摘要與統計」。
+03「進行中工作」現在只留專案卡：卡上多了 git 狀態 chip（來自最近一次同步報告快照，滑過可見 fetch 時間；沒有快照就不顯示）與「💡 N 建議」chip；展開卡內多了「近期工作階段」。前景使用、資料收集、背景任務三張統計面板移到「05 · 摘要與統計」。
+
+### 小秘書記憶區（「大腦」，2026-09-02，ADR-012）
+
+秘書回答與主動提案時固定會看的參考來源，在「01 · 小秘書」中欄對話框下方的 **🧠 小秘書記憶區**：
+
+1. **記下來**：在對話框直接輸入「記下來：週五前收尾 ADR-012」「偏好：不要提醒 repo_needs_push」「決定 @alpha：等 v2 再 merge」（英文 `/note` `/pref` `/decision` `remember:`），訊息不會送 LLM，而是寫進本機 `secretary_notes`；也可用記憶區面板的表單（選種類、選填專案）。四種種類：筆記／偏好／決定，以及只有秘書自己能寫的**觀察**。
+2. **秘書的觀察**：早晨包跑完會留下當日觀察（「掃描 12 個 repo：需要 pull 2…」「有 3 個專案 STATUS 過期」「早晨包有步驟失敗」），每天每項只寫一次、標記 `observation`、每筆都有 ✕ 可刪，「🧹 清除觀察」一鍵清掉全部觀察而不動您的筆記。
+3. **對話會參考記憶**：每次提問，系統把「今日狀態（上次做到哪、早晨包一行）＋前三個提案（含為什麼是現在）＋偏好與決定＋最近筆記＋未過期觀察」接在 system prompt 後面（預設上限 2500 字、觀察 14 天後不再注入），回覆下方會顯示「🧠 參考記憶區 N 筆」。按「👁 現在記得什麼」可以看到**與注入內容完全相同**的文字與收據（`GET /api/v1/secretary/memory/context`）。
+4. **提案會讀偏好**：偏好筆記裡每一行「不要提醒 X」或「mute: X」（X 是提案類型如 `repo_needs_push`、或專案鍵）會壓掉對應提案，`/api/v1/secretary/proposals` 的 `inputs.memory_muted` 如實計數；同專案最近一則決定／筆記會以「🧠 你之前記過」附在提案卡上。偏好只做這一種確定性解析，不會變成任何自動執行。
+5. **併入知識庫**：「02 · 知識庫 → 🧠 併入秘書記憶與工作紀錄」把筆記、每日時段微摘要、`reports/` 下的 Handoff／同步報告／STATUS 草稿／每日入口／週月報併入 RAG 的 activity 領域（獨立 worker 執行，主服務不載入索引套件；重跑覆蓋同一批切片），之後一般提問也能檢索到這些內容。
+
+```yaml
+secretary_memory:
+  enabled: true
+  chat_context:
+    enabled: true      # 本機小模型 context 吃緊時可關掉，只留筆記與提案讀偏好
+    max_chars: 2500
+  observation_ttl_days: 14
+```
+
+記憶區只存您輸入的短文字與由本機唯讀收據推出的觀察，不存 prompt／response 原文、不寫進任何 repo；API：`GET/POST /api/v1/secretary/memory`、`DELETE /api/v1/secretary/memory/{id}`、`DELETE /api/v1/secretary/memory?kind=observation`。
+
+### 主控台一串 `POST /api/v1/events/ai 403 Forbidden` 是什麼？
+
+那是 Browser Extension 在送對話事件與 heartbeat，但帶的 ingest token 缺少或與本機設定不符；extension 的離線佇列會每秒重送，所以會看到一整排。2026-09-02 起回應會直接說明：`detail: extension ingest token missing` 或 `extension ingest token mismatch`，主控台每 60 秒印一則 WARNING（附被壓掉的次數）。處理：在 Extension popup 重新貼上 `python main.py init` 顯示的 ingest token（或確認 `OMNICONTEXT_INGEST_TOKEN` 環境變數／`security.browser_extension_ingest_token` 與 popup 一致）。`Origin is not allowed` 則是非 extension 的來源被擋，屬正常防護。
 
 ### 查看 Proposal-only 主動秘書建議
 

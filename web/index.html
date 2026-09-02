@@ -43,13 +43,14 @@
       </div>
     </div>
     <nav class="tabs">
-      <button class="tab active" data-tab="tab-assistant" data-i18n="tab_assistant">01 · 🤖 小秘書與知識庫</button>
-      <button class="tab" data-tab="tab-projects" data-i18n="tab_projects">02 · 進行中工作</button>
-      <button class="tab" data-tab="tab-repos" data-i18n="tab_repos">03 · 🔁 Git 同步中心</button>
-      <button class="tab" data-tab="tab-summaries" data-i18n="tab_summaries">04 · 摘要與統計</button>
-      <button class="tab tab-secondary" data-tab="tab-dashboard" data-i18n="tab_dashboard">05 · 即時情報流</button>
-      <button class="tab tab-secondary" data-tab="tab-settings" data-i18n="tab_settings">06 · ⚙️ 設定</button>
-      <button class="tab tab-secondary" data-tab="tab-system-health" data-i18n="tab_system_health">07 · 🛡️ 系統健康</button>
+      <button class="tab active" data-tab="tab-assistant" data-i18n="tab_assistant">01 · 🤖 小秘書</button>
+      <button class="tab" data-tab="tab-knowledge" data-i18n="tab_knowledge">02 · 📚 知識庫</button>
+      <button class="tab" data-tab="tab-projects" data-i18n="tab_projects">03 · 進行中工作</button>
+      <button class="tab" data-tab="tab-repos" data-i18n="tab_repos">04 · 🔁 Git 同步中心</button>
+      <button class="tab" data-tab="tab-summaries" data-i18n="tab_summaries">05 · 摘要與統計</button>
+      <button class="tab tab-secondary" data-tab="tab-dashboard" data-i18n="tab_dashboard">06 · 即時情報流</button>
+      <button class="tab tab-secondary" data-tab="tab-settings" data-i18n="tab_settings">07 · ⚙️ 設定</button>
+      <button class="tab tab-secondary" data-tab="tab-system-health" data-i18n="tab_system_health">08 · 🛡️ 系統健康</button>
     </nav>
   </div>
 
@@ -57,27 +58,10 @@
     <main class="main">
 
       <!-- 01 進行中工作 -->
-      <!-- 01 小秘書首頁：對話交辦 + 建議 + 今日概況 -->
+      <!-- 01 小秘書：左＝今日行動清單、中＝交辦與提問、右欄＝統計＋Focus Now -->
       <section id="tab-assistant" class="pane active">
-        <div class="panel assistant-hero mb-14">
-          <div class="panel-head">
-            <span class="mono-label accent" data-i18n="assistant_title">🤖 小秘書 · 交辦與提問</span>
-            <span id="assistant-advisor-badge" class="trust noisy">RULES</span>
-          </div>
-          <div id="assistant-chat-messages" class="assistant-chat-messages">
-            <div class="placeholder" data-i18n="assistant_chat_empty">問文件、查專案進度、請我建議下一步——回答會引用本機知識庫與工作紀錄。</div>
-          </div>
-          <div class="assistant-input-row">
-            <input id="input-assistant-prompt" type="text" maxlength="4000" data-i18n-ph="assistant_input_ph" placeholder="請小秘書查資料、寫摘要、建議下一步…">
-            <select id="select-assistant-provider" class="assistant-select" title="LLM provider"></select>
-            <select id="select-assistant-model" class="assistant-select" title="模型"></select>
-            <button id="btn-assistant-send" class="btn btn-primary" data-i18n="btn_assistant_send">交辦 ⚡</button>
-          </div>
-          <div class="context-memory-boundary" data-i18n="assistant_chat_boundary">對話使用本機知識庫（RAG）與所選模型；完整引用卡片與對話歷史在下方「知識庫與 RAG」區塊。</div>
-        </div>
-
-        <div id="assistant-strip" class="assistant-strip mb-14"></div>
-
+        <div class="assistant-columns">
+          <div class="assistant-col assistant-col-today">
         <section class="panel secretary-inbox mb-14" id="today-panel">
           <div class="panel-head">
             <span class="mono-label accent" data-i18n="today_title">TODAY · 今日行動清單</span>
@@ -98,12 +82,64 @@
             <div class="context-memory-boundary" data-i18n="secretary_boundary">只呈現本機 evidence 衍生建議；不保存、不會自動執行。LLM 註解（若啟用）僅供參考，預設使用本機模型。</div>
           </div>
         </section>
+          </div>
+          <div class="assistant-col assistant-col-chat">
+        <div class="panel assistant-hero mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent" data-i18n="assistant_title">🤖 小秘書 · 交辦與提問</span>
+            <span id="assistant-advisor-badge" class="trust noisy">RULES</span>
+          </div>
+          <div id="assistant-chat-messages" class="assistant-chat-messages">
+            <div class="placeholder" data-i18n="assistant_chat_empty">問文件、查專案進度、請我建議下一步——回答會引用本機知識庫與工作紀錄。</div>
+          </div>
+          <div class="assistant-input-row">
+            <input id="input-assistant-prompt" type="text" maxlength="4000" data-i18n-ph="assistant_input_ph" placeholder="請小秘書查資料、寫摘要、建議下一步…">
+            <select id="select-assistant-provider" class="assistant-select" title="LLM provider"></select>
+            <select id="select-assistant-model" class="assistant-select" title="模型"></select>
+            <button id="btn-assistant-send" class="btn btn-primary" data-i18n="btn_assistant_send">交辦 ⚡</button>
+          </div>
+          <div class="context-memory-boundary" data-i18n="assistant_chat_boundary">對話使用本機知識庫（RAG）與所選模型；完整引用卡片與對話歷史在下方「知識庫與 RAG」區塊。</div>
+        </div>
 
-        <details class="panel panel-collapsible" id="panel-rag" open>
-          <summary class="panel-head">
-            <span class="mono-label accent">📚</span><span class="panel-title" data-i18n="rag_merged_title">知識庫與 RAG（完整對話、引用與索引管理）</span>
-            <span class="muted small" data-i18n="rag_merged_note">與上方交辦框共用同一條對話與歷史</span>
+        <!-- ADR-012 小秘書記憶區：筆記／偏好／決定＋秘書觀察；也是對話與提案的固定參考來源 -->
+        <details class="panel memory-panel mb-14" id="memory-panel" open>
+          <summary class="panel-head memory-head">
+            <span class="mono-label accent" data-i18n="memory_title">🧠 小秘書記憶區</span>
+            <span id="memory-badge" class="trust noisy">…</span>
+            <span class="head-right memory-head-tools">
+              <button id="btn-memory-context" class="btn btn-ghost btn-sm" data-i18n="btn_memory_context" title="顯示這次對話會注入給小秘書的記憶脈絡（與 system prompt 相同）">👁 現在記得什麼</button>
+              <button id="btn-memory-clear-obs" class="btn btn-ghost btn-sm" data-i18n="btn_memory_clear_obs" title="只刪除秘書自己寫的觀察；您的筆記不受影響">🧹 清除觀察</button>
+            </span>
           </summary>
+          <div class="memory-body">
+            <div class="memory-add-row">
+              <select id="select-memory-kind" class="assistant-select" title="種類">
+                <option value="user_note" data-i18n="memory_kind_user_note">筆記</option>
+                <option value="preference" data-i18n="memory_kind_preference">偏好</option>
+                <option value="decision" data-i18n="memory_kind_decision">決定</option>
+              </select>
+              <input id="input-memory-project" type="text" maxlength="120" data-i18n-ph="memory_project_ph" placeholder="專案（選填）">
+              <input id="input-memory-body" type="text" maxlength="4000" data-i18n-ph="memory_input_ph" placeholder="要小秘書記住的事；偏好可寫「不要提醒 <專案或提案類型>」">
+              <button id="btn-memory-add" class="btn btn-primary btn-sm" data-i18n="btn_memory_add">記下來</button>
+            </div>
+            <pre id="memory-context-box" class="memory-context" hidden></pre>
+            <div id="memory-list" class="memory-list"><div class="placeholder" data-i18n="ph_loading_memory">載入記憶區…</div></div>
+            <div class="context-memory-boundary" data-i18n="memory_boundary">記憶區只存您輸入的短文字與秘書從本機唯讀收據推出的觀察（可一鍵刪除）；每次對話注入的脈絡有字數上限並附收據。在對話框輸入「記下來：…」也會寫到這裡。</div>
+          </div>
+        </details>
+
+          </div>
+        </div>
+
+      </section>
+
+      <!-- 02 知識庫（獨立分頁；與 01 交辦框共用同一條 RAG 對話） -->
+      <section id="tab-knowledge" class="pane">
+        <div class="panel" id="panel-rag">
+          <div class="panel-head">
+            <span class="mono-label accent">📚</span><span class="panel-title" data-i18n="rag_merged_title">知識庫與 RAG（完整對話、引用與索引管理）</span>
+            <span class="muted small" data-i18n="rag_merged_note">與 01 小秘書交辦框共用同一條對話與歷史</span>
+          </div>
           <div style="padding: 14px;">
         <div class="two-col" style="grid-template-columns: 340px 1fr; gap: 14px;">
           
@@ -153,6 +189,7 @@
                </div>
                <button class="btn btn-ghost btn-sm" id="btn-rag-verify-index" style="width:100%; margin-top:-4px; margin-bottom:8px;">✓ 驗證索引與空間</button>
                <button class="btn btn-ghost btn-sm" id="btn-rag-rebuild-bm25" style="width:100%; margin-top:-4px; margin-bottom:8px;">↻ 從 Chroma 重建 BM25</button>
+               <button class="btn btn-ghost btn-sm" id="btn-rag-memory-sync" style="width:100%; margin-top:-4px; margin-bottom:8px;" title="把小秘書記憶區筆記、每日時段摘要、Handoff、同步報告與 STATUS 草稿併入知識庫（獨立 worker 執行）">🧠 併入秘書記憶與工作紀錄</button>
 
                <div id="rag-retrieval-card" class="rag-storage-card mb-8" title="檢索在常駐子程序執行；主服務不載入 Chroma／BM25。狀態為程序內即時狀態。">
                  <div class="mono-mini muted">檢索 worker 狀態載入中…</div>
@@ -242,7 +279,7 @@
           </article>
         </div>
           </div>
-        </details>
+        </div>
       </section>
 
       <section id="tab-projects" class="pane">
@@ -837,6 +874,12 @@
             <div class="defect"><span data-i18n="trust_d8">中英文多語言 i18n 與專案智能歸戶</span><span class="code ok">PASS</span></div>
           </div>
         </div>
+      </details>
+
+      <!-- 今日統計：原 01 的 chips 列，收進右欄可收合 -->
+      <details class="panel rail-stats" id="rail-stats" open>
+        <summary class="rail-head rail-stats-head"><span data-i18n="rail_stats_title">今日統計</span><span>▾</span></summary>
+        <div id="assistant-strip" class="assistant-strip rail-strip"></div>
       </details>
 
       <!-- FOCUS NOW：一次一張大型卡，混合已觀測事項與明確標示的唯讀建議。 -->

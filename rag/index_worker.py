@@ -61,6 +61,18 @@ def main() -> int:
                 control_checkpoint=lambda: _control_checkpoint(args.job_id),
             )
             finish_job(args.job_id, "completed", f"已從 Chroma 重建 {result['rebuilt_chunks']} 個 BM25 切片", result=result)
+        elif job["job_type"] == "activity_sync":
+            # ADR-012：把秘書記憶區（筆記／每日摘要／Handoff／同步報告／STATUS 草稿）
+            # 併入 RAG activity 領域；在 worker 程序做，主服務不載入索引套件。
+            from rag.activity_indexer import activity_indexer
+            update_job(args.job_id, message="正在把秘書記憶區與工作紀錄併入知識庫…")
+            result = activity_indexer.sync_all()
+            finish_job(
+                args.job_id,
+                "completed",
+                f"已將 {result.get('total_activity_indexed', 0)} 筆工作紀錄／記憶切片併入知識庫",
+                result=result,
+            )
         else:
             raise ValueError(f"Unsupported RAG job type: {job['job_type']}")
         return 0

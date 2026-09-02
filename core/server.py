@@ -113,6 +113,30 @@ app.add_middleware(
 )
 
 
+_EXTENSION_TOKEN_WARNING_STATE: dict[str, Any] = {"last_logged": 0.0, "suppressed": 0}
+
+
+def _warn_extension_token_mismatch(token_present: bool) -> None:
+    """每 60 秒最多一則 WARNING，附上這段期間被壓掉的次數，避免 log 被每秒重送淹沒。"""
+    import time as _time
+
+    now = _time.monotonic()
+    state = _EXTENSION_TOKEN_WARNING_STATE
+    if now - float(state["last_logged"]) < 60:
+        state["suppressed"] = int(state["suppressed"]) + 1
+        return
+    suppressed = int(state["suppressed"])
+    state["last_logged"] = now
+    state["suppressed"] = 0
+    logger.warning(
+        "Browser Extension 的寫入請求被拒（403）：ingest token %s。%s"
+        "請在 Extension popup 重新貼上 `omnicontext init` 顯示的 ingest token；"
+        "在此之前 extension 的離線佇列會持續重送。",
+        "不符" if token_present else "缺少",
+        f"（過去 60 秒另有 {suppressed} 次相同拒絕）" if suppressed else "",
+    )
+
+
 @app.middleware("http")
 async def enforce_local_security_boundary(request: Request, call_next):
     cfg = get_config()
@@ -135,6 +159,16 @@ async def enforce_local_security_boundary(request: Request, call_next):
             token = request.headers.get("x-omnicontext-ingest-token")
             if extension_ingest_authorized(token, cfg):
                 return await call_next(request)
+            # Extension 帶了 origin 但 token 缺少／不符：console 只印一行 403 看不出原因，
+            # 這裡給明確 detail，並以節流的 WARNING 說明（extension 的離線佇列會每秒重送）。
+            _warn_extension_token_mismatch(bool(token))
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "detail": "extension ingest token missing" if not token else "extension ingest token mismatch",
+                    "hint": "Extension popup 的 token 需與 security.browser_extension_ingest_token（或其環境變數）一致；請重新貼上 `omnicontext init` 顯示的 ingest token。",
+                },
+            )
         return JSONResponse(status_code=403, content={"detail": "Origin is not allowed"})
 
     return await call_next(request)
@@ -540,6 +574,87 @@ def get_secretary_today():
     from core.secretary_packs import build_today_view
 
     return build_today_view()
+
+
+# ---------------------------------------------------------------- ADR-012 小秘書記憶區
+
+
+class MemoryNoteRequest(BaseModel):
+    kind: str = "user_note"
+    body: str
+    project_key: Optional[str] = None
+    title: Optional[str] = None
+    pinned: bool = False
+    source: str = "web"
+
+
+@app.get("/api/v1/secretary/memory")
+def get_secretary_memory(
+    kind: Optional[str] = Query(None),
+    project_key: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=500),
+):
+    """記憶區筆記清單與各類計數；唯讀。observation 一律標記可刪除。"""
+    from core.secretary_memory import MemoryRejected, list_notes
+
+    try:
+        return list_notes(kind=kind, project_key=project_key, limit=limit)
+    except MemoryRejected as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
+
+
+@app.post("/api/v1/secretary/memory")
+def add_secretary_memory(payload: MemoryNoteRequest):
+    """「記下來」：只寫使用者自己輸入的短文字到本機 secretary_notes；不觸碰任何 repo。
+
+    這不是 L1 動作（沒有外部效果），因此沿用 loopback 邊界即可、不需 execution token。
+    kind 只接受 user_note / preference / decision；observation 由秘書自己的 L0 收據產生。
+    """
+    from core.secretary_memory import USER_KINDS, MemoryRejected, add_note
+
+    if payload.kind not in USER_KINDS:
+        raise HTTPException(status_code=422, detail="kind_not_user_writable")
+    try:
+        return add_note(
+            kind=payload.kind,
+            body=payload.body,
+            project_key=payload.project_key,
+            title=payload.title,
+            pinned=payload.pinned,
+            source=(payload.source or "web")[:40],
+        )
+    except MemoryRejected as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
+
+
+@app.delete("/api/v1/secretary/memory/{note_id}")
+def delete_secretary_memory(note_id: int):
+    """一鍵刪除單筆（含秘書觀察）。"""
+    from core.secretary_memory import delete_note
+
+    result = delete_note(note_id)
+    if not result.get("deleted"):
+        raise HTTPException(status_code=404, detail="note_not_found")
+    return result
+
+
+@app.delete("/api/v1/secretary/memory")
+def clear_secretary_memory(kind: str = Query("observation")):
+    """整類清除；預設只清秘書自己的觀察，使用者筆記需明確指定 kind。"""
+    from core.secretary_memory import MemoryRejected, clear_notes
+
+    try:
+        return clear_notes(kind=kind)
+    except MemoryRejected as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
+
+
+@app.get("/api/v1/secretary/memory/context")
+def get_secretary_memory_context():
+    """秘書「當下記得什麼」：與注入對話 system prompt 完全相同的文字與收據；唯讀。"""
+    from core.secretary_memory import memory_context
+
+    return memory_context()
 
 
 @app.post("/api/v1/secretary/scheduled-tasks/presets")
