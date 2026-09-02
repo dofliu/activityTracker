@@ -369,8 +369,9 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     assert "select-agent-cli" in dashboard.text
     assert "DATA CAPTURE" in dashboard.text
     assert "extension-capture-badge" not in dashboard.text
-    assert "style.css?v=1.3.0a12-home-work-guide" in dashboard.text
-    assert "app.js?v=1.3.0a12-home-work-guide" in dashboard.text
+    from core.server import asset_version  # 資產版本改為內容雜湊，不再寫死
+    assert f"style.css?v={asset_version()}" in dashboard.text
+    assert f"app.js?v={asset_version()}" in dashboard.text
     assert "focus-carousel" in dashboard.text
     assert "repo-sync-panel" in dashboard.text
     assert "data-trust-runtime-badge" in dashboard.text
