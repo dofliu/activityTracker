@@ -3,6 +3,12 @@
 此模組刻意不做排程式同步，也不接受瀏覽器傳入任意路徑。所有 repository
 都必須先由既有 ``watchers.git_watcher.repositories`` 設定探索而來；所有寫入
 操作則在逐一確認後，以 argv 形式執行 Git，避免 shell injection 與意外批次變更。
+
+ADR-011 Addendum B（2026-09-02）補上「全覽與批次」：``fetch --prune`` 只更新
+remote-tracking ref，可一鍵對全部 repo 執行；批次 pull／push 則必須先由
+``batch_plan`` 列出「目前符合前置條件」的清單、由使用者確認該清單後，逐一
+在 lock 內重檢再執行；批次 push 另有獨立開關且預設關閉。任何批次都不會
+放寬單一動作的前置條件，也仍然沒有排程自動同步。
 """
 
 from __future__ import annotations
@@ -103,6 +109,19 @@ class LocalRepositorySync:
             return max(1, min(int(configured), 50))
         except (TypeError, ValueError):
             return 10
+
+    @property
+    def batch_push_allowed(self) -> bool:
+        """批次 push 獨立開關；預設關閉（單一 repo 的手動 push 不受影響）。"""
+        return bool(self.cfg.get("repository_sync.batch.allow_push", False))
+
+    @property
+    def batch_max_repositories(self) -> int:
+        configured = self.cfg.get("repository_sync.batch.max_repositories", 50)
+        try:
+            return max(1, min(int(configured), 200))
+        except (TypeError, ValueError):
+            return 50
 
     def _configured_roots(self) -> list[Path]:
         return [path.expanduser().resolve() for path in self.cfg.get_paths(
@@ -246,6 +265,17 @@ class LocalRepositorySync:
         commit_text = self._git_text(repo, "log", "-1", "--format=%ct")
         return float(commit_text) if commit_text and commit_text.isdigit() else 0.0
 
+    def _last_fetch_at(self, repo: RepositoryReference) -> str | None:
+        """FETCH_HEAD 的修改時間＝本機上次成功 fetch 的時刻；沒有就是從未 fetch。"""
+        git_dir_text = self._git_text(repo, "rev-parse", "--git-dir")
+        if not git_dir_text:
+            return None
+        marker = (repo.path / git_dir_text).resolve() / "FETCH_HEAD"
+        try:
+            return datetime.fromtimestamp(marker.stat().st_mtime).astimezone().isoformat(timespec="seconds")
+        except OSError:
+            return None
+
     def _operation_in_progress(self, repo: RepositoryReference) -> str | None:
         git_dir_text = self._git_text(repo, "rev-parse", "--git-dir")
         if not git_dir_text:
@@ -281,6 +311,8 @@ class LocalRepositorySync:
                 parts = rev_counts.split()
                 if len(parts) == 2 and all(part.isdigit() for part in parts):
                     ahead, behind = int(parts[0]), int(parts[1])
+
+        last_fetch_at = self._last_fetch_at(repo)
 
         if not branch:
             sync_state = "detached_head"
@@ -319,6 +351,7 @@ class LocalRepositorySync:
             "behind": behind,
             "sync_state": sync_state,
             "remote_tracking_basis": "cached_local_remote_tracking_ref",
+            "last_fetch_at": last_fetch_at,
             "operation_in_progress": operation,
             "worktree": counts,
             "clean": clean,
@@ -362,7 +395,14 @@ class LocalRepositorySync:
             ),
         }
 
-    def list_statuses(self) -> dict[str, Any]:
+    def list_statuses(self, scope: str = "recent") -> dict[str, Any]:
+        """``recent``：近期 N 個 repo 的完整狀態（Dashboard 卡片）；``all``：全部。
+
+        兩者都只讀本機 cached remote-tracking ref，不連網。``all`` 會對每個
+        repo 跑 git status，成本與 repo 數成正比，因此由使用者展開表格時才呼叫。
+        """
+        if scope not in ("recent", "all"):
+            raise RepositorySyncRejected("scope 只接受 recent 或 all")
         references, truncated = self._discover_references()
         def inspect(repo: RepositoryReference) -> dict[str, Any]:
             try:
@@ -387,7 +427,9 @@ class LocalRepositorySync:
                 key=lambda item: (-item[1], item[0].path.name.casefold(), str(item[0].path).casefold()),
             )
         ]
-        selected_references = ranked_references[: self.dashboard_recent_limit]
+        selected_references = (
+            ranked_references if scope == "all" else ranked_references[: self.dashboard_recent_limit]
+        )
 
         # subprocess 的 status 查詢可受大型 untracked tree 拖慢；有限並行讓單一
         # repo 的 timeout 不會阻塞整個 Dashboard，也不會不受控地大量啟動 Git。
@@ -404,21 +446,189 @@ class LocalRepositorySync:
             1 for repository in repositories
             if repository.get("sync_state") != "synced" or not repository.get("clean", False)
         )
-        displayed = repositories[: self.dashboard_recent_limit]
+        displayed = repositories if scope == "all" else repositories[: self.dashboard_recent_limit]
         for repository in displayed:
             repository.pop("_sort_last_activity_epoch", None)
         return {
+            "scope": scope,
             "repositories": displayed,
             "repository_count": repository_count,
             "displayed_count": len(displayed),
             "recent_limit": self.dashboard_recent_limit,
             "attention_count": attention_count,
             "attention_scope": "displayed_repositories",
+            "summary": self._summarize(displayed),
+            "batch": {
+                "fetch_all": True,
+                "pull_ff_only": True,
+                "push": self.batch_push_allowed,
+                "max_repositories": self.batch_max_repositories,
+            },
             "recent_ranking_basis": "last_local_commit_then_displayed_worktree_activity",
             "truncated": truncated,
             "remote_tracking_basis": "cached_local_remote_tracking_ref",
             "automatic_sync": False,
             "commit_policy": "staged_only_no_automatic_git_add",
+        }
+
+    @staticmethod
+    def _summarize(repositories: list[dict[str, Any]]) -> dict[str, int]:
+        summary = {
+            "synced": 0, "behind": 0, "ahead": 0, "diverged": 0,
+            "no_upstream": 0, "dirty": 0, "unavailable": 0,
+        }
+        for repo in repositories:
+            state = repo.get("sync_state")
+            if state in ("synced", "behind", "ahead", "diverged"):
+                summary[state] += 1
+            elif state in ("no_upstream", "detached_head", "upstream_unavailable"):
+                summary["no_upstream"] += 1
+            else:
+                summary["unavailable"] += 1
+            if repo.get("clean") is False:
+                summary["dirty"] += 1
+        return summary
+
+    def fetch_all(self) -> dict[str, Any]:
+        """對全部有 remote 的 repo 執行 ``fetch --prune``（只更新 remote-tracking ref）。
+
+        這是唯一允許「一鍵全部」而不需列清單確認的動作：它不改 worktree、不改
+        本機 branch、不改遠端。正在執行其他動作的 repo 會被跳過並如實列出。
+        """
+        references, truncated = self._discover_references()
+
+        def one(repo: RepositoryReference) -> dict[str, Any]:
+            lock = self._repo_lock(repo.repo_id)
+            if not lock.acquire(blocking=False):
+                return {"repo_id": repo.repo_id, "repo_name": repo.path.name, "status": "skipped",
+                        "reason": "此 repository 正在執行另一個同步動作"}
+            try:
+                branch = self._git_text(repo, "branch", "--show-current") or None
+                remote = self._git_text(repo, "config", "--get", f"branch.{branch}.remote") if branch else None
+                if not remote:
+                    remote = self._git_text(repo, "config", "--get", "remote.origin.url") and "origin"
+                if not remote:
+                    return {"repo_id": repo.repo_id, "repo_name": repo.path.name, "status": "skipped",
+                            "reason": "沒有可 fetch 的 remote"}
+                try:
+                    result = self._run(repo, ("fetch", "--prune", remote))
+                except subprocess.TimeoutExpired:
+                    return {"repo_id": repo.repo_id, "repo_name": repo.path.name, "status": "failed",
+                            "reason": f"Git fetch 逾時（{self.timeout_seconds} 秒）"}
+                output = _bounded_output((result.stdout or "") + "\n" + (result.stderr or ""))
+                return {
+                    "repo_id": repo.repo_id, "repo_name": repo.path.name,
+                    "status": "success" if result.returncode == 0 else "failed",
+                    "return_code": result.returncode,
+                    "reason": None if result.returncode == 0 else (output or "Git fetch 失敗"),
+                }
+            except (OSError, subprocess.SubprocessError) as exc:
+                return {"repo_id": repo.repo_id, "repo_name": repo.path.name, "status": "failed",
+                        "reason": _bounded_output(str(exc))}
+            finally:
+                lock.release()
+
+        with ThreadPoolExecutor(max_workers=min(self.status_parallelism, len(references) or 1)) as executor:
+            results = list(executor.map(one, references))
+        counts = {"success": 0, "failed": 0, "skipped": 0}
+        for item in results:
+            counts[item["status"]] = counts.get(item["status"], 0) + 1
+        return {
+            "action": "fetch_all",
+            "repository_count": len(references),
+            "truncated": truncated,
+            "counts": counts,
+            "results": results,
+            "worktree_changed": False,
+            "automatic": False,
+            "claim_boundary": "只更新各 repo 的 remote-tracking refs；不改 worktree、本機 branch 或遠端。",
+        }
+
+    _BATCH_ACTIONS = ("pull_ff_only", "push")
+
+    def batch_plan(self, action: str) -> dict[str, Any]:
+        """列出目前符合 ``action`` 前置條件的 repo；不執行任何動作。
+
+        使用者確認的是這份清單；``batch_execute`` 只接受清單內的 repo_id，
+        且每個 repo 執行前仍會在 lock 內重檢一次。
+        """
+        if action not in self._BATCH_ACTIONS:
+            raise RepositorySyncRejected("批次只支援 pull_ff_only 與 push")
+        if action == "push" and not self.batch_push_allowed:
+            raise RepositorySyncRejected(
+                "批次 push 未啟用（repository_sync.batch.allow_push=false）；單一 repo 的 Push 仍可逐一執行"
+            )
+        statuses = self.list_statuses(scope="all")
+        eligible: list[dict[str, Any]] = []
+        excluded: list[dict[str, Any]] = []
+        for repo in statuses["repositories"]:
+            state = (repo.get("actions") or {}).get(action) or {}
+            entry = {
+                "repo_id": repo["repo_id"], "name": repo["name"], "branch": repo.get("branch"),
+                "upstream": repo.get("upstream"), "ahead": repo.get("ahead"), "behind": repo.get("behind"),
+                "sync_state": repo.get("sync_state"), "last_fetch_at": repo.get("last_fetch_at"),
+            }
+            if state.get("allowed"):
+                eligible.append(entry)
+            else:
+                excluded.append({**entry, "reason": state.get("reason") or repo.get("error") or "前置條件未通過"})
+        capped = eligible[: self.batch_max_repositories]
+        return {
+            "action": action,
+            "eligible": capped,
+            "eligible_count": len(capped),
+            "excluded": excluded,
+            "excluded_count": len(excluded),
+            "capped": len(eligible) > len(capped),
+            "max_repositories": self.batch_max_repositories,
+            "remote_tracking_basis": "cached_local_remote_tracking_ref",
+            "claim_boundary": "清單依本機 cached remote-tracking ref 判定；執行時每個 repo 會再重檢一次，不符者跳過。",
+        }
+
+    def batch_execute(self, action: str, repo_ids: list[str]) -> dict[str, Any]:
+        """依使用者確認的 repo_id 清單逐一執行；每個 repo 都走 ``execute`` 的重檢與 lock。"""
+        if action not in self._BATCH_ACTIONS:
+            raise RepositorySyncRejected("批次只支援 pull_ff_only 與 push")
+        if action == "push" and not self.batch_push_allowed:
+            raise RepositorySyncRejected(
+                "批次 push 未啟用（repository_sync.batch.allow_push=false）"
+            )
+        unique_ids = list(dict.fromkeys(str(item) for item in repo_ids))
+        if not unique_ids:
+            raise RepositorySyncRejected("批次清單為空")
+        if len(unique_ids) > self.batch_max_repositories:
+            raise RepositorySyncRejected(f"單次批次最多 {self.batch_max_repositories} 個 repository")
+        results: list[dict[str, Any]] = []
+        counts = {"success": 0, "failed": 0, "skipped": 0}
+        # 逐一（而非並行）執行：pull/push 可能觸發 hooks 或 credential helper，
+        # 並行會讓失敗原因難以歸因，也可能同時彈出多個系統提示。
+        for repo_id in unique_ids:
+            try:
+                receipt = self.execute(repo_id, action)
+                results.append({
+                    "repo_id": repo_id, "repo_name": receipt["repo_name"], "status": "success",
+                    "return_code": receipt["return_code"],
+                    "after_sync_state": (receipt.get("after") or {}).get("sync_state"),
+                })
+                counts["success"] += 1
+            except RepositorySyncRejected as exc:
+                message = str(exc)
+                status = "skipped" if ("前置" in message or "僅限" in message or "正在執行" in message or "找不到" in message) else "failed"
+                name = None
+                try:
+                    name = self._reference_by_id(repo_id).path.name
+                except RepositorySyncRejected:
+                    pass
+                results.append({"repo_id": repo_id, "repo_name": name, "status": status, "reason": message})
+                counts[status] += 1
+        return {
+            "action": action,
+            "requested": len(unique_ids),
+            "counts": counts,
+            "results": results,
+            "automatic": False,
+            "force": False,
+            "claim_boundary": "每個 repo 執行前重檢 clean worktree、只落後／只領先且無分歧；不符者跳過，永不 force。",
         }
 
     def _reference_by_id(self, repo_id: str) -> RepositoryReference:

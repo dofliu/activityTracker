@@ -884,3 +884,28 @@ details.trust-panel[open] summary { border-bottom: none; }
 }
 .palette-select:hover { background: var(--s2); }
 .palette-select option { background: var(--s1); color: var(--tx); }
+
+/* Repo 全覽與批次（ADR-011 Addendum B） */
+.repo-overview-toolbar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-content: flex-start; }
+.repo-overview-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 8px; }
+.repo-overview-filters .repo-overview-chip { padding: 3px 9px; border: 1px solid var(--bd); border-radius: 999px; background: var(--s2); color: var(--mu); font-family: "JetBrains Mono", monospace; font-size: 10px; cursor: pointer; }
+.repo-overview-filters .repo-overview-chip.is-active { border-color: var(--accent); color: var(--accent); background: rgba(237, 115, 35, 0.10); }
+.repo-overview-table { overflow-x: auto; border: 1px solid var(--bd); background: var(--s1); }
+.repo-overview-table:empty { display: none; }
+.repo-overview-table table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 11px; }
+.repo-overview-table th, .repo-overview-table td { padding: 6px 8px; border-bottom: 1px solid var(--bd); text-align: left; vertical-align: top; white-space: nowrap; }
+.repo-overview-table th { position: sticky; top: 0; background: var(--s2); color: var(--mu); font-family: "JetBrains Mono", monospace; font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase; }
+.repo-overview-table tbody tr { border-left: 3px solid var(--bd); }
+.repo-overview-table tr.state-synced td:first-child { border-left: 3px solid var(--success, #4b9c5c); }
+.repo-overview-table tr.state-ahead td:first-child, .repo-overview-table tr.state-behind td:first-child { border-left: 3px solid var(--warn, #bd871f); }
+.repo-overview-table tr.state-diverged td:first-child, .repo-overview-table tr.state-unavailable td:first-child { border-left: 3px solid var(--danger, #b64935); }
+.repo-overview-table td.repo-overview-name { font-weight: 700; color: var(--tx); max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.repo-overview-table td code { font-size: 10px; }
+.repo-overview-table .repo-sync-action { min-width: 0; padding: 2px 7px; font-size: 10px; }
+.repo-overview-table td.repo-overview-actions { white-space: nowrap; }
+.repo-overview-table .is-dirty { color: var(--warn, #bd871f); }
+.repo-overview-table .is-clean { color: var(--success, #4b9c5c); }
+@media (max-width: 720px) {
+  .repo-overview-toolbar { justify-content: flex-start; }
+}
+

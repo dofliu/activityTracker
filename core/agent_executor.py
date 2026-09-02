@@ -212,6 +212,18 @@ def _matching_repo(project_key: str, references: list[Any]):
     return matches[0] if len(matches) == 1 else None
 
 
+_REPO_SYNC_TYPES = {"repo_needs_pull", "repo_needs_push"}
+
+
+def _repo_id_from_subject(proposal: dict[str, Any]) -> str | None:
+    """Repo 同步提案以 ``repo:<repo_id>`` 指涉目標；只接受既有探索結果內的 id。"""
+    subject = str(proposal.get("subject_ref") or "")
+    if not subject.startswith("repo:"):
+        return None
+    repo_id = subject.split(":", 1)[1]
+    return repo_id if len(repo_id) == 16 and all(ch in "0123456789abcdef" for ch in repo_id) else None
+
+
 def derive_action(
     proposal: dict[str, Any],
     *,
@@ -220,6 +232,43 @@ def derive_action(
     """每個 proposal 對應至多一個 deterministic template；display 與 execute 共用。"""
     proposal_type = str(proposal.get("proposal_type") or "")
     project_key = str(proposal.get("project_key") or "")
+
+    if proposal_type in _REPO_SYNC_TYPES:
+        repo_id = _repo_id_from_subject(proposal)
+        try:
+            references = services.repo_references()
+        except Exception:  # noqa: BLE001 — 探索失敗視為不可執行
+            references = []
+        if repo_id is None or not any(ref.repo_id == repo_id for ref in references):
+            return None
+        if proposal_type == "repo_needs_pull":
+            # L1：只在 clean worktree、只落後且可 fast-forward 時才會真的執行，
+            # repo_sync.execute 會在 lock 內重檢；不符即 failed receipt，不 force。
+            return ActionPlan(
+                template_id="repo_pull_ff",
+                risk_level=RISK_L1,
+                label=f"本機 {project_key} fast-forward pull（clean 且只落後時才執行）",
+                call_description=f"repo_sync.execute({repo_id!r}, 'pull_ff_only')",
+                params={"repo_id": repo_id, "action": "pull_ff_only"},
+                timeout_seconds=180,
+                receipt_fields=("repo_name", "action", "status", "return_code"),
+                runner=lambda _ctx: _safe_repo_receipt(
+                    services.repo_execute(repo_id, "pull_ff_only")
+                ),
+            )
+        # repo_needs_push：push 留在同步中心逐一／批次確認，這裡只提供 fetch 讓判斷更新。
+        return ActionPlan(
+            template_id="repo_fetch",
+            risk_level=RISK_L1,
+            label=f"更新本機 {project_key} 的 remote-tracking（git fetch）；push 請到同步中心確認",
+            call_description=f"repo_sync.execute({repo_id!r}, 'fetch')",
+            params={"repo_id": repo_id, "action": "fetch"},
+            timeout_seconds=120,
+            receipt_fields=("repo_name", "action", "status", "return_code"),
+            runner=lambda _ctx: _safe_repo_receipt(
+                services.repo_execute(repo_id, "fetch")
+            ),
+        )
 
     if proposal_type in _PR_ISSUE_TYPES and project_key:
         try:

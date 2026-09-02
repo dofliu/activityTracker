@@ -55,7 +55,12 @@ watchers:
     scan_interval_seconds: 300
 repository_sync:
   # 本機 Git 同步中心與 git_watcher 共用這些明示設定的 repository roots。
-  # 不會自動 fetch / pull / commit / push；每項動作均由 Dashboard 個別確認。
+  # 沒有排程自動 fetch / pull / commit / push；單一動作由 Dashboard 個別確認，
+  # 批次 pull/push 需先列出符合條件的清單並確認（每個 repo 執行前仍重檢）。
+  batch:
+    # 批次 push 會發佈 commit，預設關閉；單一 repo 的 Push 不受影響。
+    allow_push: false
+    max_repositories: 50
   command_timeout_seconds: 30
   # 讀取 branch/worktree 的單一 repo 上限與有限並行度；逾時只隔離該 repo。
   status_timeout_seconds: 5

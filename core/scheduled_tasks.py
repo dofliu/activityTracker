@@ -172,6 +172,15 @@ def _run_status_draft(_params: dict[str, Any]) -> Callable[[dict[str, Any]], dic
     return _runner
 
 
+def _run_repo_sync_report(_params: dict[str, Any]) -> Callable[[dict[str, Any]], dict[str, Any]]:
+    def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
+        from core.repo_sync_report import build_repo_sync_report
+
+        return build_repo_sync_report()
+
+    return _runner
+
+
 SCHEDULABLE_TEMPLATES: dict[str, SchedulableTemplate] = {
     template.template_id: template
     for template in (
@@ -213,6 +222,20 @@ SCHEDULABLE_TEMPLATES: dict[str, SchedulableTemplate] = {
                 "llm_used", "output_path",
             ),
             timeout_seconds=600,
+        ),
+        SchedulableTemplate(
+            template_id="repo_sync_report",
+            risk_level=RISK_L0,
+            label="Repo 同步報告：掃描全部本機 repo 的 cached 同步狀態，產生報告與提案快照",
+            description="只讀 git status 與本機 remote-tracking ref，不連網、不改 worktree；快照讓小秘書提出需要 pull／push 的 repo（執行仍需批准）。",
+            params_schema={},
+            validate_params=_validate_no_params,
+            build_runner=_run_repo_sync_report,
+            receipt_fields=(
+                "repos_scanned", "needs_pull", "needs_push", "diverged", "dirty",
+                "no_upstream", "never_fetched", "output_path",
+            ),
+            timeout_seconds=300,
         ),
         SchedulableTemplate(
             template_id="status_snapshot_draft",

@@ -72,7 +72,24 @@ Dashboard「進行中工作 → 本機 Git 同步中心」（可折疊卡片，�
 - Pull 只允許 clean worktree 且可以 fast-forward；分歧、conflict、rebase／merge 中一律不提供 Pull。
 - Push 不提供 force push，且只在 clean worktree、沒有落後或分歧時啟用。
 - Commit 必須自行先在 Git/IDE stage 指定檔案並輸入 message；系統不會 `git add`，也不會提交 untracked 或未 staged 的檔案。
-- 不會自動排程 `fetch`、`pull`、`commit` 或 `push`。
+- 不會排程自動 `fetch`、`pull`、`commit` 或 `push`。
+
+#### 全覽與批次（2026-09-02，ADR-011 Addendum B）
+
+同步中心卡片下方的「全覽與批次」讓你一次看完**全部** repo，而不只是近期 10 個：
+
+- **📋 載入全覽**：表格列出每個 repo 的 branch → upstream、狀態（↑↓ 數字）、worktree、**上次 fetch 時間**（從未 fetch 會標「從未」）與逐一動作按鈕；篩選 chip 可切到「需 pull／需 push／分歧／worktree 未提交／無 upstream」。狀態一律是本機 cached 的遠端參照，所以「上次 fetch」欄就是這個判斷的時效。
+- **🔄 全部 Fetch**：對全部 repo 執行 `fetch --prune`，只更新遠端參照，不動任何 worktree；完成後表格會反映真正的落後／領先。
+- **⬇ 批次 Pull (FF only)**：先列出**目前符合條件**（clean、只落後、無分歧）的 repo 清單與被排除的原因，你確認這份清單後才逐一執行；執行當下不符的會跳過，永不 force。
+- **⬆ 批次 Push**：同樣的清單確認模式，但因為會發佈 commit，**預設關閉**（`repository_sync.batch.allow_push: true` 才啟用）；單一 repo 的 Push 不受影響。
+
+```powershell
+Invoke-RestMethod "http://127.0.0.1:8765/api/v1/repos/sync-status?scope=all"
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8765/api/v1/repos/sync-fetch-all" -ContentType "application/json" -Body '{"confirmation":"confirmed"}'
+Invoke-RestMethod "http://127.0.0.1:8765/api/v1/repos/sync-batch-plan?action=pull_ff_only"
+```
+
+**讓小秘書每天確認**：在「設定 → 小秘書執行器 → 排程任務」新增 `repo_sync_report`（L0 唯讀），它每天掃描全部 repo 的 cached 狀態、寫報告到 `reports/repo_sync/RepoSync_YYYYMMDD.md`，並留下快照讓小秘書在提案與晨報中列出「N 個 repo 需要 pull／push」。需要 pull 的 repo 會附「批准執行」（L1 `repo_pull_ff`，可在儀表板或 Telegram inline 批准；執行時仍重檢 clean 與可 fast-forward）；需要 push 的只提供 fetch，push 請回同步中心確認。報告不會 fetch，所以它反映的是上次 fetch 之後的認知——想要即時，先按「全部 Fetch」或批准 fetch 提案。
 
 同步中心卡片（在「進行中工作」分頁）下方是 **Repo Onboarding／對帳（P4.3）**：按「🔍 掃描對帳」列出三種尚未納管的情況，每種都提供一次一個 repository 的確認式動作：
 

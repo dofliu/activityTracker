@@ -40,3 +40,17 @@
    - `clone_repo`：clone 到使用者選定的設定 root 之下；目的地路徑已存在（含空目錄）一律拒絕，絕不覆寫；一律使用 https URL 且不夾帶 token（私有 repo 由使用者本機 credential manager 認證，失敗如實回報）。
    - `create_remote`：為無 remote 的 repo 建立 GitHub repo（**預設 private**）並 `remote add`；遠端保持空 repo，**永不代為 push**——首次發布由使用者自行 `git push -u`。
 3. 延續既有邊界：目標一律以 canonical-path hash id 引用（不接受瀏覽器傳入路徑）、單一目標 lock、argv 禁 shell、`GIT_TERMINAL_PROMPT=0`、輸出長度與 secret 遮蔽、永不 force。
+
+## 2026-09-02 Addendum B：全覽、批次與小秘書同步報告
+
+使用者要的是「一張表看到所有 repo 是否同步、需要 pull 還是 push，然後一一或批次處理，並讓小秘書每天幫忙確認」。原決策只提供近期 N 個 repo 的卡片與逐一動作，且明文拒絕「自動背景雙向同步」。這份 Addendum 在**不放寬任何單一動作前置條件**的前提下補齊全覽與批次，並把小秘書的參與限制在「唯讀報告＋批准式執行」：
+
+1. **全覽（唯讀）**：`GET /api/v1/repos/sync-status?scope=all` 回傳設定範圍內**全部** repo 的狀態（仍是 cached remote-tracking ref、不連網），每筆附 `last_fetch_at`（`FETCH_HEAD` 修改時間；從未 fetch 為 null）與 `summary` 計數，讓「需要 pull／push」的判斷附帶它所依據的時間點。
+2. **全部 Fetch**：`POST /api/v1/repos/sync-fetch-all` 對全部有 remote 的 repo 執行 `fetch --prune`。這是唯一允許「一鍵全部、不列清單」的動作，因為它只更新 remote-tracking refs，不改 worktree、本機 branch 或遠端；正在執行其他動作的 repo 跳過並如實列出。
+3. **批次 Pull／Push 採「清單確認」而非「全面執行」**：`GET /api/v1/repos/sync-batch-plan?action=…` 先列出**目前**符合該動作前置條件的 repo（與被排除者的原因）；使用者確認的是這份清單，`POST /api/v1/repos/sync-batch` 只接受清單內的 `repo_id`（`extra=forbid`、16 hex、單次上限 50）。執行為逐一（非並行），每個 repo 都走既有 `execute()` 的 lock 與前置條件重檢——執行當下不符者跳過，永不 force，也不會為了「讓批次成功」放寬條件。
+4. **批次 Push 有獨立開關 `repository_sync.batch.allow_push`，預設關閉**；關閉時 plan／execute 回 409，單一 repo 的手動 Push 不受影響。
+5. **小秘書只做報告與批准式執行**：新增 L0 排程 template `repo_sync_report`（`core/repo_sync_report.py`）——掃描全部 repo 的 cached 狀態、寫 markdown 報告與 JSON 快照（`reports/repo_sync/`），**不 fetch、不連網**；`build_action_proposals` 只讀新鮮快照（預設 36 小時內）產生 `repo_needs_pull`／`repo_needs_push`／`repo_diverged` 提案。`repo_needs_pull` 對應新的 **L1** template `repo_pull_ff`（批准後才執行，仍走 `execute()` 重檢），`repo_needs_push` 只提供 `repo_fetch`（push 留在同步中心確認），`repo_diverged` 不對應任何 Git 寫入。依 ADR-008，L1 永不可排程；「每天自動 pull」仍然不存在。
+6. 「無自動同步」的措辭調整為「**無排程自動同步**」：所有會改動 worktree 或遠端的動作仍需使用者在場確認，差別只在確認的粒度可以是一份清單。
+
+不變的邊界：repo 只從設定 root 探索、API 只認 `repo_id`、argv 禁 shell、`GIT_TERMINAL_PROMPT=0`、輸出長度與 secret 遮蔽、每 repo lock、永不 force、永不 `git add`、不處理 merge conflict／rebase。
+
