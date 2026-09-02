@@ -406,6 +406,22 @@ DeskRAG 支援結合本機知識庫（PDF、Word、PPTX、Excel、代碼/Markdow
 
 串流保證：知識庫檢索有 60 秒硬性逾時（逾時就不帶文件脈絡、照常回答並註明），且無論檢索或供應商發生什麼錯誤，後端一定送出結束事件；瀏覽器端另有 120 秒閒置逾時做安全網——介面不會停在「回覆中」不動。
 
+### 檢索 worker：索引不進主服務程序
+
+檢索（Chroma 向量查詢、BM25、query embedding）預設在**常駐子程序**執行（`python -m rag.retrieval_worker`，由主服務以 stdin/stdout JSON lines 驅動），主服務只持有一條 pipe，不載入任何索引：
+
+- **預熱**：服務啟動後若已有索引，會在背景把 BM25／Chroma／embedding 模型載進 worker，第一次提問不必等數十秒載入；沒有索引時不啟動任何子程序。知識庫區塊的「檢索 worker」卡片顯示狀態（尚未啟動／預熱中／就緒／失敗）、載入切片數、預熱耗時與 worker 記憶體；也可按「🔥 預熱檢索 worker」手動觸發，或按「💤 釋放記憶體」結束 worker（下次提問自動重啟）。
+- **卡住可救**：檢索超過 60 秒時終止 worker 而不是讓主服務的 thread 永遠卡住；下一次提問自動重新啟動，重啟次數與最近錯誤都在狀態卡片與 `GET /api/v1/rag/retrieval/status` 可見。
+- **設定**：`rag.retrieval.mode: worker | in_process`（預設 worker；`in_process` 為舊行為，在主服務內檢索）、`rag.retrieval.warmup_on_start: true | false`。
+
+```powershell
+Invoke-RestMethod "http://127.0.0.1:8765/api/v1/rag/retrieval/status"
+Invoke-RestMethod -Method Post "http://127.0.0.1:8765/api/v1/rag/retrieval/warmup"
+Invoke-RestMethod -Method Post "http://127.0.0.1:8765/api/v1/rag/retrieval/shutdown"
+```
+
+狀態卡片只描述 worker 程序狀態與載入計數，不代表檢索結果正確或索引完整；索引一致性仍以「驗證索引與空間」的 worker 收據為準。
+
 ### 查看 Proposal-only 主動秘書建議
 
 主頁 `SECRETARY SUGGESTIONS` 會從 Project State、actionable Open Loops 與 Extension diagnostics 顯示可追溯建議。每張卡片都附 `project_states:<id>`、`open_loops:<id>` 或 `extension_status:live` 等 evidence refs。

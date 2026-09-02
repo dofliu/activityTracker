@@ -20,6 +20,11 @@ from rag.jobs import (
     request_pause, update_job,
 )
 from rag.storage import storage_report
+from rag.retrieval.catalog import DEFAULT_STRATEGY, STRATEGY_CATALOG
+from rag.retrieval.context import citations_from_payload, format_context_prompt
+from rag.retrieval_client import (
+    RetrievalTimeoutError, retrieval_client, retrieval_mode,
+)
 
 RETRIEVAL_TIMEOUT_SECONDS = 60
 
@@ -340,11 +345,62 @@ def get_file_content(path: str):
 
 @router.get("/strategies")
 def list_strategies():
-    from rag.retrieval.registry import retriever_registry
+    # 靜態目錄：主服務不必為了下拉選單 import registry（那會在主程序建立 Chroma client）。
     return {
-        "default": retriever_registry.default_strategy,
-        "strategies": retriever_registry.list_strategies()
+        "default": DEFAULT_STRATEGY,
+        "strategies": list(STRATEGY_CATALOG),
     }
+
+
+@router.get("/retrieval/status")
+def retrieval_worker_status():
+    """常駐檢索 worker 的程序狀態與預熱收據（記憶體內狀態，不宣稱檢索正確性）。"""
+    return retrieval_client.status()
+
+
+@router.post("/retrieval/warmup")
+def retrieval_worker_warmup():
+    """在背景把索引載進檢索 worker；主服務不等待、也不載入任何索引。"""
+    if retrieval_mode() != "worker":
+        raise HTTPException(status_code=409, detail="目前為 in_process 檢索模式，沒有可預熱的 worker")
+    return retrieval_client.warmup_in_background(reason="dashboard")
+
+
+@router.post("/retrieval/shutdown")
+def retrieval_worker_shutdown():
+    """釋放檢索 worker 佔用的記憶體；下一次提問會自動重新啟動。"""
+    return retrieval_client.shutdown()
+
+
+def _retrieve_citations(query: str, req: "ChatRequest"):
+    """依設定把檢索送進常駐 worker（預設）或在本程序執行。
+
+    兩條路徑都回傳 CitationSource 清單；worker 路徑的逾時由 client 自己
+    處理（逾時即 kill 並在下次重啟），這裡把它轉成 asyncio.TimeoutError
+    讓上層沿用同一段降級邏輯。
+    """
+    if retrieval_mode() == "worker":
+        try:
+            payload = retrieval_client.retrieve(
+                query=query,
+                strategy=req.retrieval_strategy,
+                top_k=req.top_k,
+                alpha=req.hybrid_alpha,
+                score_threshold=req.score_threshold or 0.0,
+                timeout=RETRIEVAL_TIMEOUT_SECONDS,
+            )
+        except RetrievalTimeoutError as exc:
+            raise asyncio.TimeoutError(str(exc)) from exc
+        return citations_from_payload(payload)
+
+    from rag.retrieval.registry import retriever_registry
+    return retriever_registry.retrieve(
+        query=query,
+        strategy=req.retrieval_strategy,
+        top_k=req.top_k,
+        alpha=req.hybrid_alpha,
+        score_threshold=req.score_threshold or 0.0,
+    )
 
 
 @router.post("/chat")
@@ -368,25 +424,20 @@ async def chat_stream(req: ChatRequest):
         citations = []
         context_text = ""
         try:
-            # 先送一個 status，讓瀏覽器立刻收到位元組：大型索引的首次檢索
-            # 可能要載入 Chroma/BM25，沒有這個事件會被誤認為服務沒回應。
+            # 先送一個 status，讓瀏覽器立刻收到位元組：worker 尚未預熱時，
+            # 首次檢索仍要在子程序載入 Chroma/BM25，沒有這個事件會被誤認為沒回應。
             yield "event: status\ndata: {\"stage\": \"retrieving\"}\n\n"
 
             if req.enable_rag:
-                from rag.retrieval.registry import retriever_registry
+                # worker 模式由 client 在 RETRIEVAL_TIMEOUT_SECONDS 到時 kill 子程序並拋出，
+                # 外層多給幾秒寬限讓那個例外傳回來；in_process 模式外層就是唯一的守門。
+                grace = 5 if retrieval_mode() == "worker" else 0
                 try:
                     citations = await asyncio.wait_for(
-                        asyncio.to_thread(
-                            retriever_registry.retrieve,
-                            query=last_user_message,
-                            strategy=req.retrieval_strategy,
-                            top_k=req.top_k,
-                            alpha=req.hybrid_alpha,
-                            score_threshold=req.score_threshold or 0.0,
-                        ),
-                        timeout=RETRIEVAL_TIMEOUT_SECONDS,
+                        asyncio.to_thread(_retrieve_citations, last_user_message, req),
+                        timeout=RETRIEVAL_TIMEOUT_SECONDS + grace,
                     )
-                    context_text = retriever_registry.format_context_prompt(citations)
+                    context_text = format_context_prompt(citations)
                 except asyncio.TimeoutError:
                     logger.warning("RAG retrieval timed out after %ss", RETRIEVAL_TIMEOUT_SECONDS)
                     citations = []

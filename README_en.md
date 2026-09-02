@@ -145,7 +145,7 @@ It is purpose-built to answer three fundamental questions at any moment:
   * **Documents**: High-precision text extraction with page/slide/sheet metadata for PDF (PyMuPDF), Word (`.docx`), PowerPoint (`.pptx`), Excel (`.xlsx`), and source code/markdown text files.
   * **Project Activity Slices**: Maps local Project States and Open Loops into virtual chunks for unified semantic retrieval across work history and static documents.
 * **Sliding Window Hierarchical Chunker**: Preserves paragraph headers, page numbers, slide titles, and sheet names.
-* **Hybrid Retrieval Engine**: Combines FastEmbed (ONNX, 512-dim `BAAI/bge-small-zh-v1.5`) + ChromaDB vector embeddings with Jieba + BM25Okapi keyword matching using Reciprocal Rank Fusion (RRF), Weighted Fusion, Vector Only, and BM25 Only.
+* **Hybrid Retrieval Engine**: Combines FastEmbed (ONNX, 512-dim `BAAI/bge-small-zh-v1.5`) + ChromaDB vector embeddings with Jieba + BM25Okapi keyword matching using Reciprocal Rank Fusion (RRF), Weighted Fusion, Vector Only, and BM25 Only. Retrieval runs in a **resident worker subprocess** (the main service never loads Chroma/BM25/embedding models; warmed up in the background after start, killed and restarted on timeout).
 * **Multi-LLM SSE Streaming Chat**: Interactive chat with token-level SSE streams and citation source cards (with page/slide/sheet badges).
 * **Native Windows Explorer Reveal**: One-click opening and highlighting of cited source documents in Windows File Explorer.
 

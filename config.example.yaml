@@ -320,3 +320,10 @@ rag:
     throttle_ms: 25
     max_file_size_mb: 50
     vector_batch_size: 32
+  retrieval:
+    # worker（預設）：檢索在常駐子程序執行，主服務不載入 Chroma／BM25／embedding；
+    # 逾時即終止子程序、下次提問自動重啟。in_process：舊行為，在主服務內檢索。
+    mode: worker
+    # 啟動後若已有索引，就在背景把索引載進 worker，第一次提問不必等載入。
+    # 沒有索引時不會啟動任何子程序（避免空裝機觸發 embedding 模型下載）。
+    warmup_on_start: true

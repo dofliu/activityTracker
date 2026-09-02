@@ -1,6 +1,6 @@
 # 待辦事項與已知問題（Backlog）
 
-> 最後更新：2026-09-01。這頁是**唯一的待辦清單入口**；現況數據以
+> 最後更新：2026-09-02。這頁是**唯一的待辦清單入口**；現況數據以
 > [STATUS.yaml](../STATUS.yaml) 為準，接手路徑見 [NEXT_SESSION.md](NEXT_SESSION.md)。
 >
 > 每一項都標明**完成判準（收據）**——沒有收據就不算完成，這是本專案的一貫原則。
@@ -28,8 +28,9 @@
 | A3 | **Telegram 設定 + inline 批准** | 「設定 → Telegram 通知」走完設定流程 → 開「inline 批准」→ 按「🔓 解鎖遠端批准」→ 等晨報或傳 `/proposals` → 實批一次 L1 動作 | `GET /api/v1/secretary/executions` 出現一筆 `approved_via=telegram_inline` 的 receipt | 🟡 P1 |
 | A4 | **L2 執行器實機試用** | 開三個執行器開關 + `python main.py init --show-token`，實跑 draft →（可選）confirm → apply | 拿到 `agent_draft_plan` 的 succeeded receipt；若試 apply，確認改動留在 worktree 且未被 commit | 🟡 P1 |
 | A5 | **P4.3 對帳實操** | 「進行中工作 → 本機 Git 同步中心 → 🔍 掃描對帳」，各實跑一種動作（init／attach／clone） | 三類分類符合預期；確認「目的地已存在」「已有 remote」等拒絕條件如實擋下 | 🟡 P1 |
+| A6 | **檢索 worker 大索引實測** | pull 最新版後啟動服務，等知識庫區塊「檢索 worker」卡片變「就緒」，再問一題 | `GET /api/v1/rag/retrieval/status` 回 `state: ready`、`warmup.bm25_chunks`／`vector_chunks` 與實際索引一致；第一次提問不再卡數十秒；主服務程序 RSS 維持百 MB 級（可與 STATUS `main_process_memory_mb_after_lazy_rag_start` 比對）。若預熱失敗，`last_error` 會說明原因——回報即可 | 🟡 P1 |
 
-> A1 是唯一還在擋 `release_ready` 的**能力型**缺口；A2 是本次修復後的回歸確認。
+> A1 是唯一還在擋 `release_ready` 的**能力型**缺口；A2、A6 是修復／重構後的回歸確認（A6 對應原 B1「首次檢索在主程序載入」，程式面已於 2026-09-02 完成，剩實機收據）。
 
 ---
 
@@ -37,11 +38,9 @@
 
 | # | 項目 | 現況與影響 | 建議處理 | 優先 |
 | :-- | :--- | :--- | :--- | :--- |
-| B1 | **大型 RAG 索引首次檢索在主程序載入** | 索引達 475k chunks（4.4GB Chroma + 559MB BM25）時，首次查詢要在主服務內載入索引，可能數十秒。已加 60 秒逾時與 `status` 事件避免介面假死，但**根因未解** | 依 [ADR-009](ADR-009-deskrag-worker-index-lifecycle.md) 精神，把檢索也移到常駐 worker，或在服務啟動後背景預熱 | 🟡 P1 |
-| B2 | **容器環境 1 項測試失敗** | `test_open_command_is_argv_not_shell_string` 在 Linux 容器缺 `xdg-open` 而失敗；**Windows 實機會過**。這是環境限制不是程式錯誤 | 可考慮讓該測試在缺 `xdg-open` 時 skip 並標註原因，讓 CI 訊號更乾淨 | ⚪ P2 |
-| B3 | **337 筆 legacy AI rows 無 `response_status`** | 早期資料缺 provenance 欄位，只保留為歷史，不進入 canonical synthesis/handoff 結論 | 維持現狀（不回填假資料）；如需清理只能標記不可用，不得推測 | ⚪ P2 |
-| B4 | **Extension 覆蓋邊界** | 2026-08-31 的 live PASS 只涵蓋 ChatGPT ＋ Claude.ai；**Gemini 未在該輪驗證**，且單輪 PASS 不等於連續／全天 capture coverage | 需要時對 Gemini 補一輪 `scripts/extension_live_acceptance.py` | ⚪ P2 |
-| B5 | **PyPI 發佈不在範圍** | 目前只發 GitHub pre-release（wheel/sdist + SHA-256 receipt） | 待 stable release 條件齊備後再評估 | ⚪ P2 |
+| B1 | **337 筆 legacy AI rows 無 `response_status`** | 早期資料缺 provenance 欄位，只保留為歷史，不進入 canonical synthesis/handoff 結論 | 維持現狀（不回填假資料）；如需清理只能標記不可用，不得推測 | ⚪ P2 |
+| B2 | **Extension 覆蓋邊界** | 2026-08-31 的 live PASS 只涵蓋 ChatGPT ＋ Claude.ai；**Gemini 未在該輪驗證**，且單輪 PASS 不等於連續／全天 capture coverage | 需要時對 Gemini 補一輪 `scripts/extension_live_acceptance.py` | ⚪ P2 |
+| B3 | **PyPI 發佈不在範圍** | 目前只發 GitHub pre-release（wheel/sdist + SHA-256 receipt） | 待 stable release 條件齊備後再評估 | ⚪ P2 |
 
 ---
 

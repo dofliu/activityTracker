@@ -148,6 +148,14 @@
                <button class="btn btn-ghost btn-sm" id="btn-rag-verify-index" style="width:100%; margin-top:-4px; margin-bottom:8px;">✓ 驗證索引與空間</button>
                <button class="btn btn-ghost btn-sm" id="btn-rag-rebuild-bm25" style="width:100%; margin-top:-4px; margin-bottom:8px;">↻ 從 Chroma 重建 BM25</button>
 
+               <div id="rag-retrieval-card" class="rag-storage-card mb-8" title="檢索在常駐子程序執行；主服務不載入 Chroma／BM25。狀態為程序內即時狀態。">
+                 <div class="mono-mini muted">檢索 worker 狀態載入中…</div>
+               </div>
+               <div style="display:flex; gap:6px; margin-top:-4px; margin-bottom:8px;">
+                 <button class="btn btn-ghost btn-sm" id="btn-rag-retrieval-warmup" style="flex:1;">🔥 預熱檢索 worker</button>
+                 <button class="btn btn-ghost btn-sm" id="btn-rag-retrieval-release" style="flex:1;">💤 釋放記憶體</button>
+               </div>
+
                <div id="rag-folders-list" class="taglist" style="max-height: 180px; overflow-y: auto;">
                 <div class="placeholder">載入知識庫目錄…</div>
                </div>

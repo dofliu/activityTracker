@@ -164,6 +164,7 @@ def test_retrieval_timeout_degrades_but_still_answers(monkeypatch):
     import rag.router as router_module
 
     monkeypatch.setattr(router_module, "RETRIEVAL_TIMEOUT_SECONDS", 0.05)
+    monkeypatch.setattr(router_module, "retrieval_mode", lambda: "in_process")
 
     class _StuckRegistry:
         def retrieve(self, **kwargs):
@@ -204,7 +205,9 @@ def test_retrieval_failure_does_not_abort_the_answer(monkeypatch):
             return ""
 
     import rag.retrieval.registry as registry_module
+    import rag.router as router_module
 
+    monkeypatch.setattr(router_module, "retrieval_mode", lambda: "in_process")
     monkeypatch.setattr(registry_module, "retriever_registry", _BrokenRegistry())
 
     async def ok_stream(**kwargs):
