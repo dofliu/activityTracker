@@ -124,6 +124,15 @@ def run_web_and_services(autostart_monitoring: bool = True):
     if autostart_monitoring:
         manager.start_all()
 
+    # 檢索 worker 預熱：有索引時在背景把 Chroma/BM25/embedding 載進子程序，
+    # 主服務不等待也不載入任何索引；沒有索引或設定關閉時只記錄略過原因。
+    try:
+        from rag.retrieval_client import maybe_warmup_on_start
+        warmup_state = maybe_warmup_on_start()
+        logger.info("RAG retrieval worker warm-up: %s (%s)", warmup_state["warmup"], warmup_state["reason"])
+    except Exception as e:  # noqa: BLE001 — 預熱失敗不能擋住服務啟動
+        logger.warning(f"RAG retrieval worker warm-up skipped: {e}")
+
     host = cfg.get("server.host", "127.0.0.1")
     port = cfg.get("server.port", 8765)
 
@@ -138,6 +147,11 @@ def run_web_and_services(autostart_monitoring: bool = True):
         logger.info("\nStopping services...")
     finally:
         manager.stop_all()
+        try:
+            from rag.retrieval_client import retrieval_client
+            retrieval_client.shutdown()
+        except Exception:  # noqa: BLE001 — 收尾時的清理失敗不影響退出
+            pass
         release_instance_lock()
         logger.info("OmniContext stopped.")
 

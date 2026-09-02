@@ -1,3 +1,8 @@
+import shutil
+import sys
+
+import pytest
+
 from core.manager import derive_monitoring_state, window_probe_is_degraded
 from core.platform_services import build_clipboard_command, build_open_command
 from core.project_engine import clean_open_loop_title, open_loop_fingerprint
@@ -11,6 +16,10 @@ def test_open_loop_fingerprint_normalizes_equivalent_titles():
     assert clean_open_loop_title("  Implement   checkpoint  ") == "Implement checkpoint"
 
 
+@pytest.mark.skipif(
+    sys.platform not in ("win32", "darwin") and shutil.which("xdg-open") is None,
+    reason="此環境沒有 xdg-open（常見於 Linux 容器／CI）；Windows 與 macOS 實機不受影響",
+)
 def test_open_command_is_argv_not_shell_string(tmp_path):
     command = build_open_command(str(tmp_path), "explorer")
     assert isinstance(command, list)

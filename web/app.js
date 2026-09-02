@@ -3529,6 +3529,30 @@ function initRAGTab() {
     });
   }
 
+  const warmupRetrievalBtn = $("btn-rag-retrieval-warmup");
+  if (warmupRetrievalBtn) {
+    warmupRetrievalBtn.addEventListener("click", async () => {
+      try {
+        await postJSON("/api/v1/rag/retrieval/warmup", {});
+        startRAGRetrievalPolling();
+      } catch (e) {
+        alert("無法啟動檢索 worker 預熱: " + e.message);
+      }
+    });
+  }
+
+  const releaseRetrievalBtn = $("btn-rag-retrieval-release");
+  if (releaseRetrievalBtn) {
+    releaseRetrievalBtn.addEventListener("click", async () => {
+      try {
+        await postJSON("/api/v1/rag/retrieval/shutdown", {});
+        await refreshRAGRetrieval();
+      } catch (e) {
+        alert("無法釋放檢索 worker: " + e.message);
+      }
+    });
+  }
+
   // 搜尋檔案
   const fileSearchInput = $("input-rag-file-search");
   if (fileSearchInput) {
@@ -3755,6 +3779,64 @@ async function refreshRAGStorage() {
   }
 }
 
+let ragRetrievalPollTimer = null;
+
+function describeRAGRetrieval(data) {
+  const mode = data.mode === "in_process" ? "in_process（在主服務內檢索）" : "常駐 worker";
+  const stateMap = {
+    cold: "尚未啟動（第一次提問時才載入索引）",
+    starting: "啟動中…",
+    loading: "已啟動，尚未預熱",
+    warming: "預熱中：正在載入 BM25／Chroma／embedding…",
+    ready: "就緒",
+    failed: "失敗",
+  };
+  const lines = [`<span>模式 ${mode}</span><span>狀態 ${stateMap[data.state] || data.state}</span>`];
+  if (data.warmup) {
+    const w = data.warmup;
+    const d = w.durations || {};
+    lines.push(`<span>BM25 ${Number(w.bm25_chunks || 0).toLocaleString()} 切片</span><span>向量 ${Number(w.vector_chunks || 0).toLocaleString()}</span>`);
+    lines.push(`<span>預熱耗時 ${d.total_ms !== undefined ? `${(d.total_ms / 1000).toFixed(1)} s` : "—"}</span><span>worker 記憶體 ${w.worker_rss_mb !== null && w.worker_rss_mb !== undefined ? `${w.worker_rss_mb} MB` : "—"}</span>`);
+    if (w.embedding_ready === false) lines.push(`<span style="grid-column: 1 / -1;">embedding 模型未就緒：${w.embedding_error || "未知原因"}</span>`);
+  }
+  if (data.requests_served) {
+    lines.push(`<span>已服務 ${data.requests_served} 次</span><span>最近檢索 ${data.last_retrieval_ms !== null && data.last_retrieval_ms !== undefined ? `${data.last_retrieval_ms} ms` : "—"}</span>`);
+  }
+  let alert = "";
+  if (data.state === "failed" && data.last_error) alert = `最近錯誤：${data.last_error}`;
+  else if (data.mode === "worker" && data.state === "cold" && !data.index_present) alert = "尚無索引，不需預熱。";
+  else if (data.mode === "worker" && data.state === "cold" && data.restarts) alert = `worker 曾重啟 ${data.restarts} 次；${data.last_error || ""}`;
+  return `<div class="rag-storage-grid">${lines.join("")}</div>${alert ? `<div class="rag-storage-alert">${alert}</div>` : ""}`;
+}
+
+async function refreshRAGRetrieval() {
+  const card = $("rag-retrieval-card");
+  if (!card) return null;
+  try {
+    const data = await getJSON("/api/v1/rag/retrieval/status");
+    card.innerHTML = describeRAGRetrieval(data);
+    const warmBtn = $("btn-rag-retrieval-warmup");
+    const releaseBtn = $("btn-rag-retrieval-release");
+    if (warmBtn) warmBtn.disabled = data.mode !== "worker" || data.state === "warming" || data.state === "ready";
+    if (releaseBtn) releaseBtn.disabled = data.mode !== "worker" || !data.pid;
+    return data;
+  } catch (e) {
+    card.textContent = "檢索 worker 狀態暫時無法取得。";
+    return null;
+  }
+}
+
+function startRAGRetrievalPolling() {
+  if (ragRetrievalPollTimer) clearInterval(ragRetrievalPollTimer);
+  ragRetrievalPollTimer = setInterval(async () => {
+    const data = await refreshRAGRetrieval();
+    if (!data || !["starting", "warming", "loading"].includes(data.state)) {
+      clearInterval(ragRetrievalPollTimer);
+      ragRetrievalPollTimer = null;
+    }
+  }, 2000);
+}
+
 async function pollRAGProgress() {
   const data = await getJSON("/api/v1/rag/progress");
   const isActive = renderRAGJob(data);
@@ -3779,6 +3861,9 @@ async function loadRAGProgress() {
     const active = renderRAGJob(data);
     if (active) startRAGProgressPolling();
     refreshRAGStorage();
+    refreshRAGRetrieval().then((retrieval) => {
+      if (retrieval && ["starting", "warming", "loading"].includes(retrieval.state)) startRAGRetrievalPolling();
+    });
   } catch (e) {}
 }
 

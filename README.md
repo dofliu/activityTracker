@@ -156,7 +156,7 @@
 * **混合檢索引掣（Hybrid Retrieval Engine）**：
   * **語意向量**：採用 FastEmbed（ONNX 本地極速推論，512 維度 `BAAI/bge-small-zh-v1.5`）+ 本地 ChromaDB 向量庫。
   * **關鍵字匹配**：採用 Jieba 繁簡中文分詞 + BM25Okapi 演算法與 Pickle 持久化。
-  * **融合演算法**：支援 **Hybrid RRF（倒數排名融合）**、**Weighted Fusion（線性加權融合）**、**Vector Only** 與 **BM25 Only**，檢索異步化不阻塞服務。
+  * **融合演算法**：支援 **Hybrid RRF（倒數排名融合）**、**Weighted Fusion（線性加權融合）**、**Vector Only** 與 **BM25 Only**，檢索在**常駐 retrieval worker 子程序**執行（主服務不載入 Chroma／BM25／embedding；啟動後背景預熱、逾時即終止並自動重啟），不阻塞服務。
 * **多模型問答與 SSE 串流**：提供 SSE 逐字串流輸出與來源引文卡片。
 * **Windows 原生檔案總管喚起**：引文卡片點擊「📂 在總管開啟」即可在 Windows 檔案總管精準定位並選中該檔案。
 * **受控索引生命週期**：每次可設定檔案上限與間隔，支援暫停、恢復、取消；「移除資料夾索引」與「清空所有 RAG 索引」都必須明確確認，且不會刪除來源檔案或 RAG 對話。
