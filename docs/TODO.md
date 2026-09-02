@@ -1,6 +1,6 @@
 # 待辦事項與已知問題（Backlog）
 
-> 最後更新：2026-09-01。這頁是**唯一的待辦清單入口**；現況數據以
+> 最後更新：2026-09-02。這頁是**唯一的待辦清單入口**；現況數據以
 > [STATUS.yaml](../STATUS.yaml) 為準，接手路徑見 [NEXT_SESSION.md](NEXT_SESSION.md)。
 >
 > 每一項都標明**完成判準（收據）**——沒有收據就不算完成，這是本專案的一貫原則。
@@ -14,6 +14,17 @@
 | 🟡 P1 | 影響日常使用品質，應優先於新功能 |
 | ⚪ P2 | 有價值但可延後；依需求決定 |
 | 👤 | **需要使用者在 Windows 實機操作**，不是程式工作 |
+
+---
+
+## 0. 進行中：等待併入 main
+
+| # | 項目 | 現況 | 完成判準（收據） | 優先 |
+| :-- | :--- | :--- | :--- | :--- |
+| O1 | **CI 加 `pull_request` trigger** | `claude/this-has-error-kn9w42` 的 `63ce028` 比 main 多這一個 commit，**尚未開 PR、尚未併入**。在它進 main 之前，新開的 PR 一樣沒有任何 CI | `main` 的 `platform-matrix.yml` 含 `pull_request: branches: [main]`，且**下一個 PR 的檢查欄真的出現六個 job** | 🟡 P1 |
+
+> 這一項有雞生蛋問題：workflow 的改動要先進 main 才會對後續 PR 生效，所以替它開的那個 PR 自己不會跑 CI。
+> 若要在合併前驗證，用 `workflow_dispatch` 對該分支手動觸發一次（本次修復即是這樣拿到六綠收據的）。
 
 ---
 
@@ -38,7 +49,7 @@
 | # | 項目 | 現況與影響 | 建議處理 | 優先 |
 | :-- | :--- | :--- | :--- | :--- |
 | B1 | **大型 RAG 索引首次檢索在主程序載入** | 索引達 475k chunks（4.4GB Chroma + 559MB BM25）時，首次查詢要在主服務內載入索引，可能數十秒。已加 60 秒逾時與 `status` 事件避免介面假死，但**根因未解** | 依 [ADR-009](ADR-009-deskrag-worker-index-lifecycle.md) 精神，把檢索也移到常駐 worker，或在服務啟動後背景預熱 | 🟡 P1 |
-| B2 | **容器環境 1 項測試失敗** | `test_open_command_is_argv_not_shell_string` 在 Linux 容器缺 `xdg-open` 而失敗；**Windows 實機會過**。這是環境限制不是程式錯誤 | 可考慮讓該測試在缺 `xdg-open` 時 skip 並標註原因，讓 CI 訊號更乾淨 | ⚪ P2 |
+| B2 | **容器環境 1 項測試失敗** | `test_open_command_is_argv_not_shell_string` 在 Linux 容器缺 `xdg-open` 而失敗；**Windows 實機與 GitHub Actions 的 ubuntu runner 都會過**。這是開發容器的環境限制不是程式錯誤。另注意：系統 pip 讓 `jieba` 建置失敗時若改手動裝部分依賴，會再多出 collector／RAG 相關失敗，同樣是缺套件 | 可考慮讓該測試在缺 `xdg-open` 時 skip 並標註原因，讓本機訊號更乾淨 | ⚪ P2 |
 | B3 | **337 筆 legacy AI rows 無 `response_status`** | 早期資料缺 provenance 欄位，只保留為歷史，不進入 canonical synthesis/handoff 結論 | 維持現狀（不回填假資料）；如需清理只能標記不可用，不得推測 | ⚪ P2 |
 | B4 | **Extension 覆蓋邊界** | 2026-08-31 的 live PASS 只涵蓋 ChatGPT ＋ Claude.ai；**Gemini 未在該輪驗證**，且單輪 PASS 不等於連續／全天 capture coverage | 需要時對 Gemini 補一輪 `scripts/extension_live_acceptance.py` | ⚪ P2 |
 | B5 | **PyPI 發佈不在範圍** | 目前只發 GitHub pre-release（wheel/sdist + SHA-256 receipt） | 待 stable release 條件齊備後再評估 | ⚪ P2 |

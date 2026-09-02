@@ -473,6 +473,8 @@ proactive_secretary:
 
 L2 每次執行都是**三道門**：execution token → 單鍵批准 → 回填 server 產生的一次性 6 碼確認碼（5 分鐘失效、錯一次即作廢）；同一動作有冷卻時間避免連點。子行程以 argv 白名單啟動（禁 shell）、工作目錄限定該專案的本機 repo、環境變數重建為位置類 allowlist——**你的任何 API key 都不會傳給子行程**（CLI 用它自己家目錄的登入憑證）。注意：這會消耗你 Claude Code／Codex 的訂閱或 API 額度；執行中的 job 可由 executions 面板取消（會真正終止行程）。
 
+> **中文輸出與 Windows 編碼**（2026-09-01 起）：計畫是用繁體中文起草的，而 Windows 的 Python 子行程預設會用 ANSI code page（cp1252／cp950）寫 pipe——這會讓 agent CLI 一輸出中文就 `UnicodeEncodeError`、以 exit 1 收場，receipt 誠實記成 `failed` 但原因與動作無關。現在 dispatcher 會強制子行程以 UTF-8 輸出（`PYTHONUTF8=1`／`PYTHONIOENCODING=utf-8`），與父行程的解碼一致，**你不需要為此調整系統地區設定或 code page**。若你在**這個版本之前**看過 L2 receipt 無故 `failed`，值得重試一次。
+
 **L2 寫入模式（agent 實際代辦；第三開關 `l2.allow_write`，預設關閉）**：採**兩段式批准**——先用「起草計畫」產出一份你讀得到的計畫檔，24 小時內同一專案的建議卡才會出現「依已批准計畫實際修改檔案」按鈕；執行時把**那份計畫全文**餵給 CLI（Claude Code 以 `--permission-mode acceptEdits` 授權檔案編輯）。dispatch 前 repo worktree 必須乾淨（保護你未提交的工作），agent **永不 commit／push**——改動以未提交變更留在 worktree，回應會列出改了哪些檔案，`git diff` 檢視、滿意再自己 commit，`git checkout .` 可整批還原。receipt 只記檔案數與輸出摘要。
 
 **P5-R5 自訂排程任務（選用，預設關閉）**：讓小秘書按時自動執行**唯讀白名單動作**。可排程的 template 只有四個，全部 L0（L1/L2 需要人在場批准，永遠不可排程）：
@@ -601,13 +603,13 @@ python main.py restore-drill `
 
 備份預設位於 `~/OmniContext/backups`。`restore-drill` 會以 read-only 方式開啟來源備份、還原到 OS 暫存目錄，比對 integrity、table list、schema fingerprint 與 row counts，最後刪除暫存 DB，只保存不含 row content 的 JSON receipt。它不提供 live database destination，因此不會覆蓋正式資料。
 
-Windows isolated wheel fresh/upgrade/assets smoke 與 formal package+DB rollback rehearsal 已通過。Rollback 必須同時回復相容 wheel 與 pre-migration online backup，且在服務停止後處理 `.db-wal/.db-shm`；只覆蓋 `.db` 可能讓新 WAL 重新套回。Windows／Ubuntu／macOS × Python 3.10／3.12 CI matrix 已於 run `32757498004` 通過；自動 retention pruning 仍屬 release gate。
+Windows isolated wheel fresh/upgrade/assets smoke 與 formal package+DB rollback rehearsal 已通過。Rollback 必須同時回復相容 wheel 與 pre-migration online backup，且在服務停止後處理 `.db-wal/.db-shm`；只覆蓋 `.db` 可能讓新 WAL 重新套回。Windows／Ubuntu／macOS × Python 3.10／3.12 CI matrix 最新一次全綠為 2026-09-01 main 的 run [`33566553321`](https://github.com/dofliu/activityTracker/actions/runs/33566553321)（六個 job）；自動 retention pruning 仍屬 release gate。
 
 ## 7. 平台能力
 
 | 功能 | Windows | macOS / Linux |
 |---|---|---|
-| FastAPI、SQLite、CLI log ingestion | source + wheel isolated smoke 已實測 | Ubuntu／macOS wheel build、install 與 API/assets smoke 已由 CI run `32757498004` 實測 |
+| FastAPI、SQLite、CLI log ingestion | source + wheel isolated smoke 已實測 | Ubuntu／macOS wheel build、install 與 API/assets smoke 已由 CI run [`33566553321`](https://github.com/dofliu/activityTracker/actions/runs/33566553321)（2026-09-01，3 OS × 2 Python 六個 job 全綠）實測 |
 | Browser Extension | Chrome/Edge Alpha | Chromium 理論可用，待實機 |
 | Window foreground collector | 支援 | 明確降級，不宣稱可用 |
 | Desktop notification | WinRT Toast／MessageBox fallback | 明確降級，待平台實作 |

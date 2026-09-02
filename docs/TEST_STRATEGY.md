@@ -149,7 +149,11 @@ python main.py extension-path
 
 ## Platform CI Matrix
 
-`.github/workflows/platform-matrix.yml` 在 Windows、Ubuntu、macOS 的 Python 3.10/3.12 執行 pytest、compileall、Extension JS syntax、build、artifact privacy/content 與 installed writable-home/API/assets smoke。2026-08-25 GitHub Actions run `32757498004` 的六個 jobs 全數通過；未來 commit 仍須以各自 run receipt 判定，不沿用本次結果。
+`.github/workflows/platform-matrix.yml` 在 Windows、Ubuntu、macOS 的 Python 3.10/3.12 執行 pytest、compileall、Extension JS syntax、build、artifact privacy/content 與 installed writable-home/API/assets smoke。最新收據:2026-09-01 main(`5f3e285`)的 run [`33566553321`](https://github.com/dofliu/activityTracker/actions/runs/33566553321) 六個 jobs 全數通過;未來 commit 仍須以各自 run receipt 判定,不沿用本次結果。
+
+**觸發時機**:`push` 限 `main`、`pull_request` 限 base 為 `main`(2026-09-02 新增,尚未併入 main——在它併入前 PR 沒有 CI,見 [TODO.md](TODO.md) §0)、以及手動 `workflow_dispatch`。push 只綁 main 是刻意的:PR 的每個 head commit 因此只會有一次 run,不會 push 與 pull_request 各跑一次。要在合併前驗證某個分支,用 `workflow_dispatch` 指定該 ref 手動觸發。
+
+**這個矩陣抓得到什麼**:2026-09-01 的 Windows 紅燈是唯一一次由矩陣獨家攔下的缺陷——`core/agent_dispatch.py` 沒有規定子行程的輸出編碼,Windows 的 Python 沿用 cp1252,agent CLI 輸出中文即 `UnicodeEncodeError`,三個 L2 測試在兩個 windows leg 上失敗而 ubuntu/macOS 全綠。教訓:**跨平台差異只有跨平台矩陣抓得到,而矩陣只在它會被觸發時才有用**——當時它不在 PR 上跑,所以缺陷是先進 main 才被發現的,main 連紅五次(run #44–#48)。回歸測試 `test_subprocess_child_emits_utf8_even_under_a_legacy_ansi_locale` 把這個特定失敗降級為任何平台都跑得到的單元測試(以繼承的 `PYTHONIOENCODING=cp1252` 重現),不必再倚賴 Windows runner 才發現。
 
 2026-08-26 本機完整 `pytest` 為 **88/88**。Collector runtime diagnostics、Extension timestamped Content Ready、response counts、fail-closed live verifier 與 config-driven project-path contracts 均通過。localhost Claude.ai run 可建立 baseline 並正確維持 RUNNING：歷史 `10 events / 6 responses`、今日 0、heartbeat 0 不會升格為 PASS；487px Monitor 無頁面水平 overflow且 console 無錯誤。這證明 verifier 與 UI 行為，不代表 Extension 已在使用者 Chrome 連線，也不代表全天 continuous coverage。
 

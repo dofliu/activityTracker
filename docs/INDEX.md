@@ -1,6 +1,6 @@
 # 📚 OmniContext 文件總覽（Documentation Index）
 
-> 最後整理：2026-09-01。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
+> 最後整理：2026-09-02。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
 
 ## 我該從哪裡開始？
 
@@ -77,5 +77,5 @@
 | [NEXT_SESSION.md](NEXT_SESSION.md) | 下一個開發 session 的接手指南（現況、待辦、環境備忘） |
 | [../promo/](../promo/) | 3 分鐘介紹影片的 18 個場景源檔、分鏡表與渲染腳本（可單景重渲） |
 | [assets/](assets/) | 文件用圖片（架構與 roadmap 卡片等） |
-| `../tests/` | 44 個 contract test 模組（261 項）；執行 `python -m pytest tests/ -v` |
+| `../tests/` | 44 個 contract test 模組（262 項）；執行 `python -m pytest tests/ -v` |
 | `../scripts/` | 驗證、清理、autostart 與 E2E 腳本 |

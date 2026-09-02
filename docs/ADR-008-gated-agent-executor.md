@@ -42,7 +42,8 @@ ADR-007 Addendum 記錄了第一次 executor 嘗試被 revert 的三個漏洞：
   - `L0` `generate_checkpoint(hours)` — 重用 checkpoint pipeline
   - `L1` `repo_fetch(repo_id)`、`repo_pull_ff(repo_id)` — 重用 ADR-011 `core/repo_sync.py` 既有安全動作與其全部前置檢查
   - `L1` `open_loop_transition(loop_id, status, note)` — 重用既有 lifecycle API
-- 需要 subprocess 的 template（調度 Claude Code／Codex CLI 等）屬 P5-R3：一律 `asyncio.create_subprocess_exec(argv_list)`，**禁止 shell**；cwd 限制在白名單 roots；環境變數以 allowlist 重建（不繼承使用者 secrets）；stdout/stderr 截斷保存摘要。
+- 需要 subprocess 的 template（調度 Claude Code／Codex CLI 等）屬 P5-R3：一律 `asyncio.create_subprocess_exec(argv_list)`，**禁止 shell**；cwd 限制在白名單 roots；環境變數以 allowlist 重建（不繼承使用者 secrets）；子行程輸出編碼強制為 UTF-8（見下）；stdout/stderr 截斷保存摘要。
+- **編碼契約（2026-09-01 補訂）**：父行程固定以 UTF-8 解碼子行程的 stdout/stderr，因此 `build_subprocess_env()` 在 allowlist 之上**強制覆寫** `PYTHONUTF8=1` 與 `PYTHONIOENCODING=utf-8`。這是覆寫而非預設值——既然解碼端固定，繼承來的任何其他值都是錯的。不設這兩個變數時，Windows 的 Python 子行程會沿用 ANSI code page（cp1252／cp950），agent CLI 輸出中文即 `UnicodeEncodeError` 並以 exit 1 收場，receipt 會誠實記成 `failed`，但失敗原因與動作本身無關。這兩個變數只選擇編碼、不攜帶任何機密，因此 allowlist 的信任邊界不變。
 
 ### D3. 三級授權閘門（每級都是實際不同的檢查，非標籤）
 
@@ -114,6 +115,7 @@ repo 檔案**的 template `agent_apply_plan`，安全契約在 D1–D6 之上再
 4. `verify_authorization` 對 L0/L1/L2 有不同行為的 contract tests。
 5. ADR-007 的 proposal-only tests 更新為「executor 關閉時行為不變」，不得留在 failing 狀態。
 6. 所有 job 產生可回查 receipt；timeout、cancel、rejected 均可觀察。
+7. 子行程輸出編碼與父行程解碼一致（強制 UTF-8），且有在繼承 legacy ANSI locale 時仍能取回非 ASCII 輸出的 contract test——否則跨平台會出現「動作本身沒問題、只是輸出編不出來」的假失敗。
 
 ## Consequences
 

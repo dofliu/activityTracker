@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **目前狀態：Personal Alpha（v1.3.0a5 已發佈為 GitHub pre-release）。** Windows milestone WinRT Toast E2E、schema 16/16、formal package+DB rollback、P3-2～P3-5、collector runtime diagnostics、P2.6 continuous coverage ledger 與跨平台 CI 已通過；Extension 1.3.1 已於 2026-08-31 取得 ChatGPT＋Claude.ai live PASS receipt，P2.7 三平台背景任務 live 驗收亦全數 PASS。**秘書已依 [ADR-008](docs/ADR-008-gated-agent-executor.md) 完成 P5-R1～R5 全階段**（LLM 註解、L0/L1 白名單代辦、L2 調度本機 agent CLI 起草／依批准計畫改檔、Telegram inline 批准與晚間交接、L0 唯讀自訂排程任務含週/月報 rollup 與 STATUS 草稿，全部預設關閉），並有秘書晨報（P5-R4a）、兩層增量摘要與小秘書首頁 UI。P4.3 Repo Onboarding／對帳（init／連結 remote／clone／建立 GitHub repo 的單一目標確認式流程）已實作；儀表板已完成資訊架構重整（6 分頁分主次、少用設定收合）與可選配色主題（火影橘／森林綠／海洋藍 × 深淺）。目前 44 個 contract test 模組共 261 項。剩餘缺口:全天 coverage ledger 實測與各功能的使用者實機 live 收據（release_ready 仍為 false）；完整待辦見 [docs/TODO.md](docs/TODO.md)。
+> **目前狀態：Personal Alpha（v1.3.0a5 已發佈為 GitHub pre-release）。** Windows milestone WinRT Toast E2E、schema 16/16、formal package+DB rollback、P3-2～P3-5、collector runtime diagnostics、P2.6 continuous coverage ledger 與跨平台 CI 已通過；Extension 1.3.1 已於 2026-08-31 取得 ChatGPT＋Claude.ai live PASS receipt，P2.7 三平台背景任務 live 驗收亦全數 PASS。**秘書已依 [ADR-008](docs/ADR-008-gated-agent-executor.md) 完成 P5-R1～R5 全階段**（LLM 註解、L0/L1 白名單代辦、L2 調度本機 agent CLI 起草／依批准計畫改檔、Telegram inline 批准與晚間交接、L0 唯讀自訂排程任務含週/月報 rollup 與 STATUS 草稿，全部預設關閉），並有秘書晨報（P5-R4a）、兩層增量摘要與小秘書首頁 UI。P4.3 Repo Onboarding／對帳（init／連結 remote／clone／建立 GitHub repo 的單一目標確認式流程）已實作；儀表板已完成資訊架構重整（6 分頁分主次、少用設定收合）與可選配色主題（火影橘／森林綠／海洋藍 × 深淺）。目前 44 個 contract test 模組共 262 項,3 OS × 2 Python 的 GitHub Actions 矩陣在 main 六個 job 全綠([run #50](https://github.com/dofliu/activityTracker/actions/runs/33566553321))。剩餘缺口:全天 coverage ledger 實測與各功能的使用者實機 live 收據（release_ready 仍為 false）；完整待辦見 [docs/TODO.md](docs/TODO.md)。
 
 **文件入口：**[📚 文件總覽](docs/INDEX.md) · [完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
 
@@ -458,7 +458,7 @@ Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 | **P3** | 記憶層 | ✅ P3-1 Context Handoff、P3-2 本機語意檢索、P3-3 `omni ask`、P3-4 Related History、P3-5 derived Session 敘事層均完成 Alpha |
 | **P4** | 收集層補完 | 瀏覽器閱讀內容、行事曆與會議、終端機指令歷史、未 commit 的工作狀態 |
 | **P5** | 主動秘書 AI 與自主執行 | 主動情境推論與前瞻提案、三級安全守門員（L0/L1/L2）、Agent Dispatcher 調度自主執行、Telegram/Web 一鍵批准、晨間前瞻與晚間交接、`STATUS.yaml` 自動維護 |
-| **P6** | 開源整備 | `1.3.0a3` candidate、formal rollback，以及 Windows／Ubuntu／macOS × Python 3.10／3.12 GitHub Actions matrix 已通過；仍待 Extension live receipts 與發佈授權 |
+| **P6** | 開源整備 | `1.3.0a3` candidate、formal rollback，以及 Windows／Ubuntu／macOS × Python 3.10／3.12 GitHub Actions matrix 已通過（最新收據 run `33566553321`，2026-09-01 六個 job 全綠）；仍待 Extension live receipts 與發佈授權 |
 
 > 收集越多不等於越有用：檔案事件曾從 3,575 筆噪音 → 4,327 筆 → 收斂至 789 筆。
 > 新增採集來源必須先通過「能否改變決策」的檢驗。
