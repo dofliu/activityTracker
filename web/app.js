@@ -55,10 +55,11 @@ const I18N = {
     btn_quick_summary: "⚡ 生成今日摘要",
     tab_assistant: "01 · 🤖 小秘書與知識庫",
     tab_projects: "02 · 進行中工作",
-    tab_summaries: "03 · 摘要與快照",
-    tab_dashboard: "04 · 即時情報流",
-    tab_settings: "05 · ⚙️ 設定",
-    tab_system_health: "06 · 🛡️ 系統健康",
+    tab_repos: "03 · 🔁 Git 同步中心",
+    tab_summaries: "04 · 摘要與快照",
+    tab_dashboard: "05 · 即時情報流",
+    tab_settings: "06 · ⚙️ 設定",
+    tab_system_health: "07 · 🛡️ 系統健康",
     rag_merged_title: "知識庫與 RAG（完整對話、引用與索引管理）",
     rag_merged_note: "與上方交辦框共用同一條對話與歷史",
     settings_group_common: "🤖 秘書與自動化（常用）",
@@ -101,7 +102,7 @@ const I18N = {
     btn_refresh_proposals: "重新整理",
     ph_loading_proposals: "正在整理可追溯建議…",
     secretary_boundary: "只呈現本機 evidence 衍生建議；不保存、不會自動執行。LLM 註解（若啟用）僅供參考，預設使用本機模型。",
-    btn_reindex_projects: "🔄 重新歸戶",
+    btn_reindex_projects: "🔄 重新整理",
     ph_loading_projects: "載入進行中工作…",
     ph_no_projects: "尚未識別到專案活動。進行程式開發、論文寫作或在 Claude / Codex 發問後將自動建立。",
     active_workstreams: "ACTIVE WORKSTREAMS",
@@ -292,10 +293,11 @@ const I18N = {
     btn_quick_summary: "⚡ Today's Summary",
     tab_assistant: "01 · 🤖 Assistant & Knowledge",
     tab_projects: "02 · Active Workstreams",
-    tab_summaries: "03 · Summaries & Snapshots",
-    tab_dashboard: "04 · Live Feed",
-    tab_settings: "05 · ⚙️ Settings",
-    tab_system_health: "06 · 🛡️ System Health",
+    tab_repos: "03 · 🔁 Git Sync Center",
+    tab_summaries: "04 · Summaries & Snapshots",
+    tab_dashboard: "05 · Live Feed",
+    tab_settings: "06 · ⚙️ Settings",
+    tab_system_health: "07 · 🛡️ System Health",
     rag_merged_title: "Knowledge & RAG (full conversation, citations, index management)",
     rag_merged_note: "Shares the same conversation and history as the chat box above",
     settings_group_common: "🤖 Secretary & Automation (frequently used)",
@@ -338,7 +340,7 @@ const I18N = {
     btn_refresh_proposals: "Refresh",
     ph_loading_proposals: "Deriving traceable suggestions…",
     secretary_boundary: "Local evidence-derived suggestions; never persisted or auto-executed. Optional LLM notes are advisory only (local model by default).",
-    btn_reindex_projects: "🔄 Re-index",
+    btn_reindex_projects: "🔄 Refresh",
     ph_loading_projects: "Loading active workstreams…",
     ph_no_projects: "No active projects detected yet. Edits, commits, and Claude / Codex / Antigravity sessions will populate this view.",
     active_workstreams: "ACTIVE WORKSTREAMS",
@@ -632,7 +634,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // ---------------------------------------------------- collapsible panels
 function initCollapsiblePanels() {
-  let repoSyncLoaded = false;
   document.querySelectorAll("details.panel-collapsible[id], details.sub-collapsible[id]").forEach(panel => {
     const key = `omni-panel-open:${panel.id}`;
     try {
@@ -642,15 +643,7 @@ function initCollapsiblePanels() {
     } catch (_) { /* localStorage 不可用時維持 HTML 預設 */ }
     panel.addEventListener("toggle", () => {
       try { localStorage.setItem(key, panel.open ? "1" : "0"); } catch (_) { /* 同上 */ }
-      if (panel.id === "repo-sync-panel" && panel.open && !repoSyncLoaded) {
-        repoSyncLoaded = true;  // 展開才做 git 掃描，省掉每次開頁的成本
-        loadRepositorySyncStatus();
-      }
     });
-    if (panel.id === "repo-sync-panel" && panel.open) {
-      repoSyncLoaded = true;
-      loadRepositorySyncStatus();
-    }
   });
 }
 
@@ -706,6 +699,7 @@ function initTabs() {
       $(id).classList.add("active");
       if (id === "tab-assistant") { loadSecretaryProposals(); loadAssistantStrip(); syncAssistantModelControls(); loadRAGFolders(); loadRAGSessions(); loadRAGProgress(); }
       if (id === "tab-projects") { loadProjects(); loadUsagePanels(); loadContextSessions(); }
+      if (id === "tab-repos") loadRepositorySyncStatus();  // 切到分頁才掃描本機 Git，不在開頁時付這個成本
       if (id === "tab-settings") loadConfig();
       if (id === "tab-summaries") { loadSummaries(); loadCheckpoints(); }
       if (id === "tab-system-health") loadSystemHealth();
