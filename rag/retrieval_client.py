@@ -326,8 +326,7 @@ class RetrievalWorkerClient:
 
         self._warmup_thread = threading.Thread(target=_run, name="rag-retrieval-warmup", daemon=True)
         self._warmup_thread.start()
-        with self._lock:
-            return self._status_locked()
+        return self._status_locked()
 
     def _status_locked(self) -> Dict[str, Any]:
         alive = self._alive()
