@@ -60,7 +60,7 @@ project_resolution:
 
 ### 1.3 本機 Git 同步中心
 
-Dashboard「03 · Git 同步中心」分頁（2026-09-02 起獨立成分頁，切到分頁時才掃描 Git 狀態）與「設定」內的 GitHub 雲端整合是兩套不同功能。同步中心先以最後一筆本機 commit 時間選出最近的 10 個 repo（可由設定調整），再讀取這些 repo 的完整 worktree 與同步狀態；畫面會另外顯示目前項目的 worktree 修改時間：
+Dashboard「04 · Git 同步中心」分頁（2026-09-02 起獨立成分頁，切到分頁時才掃描 Git 狀態）與「設定」內的 GitHub 雲端整合是兩套不同功能。同步中心先以最後一筆本機 commit 時間選出最近的 10 個 repo（可由設定調整），再讀取這些 repo 的完整 worktree 與同步狀態；畫面會另外顯示目前項目的 worktree 修改時間：
 
 - **GitHub 雲端整合**只讀取 GitHub repo／PR metadata，不會對本機檔案或 branch 執行 Git 指令。
 - **本機 Git 同步中心**只管理 `watchers.git_watcher.repositories` 明示設定 root 下發現的 repositories；頁面初次載入只讀取本機 cached remote-tracking refs，不會自動連網。
@@ -379,7 +379,7 @@ Dashboard「進行中工作」會同步顯示 `RECENT WORK SESSIONS` 與 `RELATE
 
 ### 管理 DeskRAG 知識庫與索引
 
-在 Dashboard「小秘書與知識庫」分頁的知識庫區塊中，掃描按鈕會建立一個獨立本機 worker；主頁、採集器與 Health API 不會在同一個 process 內等待文件解析或 embedding。
+在 Dashboard「02 · 知識庫」分頁中，掃描按鈕會建立一個獨立本機 worker；主頁、採集器與 Health API 不會在同一個 process 內等待文件解析或 embedding。
 
 1. **新增目錄與掃描**：新增資料夾或按「掃描索引」前，設定本次檔案上限與每檔間隔。預設為 500 檔、25 ms、單檔最多 50 MB；大型資料夾請分批執行。
 2. **執行控制**：執行中可按「暫停／恢復／取消」。取消會在目前單一檔案或向量批次完成後生效，不會強制中斷寫入。
@@ -441,7 +441,7 @@ Invoke-RestMethod -Method Post "http://127.0.0.1:8765/api/v1/rag/retrieval/shutd
 
 ### 01「今天」：今日行動清單與每日早晨包（2026-09-02）
 
-「01 · 小秘書與知識庫」分頁的第二張卡是 **TODAY · 今日行動清單**，把原本散在各處的東西收在一起：
+「01 · 小秘書」分頁採三欄：左欄是 **TODAY · 今日行動清單**、中欄是交辦與提問、右欄是全站側欄（「今日統計」可收合＋Focus Now）。知識庫（完整 RAG 對話、引用、索引管理）自 2026-09-02 起是獨立的「02 · 知識庫」分頁，與 01 的交辦框共用同一條對話。今日行動清單把原本散在各處的東西收在一起：
 
 1. **上次做到哪**（最上方）：最近有活動的專案、最後一個動作、未結事項數；「接續 →」直接跳到 02 該專案，「複製 Handoff」拿到接續 prompt。
 2. **早晨包摘要**（一行）：若排程有跑，顯示「早晨包：repo 需 pull N、需 push M、STATUS 過期 K、Handoff J 份」與時間；尚未建立排程時會提示。
@@ -449,7 +449,11 @@ Invoke-RestMethod -Method Post "http://127.0.0.1:8765/api/v1/rag/retrieval/shutd
 
 **📦 建立每日排程**（需 execution token；執行器與排程任務開關須先開）：一鍵建立兩個 L0 唯讀排程——07:30 `morning_pack`（Repo 同步報告＋STATUS 過期草稿＋活躍專案 Handoff，三步各自容錯，失敗步驟記在 receipt 的 `errors`）與 21:30 `handoff_active_projects`（今天有活動的專案各產一份 Handoff 到 `reports/handoffs/`）。已存在就不重複建立。晨報（桌面／Telegram）會帶入早晨包摘要與 top 建議的「為什麼是現在」。**沒有任何自動 pull／push**；同步動作仍由你批准。
 
-02「進行中工作」現在只留專案卡：卡上多了 git 狀態 chip（來自最近一次同步報告快照，滑過可見 fetch 時間；沒有快照就不顯示）與「💡 N 建議」chip；展開卡內多了「近期工作階段」。前景使用、資料收集、背景任務三張統計面板移到「04 · 摘要與統計」。
+03「進行中工作」現在只留專案卡：卡上多了 git 狀態 chip（來自最近一次同步報告快照，滑過可見 fetch 時間；沒有快照就不顯示）與「💡 N 建議」chip；展開卡內多了「近期工作階段」。前景使用、資料收集、背景任務三張統計面板移到「05 · 摘要與統計」。
+
+### 主控台一串 `POST /api/v1/events/ai 403 Forbidden` 是什麼？
+
+那是 Browser Extension 在送對話事件與 heartbeat，但帶的 ingest token 缺少或與本機設定不符；extension 的離線佇列會每秒重送，所以會看到一整排。2026-09-02 起回應會直接說明：`detail: extension ingest token missing` 或 `extension ingest token mismatch`，主控台每 60 秒印一則 WARNING（附被壓掉的次數）。處理：在 Extension popup 重新貼上 `python main.py init` 顯示的 ingest token（或確認 `OMNICONTEXT_INGEST_TOKEN` 環境變數／`security.browser_extension_ingest_token` 與 popup 一致）。`Origin is not allowed` 則是非 extension 的來源被擋，屬正常防護。
 
 ### 查看 Proposal-only 主動秘書建議
 

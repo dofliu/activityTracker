@@ -113,6 +113,30 @@ app.add_middleware(
 )
 
 
+_EXTENSION_TOKEN_WARNING_STATE: dict[str, Any] = {"last_logged": 0.0, "suppressed": 0}
+
+
+def _warn_extension_token_mismatch(token_present: bool) -> None:
+    """每 60 秒最多一則 WARNING，附上這段期間被壓掉的次數，避免 log 被每秒重送淹沒。"""
+    import time as _time
+
+    now = _time.monotonic()
+    state = _EXTENSION_TOKEN_WARNING_STATE
+    if now - float(state["last_logged"]) < 60:
+        state["suppressed"] = int(state["suppressed"]) + 1
+        return
+    suppressed = int(state["suppressed"])
+    state["last_logged"] = now
+    state["suppressed"] = 0
+    logger.warning(
+        "Browser Extension 的寫入請求被拒（403）：ingest token %s。%s"
+        "請在 Extension popup 重新貼上 `omnicontext init` 顯示的 ingest token；"
+        "在此之前 extension 的離線佇列會持續重送。",
+        "不符" if token_present else "缺少",
+        f"（過去 60 秒另有 {suppressed} 次相同拒絕）" if suppressed else "",
+    )
+
+
 @app.middleware("http")
 async def enforce_local_security_boundary(request: Request, call_next):
     cfg = get_config()
@@ -135,6 +159,16 @@ async def enforce_local_security_boundary(request: Request, call_next):
             token = request.headers.get("x-omnicontext-ingest-token")
             if extension_ingest_authorized(token, cfg):
                 return await call_next(request)
+            # Extension 帶了 origin 但 token 缺少／不符：console 只印一行 403 看不出原因，
+            # 這裡給明確 detail，並以節流的 WARNING 說明（extension 的離線佇列會每秒重送）。
+            _warn_extension_token_mismatch(bool(token))
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "detail": "extension ingest token missing" if not token else "extension ingest token mismatch",
+                    "hint": "Extension popup 的 token 需與 security.browser_extension_ingest_token（或其環境變數）一致；請重新貼上 `omnicontext init` 顯示的 ingest token。",
+                },
+            )
         return JSONResponse(status_code=403, content={"detail": "Origin is not allowed"})
 
     return await call_next(request)

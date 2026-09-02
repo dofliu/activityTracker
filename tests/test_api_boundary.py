@@ -69,6 +69,28 @@ def test_extension_ingest_without_token_is_denied():
     assert response.status_code == 403
 
 
+def test_extension_write_with_wrong_token_explains_403(monkeypatch):
+    """console 裡成串的 403 要能一眼看出是 token 問題，而不是泛泛的 Origin is not allowed。"""
+    monkeypatch.setenv("OMNICONTEXT_INGEST_TOKEN", "correct-token")
+    missing = client.post(
+        "/api/v1/events/ai",
+        headers={"Origin": "chrome-extension://test-extension"},
+        json={"platform": "chatgpt", "prompt_text": "x"},
+    )
+    wrong = client.post(
+        "/api/v1/extension/heartbeat",
+        headers={"Origin": "chrome-extension://test-extension", "X-OmniContext-Ingest-Token": "stale-token"},
+        json={"instance_id": "i", "extension_version": "1.3.1"},
+    )
+    assert missing.status_code == 403 and missing.json()["detail"] == "extension ingest token missing"
+    assert wrong.status_code == 403 and wrong.json()["detail"] == "extension ingest token mismatch"
+    assert "ingest token" in wrong.json()["hint"]
+    assert "correct-token" not in wrong.text
+    # 非 extension 的來源維持原本措辭
+    other = client.post("/api/v1/events/ai", headers={"Origin": "https://attacker.example"}, json={})
+    assert other.status_code == 403 and other.json()["detail"] == "Origin is not allowed"
+
+
 def test_extension_status_pairing_probe_requires_token(monkeypatch):
     monkeypatch.setenv("OMNICONTEXT_INGEST_TOKEN", "pairing-test-token")
     monkeypatch.setattr(
