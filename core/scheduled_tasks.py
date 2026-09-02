@@ -172,6 +172,38 @@ def _run_status_draft(_params: dict[str, Any]) -> Callable[[dict[str, Any]], dic
     return _runner
 
 
+def _validate_active_handoff_params(params: dict[str, Any], _database: Any) -> dict[str, Any]:
+    _reject_unknown_params(params, {"hours", "max_projects"})
+    try:
+        hours = int(params.get("hours", 24))
+        max_projects = int(params.get("max_projects", 10))
+    except (TypeError, ValueError) as exc:
+        raise ScheduleRejected("invalid_params", "hours／max_projects 需為整數", http_status=422) from exc
+    if not (1 <= hours <= 24 * 7) or not (1 <= max_projects <= 30):
+        raise ScheduleRejected("invalid_params", "hours 需在 1–168、max_projects 需在 1–30", http_status=422)
+    return {"hours": hours, "max_projects": max_projects}
+
+
+def _run_active_handoffs(params: dict[str, Any]) -> Callable[[dict[str, Any]], dict[str, Any]]:
+    def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
+        from core.secretary_packs import build_active_handoffs
+
+        return build_active_handoffs(
+            hours=int(params.get("hours", 24)), max_projects=int(params.get("max_projects", 10))
+        )
+
+    return _runner
+
+
+def _run_morning_pack(_params: dict[str, Any]) -> Callable[[dict[str, Any]], dict[str, Any]]:
+    def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
+        from core.secretary_packs import build_morning_pack
+
+        return build_morning_pack()
+
+    return _runner
+
+
 def _run_repo_sync_report(_params: dict[str, Any]) -> Callable[[dict[str, Any]], dict[str, Any]]:
     def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
         from core.repo_sync_report import build_repo_sync_report
@@ -222,6 +254,31 @@ SCHEDULABLE_TEMPLATES: dict[str, SchedulableTemplate] = {
                 "llm_used", "output_path",
             ),
             timeout_seconds=600,
+        ),
+        SchedulableTemplate(
+            template_id="morning_pack",
+            risk_level=RISK_L0,
+            label="早晨包：Repo 同步報告＋STATUS 過期草稿＋活躍專案 Handoff（全部唯讀）",
+            description="把三個既有 L0 動作綁成一次排程；晨報與「今日行動」會引用它的收據。不 fetch、不改 repo。",
+            params_schema={},
+            validate_params=_validate_no_params,
+            build_runner=_run_morning_pack,
+            receipt_fields=(
+                "repos_scanned", "needs_pull", "needs_push", "diverged",
+                "stale_status", "handoffs_written", "errors",
+            ),
+            timeout_seconds=600,
+        ),
+        SchedulableTemplate(
+            template_id="handoff_active_projects",
+            risk_level=RISK_L0,
+            label="活躍專案 Handoff：為最近 N 小時內有活動的專案各產一份 Context Handoff",
+            description="重用 handoff_engine，寫入 reports/handoffs；「上次做到哪」永遠有現成接續 prompt。",
+            params_schema={"hours": "回看幾小時內有活動（1–168，預設 24）", "max_projects": "最多幾個專案（1–30，預設 10）"},
+            validate_params=_validate_active_handoff_params,
+            build_runner=_run_active_handoffs,
+            receipt_fields=("hours", "projects_considered", "handoffs_written", "errors", "output_dir"),
+            timeout_seconds=300,
         ),
         SchedulableTemplate(
             template_id="repo_sync_report",

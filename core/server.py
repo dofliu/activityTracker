@@ -534,6 +534,26 @@ class ScheduledTaskUpdateRequest(BaseModel):
     params: Optional[Dict[str, Any]] = None
 
 
+@app.get("/api/v1/secretary/today")
+def get_secretary_today():
+    """「01 今天」的唯讀彙整：上次做到哪、最近一次早晨包收據、預設排程狀態。"""
+    from core.secretary_packs import build_today_view
+
+    return build_today_view()
+
+
+@app.post("/api/v1/secretary/scheduled-tasks/presets")
+def create_secretary_schedule_presets(request: Request):
+    """一鍵建立預設每日排程（早晨包 07:30、晚間 Handoff 21:30）；已存在者跳過。"""
+    _require_execution_token(request)
+    from core.secretary_packs import ensure_default_schedules
+
+    try:
+        return ensure_default_schedules()
+    except ExecutionRejected as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
+
+
 @app.get("/api/v1/secretary/scheduled-tasks")
 def get_secretary_scheduled_tasks():
     """P5-R5 排程任務與可排程 template 清單；唯讀，不需 execution token。"""
@@ -1352,6 +1372,28 @@ def get_local_repository_sync_status(
     自動連線、fetch 或改動任何 worktree。``scope=all`` 回傳全部 repo（全覽表格）。
     """
     return LocalRepositorySync().list_statuses(scope=scope)
+
+
+@app.get("/api/v1/repos/sync-snapshot")
+def get_local_repository_sync_snapshot():
+    """最近一次 L0 同步報告留下的快照（只讀檔，不跑 git）；專案卡用它顯示 git 狀態 chip。"""
+    from core.repo_sync_report import load_snapshot
+
+    snapshot = load_snapshot()
+    if snapshot is None:
+        return {"available": False, "repositories": [], "reason": "no_snapshot_yet",
+                "hint": "排程或手動執行 repo_sync_report／早晨包後才會有快照。"}
+    return {
+        "available": True,
+        "generated_at": snapshot.get("generated_at"),
+        "remote_tracking_basis": snapshot.get("remote_tracking_basis"),
+        "repositories": [
+            {k: repo.get(k) for k in ("repo_id", "name", "path", "branch", "ahead", "behind", "sync_state", "clean", "last_fetch_at")}
+            for repo in snapshot.get("repositories", [])
+        ],
+        "summary": snapshot.get("summary"),
+        "claim_boundary": snapshot.get("claim_boundary"),
+    }
 
 
 class RepositorySyncFetchAllRequest(BaseModel):

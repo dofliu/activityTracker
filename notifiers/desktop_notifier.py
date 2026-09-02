@@ -174,6 +174,16 @@ class DesktopNotifier:
         else:
             lines.append("沒有待收尾事項")
 
+        # 早晨包收據（若排程有跑）：一行帶出 repo 同步／STATUS／Handoff 的產出計數
+        try:
+            from core.secretary_packs import latest_pack_summary, pack_summary_line
+
+            pack_line = pack_summary_line(latest_pack_summary(now=now))
+            if pack_line:
+                lines.append(pack_line[:70])
+        except Exception:
+            pass
+
         # P5-R4：晨報帶入秘書 top 建議（唯讀；秘書層失敗不阻斷晨報本體）
         try:
             from core.proactive_secretary import briefing_proposals
@@ -183,6 +193,8 @@ class DesktopNotifier:
             if top:
                 suffix = f"（共 {secretary['total']} 項）" if secretary.get("total", 0) > 1 else ""
                 lines.append(f"秘書建議：{str(top[0].get('title') or '')[:36]}{suffix}")
+                if top[0].get("why_now"):
+                    lines.append(f"為什麼是現在：{str(top[0]['why_now'])[:50]}")
                 if secretary.get("advisor_summary"):
                     lines.append(str(secretary["advisor_summary"])[:60])
         except Exception:

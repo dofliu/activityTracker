@@ -909,3 +909,28 @@ details.trust-panel[open] summary { border-bottom: none; }
   .repo-overview-toolbar { justify-content: flex-start; }
 }
 
+/* 01 今日行動：上次做到哪 + 早晨包摘要 */
+.today-resume { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--bd); background: var(--s2); }
+.today-resume .today-resume-label { font-family: "JetBrains Mono", monospace; font-size: 9.5px; letter-spacing: 0.12em; color: var(--accent); font-weight: 700; }
+.today-resume .today-resume-title { font-size: 16px; font-weight: 900; margin: 2px 0; }
+.today-resume .today-resume-action { font-size: 12.5px; line-height: 1.5; color: var(--tx); }
+.today-resume .today-resume-meta { font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--mu); margin-top: 2px; }
+.today-resume .today-resume-buttons { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.today-pack { padding: 8px 14px; border-bottom: 1px solid var(--bd); color: var(--mu); }
+.today-pack strong { color: var(--tx); }
+.proposal-why { margin-top: 4px; font-size: 11.5px; color: var(--accent); }
+.proposal-why span { color: var(--mu); margin-right: 4px; }
+.proposal-l2-hint { margin-top: 4px; font-size: 10.5px; color: var(--mu); }
+/* 02 專案卡 chips */
+.pchip { display: inline-block; margin-left: 6px; padding: 1px 6px; border: 1px solid var(--bd); border-radius: 999px; font-family: "JetBrains Mono", monospace; font-size: 9.5px; letter-spacing: 0; color: var(--mu); background: var(--s1); vertical-align: middle; }
+.pchip.pchip-behind, .pchip.pchip-ahead { border-color: var(--warn, #bd871f); color: var(--warn, #bd871f); }
+.pchip.pchip-diverged { border-color: var(--danger, #b64935); color: var(--danger, #b64935); }
+.pchip.pchip-synced { border-color: var(--success, #4b9c5c); color: var(--success, #4b9c5c); }
+.pchip.pchip-proposals { border-color: var(--accent); color: var(--accent); }
+.pdetail-sessions { grid-column: 1 / -1; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--bd); }
+.pdetail-sessions .context-session { padding: 7px 9px; border: 1px solid var(--bd); background: var(--s1); margin-bottom: 6px; }
+@media (max-width: 720px) {
+  .today-resume { grid-template-columns: 1fr; }
+  .today-resume .today-resume-buttons { justify-content: flex-start; }
+}
+

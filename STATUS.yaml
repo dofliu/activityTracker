@@ -6,7 +6,7 @@ progress_basis: "依 P0-P8 加權里程碑估計；不是 release readiness 百�
 status: active_hardening
 release_ready: false
 last_updated: "2026-09-02"
-current_phase: "ADR-008 P5-R1～R5 全階段完成（秘書執行器／Telegram inline 批准／L0 排程任務，全部預設關閉）+ P4.3 Repo Onboarding + 儀表板資訊架構重整與配色主題 + RAG 檢索移至常駐 worker（ADR-009 Addendum）+ Repo 同步全覽／批次／秘書同步報告（ADR-011 Addendum B）；進入等待使用者側 live 收據階段"
+current_phase: "ADR-008 P5-R1～R5 全階段完成（秘書執行器／Telegram inline 批准／L0 排程任務，全部預設關閉）+ P4.3 Repo Onboarding + 儀表板資訊架構重整與配色主題 + RAG 檢索移至常駐 worker（ADR-009 Addendum）+ Repo 同步全覽／批次／秘書同步報告（ADR-011 Addendum B）+ 儀表板資訊整併與秘書每日包（早晨包／活躍專案 Handoff／為什麼是現在）；進入等待使用者側 live 收據階段"
 next_milestone: "取得使用者側 live 收據（全天 coverage ledger、Telegram 設定＋inline 批准、L2 draft→apply、P4.3 onboarding 一輪實操）後重評 release_ready；功能面依需求擴充 template 或評估 P4 其餘來源"
 planned_features:
   - id: FEATURE-001
@@ -497,6 +497,7 @@ quality_gates:
   dashboard_information_architecture: passed_six_tabs_primary_secondary_collapsible_playwright_zero_overflow_desktop_and_494px
   appearance_palettes: passed_three_palettes_x_dark_light_contrast_5_37_to_6_99_preference_local_only
   rag_cloud_provider_chat: fixed_secret_resolution_value_key_in_header_sse_always_emits_done_10_contract_tests
+  dashboard_consolidation_and_secretary_packs: implemented_today_action_list_project_cards_with_git_and_proposal_chips_stats_moved_to_04_morning_pack_and_active_handoffs_l0_presets_why_now_9_contract_tests_container_playwright_live_receipt_pending
   repo_sync_overview_and_batch: implemented_scope_all_fetch_all_list_confirmed_batch_pull_push_default_off_l0_report_l1_pull_ff_9_contract_tests_container_playwright_e2e_live_receipt_pending
   rag_retrieval_worker: implemented_resident_subprocess_main_process_imports_no_index_libraries_timeout_kill_restart_warmup_20_contract_tests_container_e2e_main_88mb_worker_335mb_large_index_live_receipt_pending
   ollama_chain_live_diagnostic: passed_windows_llm_test_2026_08_31_reachable_llama31_8b_generation_8_36s_default_provider_gemini_by_config

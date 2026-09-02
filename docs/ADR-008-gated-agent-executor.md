@@ -120,3 +120,15 @@ repo 檔案**的 template `agent_apply_plan`，安全契約在 D1–D6 之上再
 - 秘書從「只建議」升級為「可在明確授權下代辦白名單動作」，且每一步可回查、可關閉、可回退（`secretary.executor.enabled=false` 即回到 ADR-007 狀態）。
 - 白名單模板讓能力擴張變成「一次一個 template 的審查」，而不是開放式 shell。
 - 成本：新增 migration 014、execution token 管理與較多 contract tests；此成本即是安全邊界本身。
+
+## Addendum C（2026-09-02）：秘書每日包（L0 排程組合）
+
+在 D1–D6 與 P5-R5「只有 L0 可排程」不變的前提下，新增兩個 L0 template 與一組預設排程，讓秘書「更主動」而不越權：
+
+- `morning_pack`：把既有 L0 動作（`repo_sync_report`、`status_snapshot_draft`、`handoff_active_projects`）綁成一次排程；三步各自 try/except，收據扁平（計數＋失敗步驟名），供晨報與儀表板「今日行動」引用。
+- `handoff_active_projects`：對最近 N 小時（1–168）內有活動的專案各產一份 Handoff，上限 1–30，單一專案失敗不影響其他。
+- `POST /api/v1/secretary/scheduled-tasks/presets`：一鍵建立「07:30 早晨包、21:30 晚間 Handoff」；idempotent、需 execution token、受 executor＋scheduled_tasks 疊加開關約束。
+- 提案新增 `why_now`（規則產生的一句話，說明排序依據），不改變任何執行契約；L2 起草計畫仍需 L2 開關＋批准＋確認碼。
+
+沒有任何自動 pull／push／commit；L1／L2 仍不可排程。
+
