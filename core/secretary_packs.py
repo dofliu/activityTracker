@@ -134,6 +134,7 @@ def build_morning_pack(
     repo_sync: Callable[[], dict[str, Any]] | None = None,
     status_draft: Callable[[], dict[str, Any]] | None = None,
     handoffs: Callable[[], dict[str, Any]] | None = None,
+    database: Any | None = None,
 ) -> dict[str, Any]:
     """三個 L0 步驟各自 try/except；收據保持扁平、短小（output_summary 只有 500 字）。"""
     cfg = cfg or get_config()
@@ -181,6 +182,16 @@ def build_morning_pack(
         receipt["handoffs_written"] = hand.get("handoffs_written")
     receipt["errors"] = errors
     receipt["generated_at"] = now.isoformat(timespec="seconds")
+    # 秘書自己的觀察（ADR-012）：只寫當日一次、標記 observation、介面可一鍵刪除。
+    try:
+        from core.secretary_memory import observations_from_pack
+
+        receipt["observations_written"] = len(
+            observations_from_pack(receipt, database=database, now=now, cfg=cfg)
+        )
+    except Exception as exc:  # noqa: BLE001 — 記憶區故障不得讓早晨包失敗
+        logger.warning("morning pack observations skipped: %s", exc)
+        receipt["observations_written"] = 0
     receipt["claim_boundary"] = PACK_CLAIM_BOUNDARY
     return receipt
 
@@ -329,12 +340,22 @@ def build_today_view(
         presets = presets_status(database=database, now=now)
     except Exception as exc:  # noqa: BLE001 — 排程表讀不到也不該讓今日視圖消失
         presets = {"error": type(exc).__name__}
+    memory: dict[str, Any] = {"enabled": False, "counts": {}, "total": 0}
+    try:
+        from core.secretary_memory import list_notes, memory_enabled
+
+        if memory_enabled(cfg):
+            listed = list_notes(limit=1, database=database)
+            memory = {"enabled": True, "counts": listed["counts"], "total": listed["total"]}
+    except Exception as exc:  # noqa: BLE001 — 記憶區讀不到也不該讓今日視圖消失
+        memory = {"enabled": False, "error": type(exc).__name__, "counts": {}, "total": 0}
     return {
         "generated_at": (now.replace(tzinfo=None) if now.tzinfo else now).isoformat(timespec="seconds"),
         "resume": resume,
         "active_project_count": sum(1 for p in projects if p.get("status") == "active"),
         "pack": pack,
         "pack_line": pack_summary_line(pack),
+        "memory": memory,
         "schedules": {
             "executor_enabled": executor_enabled(cfg),
             "scheduled_tasks_enabled": scheduled_tasks_enabled(cfg),

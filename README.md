@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **目前狀態：Personal Alpha（v1.3.0a5 已發佈為 GitHub pre-release）。** Windows milestone WinRT Toast E2E、schema 16/16、formal package+DB rollback、P3-2～P3-5、collector runtime diagnostics、P2.6 continuous coverage ledger 與跨平台 CI 已通過；Extension 1.3.1 已於 2026-08-31 取得 ChatGPT＋Claude.ai live PASS receipt，P2.7 三平台背景任務 live 驗收亦全數 PASS。**秘書已依 [ADR-008](docs/ADR-008-gated-agent-executor.md) 完成 P5-R1～R5 全階段**（LLM 註解、L0/L1 白名單代辦、L2 調度本機 agent CLI 起草／依批准計畫改檔、Telegram inline 批准與晚間交接、L0 唯讀自訂排程任務含週/月報 rollup 與 STATUS 草稿，全部預設關閉），並有秘書晨報（P5-R4a）、兩層增量摘要與小秘書首頁 UI。P4.3 Repo Onboarding／對帳（init／連結 remote／clone／建立 GitHub repo 的單一目標確認式流程）已實作；儀表板已完成資訊架構重整（6 分頁分主次、少用設定收合）與可選配色主題（火影橘／森林綠／海洋藍 × 深淺）。目前 44 個 contract test 模組共 261 項。剩餘缺口:全天 coverage ledger 實測與各功能的使用者實機 live 收據（release_ready 仍為 false）；完整待辦見 [docs/TODO.md](docs/TODO.md)。
+> **目前狀態：Personal Alpha（v1.3.0a5 已發佈為 GitHub pre-release）。** Windows milestone WinRT Toast E2E、schema 17/17、formal package+DB rollback、P3-2～P3-5、collector runtime diagnostics、P2.6 continuous coverage ledger 與跨平台 CI 已通過；Extension 1.3.1 已於 2026-08-31 取得 ChatGPT＋Claude.ai live PASS receipt，P2.7 三平台背景任務 live 驗收亦全數 PASS。**秘書已依 [ADR-008](docs/ADR-008-gated-agent-executor.md) 完成 P5-R1～R5 全階段**（LLM 註解、L0/L1 白名單代辦、L2 調度本機 agent CLI 起草／依批准計畫改檔、Telegram inline 批准與晚間交接、L0 唯讀自訂排程任務含週/月報 rollup 與 STATUS 草稿，全部預設關閉），並有秘書晨報（P5-R4a）、兩層增量摘要與小秘書首頁 UI。P4.3 Repo Onboarding／對帳（init／連結 remote／clone／建立 GitHub repo 的單一目標確認式流程）已實作；儀表板已完成資訊架構重整（6 分頁分主次、少用設定收合）與可選配色主題（火影橘／森林綠／海洋藍 × 深淺）。目前 44 個 contract test 模組共 261 項。剩餘缺口:全天 coverage ledger 實測與各功能的使用者實機 live 收據（release_ready 仍為 false）；完整待辦見 [docs/TODO.md](docs/TODO.md)。
 
 **文件入口：**[📚 文件總覽](docs/INDEX.md) · [完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
 
@@ -167,6 +167,7 @@
 * **兩層增量（map-reduce）日報**：每次週期 checkpoint 後用本機 Ollama 把該時段壓成 ≤100 字微摘要（零 API 成本），23:30 日報只讀「微摘要時間軸＋缺漏時段原文回退」——雲端 token 用量約降一個數量級，Ollama 不可用時該時段自動回退原文，日報永遠可產生。
 * **小秘書首頁（01 分頁）**：交辦對話框（整合 RAG，與知識庫分頁共用同一條對話）、今日關鍵數字列與建議收件匣同屏;每日摘要 prompt 另有逐事件截斷與總量上限（`synthesizer.max_prompt_chars`），`python main.py llm-test` 可診斷各 provider 連線。
 * **介紹影片**：`promo/` 內含 3 分鐘介紹影片的 18 個場景源檔與分鏡表，可單景改字重渲（見 `promo/README.md`）。
+* **小秘書記憶區（2026-09-02，[ADR-012](docs/ADR-012-secretary-memory.md)）**：秘書有了固定的「大腦」——在對話框打「記下來：…」「偏好：不要提醒 repo_needs_push」「決定 @專案：…」直接寫進本機筆記；早晨包會留下可一鍵刪除的觀察；每次提問自動帶入今日狀態、前三個提案與筆記（有字數上限、附收據、可檢視），提案卡會讀偏好與同專案的決定；Handoff／同步報告／STATUS 草稿／時段摘要可一鍵併入知識庫供檢索。
 
 ---
 
@@ -360,7 +361,7 @@ activityTracker/
 │   ├── USAGE.md                    # 使用手冊：安裝、配對、日常操作、備份與故障排查
 │   ├── PRODUCT_POSITIONING.md      # 產品定位與證據邊界
 │   ├── TEST_STRATEGY.md / RELEASE_CHECKLIST.md  # 測試策略與發佈檢查
-│   ├── ADR-001 ~ ADR-011           # 架構決策紀錄
+│   ├── ADR-001 ~ ADR-012           # 架構決策紀錄
 │   └── archive/                    # 已歸檔的一次性規劃書與完成報告
 │
 ├── core/                           # 核心服務模組

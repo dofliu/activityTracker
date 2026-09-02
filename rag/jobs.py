@@ -93,7 +93,7 @@ def create_job(
     max_files: int | None = None,
     throttle_ms: int | None = None,
 ) -> dict[str, Any]:
-    if job_type not in {"index", "remove_folder", "clear_all", "audit", "rebuild_bm25"}:
+    if job_type not in {"index", "remove_folder", "clear_all", "audit", "rebuild_bm25", "activity_sync"}:
         raise ValueError(f"Unsupported RAG job type: {job_type}")
 
     db = get_db()

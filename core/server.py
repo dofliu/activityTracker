@@ -576,6 +576,87 @@ def get_secretary_today():
     return build_today_view()
 
 
+# ---------------------------------------------------------------- ADR-012 小秘書記憶區
+
+
+class MemoryNoteRequest(BaseModel):
+    kind: str = "user_note"
+    body: str
+    project_key: Optional[str] = None
+    title: Optional[str] = None
+    pinned: bool = False
+    source: str = "web"
+
+
+@app.get("/api/v1/secretary/memory")
+def get_secretary_memory(
+    kind: Optional[str] = Query(None),
+    project_key: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=500),
+):
+    """記憶區筆記清單與各類計數；唯讀。observation 一律標記可刪除。"""
+    from core.secretary_memory import MemoryRejected, list_notes
+
+    try:
+        return list_notes(kind=kind, project_key=project_key, limit=limit)
+    except MemoryRejected as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
+
+
+@app.post("/api/v1/secretary/memory")
+def add_secretary_memory(payload: MemoryNoteRequest):
+    """「記下來」：只寫使用者自己輸入的短文字到本機 secretary_notes；不觸碰任何 repo。
+
+    這不是 L1 動作（沒有外部效果），因此沿用 loopback 邊界即可、不需 execution token。
+    kind 只接受 user_note / preference / decision；observation 由秘書自己的 L0 收據產生。
+    """
+    from core.secretary_memory import USER_KINDS, MemoryRejected, add_note
+
+    if payload.kind not in USER_KINDS:
+        raise HTTPException(status_code=422, detail="kind_not_user_writable")
+    try:
+        return add_note(
+            kind=payload.kind,
+            body=payload.body,
+            project_key=payload.project_key,
+            title=payload.title,
+            pinned=payload.pinned,
+            source=(payload.source or "web")[:40],
+        )
+    except MemoryRejected as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
+
+
+@app.delete("/api/v1/secretary/memory/{note_id}")
+def delete_secretary_memory(note_id: int):
+    """一鍵刪除單筆（含秘書觀察）。"""
+    from core.secretary_memory import delete_note
+
+    result = delete_note(note_id)
+    if not result.get("deleted"):
+        raise HTTPException(status_code=404, detail="note_not_found")
+    return result
+
+
+@app.delete("/api/v1/secretary/memory")
+def clear_secretary_memory(kind: str = Query("observation")):
+    """整類清除；預設只清秘書自己的觀察，使用者筆記需明確指定 kind。"""
+    from core.secretary_memory import MemoryRejected, clear_notes
+
+    try:
+        return clear_notes(kind=kind)
+    except MemoryRejected as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
+
+
+@app.get("/api/v1/secretary/memory/context")
+def get_secretary_memory_context():
+    """秘書「當下記得什麼」：與注入對話 system prompt 完全相同的文字與收據；唯讀。"""
+    from core.secretary_memory import memory_context
+
+    return memory_context()
+
+
 @app.post("/api/v1/secretary/scheduled-tasks/presets")
 def create_secretary_schedule_presets(request: Request):
     """一鍵建立預設每日排程（早晨包 07:30、晚間 Handoff 21:30）；已存在者跳過。"""

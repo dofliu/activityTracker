@@ -101,6 +101,33 @@
           <div class="context-memory-boundary" data-i18n="assistant_chat_boundary">對話使用本機知識庫（RAG）與所選模型；完整引用卡片與對話歷史在下方「知識庫與 RAG」區塊。</div>
         </div>
 
+        <!-- ADR-012 小秘書記憶區：筆記／偏好／決定＋秘書觀察；也是對話與提案的固定參考來源 -->
+        <details class="panel memory-panel mb-14" id="memory-panel" open>
+          <summary class="panel-head memory-head">
+            <span class="mono-label accent" data-i18n="memory_title">🧠 小秘書記憶區</span>
+            <span id="memory-badge" class="trust noisy">…</span>
+            <span class="head-right memory-head-tools">
+              <button id="btn-memory-context" class="btn btn-ghost btn-sm" data-i18n="btn_memory_context" title="顯示這次對話會注入給小秘書的記憶脈絡（與 system prompt 相同）">👁 現在記得什麼</button>
+              <button id="btn-memory-clear-obs" class="btn btn-ghost btn-sm" data-i18n="btn_memory_clear_obs" title="只刪除秘書自己寫的觀察；您的筆記不受影響">🧹 清除觀察</button>
+            </span>
+          </summary>
+          <div class="memory-body">
+            <div class="memory-add-row">
+              <select id="select-memory-kind" class="assistant-select" title="種類">
+                <option value="user_note" data-i18n="memory_kind_user_note">筆記</option>
+                <option value="preference" data-i18n="memory_kind_preference">偏好</option>
+                <option value="decision" data-i18n="memory_kind_decision">決定</option>
+              </select>
+              <input id="input-memory-project" type="text" maxlength="120" data-i18n-ph="memory_project_ph" placeholder="專案（選填）">
+              <input id="input-memory-body" type="text" maxlength="4000" data-i18n-ph="memory_input_ph" placeholder="要小秘書記住的事；偏好可寫「不要提醒 <專案或提案類型>」">
+              <button id="btn-memory-add" class="btn btn-primary btn-sm" data-i18n="btn_memory_add">記下來</button>
+            </div>
+            <pre id="memory-context-box" class="memory-context" hidden></pre>
+            <div id="memory-list" class="memory-list"><div class="placeholder" data-i18n="ph_loading_memory">載入記憶區…</div></div>
+            <div class="context-memory-boundary" data-i18n="memory_boundary">記憶區只存您輸入的短文字與秘書從本機唯讀收據推出的觀察（可一鍵刪除）；每次對話注入的脈絡有字數上限並附收據。在對話框輸入「記下來：…」也會寫到這裡。</div>
+          </div>
+        </details>
+
           </div>
         </div>
 
@@ -162,6 +189,7 @@
                </div>
                <button class="btn btn-ghost btn-sm" id="btn-rag-verify-index" style="width:100%; margin-top:-4px; margin-bottom:8px;">✓ 驗證索引與空間</button>
                <button class="btn btn-ghost btn-sm" id="btn-rag-rebuild-bm25" style="width:100%; margin-top:-4px; margin-bottom:8px;">↻ 從 Chroma 重建 BM25</button>
+               <button class="btn btn-ghost btn-sm" id="btn-rag-memory-sync" style="width:100%; margin-top:-4px; margin-bottom:8px;" title="把小秘書記憶區筆記、每日時段摘要、Handoff、同步報告與 STATUS 草稿併入知識庫（獨立 worker 執行）">🧠 併入秘書記憶與工作紀錄</button>
 
                <div id="rag-retrieval-card" class="rag-storage-card mb-8" title="檢索在常駐子程序執行；主服務不載入 Chroma／BM25。狀態為程序內即時狀態。">
                  <div class="mono-mini muted">檢索 worker 狀態載入中…</div>

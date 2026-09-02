@@ -537,3 +537,29 @@ class ProposalSnooze(Base):
     dismissed = Column(Boolean, default=False)
     note = Column(Text, nullable=True)
     created_at = Column(DateTime, default=get_local_now)
+
+
+class SecretaryNote(Base):
+    """小秘書記憶區（ADR-012）：使用者交代的筆記／偏好／決定，以及秘書自己的觀察。
+
+    這是秘書回答與主動提案時的固定參考來源（「大腦」）。四種 kind 都是純文字：
+    ``user_note``（記下來）、``preference``（偏好，例如「不要提醒 X」）、
+    ``decision``（決定）、``observation``（秘書從 L0 收據推出的觀察，可一鍵刪除）。
+    只存使用者自己輸入或由本機唯讀收據推出的短文字，不存 prompt／response 原文。
+    """
+    __tablename__ = "secretary_notes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    kind = Column(String(24), nullable=False, index=True)
+    project_key = Column(String(255), nullable=True, index=True)
+    title = Column(String(200), nullable=True)
+    body = Column(Text, nullable=False)
+    source = Column(String(40), nullable=False, default="api")  # chat / web / api / morning_pack
+    source_ref = Column(String(255), nullable=True, index=True)  # observation 去重用，例如 morning_pack:2026-09-02
+    pinned = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=get_local_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=get_local_now, onupdate=get_local_now)
+
+    __table_args__ = (
+        Index("ix_secretary_notes_kind_created", "kind", "created_at"),
+    )

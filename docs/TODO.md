@@ -31,6 +31,7 @@
 | A6 | **檢索 worker 大索引實測** | pull 最新版後啟動服務，等知識庫區塊「檢索 worker」卡片變「就緒」，再問一題 | `GET /api/v1/rag/retrieval/status` 回 `state: ready`、`warmup.bm25_chunks`／`vector_chunks` 與實際索引一致；第一次提問不再卡數十秒；主服務程序 RSS 維持百 MB 級（可與 STATUS `main_process_memory_mb_after_lazy_rag_start` 比對）。若預熱失敗，`last_error` 會說明原因——回報即可 | 🟡 P1 |
 | A7 | **Repo 同步全覽與批次實操** | 「04 · Git 同步中心 → 📋 載入全覽」→「🔄 全部 Fetch」→ 若有符合條件者按「⬇ 批次 Pull」確認清單；另在排程任務新增 `repo_sync_report` 跑一次 | 全覽表格列出全部設定 root 下的 repo（數量與 `repository_count` 一致）且「上次 fetch」欄在 Fetch 後更新；批次 Pull 收據的 success／skipped 與清單一致、被跳過者有原因；`reports/repo_sync/RepoSync_YYYYMMDD.md` 產生且小秘書提案出現「需要 pull」項目（批准後 `GET /api/v1/secretary/executions` 有 `repo_pull_ff` receipt）。若要試批次 Push，先在 config 開 `repository_sync.batch.allow_push` | 🟡 P1 |
 | A8 | **小秘書每日包實機收據** | 「01 小秘書 → 今日行動清單 → 📦 建立每日排程」（需 execution token），隔天早上看 01 的早晨包摘要行與桌面／Telegram 晨報；或在「設定 → 排程任務」對 `morning_pack` 按立即執行 | `GET /api/v1/secretary/executions` 出現 `morning_pack` 與 `handoff_active_projects` 的 succeeded receipt；01 顯示「早晨包：repo 需 pull N…」；`reports/handoffs/` 有當天活躍專案的 Handoff；02 專案卡出現 git 狀態 chip。若某步失敗，receipt 的 `errors` 會列出步驟名 | 🟡 P1 |
+| A9 | **小秘書記憶區實機收據** | 在 01 對話框輸入「記下來：…」與「偏好：不要提醒 repo_needs_push」→ 問一題 → 對 `morning_pack` 立即執行 → 刪一則觀察；另在 02 知識庫按「🧠 併入秘書記憶與工作紀錄」 | 回覆下方出現「🧠 參考記憶區 N 筆」且「👁 現在記得什麼」列出剛記的筆記；`GET /api/v1/secretary/proposals` 的 `inputs.memory_muted ≥ 1` 且不再出現 push 提案；記憶區出現 `observation` 並可 ✕ 刪除；RAG job `activity_sync` completed 且提問能引用 Handoff／筆記切片 | 🟡 P1 |
 
 > A1 是唯一還在擋 `release_ready` 的**能力型**缺口；A2、A6 是修復／重構後的回歸確認（A6 對應原 B1「首次檢索在主程序載入」，程式面已於 2026-09-02 完成，剩實機收據）。
 

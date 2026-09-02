@@ -576,6 +576,41 @@ def _migration_016_secretary_scheduled_tasks(connection: Connection) -> None:
     ))
 
 
+def _migration_017_secretary_notes(connection: Connection) -> None:
+    """ADR-012 小秘書記憶區：使用者筆記／偏好／決定與秘書觀察（純文字、可刪除）。"""
+    connection.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS secretary_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind VARCHAR(24) NOT NULL,
+            project_key VARCHAR(255),
+            title VARCHAR(200),
+            body TEXT NOT NULL,
+            source VARCHAR(40) NOT NULL DEFAULT 'api',
+            source_ref VARCHAR(255),
+            pinned BOOLEAN NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME
+        );
+        """
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_secretary_notes_kind ON secretary_notes(kind);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_secretary_notes_project_key ON secretary_notes(project_key);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_secretary_notes_source_ref ON secretary_notes(source_ref);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_secretary_notes_created_at ON secretary_notes(created_at);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_secretary_notes_kind_created ON secretary_notes(kind, created_at);"
+    ))
+
+
 MIGRATIONS: tuple[MigrationDefinition, ...] = (
     MigrationDefinition(
         1,
@@ -686,6 +721,14 @@ MIGRATIONS: tuple[MigrationDefinition, ...] = (
         "secretary_scheduled_tasks:create;indexes:template,enabled_template;"
         "contract:l0_read_only_templates_only;audit:agent_execution_receipts",
         _migration_016_secretary_scheduled_tasks,
+    ),
+    MigrationDefinition(
+        17,
+        "secretary_notes_memory",
+        "secretary_notes:create;indexes:kind,project_key,source_ref,created_at,kind_created;"
+        "kinds:user_note,preference,decision,observation;privacy:no_prompt_or_response_text;"
+        "contract:observations_deletable_dedupe_by_source_ref",
+        _migration_017_secretary_notes,
     ),
 )
 

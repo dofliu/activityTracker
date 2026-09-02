@@ -63,6 +63,18 @@ const I18N = {
     btn_create_presets: "📦 建立每日排程",
     today_resume_label: "上次做到哪",
     why_now_label: "為什麼是現在",
+    memory_title: "🧠 小秘書記憶區",
+    btn_memory_add: "記下來",
+    btn_memory_context: "👁 現在記得什麼",
+    btn_memory_clear_obs: "🧹 清除觀察",
+    memory_kind_user_note: "筆記",
+    memory_kind_preference: "偏好",
+    memory_kind_decision: "決定",
+    memory_project_ph: "專案（選填）",
+    memory_input_ph: "要小秘書記住的事；偏好可寫「不要提醒 <專案或提案類型>」",
+    memory_boundary: "記憶區只存您輸入的短文字與秘書從本機唯讀收據推出的觀察（可一鍵刪除）；每次對話注入的脈絡有字數上限並附收據。在對話框輸入「記下來：…」也會寫到這裡。",
+    memory_note_label: "你之前記過",
+    ph_loading_memory: "載入記憶區…",
     related_history_note: "輸入目前的問題，從本機 semantic index 找相似歷史",
     sec_sessions: "近期工作階段",
     tab_dashboard: "06 · 即時情報流",
@@ -309,6 +321,18 @@ const I18N = {
     btn_create_presets: "📦 Create daily schedules",
     today_resume_label: "Resume here",
     why_now_label: "Why now",
+    memory_title: "🧠 Secretary memory",
+    btn_memory_add: "Remember",
+    btn_memory_context: "👁 What I remember now",
+    btn_memory_clear_obs: "🧹 Clear observations",
+    memory_kind_user_note: "Note",
+    memory_kind_preference: "Preference",
+    memory_kind_decision: "Decision",
+    memory_project_ph: "Project (optional)",
+    memory_input_ph: "Something the secretary should remember; a preference may say “mute <project or proposal type>”",
+    memory_boundary: "Memory holds only short text you typed plus observations the secretary derives from local read-only receipts (deletable). The context injected into each chat is capped and comes with a receipt. Typing “remember: …” in the chat box writes here too.",
+    memory_note_label: "You noted",
+    ph_loading_memory: "Loading memory…",
     related_history_note: "Describe your current question to find similar history in the local semantic index",
     sec_sessions: "Recent work sessions",
     tab_dashboard: "06 · Live Feed",
@@ -638,6 +662,8 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSecretaryProposals();
   loadAssistantStrip();
   loadTodayView();
+  loadMemoryPanel();
+  initMemoryPanel();
   loadRepoSnapshot();
   loadRAGFolders();
   loadRAGSessions();
@@ -714,7 +740,7 @@ function initTabs() {
       tab.classList.add("active");
       const id = tab.dataset.tab;
       $(id).classList.add("active");
-      if (id === "tab-assistant") { loadSecretaryProposals(); loadAssistantStrip(); syncAssistantModelControls(); loadProjects(); loadTodayView(); }
+      if (id === "tab-assistant") { loadSecretaryProposals(); loadAssistantStrip(); syncAssistantModelControls(); loadProjects(); loadTodayView(); loadMemoryPanel(); }
       if (id === "tab-knowledge") { loadRAGFolders(); loadRAGSessions(); loadRAGProgress(); }
       if (id === "tab-projects") { loadProjects(); loadRepoSnapshot(); }
       if (id === "tab-repos") loadRepositorySyncStatus();  // 切到分頁才掃描本機 Git，不在開頁時付這個成本
@@ -1192,6 +1218,7 @@ function renderSecretaryProposals() {
         ${detail}
         <div class="proposal-reason">${esc(item.reason)}</div>
         ${item.why_now ? `<div class="proposal-why"><span>${esc(t("why_now_label"))}：</span>${esc(item.why_now)}</div>` : ""}
+        ${item.memory_note ? `<div class="proposal-memory"><span>🧠 ${esc(t("memory_note_label"))}：</span>${esc(item.memory_note)}</div>` : ""}
         <div class="proposal-action"><span>${zh ? "建議" : "Suggested"}</span>${esc(item.suggested_action)}</div>
         ${llmNote}
         ${actionLabel}
@@ -1398,10 +1425,13 @@ function renderAssistantChatMirror() {
     const cites = !isUser && Array.isArray(msg.citations) && msg.citations.length
       ? `<div class="assistant-cite-chip">📎 ${msg.citations.length} ${zh ? "則引用 · 詳見知識庫分頁" : "citations · see RAG tab"}</div>`
       : "";
+    const mem = !isUser && msg.memory && msg.memory.included
+      ? `<span class="assistant-memory-chip" title="${esc((msg.memory.sections || []).join(", "))}">🧠 ${zh ? `參考記憶區 ${msg.memory.notes_used || 0} 筆` : `memory: ${msg.memory.notes_used || 0} notes`}${msg.memory.truncated ? (zh ? "（已截斷）" : " (truncated)") : ""}</span>`
+      : "";
     return `
       <div class="assistant-msg ${isUser ? "user" : "bot"}">
         <span class="assistant-msg-role">${isUser ? (zh ? "您" : "YOU") : "🤖"}</span>
-        <div class="assistant-msg-body">${esc(msg.content || "…")}${cites}</div>
+        <div class="assistant-msg-body">${esc(msg.content || "…")}${mem}${cites}</div>
       </div>`;
   }).join("");
   box.scrollTop = box.scrollHeight;
@@ -1688,6 +1718,189 @@ async function createSchedulePresets() {
   } catch (e) {
     alert((zh ? "建立失敗：" : "Failed: ") + e.message);
   }
+}
+
+// ---------------------------------------------------------------- ADR-012 小秘書記憶區
+let memoryCache = null;
+const MEMORY_COMMANDS = [
+  { kind: "user_note", re: /^\s*(?:記下來|記住|筆記|\/note|remember)\s*[:：]?\s*([\s\S]+)$/ },
+  { kind: "preference", re: /^\s*(?:偏好|\/pref(?:erence)?)\s*[:：]?\s*([\s\S]+)$/ },
+  { kind: "decision", re: /^\s*(?:決定|\/decision|decide)\s*[:：]?\s*([\s\S]+)$/ },
+];
+
+// 與後端 core/secretary_memory.parse_note_command 同一套前綴；只在前端先判斷要不要送 LLM。
+function parseMemoryCommand(text) {
+  for (const cmd of MEMORY_COMMANDS) {
+    const m = cmd.re.exec(text || "");
+    if (!m) continue;
+    let body = m[1].trim();
+    let projectKey = null;
+    const at = /^@([\w.\-]+)\s*[:：]?\s*([\s\S]*)$/.exec(body);
+    const bracket = /^\[([^\]]{1,120})\]\s*([\s\S]*)$/.exec(body);
+    if (at) { projectKey = at[1]; body = at[2].trim(); }
+    else if (bracket) { projectKey = bracket[1].trim(); body = bracket[2].trim(); }
+    if (!body) return null;
+    return { kind: cmd.kind, body, project_key: projectKey };
+  }
+  return null;
+}
+
+function memoryKindLabel(kind) {
+  const zh = currentLang === "zh-TW";
+  return ({
+    user_note: zh ? "筆記" : "note",
+    preference: zh ? "偏好" : "preference",
+    decision: zh ? "決定" : "decision",
+    observation: zh ? "觀察" : "observation",
+  })[kind] || kind;
+}
+
+async function rememberFromChat(cmd, rawPrompt) {
+  const zh = currentLang === "zh-TW";
+  ragChatHistory.push({ role: "user", content: rawPrompt, time: new Date().toLocaleTimeString() });
+  let reply;
+  try {
+    const note = await postJSON("/api/v1/secretary/memory", { ...cmd, source: "chat" });
+    reply = zh
+      ? `🧠 已記下（${memoryKindLabel(note.kind)}${note.project_key ? ` · ${note.project_key}` : ""}）：${note.body}\n之後回答與提案都會參考；可在下方記憶區刪除。`
+      : `🧠 Remembered (${memoryKindLabel(note.kind)}${note.project_key ? ` · ${note.project_key}` : ""}): ${note.body}\nFuture answers and proposals will use it; delete it in the memory panel below.`;
+    loadMemoryPanel();
+  } catch (e) {
+    reply = (zh ? "沒有記下：" : "Not saved: ") + e.message;
+  }
+  ragChatHistory.push({ role: "assistant", content: reply, citations: [], time: new Date().toLocaleTimeString() });
+  renderRAGMessages();
+}
+
+async function loadMemoryPanel() {
+  const list = $("memory-list");
+  const badge = $("memory-badge");
+  if (!list) return;
+  try {
+    memoryCache = await getJSON("/api/v1/secretary/memory?limit=60");
+  } catch (e) {
+    memoryCache = null;
+    list.innerHTML = `<div class="placeholder">${currentLang === "zh-TW" ? "記憶區暫時讀不到。" : "Memory unavailable."}</div>`;
+    if (badge) { badge.textContent = "—"; badge.className = "trust noisy"; }
+    return;
+  }
+  renderMemoryList();
+}
+
+function renderMemoryList() {
+  const list = $("memory-list");
+  const badge = $("memory-badge");
+  const clearBtn = $("btn-memory-clear-obs");
+  if (!list || !memoryCache) return;
+  const zh = currentLang === "zh-TW";
+  const notes = memoryCache.notes || [];
+  const counts = memoryCache.counts || {};
+  if (badge) {
+    badge.textContent = `${memoryCache.total || 0} ${zh ? "筆" : "NOTES"}`;
+    badge.className = `trust ${memoryCache.total ? "ok" : "noisy"}`;
+  }
+  if (clearBtn) clearBtn.disabled = !(counts.observation > 0);
+  if (!notes.length) {
+    list.innerHTML = `<div class="placeholder">${zh
+      ? "還沒有任何記憶。上方輸入或在對話框打「記下來：…」；早晨包跑過後秘書也會留下觀察。"
+      : "Nothing remembered yet. Use the form above or type “remember: …” in the chat; the morning pack also leaves observations."}</div>`;
+    return;
+  }
+  list.innerHTML = notes.map(n => {
+    const when = String(n.created_at || "").slice(0, 16).replace("T", " ");
+    const proj = n.project_key ? `<span class="pchip">${esc(n.project_key)}</span>` : "";
+    const title = n.title ? `<strong>${esc(n.title)}</strong> · ` : "";
+    const src = n.kind === "observation" ? ` · ${esc(n.source || "")}` : "";
+    return `
+      <div class="memory-item" data-note-id="${n.id}">
+        <span class="memory-kind ${esc(n.kind)}">${esc(memoryKindLabel(n.kind))}</span>
+        <div class="memory-item-body">${title}${esc(n.body)}${proj}<div class="memory-item-meta">${esc(when)}${src}</div></div>
+        <button class="btn btn-ghost btn-sm btn-delete" data-delete-note="${n.id}" title="${zh ? "刪除這筆" : "Delete"}">✕</button>
+      </div>`;
+  }).join("");
+  list.querySelectorAll("[data-delete-note]").forEach(btn => {
+    btn.addEventListener("click", () => deleteMemoryNote(Number(btn.getAttribute("data-delete-note"))));
+  });
+}
+
+async function deleteMemoryNote(noteId) {
+  const zh = currentLang === "zh-TW";
+  try {
+    const res = await fetch(API + `/api/v1/secretary/memory/${noteId}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    showToast(zh ? "已刪除" : "Deleted");
+    loadMemoryPanel();
+    loadSecretaryProposals();
+  } catch (e) {
+    alert((zh ? "刪除失敗：" : "Delete failed: ") + e.message);
+  }
+}
+
+async function addMemoryNote() {
+  const zh = currentLang === "zh-TW";
+  const bodyInput = $("input-memory-body");
+  const projectInput = $("input-memory-project");
+  const kindSelect = $("select-memory-kind");
+  const body = (bodyInput && bodyInput.value || "").trim();
+  if (!body) return;
+  try {
+    await postJSON("/api/v1/secretary/memory", {
+      kind: kindSelect ? kindSelect.value : "user_note",
+      body,
+      project_key: (projectInput && projectInput.value || "").trim() || null,
+      source: "web",
+    });
+    if (bodyInput) bodyInput.value = "";
+    showToast(zh ? "已記下" : "Remembered");
+    loadMemoryPanel();
+    loadSecretaryProposals();
+  } catch (e) {
+    alert((zh ? "沒有記下：" : "Not saved: ") + e.message);
+  }
+}
+
+async function clearMemoryObservations() {
+  const zh = currentLang === "zh-TW";
+  if (!confirm(zh ? "刪除秘書自己寫的所有觀察？您的筆記、偏好與決定不受影響。" : "Delete every secretary observation? Your notes, preferences and decisions are untouched.")) return;
+  try {
+    const res = await fetch(API + "/api/v1/secretary/memory?kind=observation", { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+    showToast(zh ? `已刪除 ${data.deleted || 0} 則觀察` : `${data.deleted || 0} observations deleted`);
+    loadMemoryPanel();
+  } catch (e) {
+    alert((zh ? "清除失敗：" : "Clear failed: ") + e.message);
+  }
+}
+
+async function toggleMemoryContext() {
+  const box = $("memory-context-box");
+  if (!box) return;
+  if (!box.hidden) { box.hidden = true; return; }
+  const zh = currentLang === "zh-TW";
+  box.textContent = zh ? "整理中…" : "Loading…";
+  box.hidden = false;
+  try {
+    const data = await getJSON("/api/v1/secretary/memory/context");
+    const r = data.receipt || {};
+    const head = r.included
+      ? (zh ? `（${r.chars} 字 · ${r.notes_used} 筆記憶${r.truncated ? " · 已截斷" : ""}）\n` : `(${r.chars} chars · ${r.notes_used} notes${r.truncated ? " · truncated" : ""})\n`)
+      : (zh ? `（目前沒有可注入的脈絡：${r.reason || "empty"}）` : `(nothing to inject: ${r.reason || "empty"})`);
+    box.textContent = head + (data.text || "");
+  } catch (e) {
+    box.textContent = (zh ? "讀不到：" : "Unavailable: ") + e.message;
+  }
+}
+
+function initMemoryPanel() {
+  const addBtn = $("btn-memory-add");
+  const bodyInput = $("input-memory-body");
+  const clearBtn = $("btn-memory-clear-obs");
+  const ctxBtn = $("btn-memory-context");
+  if (addBtn) addBtn.addEventListener("click", addMemoryNote);
+  if (bodyInput) bodyInput.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); addMemoryNote(); } });
+  if (clearBtn) clearBtn.addEventListener("click", (ev) => { ev.preventDefault(); ev.stopPropagation(); clearMemoryObservations(); });
+  if (ctxBtn) ctxBtn.addEventListener("click", (ev) => { ev.preventDefault(); ev.stopPropagation(); toggleMemoryContext(); });
 }
 
 // ---------------------------------------------------------------- 02 專案卡：git 狀態 chip（來自 L0 同步報告快照）
@@ -3883,6 +4096,19 @@ function initRAGTab() {
     });
   }
 
+  const memorySyncBtn = $("btn-rag-memory-sync");
+  if (memorySyncBtn) {
+    memorySyncBtn.addEventListener("click", async () => {
+      if (!confirm("把小秘書記憶區筆記、每日時段摘要、Handoff、同步報告與 STATUS 草稿併入知識庫？\n只讀本機資料，在獨立 worker 執行；重跑會覆蓋同一批切片。")) return;
+      try {
+        await postJSON("/api/v1/rag/memory/sync", {});
+        startRAGProgressPolling();
+      } catch (e) {
+        alert("無法啟動記憶併入: " + e.message);
+      }
+    });
+  }
+
   const rebuildBM25Btn = $("btn-rag-rebuild-bm25");
   if (rebuildBM25Btn) {
     rebuildBM25Btn.addEventListener("click", async () => {
@@ -4383,6 +4609,14 @@ async function sendRAGChatMessage(fromInput) {
   const prompt = (promptInput.value || "").trim();
   if (!prompt) return;
 
+  // 「記下來：…」「偏好：…」「決定：…」直接寫進記憶區，不送 LLM（ADR-012）。
+  const noteCmd = parseMemoryCommand(prompt);
+  if (noteCmd) {
+    promptInput.value = "";
+    await rememberFromChat(noteCmd, prompt);
+    return;
+  }
+
   promptInput.value = "";
   const provider = $("select-rag-provider") ? $("select-rag-provider").value : "ollama";
   const modelSelect = $("select-rag-model") || $("input-rag-model");
@@ -4506,6 +4740,11 @@ async function sendRAGChatMessage(fromInput) {
         if (eventType === "citations" && eventData) {
           try {
             assistantMsg.citations = JSON.parse(eventData);
+            renderRAGMessages();
+          } catch (e) {}
+        } else if (eventType === "memory" && eventData) {
+          try {
+            assistantMsg.memory = JSON.parse(eventData);
             renderRAGMessages();
           } catch (e) {}
         } else if (eventType === "message" && eventData) {
