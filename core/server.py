@@ -147,11 +147,38 @@ if not WEB_DIR.is_dir():
 app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 
 
+
+def asset_version(web_dir: Path | None = None) -> str:
+    """前端資產的 cache-buster：版本號＋ app.js/style.css 內容雜湊。
+
+    以前 index.html 寫死 ``?v=1.3.0a12-…``，每次改 app.js 瀏覽器都可能沿用
+    舊快取（例：分頁編號重複，是舊 app.js 的 i18n 字典覆蓋了新 HTML）。
+    雜湊由檔案內容算出，任何一次改動都會換 URL，不必手動記得改版本字串。
+    """
+    web_dir = web_dir or WEB_DIR
+    digest = hashlib.sha1()
+    for name in ("app.js", "style.css"):
+        try:
+            digest.update((web_dir / name).read_bytes())
+        except OSError:
+            digest.update(name.encode("utf-8"))
+    return f"{__version__}-{digest.hexdigest()[:10]}"
+
+
+def render_index_html(web_dir: Path | None = None) -> str | None:
+    web_dir = web_dir or WEB_DIR
+    index_file = web_dir / "index.html"
+    if not index_file.exists():
+        return None
+    return index_file.read_text(encoding="utf-8").replace("__ASSET_VERSION__", asset_version(web_dir))
+
+
 @app.get("/", response_class=HTMLResponse)
 def index_page():
-    index_file = WEB_DIR / "index.html"
-    if index_file.exists():
-        return FileResponse(str(index_file))
+    html = render_index_html()
+    if html is not None:
+        # HTML 本體不快取，資產靠 ?v= 雜湊換 URL；兩者合起來才不會出現新舊混用。
+        return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
     return HTMLResponse("<h2>OmniContext Web Dashboard is initializing... Please refresh shortly.</h2>")
 
 
