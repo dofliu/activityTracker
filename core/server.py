@@ -1049,6 +1049,14 @@ def arm_telegram_approvals(request: Request):
         raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
 
 
+@app.get("/api/v1/telegram/chat/status")
+def telegram_chat_status():
+    """ADR-013 小秘書對話開關與狀態；唯讀，不含 token。"""
+    from notifiers.telegram_chat import chat_status
+
+    return chat_status()
+
+
 @app.post("/api/v1/telegram/approvals/disarm")
 def disarm_telegram_approvals():
     """上鎖批准通道（降低權限方向，不需 token）。"""

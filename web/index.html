@@ -493,6 +493,12 @@
             <div class="usage-toggle-row mb-6">
               <label class="setting-check"><input type="checkbox" id="toggle-tg-approvals"><span data-i18n="tg_approvals_label">啟用 inline 批准（晨報／晚報附「✅ 批准」按鈕，僅 L0/L1）</span></label>
             </div>
+            <div class="usage-toggle-row mb-6">
+              <label class="setting-check"><input type="checkbox" id="toggle-tg-chat"><span data-i18n="tg_secretary_chat_label">啟用小秘書對話（手機上直接提問／記筆記；提問與回答會經過 Telegram）</span></label>
+            </div>
+            <div class="usage-toggle-row mb-6">
+              <label class="setting-check"><input type="checkbox" id="toggle-tg-remote-arm"><span data-i18n="tg_remote_arm_label">允許用 /arm &lt;token&gt; 從手機解鎖批准（訊息會被自動刪除；不開則只能在這裡解鎖）</span></label>
+            </div>
             <div class="fields usage-settings-fields mb-6">
               <div style="display:flex; align-items:flex-end; gap: 8px;">
                 <button class="btn btn-ghost" id="btn-tg-arm" data-i18n="btn_tg_arm">🔓 解鎖遠端批准（需 execution token）</button>
@@ -500,6 +506,7 @@
               </div>
               <div style="display:flex; align-items:flex-end;"><span id="tg-approvals-status" class="muted small"></span></div>
             </div>
+            <div class="usage-boundary" data-i18n="tg_chat_boundary">小秘書對話：手機上直接打字即可提問（會帶今日狀態、建議與記憶區筆記），「記下來：…」直接寫進記憶區不送 LLM，/today /notes /status /proposals 為指令。這是本專案唯一會把「你的提問與秘書的回答」送出本機的通道——內容會經過 Telegram 伺服器（引用只送檔名，不送文件內容）；若對話 provider 選雲端供應商，內容另會送往該供應商。預設關閉。</div>
             <div class="usage-boundary" data-i18n="tg_boundary">③ 「測試連線」會即時呼叫 getMe 驗證 token，並向所選對話實發一則固定內容的測試訊息；全部通過才會寫入本機 config.yaml 並啟用晨報／晚報推播。token 與 chat id 只存在本機，瀏覽器永遠拿不回明文（顯示為 ***REDACTED***）；若已設定環境變數 TELEGRAM_BOT_TOKEN／TELEGRAM_CHAT_ID 則優先使用且不會複製進檔案。</div>
           </div>
         </div>

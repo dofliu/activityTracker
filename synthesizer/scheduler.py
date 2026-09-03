@@ -473,16 +473,16 @@ class SynthesisScheduler:
     def _maybe_start_telegram_poller(self, telegram_enabled: bool):
         """P5-R4b：批准通道啟用時啟動 getUpdates 長輪詢（outbound only）。
 
-        poller 只在（telegram 通知＋executor＋telegram_approvals 三開關都開）
-        時啟動；批准仍需使用者先在儀表板以 execution token 解鎖（arm）。
+        poller 在（telegram 通知＋executor＋telegram_approvals）或
+        （telegram 通知＋小秘書對話，ADR-013）任一組合成立時啟動；批准仍需
+        使用者先以 execution token 解鎖（arm）。
         """
         try:
-            from notifiers.telegram_approvals import (
-                TelegramApprovalPoller,
-                telegram_approvals_enabled,
-            )
+            from notifiers.telegram_approvals import TelegramApprovalPoller
+            from notifiers.telegram_chat import telegram_updates_poller_enabled
 
-            if telegram_enabled and telegram_approvals_enabled(self.cfg):
+            # ADR-013：批准或小秘書對話任一啟用就需要長輪詢；兩者都關就完全不開。
+            if telegram_enabled and telegram_updates_poller_enabled(self.cfg):
                 self._telegram_poller = TelegramApprovalPoller()
                 self._telegram_poller.start()
         except Exception as e:

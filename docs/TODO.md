@@ -32,6 +32,7 @@
 | A7 | **Repo 同步全覽與批次實操** | 「04 · Git 同步中心 → 📋 載入全覽」→「🔄 全部 Fetch」→ 若有符合條件者按「⬇ 批次 Pull」確認清單；另在排程任務新增 `repo_sync_report` 跑一次 | 全覽表格列出全部設定 root 下的 repo（數量與 `repository_count` 一致）且「上次 fetch」欄在 Fetch 後更新；批次 Pull 收據的 success／skipped 與清單一致、被跳過者有原因；`reports/repo_sync/RepoSync_YYYYMMDD.md` 產生且小秘書提案出現「需要 pull」項目（批准後 `GET /api/v1/secretary/executions` 有 `repo_pull_ff` receipt）。若要試批次 Push，先在 config 開 `repository_sync.batch.allow_push` | 🟡 P1 |
 | A8 | **小秘書每日包實機收據** | 「01 小秘書 → 今日行動清單 → 📦 建立每日排程」（需 execution token），隔天早上看 01 的早晨包摘要行與桌面／Telegram 晨報；或在「設定 → 排程任務」對 `morning_pack` 按立即執行 | `GET /api/v1/secretary/executions` 出現 `morning_pack` 與 `handoff_active_projects` 的 succeeded receipt；01 顯示「早晨包：repo 需 pull N…」；`reports/handoffs/` 有當天活躍專案的 Handoff；02 專案卡出現 git 狀態 chip。若某步失敗，receipt 的 `errors` 會列出步驟名 | 🟡 P1 |
 | A9 | **小秘書記憶區實機收據** | 在 01 對話框輸入「記下來：…」與「偏好：不要提醒 repo_needs_push」→ 問一題 → 對 `morning_pack` 立即執行 → 刪一則觀察；另在 02 知識庫按「🧠 併入秘書記憶與工作紀錄」 | 回覆下方出現「🧠 參考記憶區 N 筆」且「👁 現在記得什麼」列出剛記的筆記；`GET /api/v1/secretary/proposals` 的 `inputs.memory_muted ≥ 1` 且不再出現 push 提案；記憶區出現 `observation` 並可 ✕ 刪除；RAG job `activity_sync` completed 且提問能引用 Handoff／筆記切片 | 🟡 P1 |
+| A10 | **手機 Telegram 對話實機收據** | 「設定 → Telegram 通知」勾「啟用小秘書對話」→ 儲存 → 重載設定 → 在手機對 bot 送「/today」「記下來：測試」與一句提問；若要試遠端解鎖另勾「允許 /arm」後送 `/arm <execution token>` | `/today` 回今日清單、提問有答案且附「🧠 參考記憶區 N 筆」、筆記出現在儀表板 01 記憶區（source=telegram）；`/arm` 送出後**那則訊息在手機上消失**且 `GET /api/v1/telegram/approvals/status` 的 `armed=true`，`/disarm` 立刻回 false。若對話沒反應，先看 `/status` 的「長輪詢」是否運行中 | 🟡 P1 |
 
 > A1 是唯一還在擋 `release_ready` 的**能力型**缺口；A2、A6 是修復／重構後的回歸確認（A6 對應原 B1「首次檢索在主程序載入」，程式面已於 2026-09-02 完成，剩實機收據）。
 
@@ -55,6 +56,7 @@
 | C2 | **更多可排程 template** | 依 P5-R5 模式新增 **L0 唯讀**排程動作；L1/L2 永遠不可排程（模組載入即強制） | 依需求 | ⚪ P2 |
 | C3 | **P4 其餘採集來源** | 瀏覽器閱讀、行事曆、terminal history、未 commit 狀態 | 每項先過「能否改變決策」檢驗才納入 | ⚪ P2 |
 | C4 | **更多配色主題** | 外觀已拆成 `data-theme` × `data-accent` 兩軸，新增一套只需加一組 CSS 變數區塊，不動任何元件樣式 | 依喜好 | ⚪ P2 |
+| C5 | **遠端網頁存取（私有網路）** | 讓手機用瀏覽器看完整儀表板：把 `security.allow_remote_clients` 換成 CIDR allowlist（預設只放行 Tailscale／WireGuard 網段）＋登入憑證＋PWA。**不做公開反向代理。** 需要先寫 ADR（認證形狀、失敗即拒、收據） | ADR-013 已先以 Telegram 覆蓋「觀察＋對話」 | ⚪ P2 |
 
 ---
 
