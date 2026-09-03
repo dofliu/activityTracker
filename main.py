@@ -54,7 +54,6 @@ from core.project_engine import (
 )
 from synthesizer.aggregator import generate_daily_summary_pipeline, generate_periodic_checkpoint
 from scripts.cleanup_noise import cleanup_noise_and_demo_data
-from notifiers.telegram_notifier import TelegramNotifier
 from notifiers.desktop_notifier import DesktopNotifier
 from exporters.daily_brief import export_daily_brief
 
@@ -592,45 +591,62 @@ def cmd_recall(
 
 
 def cmd_notify_telegram(action: str, date_str: Optional[str] = None, dry_run: bool = False):
-    """測試或手動發送 Telegram 通知 (支援 --dry-run 預覽)"""
-    notifier = TelegramNotifier()
-    if dry_run:
-        now = get_local_now()
-        projects = get_active_projects_list()
-        open_loops = get_open_loops_list()
-        print("\n" + "="*50)
-        print("📱 Telegram 推播預覽 (Dry-run Mode)")
-        print("="*50)
-        if action == "briefing":
-            active_projs = [p for p in projects if p["status"] == "active"][:5]
-            print(f"<b>🌅 OmniContext 晨間簡報 ({now.strftime('%Y-%m-%d')})</b>\n")
-            print("<b>🔥 今日重點活躍專案：</b>")
-            for p in active_projs:
-                print(f"• <b>[{p['category']}] {p['display_name']}</b>\n  └─ {p['last_action_summary']}")
-            print(f"\n<b>📌 待跟進未結事項 ({len(open_loops)} 項)：</b>")
-            for ol in open_loops[:6]:
-                print(f"• [ ] <b>[{ol['project_key']}]</b> {ol['title']}")
-        elif action == "stagnation":
-            stagnant = [p for p in projects if p["status"] in ["idle", "stale"] and p["idle_days"] >= 3][:4]
-            print("<b>⚠️ OmniContext 專案停滯提醒</b>\n")
-            for p in stagnant:
-                print(f"• <b>{p['display_name']}</b> (已閒置 {p['idle_days']} 天)\n  └─ 上次動態: {p['last_action_summary']}")
-        print("="*50 + "\n")
+    """測試或手動發送推播（支援 --dry-run 預覽）。
+
+    ADR-014：內容組裝與傳送已分離，因此預覽與實際送出的是**同一份**內容；
+    實際送出會推到所有啟用的通道（Telegram／LINE）。
+    """
+    from notifiers.messages import (
+        build_daily_summary,
+        build_morning_briefing,
+        build_stagnation_alert,
+        render_plain,
+    )
+    from notifiers.secretary_push import (
+        push_daily_summary,
+        push_enabled,
+        push_morning_briefing,
+        push_stagnation_alert,
+    )
+
+    resolved_date = date_str or get_local_now().strftime("%Y-%m-%d")
+    builders = {
+        "summary": lambda: build_daily_summary(resolved_date),
+        "briefing": build_morning_briefing,
+        "stagnation": build_stagnation_alert,
+    }
+    if action not in builders:
+        print(f"未知的通知類型: {action}")
         return
 
-    if action == "summary":
-        d = date_str or get_local_now().strftime("%Y-%m-%d")
-        print(f"正在發送 {d} 的每日日報至 Telegram...")
-        success = notifier.send_daily_summary(d)
-        print("✅ 發送成功" if success else "❌ 發送失敗，請確認 config.yaml 或環境變數中的 bot_token 與 chat_id")
-    elif action == "briefing":
-        print("正在發送晨間簡報至 Telegram...")
-        success = notifier.send_morning_briefing()
-        print("✅ 發送成功" if success else "❌ 發送失敗")
-    elif action == "stagnation":
-        print("正在檢查並發送停滯專案警示至 Telegram...")
-        success = notifier.send_stagnation_alert()
-        print("✅ 發送成功" if success else "❌ 發送失敗")
+    if dry_run:
+        message = builders[action]()
+        print("\n" + "=" * 50)
+        print("📱 推播預覽 (Dry-run Mode)")
+        print("=" * 50)
+        print(render_plain(message) if message else "（目前沒有內容可推播）")
+        print("=" * 50 + "\n")
+        return
+
+    if not push_enabled():
+        print("❌ 沒有已設定的推播通道；請先在儀表板「設定」完成 Telegram 或 LINE 連線")
+        return
+
+    label = {"summary": f"{resolved_date} 的每日日報", "briefing": "晨間簡報", "stagnation": "停滯專案警示"}[action]
+    print(f"正在發送{label}…")
+    receipt = {
+        "summary": lambda: push_daily_summary(resolved_date),
+        "briefing": push_morning_briefing,
+        "stagnation": push_stagnation_alert,
+    }[action]()
+    if receipt.get("skipped"):
+        print(f"⚠️ 未發送：{receipt['skipped']}")
+        return
+    for item in receipt["results"]:
+        mark = "✅" if item.get("sent") else "❌"
+        detail = "" if item.get("sent") else f"（{item.get('error')}）"
+        print(f"  {mark} {item['channel']}{detail}")
+    print(f"完成：{receipt['sent']}/{receipt['attempted']} 個通道送出")
 
 
 def cmd_notify_desktop(action: str, dry_run: bool = False):

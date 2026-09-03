@@ -29,7 +29,9 @@ active 唯一索引防重疊，重放的實際影響已被收斂。
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import secrets as py_secrets
 import threading
 import time as time_module
 from collections import OrderedDict
@@ -58,6 +60,7 @@ CALLBACK_DATA_LIMIT = 64  # Telegram callback_data 硬上限（bytes）
 BUTTON_TEXT_LIMIT = 48
 ANSWER_TEXT_LIMIT = 190
 DEFAULT_ARM_TTL_HOURS = 24
+DEFAULT_ARM_CODE_TTL_SECONDS = 300  # 一次性 arm code 的有效期（ADR-014）
 DEFAULT_MAX_ACTIONS_PER_PUSH = 4
 LONG_POLL_SECONDS = 25
 
@@ -75,6 +78,8 @@ _PROCESSED_CALLBACK_CAP = 300
 _POLLER_RUNNING = False
 _LAST_POLL_AT: datetime | None = None
 _IGNORED_FOREIGN_UPDATES = 0
+# 一次性 arm code：只存雜湊與到期時間，用過即銷毀；重啟即失效（ADR-014）。
+_PENDING_ARM_CODE: dict[str, Any] | None = None
 
 
 def telegram_approvals_enabled(cfg: Any | None = None) -> bool:
@@ -134,11 +139,93 @@ def arm_approvals(cfg: Any | None = None, now: datetime | None = None) -> dict[s
     }
 
 
+def _arm_code_ttl_seconds(cfg: Any) -> int:
+    try:
+        raw = int(
+            cfg.get(
+                "proactive_secretary.executor.telegram_approvals.arm_code_ttl_seconds",
+                DEFAULT_ARM_CODE_TTL_SECONDS,
+            )
+        )
+    except (TypeError, ValueError):
+        return DEFAULT_ARM_CODE_TTL_SECONDS
+    return min(3600, max(60, raw))
+
+
+def _hash_code(code: str) -> str:
+    return hashlib.sha256(code.encode("utf-8")).hexdigest()
+
+
+def issue_arm_code(cfg: Any | None = None, now: datetime | None = None) -> dict[str, Any]:
+    """簽發一次性 arm code；呼叫端（API 層）必須已通過 execution token 驗證。
+
+    ADR-014：手機不再需要持有長期的 execution token——在儀表板按一下取得
+    6 位數短效碼，用它 arm 即可。code 只以雜湊留在記憶體，回傳值是**唯一**
+    一次看到明碼的機會，且不寫 log。
+    """
+    global _PENDING_ARM_CODE
+    cfg = cfg or get_config()
+    now = now or get_local_now()
+    if not telegram_approvals_enabled(cfg):
+        raise ExecutionRejected(
+            "telegram_approvals_disabled",
+            "Telegram 批准未啟用（executor.telegram_approvals.enabled=false）",
+        )
+    ttl = _arm_code_ttl_seconds(cfg)
+    code = f"{py_secrets.randbelow(1_000_000):06d}"
+    expires_at = now + timedelta(seconds=ttl)
+    with _STATE_LOCK:
+        _PENDING_ARM_CODE = {"code_hash": _hash_code(code), "expires_at": expires_at}
+    logger.info("Arm code issued (valid %ds); code itself is never logged.", ttl)
+    return {
+        "code": code,
+        "expires_at": expires_at.isoformat(timespec="seconds"),
+        "ttl_seconds": ttl,
+        "single_use": True,
+        "claim_boundary": (
+            "一次性短效碼；只存雜湊在記憶體、服務重啟即失效、用過即銷毀。"
+            "它只能用來解鎖批准通道，不能代替 execution token 做任何其他事。"
+        ),
+    }
+
+
+def consume_arm_code(
+    provided: str, *, cfg: Any | None = None, now: datetime | None = None
+) -> tuple[bool, str]:
+    """驗證並銷毀 arm code；回傳 ``(是否通過, 原因)``。
+
+    不論通過或失敗都銷毀待驗碼——避免對同一個碼反覆猜測。
+    """
+    global _PENDING_ARM_CODE
+    now = now or get_local_now()
+    candidate = str(provided or "").strip()
+    with _STATE_LOCK:
+        pending = _PENDING_ARM_CODE
+        _PENDING_ARM_CODE = None
+    if pending is None:
+        return False, "no_pending_code"
+    if now >= pending["expires_at"]:
+        return False, "code_expired"
+    if not candidate or not py_secrets.compare_digest(_hash_code(candidate), pending["code_hash"]):
+        return False, "code_mismatch"
+    return True, "ok"
+
+
+def arm_code_status(now: datetime | None = None) -> dict[str, Any]:
+    now = now or get_local_now()
+    with _STATE_LOCK:
+        pending = _PENDING_ARM_CODE
+    if pending is None or now >= pending["expires_at"]:
+        return {"pending": False}
+    return {"pending": True, "expires_at": pending["expires_at"].isoformat(timespec="seconds")}
+
+
 def disarm_approvals() -> dict[str, Any]:
-    """上鎖批准通道（降低權限的方向，不需 token）。"""
-    global _ARMED_UNTIL
+    """上鎖批准通道（降低權限的方向，不需 token）；同時銷毀待驗的 arm code。"""
+    global _ARMED_UNTIL, _PENDING_ARM_CODE
     with _STATE_LOCK:
         _ARMED_UNTIL = None
+        _PENDING_ARM_CODE = None
     return {"armed": False, "claim_boundary": APPROVALS_CLAIM_BOUNDARY}
 
 
@@ -161,6 +248,7 @@ def approvals_status(cfg: Any | None = None, now: datetime | None = None) -> dic
         "enabled": telegram_approvals_enabled(cfg),
         "armed": armed,
         "armed_until": armed_until.isoformat(timespec="seconds") if armed else None,
+        "arm_code": arm_code_status(now),
         "poller_running": poller_running,
         "last_poll_at": last_poll.isoformat(timespec="seconds") if last_poll else None,
         "ignored_foreign_updates": ignored,
@@ -169,9 +257,10 @@ def approvals_status(cfg: Any | None = None, now: datetime | None = None) -> dic
 
 
 def _reset_state_for_tests() -> None:
-    global _ARMED_UNTIL, _IGNORED_FOREIGN_UPDATES
+    global _ARMED_UNTIL, _IGNORED_FOREIGN_UPDATES, _PENDING_ARM_CODE
     with _STATE_LOCK:
         _ARMED_UNTIL = None
+        _PENDING_ARM_CODE = None
         _PROCESSED_CALLBACK_IDS.clear()
         _IGNORED_FOREIGN_UPDATES = 0
 

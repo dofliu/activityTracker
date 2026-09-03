@@ -169,6 +169,7 @@
 * **介紹影片**：`promo/` 內含 3 分鐘介紹影片的 18 個場景源檔與分鏡表，可單景改字重渲（見 `promo/README.md`）。
 * **小秘書記憶區（2026-09-02，[ADR-012](docs/ADR-012-secretary-memory.md)）**：秘書有了固定的「大腦」——在對話框打「記下來：…」「偏好：不要提醒 repo_needs_push」「決定 @專案：…」直接寫進本機筆記；早晨包會留下可一鍵刪除的觀察；每次提問自動帶入今日狀態、前三個提案與筆記（有字數上限、附收據、可檢視），提案卡會讀偏好與同專案的決定；Handoff／同步報告／STATUS 草稿／時段摘要可一鍵併入知識庫供檢索。
 * **手機上的小秘書（2026-09-03，[ADR-013](docs/ADR-013-telegram-secretary-chat.md)，預設關閉）**：不在電腦前也能用——在 Telegram 綁定的對話裡直接打字就是提問（走與儀表板交辦框同一條管線，回覆附引用檔名與「參考記憶區 N 筆」），「記下來：…／偏好：…」直接寫進記憶區不送 LLM，`/today` `/notes` `/status` `/proposals` 為指令；批准仍只有白名單 L0/L1 且通道要先解鎖，`/disarm` 隨時可上鎖。**邊界**：這是唯一會把提問與回答送出本機的通道（內容經 Telegram，引用只送檔名），因此預設關閉；不想外送就只用通知與批准。
+* **通知可以選 LINE 或 Telegram（2026-09-03，[ADR-014](docs/ADR-014-multi-channel-push-and-arm-code.md)，皆預設關閉）**：晨報／晚報／日報／停滯提醒可以推 Telegram、LINE 或兩者，同一份內容自動用各平台的格式呈現。**能力邊界**：LINE Messaging API 沒有輪詢介面，接收訊息需要公開 webhook（會打破「只在 127.0.0.1」的邊界），所以 **LINE 只做推播**，提問、記筆記與按鈕批准仍走 Telegram。同時把 `/arm` 從 execution token 改成儀表板簽發的 6 位數短效碼（單次、5 分鐘失效、猜錯即焚）——手機從此不必持有長期 secret。
 
 ---
 
@@ -362,7 +363,7 @@ activityTracker/
 │   ├── USAGE.md                    # 使用手冊：安裝、配對、日常操作、備份與故障排查
 │   ├── PRODUCT_POSITIONING.md      # 產品定位與證據邊界
 │   ├── TEST_STRATEGY.md / RELEASE_CHECKLIST.md  # 測試策略與發佈檢查
-│   ├── ADR-001 ~ ADR-013           # 架構決策紀錄
+│   ├── ADR-001 ~ ADR-014           # 架構決策紀錄
 │   └── archive/                    # 已歸檔的一次性規劃書與完成報告
 │
 ├── core/                           # 核心服務模組

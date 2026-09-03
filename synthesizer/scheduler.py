@@ -4,7 +4,6 @@ import time
 from datetime import datetime
 from core.config import get_config
 from .aggregator import generate_daily_summary_pipeline, generate_periodic_checkpoint
-from notifiers.telegram_notifier import TelegramNotifier
 from notifiers.desktop_notifier import DesktopNotifier
 from exporters.daily_brief import export_daily_brief
 from core.usage_analytics import evaluate_daily_milestones
@@ -18,7 +17,6 @@ class SynthesisScheduler:
         self._running = False
         self._thread: threading.Thread | None = None
         self._apscheduler = None
-        self._notifier = TelegramNotifier()
         self._desktop = DesktopNotifier()
         self._telegram_poller = None
 
@@ -380,11 +378,13 @@ class SynthesisScheduler:
             # 日報產生後未結事項會更新，順道刷新每日入口的簡報檔
             self._refresh_daily_brief()
 
-            # 若啟用 Telegram，自動推播晚報
-            if self._notifier.is_enabled() and "date_str" in res:
-                self._notifier.send_daily_summary(res["date_str"])
+            # 推播日報到所有啟用的通道（Telegram／LINE；ADR-014）
+            from notifiers.secretary_push import push_daily_summary, push_enabled, push_stagnation_alert
+
+            if push_enabled(self.cfg) and "date_str" in res:
+                push_daily_summary(res["date_str"], cfg=self.cfg)
                 # 順道檢查停滯專案
-                self._notifier.send_stagnation_alert()
+                push_stagnation_alert(cfg=self.cfg)
         except Exception as e:
             logger.error(f"Error during scheduled daily synthesis: {e}", exc_info=True)
 
@@ -507,10 +507,13 @@ class SynthesisScheduler:
             logger.error(f"Error pushing telegram proposals: {e}", exc_info=True)
 
     def _run_telegram_evening_job(self):
-        logger.info("Triggering telegram evening handoff...")
+        logger.info("Triggering evening handoff push...")
         try:
-            if self._notifier.is_enabled():
-                self._notifier.send_evening_handoff()
+            from notifiers.secretary_push import push_enabled, push_evening_handoff
+
+            if push_enabled(self.cfg):
+                push_evening_handoff(cfg=self.cfg)
+                # 附批准按鈕的建議推播只有 Telegram 支援（LINE 無法接收回呼）
                 self._push_telegram_proposals("🌙 睡前待判斷：")
         except Exception as e:
             logger.error(f"Error sending telegram evening handoff: {e}", exc_info=True)
@@ -518,8 +521,10 @@ class SynthesisScheduler:
     def _run_morning_briefing_job(self):
         logger.info("Triggering scheduled morning briefing...")
         try:
-            if self._notifier.is_enabled():
-                self._notifier.send_morning_briefing()
+            from notifiers.secretary_push import push_enabled, push_morning_briefing
+
+            if push_enabled(self.cfg):
+                push_morning_briefing(cfg=self.cfg)
                 self._push_telegram_proposals("☀️ 今日待判斷：")
         except Exception as e:
             logger.error(f"Error sending morning briefing: {e}", exc_info=True)
