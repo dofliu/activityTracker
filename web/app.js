@@ -227,6 +227,16 @@ const I18N = {
     tg_boundary: "③ 「測試連線」會即時呼叫 getMe 驗證 token，並向所選對話實發一則固定內容的測試訊息；全部通過才會寫入本機 config.yaml 並啟用晨報／晚報推播。token 與 chat id 只存在本機，瀏覽器永遠拿不回明文（顯示為 ***REDACTED***）；若已設定環境變數 TELEGRAM_BOT_TOKEN／TELEGRAM_CHAT_ID 則優先使用且不會複製進檔案。inline 批准只處理綁定 chat 的按鈕、只能執行 L0/L1 白名單動作（L2 一律回儀表板）；批准通道需以 execution token 解鎖，重啟服務即自動上鎖。",
     tg_approvals_label: "啟用 inline 批准（晨報／晚報附「✅ 批准」按鈕，僅 L0/L1）",
     tg_secretary_chat_label: "啟用小秘書對話（手機上直接提問／記筆記；提問與回答會經過 Telegram）",
+    btn_tg_arm_code: "🔑 產生解鎖碼",
+    settings_line_title: "LINE 通知（只能推播）",
+    line_token_label: "CHANNEL ACCESS TOKEN",
+    line_to_label: "收件 USER ID",
+    line_step1_help: "① 在 LINE Developers Console 建立 Messaging API channel → 發行「Channel access token（long-lived）」貼到下方。",
+    line_step2_help: "② 用手機把這個官方帳號加為好友，再從 Console 的「Basic settings → Your user ID」複製 userId（U 開頭）貼上——那不是 LINE ID（@xxxx）。",
+    btn_line_test: "📡 測試連線",
+    btn_line_connect: "✅ 測試並儲存啟用",
+    btn_line_disconnect: "解除",
+    line_boundary: "LINE 只做推播（晨報／晚報／日報／停滯提醒）：LINE Messaging API 沒有輪詢介面，要接收你的訊息必須由 LINE 平台 webhook 連到一個公開網址，那會打破本專案「只在 127.0.0.1」的邊界——所以提問、記筆記與批准仍走 Telegram。另請注意 LINE 官方帳號免費方案有每月推播則數上限。token 與 userId 只存本機，瀏覽器永遠拿不回明文。",
     tg_remote_arm_label: "允許用 /arm <token> 從手機解鎖批准（訊息會被自動刪除；不開則只能在這裡解鎖）",
     tg_chat_boundary: "小秘書對話：手機上直接打字即可提問（會帶今日狀態、建議與記憶區筆記），「記下來：…」直接寫進記憶區不送 LLM，/today /notes /status /proposals 為指令。這是本專案唯一會把「你的提問與秘書的回答」送出本機的通道——內容會經過 Telegram 伺服器（引用只送檔名，不送文件內容）；若對話 provider 選雲端供應商，內容另會送往該供應商。預設關閉。",
     btn_tg_arm: "🔓 解鎖遠端批准（需 execution token）",
@@ -494,6 +504,16 @@ const I18N = {
     tg_boundary: "③ Test connection calls getMe live to validate the token and sends one fixed test message to the selected chat; only when everything passes are the settings written to local config.yaml and the morning/evening pushes enabled. Token and chat id stay on this machine — the browser never gets the plaintext back (shown as ***REDACTED***). If TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID env vars exist they take precedence and are never copied into the file. Inline approvals only accept buttons from the bound chat and only run L0/L1 whitelist actions (L2 always goes back to the dashboard); the approval channel must be unlocked with the execution token and re-locks on every service restart.",
     tg_approvals_label: "Enable inline approvals (✅ buttons on morning/evening pushes, L0/L1 only)",
     tg_secretary_chat_label: "Enable secretary chat (ask and take notes from your phone; questions and answers pass through Telegram)",
+    btn_tg_arm_code: "🔑 Issue unlock code",
+    settings_line_title: "LINE notifications (push only)",
+    line_token_label: "CHANNEL ACCESS TOKEN",
+    line_to_label: "RECIPIENT USER ID",
+    line_step1_help: "① In the LINE Developers Console create a Messaging API channel, then issue a long-lived channel access token and paste it below.",
+    line_step2_help: "② Add the official account as a friend on your phone, then copy the userId (starts with U) from Basic settings → Your user ID — that is not the LINE ID (@xxxx).",
+    btn_line_test: "📡 Test connection",
+    btn_line_connect: "✅ Test and save",
+    btn_line_disconnect: "Disconnect",
+    line_boundary: "LINE is push-only (morning/evening briefings, daily report, stagnation alerts). The LINE Messaging API has no polling endpoint: receiving your messages would require LINE to reach a public webhook, which would break this project's 127.0.0.1-only boundary — so asking, note-taking and approvals stay on Telegram. Note also that the free LINE official account plan caps monthly push messages. Token and userId stay on this machine; the browser never gets the plaintext back.",
     tg_remote_arm_label: "Allow /arm <token> to unlock approvals from the phone (the message is deleted automatically; otherwise unlock here only)",
     tg_chat_boundary: "Secretary chat: type in the bound chat to ask (today's status, proposals and your notes are included); “remember: …” writes straight to memory without calling the LLM; /today /notes /status /proposals are commands. This is the only channel that sends your questions and the secretary's answers off this machine — content passes through Telegram's servers (citations send filenames only, never document content), and a cloud chat provider also receives the content. Off by default.",
     btn_tg_arm: "🔓 Unlock remote approvals (execution token)",
@@ -2524,6 +2544,10 @@ function initSettingsForm() {
   $("btn-tg-disconnect").addEventListener("click", tgDisconnect);
   // P5-R4b inline 批准：解鎖／上鎖批准通道（解鎖需 execution token）。
   $("btn-tg-arm").addEventListener("click", tgArm);
+  $("btn-tg-arm-code").addEventListener("click", tgIssueArmCode);
+  $("btn-line-test").addEventListener("click", () => lineTest(false));
+  $("btn-line-connect").addEventListener("click", () => lineTest(true));
+  $("btn-line-disconnect").addEventListener("click", lineDisconnect);
   $("btn-tg-disarm").addEventListener("click", tgDisarm);
 }
 
@@ -2583,6 +2607,7 @@ async function loadConfig() {
     loadScheduledTasks();
     loadTelegramStatus();
     loadTelegramApprovalsStatus();
+    loadLineStatus();
     $("toggle-usage-tracking").checked = usage.enabled === true;
     const usageNotifications = usage.notifications || {};
     $("toggle-usage-notifications").checked = usageNotifications.enabled === true;
@@ -3032,6 +3057,9 @@ async function loadTelegramApprovalsStatus() {
       parts.push(zh ? "🔒 已上鎖（按「解鎖遠端批准」啟用）" : "🔒 locked (press Unlock to enable)");
     }
     parts.push((zh ? "輪詢器：" : "poller: ") + (st.poller_running ? (zh ? "運行中" : "running") : (zh ? "未運行（啟用後重載設定）" : "not running")));
+    if (st.arm_code && st.arm_code.pending) {
+      parts.push((zh ? "解鎖碼有效至 " : "unlock code until ") + String(st.arm_code.expires_at || "").slice(11, 16));
+    }
     try {
       const chat = await getJSON("/api/v1/telegram/chat/status");
       parts.push((zh ? "對話：" : "chat: ") + (chat.enabled ? (zh ? "開" : "on") : (zh ? "關" : "off")));
@@ -3041,6 +3069,105 @@ async function loadTelegramApprovalsStatus() {
   } catch (e) {
     box.textContent = "";
   }
+}
+
+async function tgIssueArmCode() {
+  const zh = currentLang === "zh-TW";
+  const box = $("tg-arm-code-box");
+  const data = await schedRequest("/api/v1/telegram/approvals/arm-code", "POST");
+  if (!data) return;
+  if (box) {
+    box.innerHTML = `<span class="arm-code">${esc(data.code)}</span>` +
+      `<span class="muted small">${zh
+        ? `${Math.round((data.ttl_seconds || 300) / 60)} 分鐘內有效、只能用一次。在手機傳「/arm ${esc(data.code)}」解鎖。`
+        : `Valid for ${Math.round((data.ttl_seconds || 300) / 60)} min, single use. Send “/arm ${esc(data.code)}” from your phone.`}</span>`;
+    box.hidden = false;
+    setTimeout(() => { box.hidden = true; box.innerHTML = ""; }, (data.ttl_seconds || 300) * 1000);
+  }
+  loadTelegramApprovalsStatus();
+}
+
+// ---------------------------------------------------------------- ADR-014 LINE（只能推播）
+async function loadLineStatus() {
+  const badge = $("line-status-badge");
+  if (!badge) return;
+  const zh = currentLang === "zh-TW";
+  try {
+    const st = await getJSON("/api/v1/line/status");
+    if (st.enabled && st.token_configured && st.to_configured) {
+      badge.textContent = zh ? "已啟用（推播）" : "ENABLED (PUSH)";
+      badge.className = "trust ok";
+    } else if (st.token_configured) {
+      badge.textContent = zh ? "待設定收件 ID" : "NEEDS USER ID";
+      badge.className = "trust noisy";
+    } else {
+      badge.textContent = zh ? "未設定" : "NOT SET";
+      badge.className = "trust broken";
+    }
+    if (st.token_source === "env" && $("input-line-token")) {
+      $("input-line-token").placeholder = zh ? "（已由環境變數提供）" : "(provided by env var)";
+    }
+  } catch (e) {
+    badge.textContent = zh ? "讀不到" : "UNKNOWN";
+    badge.className = "trust broken";
+  }
+}
+
+function lineRenderResult(receipt) {
+  const box = $("line-test-result");
+  if (!box) return;
+  const zh = currentLang === "zh-TW";
+  if (receipt.ok) {
+    const name = receipt.bot_display_name || receipt.bot_basic_id || "";
+    box.textContent = (receipt.message_sent
+      ? (zh ? `✅ 連線成功，已發出測試訊息 ${name}` : `✅ Connected, test message sent ${name}`)
+      : (zh ? `✅ token 有效 ${name}｜${receipt.hint || ""}` : `✅ Token valid ${name} | ${receipt.hint || ""}`))
+      + (receipt.saved ? (zh ? "｜已儲存並啟用" : " | saved and enabled") : "");
+  } else {
+    box.textContent = `❌ ${receipt.error_code || "failed"}：${receipt.hint || ""}`;
+  }
+}
+
+async function lineTest(save) {
+  const zh = currentLang === "zh-TW";
+  const box = $("line-test-result");
+  if (box) box.textContent = zh ? "測試中…" : "Testing…";
+  const body = {
+    access_token: ($("input-line-token").value || "").trim() || null,
+    to: ($("input-line-to").value || "").trim() || null,
+  };
+  try {
+    const receipt = await postJSON(save ? "/api/v1/line/connect" : "/api/v1/line/test", body);
+    lineRenderResult(receipt);
+    if (receipt.saved) {
+      $("input-line-token").value = "";
+      loadLineStatus();
+      loadNotificationChannels();
+    }
+  } catch (e) {
+    lineRenderResult({ ok: false, error_code: "request_failed", hint: String(e.message || e) });
+  }
+}
+
+async function lineDisconnect() {
+  const zh = currentLang === "zh-TW";
+  if (!confirm(zh ? "停用 LINE 推播並清除本機儲存的 token 與收件 ID？" : "Disable LINE push and clear the stored token and recipient id?")) return;
+  try {
+    const receipt = await postJSON("/api/v1/line/disconnect", {});
+    lineRenderResult({ ok: true, hint: receipt.hint });
+    loadLineStatus();
+    loadNotificationChannels();
+  } catch (e) {
+    lineRenderResult({ ok: false, error_code: "request_failed", hint: String(e.message || e) });
+  }
+}
+
+async function loadNotificationChannels() {
+  const box = $("tg-approvals-status");
+  if (!box) return;
+  try {
+    await getJSON("/api/v1/notifications/channels");
+  } catch (e) {}
 }
 
 async function tgArm() {

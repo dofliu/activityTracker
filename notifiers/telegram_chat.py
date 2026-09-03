@@ -13,10 +13,11 @@ port），把綁定 chat 的自由文字轉給 :func:`core.secretary_ask.ask_sec
   切片；若 LLM provider 選的是雲端供應商，內容另會送往該供應商（與網頁相同）。
 - **chat 綁定不變**：只處理設定 chat id 的訊息；其他 chat 靜默忽略。
 - **批准仍是 ADR-008 的兩道門**：Telegram 只能批准 server 白名單的 L0/L1，
-  且通道必須先 arm。``/arm`` 需 execution token 且另有開關
-  ``executor.telegram_approvals.allow_remote_arm``（預設關閉）；帶 token 的
-  訊息一收到就刪除，token 不進 log、不進回傳收據。``/disarm`` 是降低權限的
-  方向，永遠可用、不需任何開關。
+  且通道必須先 arm。``/arm`` 收的是儀表板簽發的**一次性 6 位數短效碼**
+  （ADR-014；5 分鐘失效、用過即銷毀），手機因此永遠不需要持有長期的
+  execution token；另有開關 ``executor.telegram_approvals.allow_remote_arm``
+  （預設關閉）。訊息仍會被刪除當作多一層防護。``/disarm`` 是降低權限的方向，
+  永遠可用、不需任何開關。
 - **不阻塞 poller**：慢的問答丟到背景執行緒，同時間只允許一題；批准按鈕與
   其他指令不會被一題長回答卡住。
 """
@@ -29,7 +30,6 @@ from datetime import datetime
 from typing import Any, Callable, Optional
 
 from core.config import get_config
-from core.security import execution_authorized
 from core.time_utils import get_local_now
 from notifiers.telegram_setup import Transport, _call_api
 
@@ -126,7 +126,7 @@ def send_text(
 def _delete_message(
     token: str, chat: str, message_id: Any, *, transport: Optional[Transport] = None
 ) -> bool:
-    """刪掉含 token 的訊息；失敗不致命，但要如實告知使用者自行刪除。"""
+    """刪掉帶解鎖碼的訊息（多一層防護；碼本身是一次性短效的）。"""
     if message_id is None:
         return False
     try:
@@ -154,7 +154,7 @@ HELP_TEXT = (
     "／proposals　待判斷建議（附可批准按鈕）\n"
     "／notes　記憶區最近的筆記\n"
     "／status　開關、批准通道與記憶區狀態\n"
-    "／arm <token>　解鎖遠端批准（需開啟遠端解鎖開關；訊息會被自動刪除）\n"
+    "／arm <6 位數碼>　解鎖遠端批准（碼在儀表板產生，5 分鐘失效、用一次）\n"
     "／disarm　立刻上鎖批准通道（隨時可用）\n"
     "\n"
     "記下來：… ／ 偏好：… ／ 決定：… 會直接寫進記憶區，不送 LLM。\n"
@@ -261,40 +261,58 @@ def _handle_arm(
     transport: Optional[Transport],
     now: datetime,
 ) -> dict[str, Any]:
-    """`/arm <execution token>`：收到就先刪訊息，再驗證。token 絕不進 log 或收據。"""
-    from notifiers.telegram_approvals import arm_approvals
+    """`/arm <6 位數 code>`：一次性短效碼（ADR-014），不再是長期 execution token。
 
-    deleted = _delete_message(token, chat, message_id, transport=transport)
-    tail = "" if deleted else "\n⚠️ 沒能自動刪除你的訊息，請手動刪除那則含 token 的訊息。"
+    手機因此永遠不需要持有 execution token；碼在儀表板按一下取得，5 分鐘失效、
+    用過即銷毀，留在聊天記錄裡也沒有長期價值。收到仍會嘗試刪除訊息（多一層防護）。
+    """
+    from notifiers.telegram_approvals import arm_approvals, consume_arm_code
+
+    _delete_message(token, chat, message_id, transport=transport)
 
     if not remote_arm_enabled(cfg):
         send_text(
             token,
             chat,
-            "遠端解鎖未開放。請在儀表板「設定 → Telegram 通知 → 🔓 解鎖遠端批准」解鎖，"
-            "或先開啟 executor.telegram_approvals.allow_remote_arm。" + tail,
+            "遠端解鎖未開放。請在儀表板「設定 → Telegram 通知 → 🔓 解鎖遠端批准」直接解鎖，"
+            "或先開啟 executor.telegram_approvals.allow_remote_arm。",
             transport=transport,
         )
         return {"handled": "remote_arm_disabled"}
 
-    provided = raw.split(maxsplit=1)[1].strip() if len(raw.split(maxsplit=1)) > 1 else ""
+    parts = raw.split(maxsplit=1)
+    provided = parts[1].strip() if len(parts) > 1 else ""
     if not provided:
-        send_text(token, chat, "用法：/arm <execution token>（在終端機執行 `omnicontext init --show-token` 取得）。" + tail, transport=transport)
-        return {"handled": "arm_missing_token"}
-    if not execution_authorized(provided, cfg):
-        send_text(token, chat, "execution token 不正確，批准通道維持上鎖。" + tail, transport=transport)
-        return {"handled": "arm_rejected"}
+        send_text(
+            token,
+            chat,
+            "用法：/arm <6 位數碼>。在儀表板「設定 → Telegram 通知 → 🔑 產生解鎖碼」取得，"
+            "5 分鐘內有效、只能用一次。",
+            transport=transport,
+        )
+        return {"handled": "arm_missing_code"}
+
+    accepted, reason = consume_arm_code(provided, cfg=cfg, now=now)
+    if not accepted:
+        hint = {
+            "no_pending_code": "目前沒有待驗的解鎖碼；請在儀表板按「🔑 產生解鎖碼」。",
+            "code_expired": "這個碼已過期（5 分鐘）；請重新產生一組。",
+            "code_mismatch": "碼不正確；為安全起見剛才那組已作廢，請重新產生。",
+        }.get(reason, "解鎖碼無效。")
+        send_text(token, chat, f"批准通道維持上鎖。{hint}", transport=transport)
+        return {"handled": "arm_rejected", "reason": reason}
+
     try:
         receipt = arm_approvals(cfg=cfg, now=now)
     except Exception as exc:  # noqa: BLE001 — 例如 telegram_approvals 未啟用
-        send_text(token, chat, f"沒有解鎖：{getattr(exc, 'error_code', type(exc).__name__)}" + tail, transport=transport)
+        send_text(token, chat, f"沒有解鎖：{getattr(exc, 'error_code', type(exc).__name__)}", transport=transport)
         return {"handled": "arm_failed"}
     send_text(
         token,
         chat,
         f"🔓 批准通道已解鎖至 {str(receipt.get('armed_until'))[:16]}"
         f"（{receipt.get('ttl_hours')} 小時；服務重啟即失效）。"
-        "仍只能批准白名單的 L0/L1 動作，L2 要回儀表板輸入確認碼。" + tail,
+        "仍只能批准白名單的 L0/L1 動作，L2 要回儀表板輸入確認碼。",
         transport=transport,
     )
     return {"handled": "armed", "armed_until": receipt.get("armed_until")}

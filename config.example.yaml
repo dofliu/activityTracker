@@ -272,11 +272,12 @@ proactive_secretary:
       enabled: false
       arm_ttl_hours: 24
       max_actions_per_push: 4
-      # ADR-013：允許在 Telegram 用 `/arm <execution token>` 從手機解鎖批准
-      # 通道。預設關閉——開啟等於同意 execution token 會以訊息形式經過
-      # Telegram（服務收到後立刻刪除該訊息、不寫 log、不進 receipt）；較
-      # 安全的做法仍是在儀表板解鎖。`/disarm`（上鎖）不受此開關限制。
+      # ADR-013／014：允許在 Telegram 用 `/arm <6 位數碼>` 從手機解鎖批准通道。
+      # 碼由儀表板「🔑 產生解鎖碼」簽發（需 execution token），只存雜湊在
+      # 記憶體、arm_code_ttl_seconds 後失效、用過即銷毀——手機因此永遠不需要
+      # 持有長期的 execution token。預設關閉；`/disarm`（上鎖）不受此開關限制。
       allow_remote_arm: false
+      arm_code_ttl_seconds: 300
     agent_cli:
       binary: claude          # 或 codex
       args: ['-p', '{prompt}']  # codex 範例：['exec', '{prompt}']
@@ -318,6 +319,17 @@ notifiers:
       model: ''           # 空＝沿用該 provider 的預設模型
       enable_rag: true
       max_question_chars: 1000
+  # ADR-014 LINE 推播（預設關閉）。**只能推播**：LINE Messaging API 沒有輪詢
+  # 介面，要接收訊息必須由 LINE 平台 webhook POST 到公開 HTTPS 網址，那會
+  # 打破本專案的 loopback-only 邊界（ADR-001）——因此提問與批准仍走 Telegram。
+  # 另注意：LINE 官方帳號免費方案有每月推播則數上限（依地區方案不同）。
+  # to 要填 userId（U 開頭長字串），不是 LINE ID（@xxxx）；取得方式見 USAGE。
+  line:
+    enabled: false
+    access_token_env: LINE_CHANNEL_ACCESS_TOKEN
+    to_env: LINE_TO_ID
+    access_token: ''
+    to: ''
 exporters:
   daily_brief:
     enabled: true

@@ -1,6 +1,6 @@
 # 下一個 Session 接手指南
 
-> 最後更新:2026-09-03(session `claude/stoic-hamilton-4oicm4`:RAG 檢索移至常駐 worker、Repo 同步全覽／批次／秘書同步報告、01 三欄與知識庫分頁、**小秘書記憶區 ADR-012**、**Telegram 手機對話 ADR-013**,TODO B1/B2 結案)。
+> 最後更新:2026-09-03(session `claude/stoic-hamilton-4oicm4`:RAG 檢索移至常駐 worker、Repo 同步全覽／批次／秘書同步報告、01 三欄與知識庫分頁、**小秘書記憶區 ADR-012**、**Telegram 手機對話 ADR-013**、**多通道推播與短效解鎖碼 ADR-014**,TODO B1/B2 結案)。
 > 這頁是給「下一個開發 session(人或 AI)」的最短接手路徑;現況以
 > [STATUS.yaml](../STATUS.yaml) 與 [ROADMAP.md](../ROADMAP.md) §11 為準,
 > **待辦清單一律以 [TODO.md](TODO.md) 為準**(含每項的完成判準)。
@@ -20,13 +20,14 @@
 - **Repo 同步全覽與批次**(2026-09-02,ADR-011 Addendum B):`GET /api/v1/repos/sync-status?scope=all`(全部 repo＋`last_fetch_at`＋summary)、`POST /repos/sync-fetch-all`(唯一不需列清單的批次:只動 remote-tracking refs)、`GET /repos/sync-batch-plan?action=`＋`POST /repos/sync-batch`(先列符合條件清單→確認→逐一在 lock 內重檢;批次 push 需 `repository_sync.batch.allow_push`,預設關)。小秘書:L0 排程 template `repo_sync_report`(`core/repo_sync_report.py`,唯讀不連網,寫 `reports/repo_sync/` 報告＋`latest.json` 快照)→ `build_action_proposals` 讀 ≤36h 的快照產生 `repo_needs_pull/repo_needs_push/repo_diverged`(subject_ref=`repo:<id>`)→ executor 對應 L1 `repo_pull_ff`(pull)／`repo_fetch`(push 不代辦)。**沒有每日自動 pull**(ADR-008 L1 不可排程)。契約在 `tests/test_repo_sync_batch.py`(9 項,真 tmp git repo)。
 - **小秘書記憶區**(2026-09-02,[ADR-012](ADR-012-secretary-memory.md)):`core/secretary_memory.py`——`secretary_notes`(migration 017;kind = user_note/preference/decision/observation;observation 只由 L0 收據產生、依 `source_ref` 每日去重、可單筆或 `DELETE ?kind=observation` 整類刪);對話前綴 `parse_note_command`(前後端同一套規則,「記下來：」不送 LLM);`memory_context()` 固定順序(今日狀態→top 3 提案→偏好決定→筆記→未過期觀察)、字數上限、回收據,`rag/router.py` chat 把它接在 system prompt 與檢索切片之間並送 SSE `memory` 事件;`build_action_proposals` 讀偏好 `不要提醒 X`/`mute: X` 壓提案(`inputs.memory_muted`)、附 `memory_note`;`build_morning_pack(database=)` 尾端寫觀察且故障隔離;`activity_indexer` 新增 secretary_note/micro_summary/report_* 切片(reports_dir 白名單子目錄+根目錄固定檔名),RAG worker job `activity_sync`(`POST /api/v1/rag/memory/sync`)在獨立程序併入。API `GET/POST/DELETE /api/v1/secretary/memory*`。**沒有 LLM 自動寫記憶;偏好只影響提案呈現,不變成執行。**契約在 `tests/test_secretary_memory.py`(20 項)。
 - **手機通道**(2026-09-03,[ADR-013](ADR-013-telegram-secretary-chat.md)):儀表板仍只在 loopback(`allow_remote_clients` 是無認證的全有全無開關,別開);手機走既有 Telegram 長輪詢。`core/secretary_ask.ask_secretary()` 把交辦框那條管線(記憶區脈絡＋`rag.router._retrieve_citations`＋LLM)收成同步呼叫,**rag import 一律在函式內**(ADR-009 乾淨 import 契約由 `tests/test_telegram_chat.py` 末項守門);`notifiers/telegram_chat.py` 是通道層(自由文字→問答、`parse_note_command`→筆記 source=telegram、`/today` `/notes` `/status` `/help`、`/arm`＋`/disarm`)。開關:`notifiers.telegram.chat.enabled`、`executor.telegram_approvals.allow_remote_arm`,**皆預設關閉**;poller 條件改為 `telegram_updates_poller_enabled`(批准或對話任一)。批准仍只 L0/L1＋需 arm;`/arm` 的訊息一收到就 `deleteMessage`,token 不進 log/receipt;`/disarm` 不受開關限制。問答在背景執行緒、同時只一題、長答案分段。**已知邊界:這是唯一會把提問與回答送出本機的通道(內容經 Telegram;引用只送檔名)。**契約在 `tests/test_telegram_chat.py`(26 項,fake transport／fake gateway,不碰網路與索引)。
+- **推播通道**(2026-09-03,[ADR-014](ADR-014-multi-channel-push-and-arm-code.md)):內容與呈現已分離——`notifiers/messages.py` 是通道中立的 `Message`／`Section`＋組裝函式(晨報／晚間交接／日報／停滯提醒),`render_plain`(LINE、CLI)與 `render_telegram_html`(Telegram,內容一律 `html.escape`)各自呈現;`notifiers/channels.py` 的 adapter 宣告能力(`receive`／`buttons`／`delete_message`／`rich_text`),`notifiers/secretary_push.py` 組裝一次扇出多通道(逐通道 try/except)。**LINE 只能推播**(`notifiers/line_setup.py`;token 只走 Authorization header,絕不進 URL/log/receipt)——LINE Messaging API 沒有輪詢介面,接收訊息要公開 webhook,會打破 ADR-001;因此提問／筆記／批准仍只有 Telegram,雙向留在 TODO C6。`TelegramNotifier` 現在只是相容外殼(73 行,不再自己發 HTTP);scheduler 改用 `push_*`,`main.py notify --dry-run` 與實際送出共用組裝。**`/arm` 已改為一次性 6 位數碼**(`issue_arm_code`／`consume_arm_code`:只存雜湊、300 秒、單次、猜錯即焚、disarm 與重啟即銷毀),手機不再需要 execution token;儀表板「🔑 產生解鎖碼」＋`POST /api/v1/telegram/approvals/arm-code`。設定分頁新增「03 LINE 通知」卡(其餘卡片順延為 04–08)。契約在 `tests/test_notification_channels.py`(29 項)與 `tests/test_telegram_chat.py`(29 項)。
 - **介紹影片**:3 分鐘 MP4 已交付使用者;場景源檔在 [`promo/`](../promo/)(單景可重渲,見其 README)。
 
 ## 待辦與下一步
 
 **一律看 [TODO.md](TODO.md)**（每項都附完成判準）。目前的形狀是：
 
-- **A. 等待使用者側 live 收據**(👤 需在 Windows 實機操作,不是程式工作):全天 coverage ledger(唯一還擋 `release_ready` 的能力缺口)、RAG 雲端 provider 複測、Telegram 設定＋inline 批准、L2 執行器試用、P4.3 對帳實操、檢索 worker 大索引實測、Repo 同步全覽與批次實操、小秘書每日包與記憶區實機收據。
+- **A. 等待使用者側 live 收據**(👤 需在 Windows 實機操作,不是程式工作):全天 coverage ledger(唯一還擋 `release_ready` 的能力缺口)、RAG 雲端 provider 複測、Telegram 設定＋inline 批准、L2 執行器試用、P4.3 對帳實操、檢索 worker 大索引實測、Repo 同步全覽與批次實操、小秘書每日包與記憶區實機收據、LINE 推播實機收據。
 - **B. 已知問題與技術債**:legacy AI rows、Extension 覆蓋邊界、PyPI 不在範圍(原 B1 檢索在主程序載入、B2 缺 xdg-open 測試失敗已於 2026-09-02 結案;B1 的實機收據轉為 A6)。
 - **C. 功能候選**:更多 L2／可排程 template、P4 其餘採集來源、更多配色。
 

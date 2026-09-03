@@ -502,9 +502,11 @@
             <div class="fields usage-settings-fields mb-6">
               <div style="display:flex; align-items:flex-end; gap: 8px;">
                 <button class="btn btn-ghost" id="btn-tg-arm" data-i18n="btn_tg_arm">🔓 解鎖遠端批准（需 execution token）</button>
+                <button class="btn btn-ghost" id="btn-tg-arm-code" data-i18n="btn_tg_arm_code" title="簽發一次性 6 位數解鎖碼；在手機送 /arm <碼> 即可解鎖，手機不必持有 execution token">🔑 產生解鎖碼</button>
                 <button class="btn btn-ghost" id="btn-tg-disarm" data-i18n="btn_tg_disarm">🔒 上鎖</button>
               </div>
               <div style="display:flex; align-items:flex-end;"><span id="tg-approvals-status" class="muted small"></span></div>
+              <div id="tg-arm-code-box" class="arm-code-box" hidden></div>
             </div>
             <div class="usage-boundary" data-i18n="tg_chat_boundary">小秘書對話：手機上直接打字即可提問（會帶今日狀態、建議與記憶區筆記），「記下來：…」直接寫進記憶區不送 LLM，/today /notes /status /proposals 為指令。這是本專案唯一會把「你的提問與秘書的回答」送出本機的通道——內容會經過 Telegram 伺服器（引用只送檔名，不送文件內容）；若對話 provider 選雲端供應商，內容另會送往該供應商。預設關閉。</div>
             <div class="usage-boundary" data-i18n="tg_boundary">③ 「測試連線」會即時呼叫 getMe 驗證 token，並向所選對話實發一則固定內容的測試訊息；全部通過才會寫入本機 config.yaml 並啟用晨報／晚報推播。token 與 chat id 只存在本機，瀏覽器永遠拿不回明文（顯示為 ***REDACTED***）；若已設定環境變數 TELEGRAM_BOT_TOKEN／TELEGRAM_CHAT_ID 則優先使用且不會複製進檔案。</div>
@@ -512,10 +514,37 @@
         </div>
 
 
+        <div class="panel mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent">03</span><span class="panel-title" data-i18n="settings_line_title">LINE 通知（只能推播）</span>
+            <span id="line-status-badge" class="trust broken">未設定</span>
+          </div>
+          <div style="padding: 14px;">
+            <div class="muted small mb-6" data-i18n="line_step1_help">① 在 LINE Developers Console 建立 Messaging API channel → 發行「Channel access token（long-lived）」貼到下方。</div>
+            <div class="fields usage-settings-fields mb-6">
+              <div style="grid-column: span 2;"><div class="mono-mini muted mb-6" data-i18n="line_token_label">CHANNEL ACCESS TOKEN</div>
+                <input type="password" id="input-line-token" class="mono" placeholder="長期 token…" autocomplete="off">
+              </div>
+              <div><div class="mono-mini muted mb-6" data-i18n="line_to_label">收件 USER ID</div>
+                <input type="text" id="input-line-to" class="mono" placeholder="U0123456789abcdef…">
+              </div>
+              <div style="display:flex; align-items:flex-end; gap: 8px;">
+                <button class="btn btn-ghost" id="btn-line-test" data-i18n="btn_line_test">📡 測試連線</button>
+                <button class="btn btn-primary" id="btn-line-connect" data-i18n="btn_line_connect">✅ 測試並儲存啟用</button>
+                <button class="btn btn-ghost" id="btn-line-disconnect" data-i18n="btn_line_disconnect">解除</button>
+              </div>
+            </div>
+            <div class="muted small mb-6" data-i18n="line_step2_help">② 用手機把這個官方帳號加為好友，再從 Console 的「Basic settings → Your user ID」複製 userId（U 開頭）貼上——那不是 LINE ID（@xxxx）。</div>
+            <div id="line-test-result" class="muted small mb-6"></div>
+            <div class="usage-boundary" data-i18n="line_boundary">LINE 只做推播（晨報／晚報／日報／停滯提醒）：LINE Messaging API 沒有輪詢介面，要接收你的訊息必須由 LINE 平台 webhook 連到一個公開網址，那會打破本專案「只在 127.0.0.1」的邊界——所以提問、記筆記與批准仍走 Telegram。另請注意 LINE 官方帳號免費方案有每月推播則數上限。token 與 userId 只存本機，瀏覽器永遠拿不回明文。</div>
+          </div>
+        </div>
+
+
         <div class="settings-group-label" data-i18n="settings_group_other">🧩 其他設定（較少變動，點標題展開）</div>
 
         <details class="panel mb-14 panel-collapsible" id="panel-watch-paths">
-          <summary class="panel-head"><span class="mono-label accent">03</span><span class="panel-title" data-i18n="settings_p1_title">監控路徑</span></summary>
+          <summary class="panel-head"><span class="mono-label accent">04</span><span class="panel-title" data-i18n="settings_p1_title">監控路徑</span></summary>
           <div class="split">
             <div class="split-col">
               <div class="mono-mini muted mb-8" data-i18n="label_file_dirs">FILE DIRS</div>
@@ -549,7 +578,7 @@
 
         <details class="panel mb-14 panel-collapsible" id="panel-capture-sources">
           <summary class="panel-head">
-            <span class="mono-label accent">04</span><span class="panel-title" data-i18n="settings_p2_title">採集來源</span>
+            <span class="mono-label accent">05</span><span class="panel-title" data-i18n="settings_p2_title">採集來源</span>
             <span class="muted small" data-i18n="settings_p2_note">右欄標示目前可信度</span>
           </summary>
           <div class="sources">
@@ -565,7 +594,7 @@
         </details>
 
         <details class="panel mb-14 panel-collapsible" id="panel-llm">
-          <summary class="panel-head"><span class="mono-label accent">05</span><span class="panel-title" data-i18n="settings_p3_title">摘要與 LLM</span></summary>
+          <summary class="panel-head"><span class="mono-label accent">06</span><span class="panel-title" data-i18n="settings_p3_title">摘要與 LLM</span></summary>
           <div class="fields">
             <div><div class="mono-mini muted mb-6">DAILY AT</div><input type="text" id="input-schedule-time" value="23:30" class="mono"></div>
             <div><div class="mono-mini muted mb-6">CHECKPOINT / H</div><input type="number" id="input-checkpoint-interval" value="2" min="1" max="12" class="mono"></div>
@@ -598,7 +627,7 @@
 
         <details class="panel mb-14 panel-collapsible" id="panel-usage-settings">
           <summary class="panel-head">
-            <span class="mono-label accent">06</span><span class="panel-title" data-i18n="settings_usage_title">每日使用時間與里程碑</span>
+            <span class="mono-label accent">07</span><span class="panel-title" data-i18n="settings_usage_title">每日使用時間與里程碑</span>
             <span class="muted small" data-i18n="settings_usage_note">前景時間，不代表生產力或實際工時</span>
           </summary>
           <div class="usage-settings-body">
@@ -628,7 +657,7 @@
 
         <details class="panel mb-14 panel-collapsible" id="panel-github">
           <summary class="panel-head">
-            <span class="mono-label accent">07</span><span class="panel-title" data-i18n="settings_p4_title">GitHub 雲端整合 (全專案與 PR 追蹤)</span>
+            <span class="mono-label accent">08</span><span class="panel-title" data-i18n="settings_p4_title">GitHub 雲端整合 (全專案與 PR 追蹤)</span>
             <span id="gh-auth-badge" class="trust broken">未連線</span>
           </summary>
           <div style="padding: 14px;">

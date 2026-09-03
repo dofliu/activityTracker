@@ -4,8 +4,8 @@
 - 綁定 chat 邊界不因對話啟用而鬆動。
 - 自由文字→問答：先回「查一下」再回答案，同時間只允許一題，過長拒絕。
 - 「記下來／偏好／決定」寫進記憶區（source=telegram），完全不呼叫 LLM。
-- /today /notes /status 唯讀；/arm 需開關＋execution token 且訊息立刻刪除、
-  token 不進收據；/disarm（降低權限）永遠可用。
+- /today /notes /status 唯讀；/arm 收一次性短效碼（ADR-014：用過即銷毀、猜錯即
+  作廢、過期即拒），碼與 bot token 都不得回顯；/disarm（降低權限）永遠可用。
 - ask_secretary：問題驗證、收據誠實、LLM 失敗與逾時都降級成可讀答案。
 全部以 fake transport／fake gateway 執行，不需真實 bot、網路或索引。
 """
@@ -37,6 +37,7 @@ from notifiers.telegram_chat import (
 FAKE_TOKEN = "123456789:AAFakeTokenForChatTests"
 FAKE_CHAT = "987654321"
 EXEC_TOKEN = "exec-token-for-tests"
+_LOCAL_ORIGIN = "http://127.0.0.1:8765"
 NOW = datetime(2026, 9, 3, 9, 0, 0)
 
 
@@ -363,57 +364,107 @@ def test_today_survives_a_broken_today_view(monkeypatch):
 
 def test_arm_refused_when_remote_arm_switch_is_off_and_message_deleted():
     transport = RecordingTransport()
+    issued = approvals.issue_arm_code(cfg=_cfg(remote_arm=False), now=NOW)
     receipt = handle_chat_message(
-        f"/arm {EXEC_TOKEN}", cfg=_cfg(remote_arm=False), token=FAKE_TOKEN, chat=FAKE_CHAT,
+        f"/arm {issued['code']}", cfg=_cfg(remote_arm=False), token=FAKE_TOKEN, chat=FAKE_CHAT,
         message_id=7, transport=transport, now=NOW,
     )
     assert receipt == {"handled": "remote_arm_disabled"}
     assert transport.methods()[0] == "deleteMessage"
     assert approvals.approvals_status(cfg=_cfg(), now=NOW)["armed"] is False
-    assert EXEC_TOKEN not in "\n".join(transport.texts())
+    assert issued["code"] not in "\n".join(transport.texts())
 
 
-def test_arm_with_wrong_token_stays_locked():
+def test_arm_without_a_pending_code_is_refused():
     transport = RecordingTransport()
     receipt = handle_chat_message(
-        "/arm not-the-token", cfg=_cfg(remote_arm=True), token=FAKE_TOKEN, chat=FAKE_CHAT,
+        "/arm 123456", cfg=_cfg(remote_arm=True), token=FAKE_TOKEN, chat=FAKE_CHAT,
         message_id=7, transport=transport, now=NOW,
     )
-    assert receipt == {"handled": "arm_rejected"}
-    assert transport.methods()[0] == "deleteMessage"
+    assert receipt == {"handled": "arm_rejected", "reason": "no_pending_code"}
     assert approvals.approvals_status(cfg=_cfg(), now=NOW)["armed"] is False
+    assert "產生解鎖碼" in transport.texts()[-1]
 
 
-def test_arm_with_valid_token_arms_and_never_echoes_the_token():
-    transport = RecordingTransport()
+def test_arm_with_valid_code_arms_and_the_code_is_single_use():
     cfg = _cfg(remote_arm=True)
+    issued = approvals.issue_arm_code(cfg=cfg, now=NOW)
+    assert len(issued["code"]) == 6 and issued["code"].isdigit() and issued["single_use"] is True
+
+    transport = RecordingTransport()
     receipt = handle_chat_message(
-        f"/arm {EXEC_TOKEN}", cfg=cfg, token=FAKE_TOKEN, chat=FAKE_CHAT,
+        f"/arm {issued['code']}", cfg=cfg, token=FAKE_TOKEN, chat=FAKE_CHAT,
         message_id=7, transport=transport, now=NOW,
     )
     assert receipt["handled"] == "armed"
-    assert transport.methods()[0] == "deleteMessage"
+    assert transport.methods()[0] == "deleteMessage"  # 多一層防護：訊息仍被刪除
     assert approvals.approvals_status(cfg=cfg, now=NOW)["armed"] is True
+    # arm 授權窗仍是 24h（碼的短效只約束「解鎖這個動作」）
     assert approvals.approvals_status(cfg=cfg, now=NOW + timedelta(hours=25))["armed"] is False
+    # 碼與 bot token 都不得回顯
     joined = "\n".join(transport.texts()) + str(receipt)
-    assert EXEC_TOKEN not in joined and FAKE_TOKEN not in joined
+    assert issued["code"] not in joined and FAKE_TOKEN not in joined
 
-
-def test_arm_warns_when_the_message_could_not_be_deleted():
-    class FailingDelete(RecordingTransport):
-        def __call__(self, url, payload, timeout):
-            method = url.rsplit("/", 1)[1]
-            self.calls.append((method, payload))
-            if method == "deleteMessage":
-                return 400, {"ok": False}
-            return 200, {"ok": True, "result": {}}
-
-    transport = FailingDelete()
-    handle_chat_message(
-        f"/arm {EXEC_TOKEN}", cfg=_cfg(remote_arm=True), token=FAKE_TOKEN, chat=FAKE_CHAT,
-        message_id=7, transport=transport, now=NOW,
+    # 同一組碼不能再用一次
+    approvals.disarm_approvals()
+    again = handle_chat_message(
+        f"/arm {issued['code']}", cfg=cfg, token=FAKE_TOKEN, chat=FAKE_CHAT,
+        message_id=8, transport=RecordingTransport(), now=NOW,
     )
-    assert "沒能自動刪除" in "\n".join(transport.texts())
+    assert again == {"handled": "arm_rejected", "reason": "no_pending_code"}
+
+
+def test_wrong_code_burns_the_pending_code():
+    """猜錯一次就作廢，避免對同一組碼反覆猜測。"""
+    cfg = _cfg(remote_arm=True)
+    issued = approvals.issue_arm_code(cfg=cfg, now=NOW)
+    wrong = "000000" if issued["code"] != "000000" else "111111"
+    first = handle_chat_message(
+        f"/arm {wrong}", cfg=cfg, token=FAKE_TOKEN, chat=FAKE_CHAT,
+        message_id=7, transport=RecordingTransport(), now=NOW,
+    )
+    assert first == {"handled": "arm_rejected", "reason": "code_mismatch"}
+    second = handle_chat_message(
+        f"/arm {issued['code']}", cfg=cfg, token=FAKE_TOKEN, chat=FAKE_CHAT,
+        message_id=8, transport=RecordingTransport(), now=NOW,
+    )
+    assert second == {"handled": "arm_rejected", "reason": "no_pending_code"}
+    assert approvals.approvals_status(cfg=cfg, now=NOW)["armed"] is False
+
+
+def test_expired_code_is_refused():
+    cfg = _cfg(remote_arm=True)
+    issued = approvals.issue_arm_code(cfg=cfg, now=NOW)
+    late = NOW + timedelta(seconds=issued["ttl_seconds"] + 1)
+    receipt = handle_chat_message(
+        f"/arm {issued['code']}", cfg=cfg, token=FAKE_TOKEN, chat=FAKE_CHAT,
+        message_id=7, transport=RecordingTransport(), now=late,
+    )
+    assert receipt == {"handled": "arm_rejected", "reason": "code_expired"}
+    assert approvals.approvals_status(cfg=cfg, now=late)["armed"] is False
+
+
+def test_arm_code_is_never_stored_in_plaintext_and_status_hides_it():
+    cfg = _cfg(remote_arm=True)
+    issued = approvals.issue_arm_code(cfg=cfg, now=NOW)
+    pending = approvals._PENDING_ARM_CODE
+    assert pending is not None and issued["code"] not in str(pending)
+    status = approvals.approvals_status(cfg=cfg, now=NOW)
+    assert status["arm_code"]["pending"] is True and issued["code"] not in str(status)
+    # disarm 也銷毀待驗碼
+    approvals.disarm_approvals()
+    assert approvals._PENDING_ARM_CODE is None
+    assert approvals.approvals_status(cfg=cfg, now=NOW)["arm_code"] == {"pending": False}
+
+
+def test_arm_code_endpoint_requires_execution_token():
+    from fastapi.testclient import TestClient
+
+    from core.server import app
+
+    client = TestClient(app)
+    res = client.post("/api/v1/telegram/approvals/arm-code", headers={"Origin": _LOCAL_ORIGIN})
+    assert res.status_code == 401
 
 
 def test_disarm_always_available_even_with_remote_arm_off():

@@ -1049,6 +1049,95 @@ def arm_telegram_approvals(request: Request):
         raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
 
 
+@app.post("/api/v1/telegram/approvals/arm-code")
+def issue_telegram_arm_code(request: Request):
+    """簽發一次性 arm code（ADR-014）：手機用它解鎖，不必持有 execution token。
+
+    回傳值是唯一一次看到明碼的機會（只有雜湊留在記憶體、不寫 log）；碼短效、
+    只能用一次，且只能用來解鎖批准通道。
+    """
+    _require_execution_token(request)
+    from notifiers.telegram_approvals import issue_arm_code
+
+    try:
+        return issue_arm_code()
+    except ExecutionRejected as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
+
+
+@app.get("/api/v1/notifications/channels")
+def get_notification_channels():
+    """ADR-014 推播通道總覽（Telegram／LINE）與各自能力；不含任何 secret。"""
+    from notifiers.channels import channels_status
+
+    return channels_status()
+
+
+class LineConnectRequest(BaseModel):
+    access_token: Optional[str] = None
+    to: Optional[str] = None
+    enabled: bool = True
+
+
+class LineTestRequest(BaseModel):
+    access_token: Optional[str] = None
+    to: Optional[str] = None
+    send_test_message: bool = True
+
+
+@app.get("/api/v1/line/status")
+def get_line_status():
+    """LINE 設定現況（僅布林與來源標籤，不回傳 secret 值）。"""
+    from notifiers.line_setup import line_status
+
+    return line_status()
+
+
+@app.post("/api/v1/line/test")
+def test_line(payload: Optional[LineTestRequest] = None):
+    """即時連線測試：/v2/bot/info 驗 token；已有收件 id 時實發一則測試訊息。"""
+    from notifiers.line_setup import test_line_connection
+
+    payload = payload or LineTestRequest()
+    return test_line_connection(
+        access_token=payload.access_token,
+        to=payload.to,
+        send_test_message=payload.send_test_message,
+    )
+
+
+@app.post("/api/v1/line/connect")
+def connect_line(payload: LineConnectRequest):
+    """設定流程收尾：先即時驗證，全部通過才寫 config 並熱套用排程。"""
+    from notifiers.line_setup import save_line_settings
+
+    receipt = save_line_settings(
+        access_token=payload.access_token, to=payload.to, enabled=payload.enabled
+    )
+    if receipt.get("saved"):
+        try:
+            get_manager().reload_config()
+            receipt["scheduler_reloaded"] = True
+        except Exception:  # noqa: BLE001 — 設定已保存；重載失敗如實回報
+            logger.warning("Scheduler reload after LINE connect failed", exc_info=True)
+            receipt["scheduler_reloaded"] = False
+            receipt["hint"] = "設定已保存，但排程重載失敗；重啟服務後生效"
+    return receipt
+
+
+@app.post("/api/v1/line/disconnect")
+def disconnect_line_endpoint():
+    """停用並清除 config 內的 LINE secret（環境變數不受影響）。"""
+    from notifiers.line_setup import disconnect_line
+
+    receipt = disconnect_line()
+    try:
+        get_manager().reload_config()
+    except Exception:  # noqa: BLE001
+        logger.warning("Scheduler reload after LINE disconnect failed", exc_info=True)
+    return receipt
+
+
 @app.get("/api/v1/telegram/chat/status")
 def telegram_chat_status():
     """ADR-013 小秘書對話開關與狀態；唯讀，不含 token。"""

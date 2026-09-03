@@ -888,6 +888,8 @@ details.trust-panel[open] summary { border-bottom: none; }
 /* Repo 全覽與批次（ADR-011 Addendum B） */
 .repo-overview-toolbar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-content: flex-start; }
 .repo-overview-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 8px; }
+/* 同上：display 規則必須為 hidden 屬性留退路 */
+.repo-overview-filters[hidden] { display: none; }
 .repo-overview-filters .repo-overview-chip { padding: 3px 9px; border: 1px solid var(--bd); border-radius: 999px; background: var(--s2); color: var(--mu); font-family: "JetBrains Mono", monospace; font-size: 10px; cursor: pointer; }
 .repo-overview-filters .repo-overview-chip.is-active { border-color: var(--accent); color: var(--accent); background: rgba(237, 115, 35, 0.10); }
 .repo-overview-table { overflow-x: auto; border: 1px solid var(--bd); background: var(--s1); }
@@ -980,3 +982,9 @@ details.trust-panel[open] summary { border-bottom: none; }
   .memory-add-row { grid-template-columns: 1fr 1fr; }
   .memory-add-row input:nth-child(3) { grid-column: 1 / -1; }
 }
+
+/* ADR-014 一次性解鎖碼 */
+.arm-code-box { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin-top: 6px; border: 1px solid var(--accent); border-radius: 6px; background: var(--s2); }
+/* display:flex 會蓋掉 hidden 屬性的 display:none，必須明確還原 */
+.arm-code-box[hidden] { display: none; }
+.arm-code { font-family: "JetBrains Mono", monospace; font-size: 20px; font-weight: 700; letter-spacing: 4px; color: var(--accent); }

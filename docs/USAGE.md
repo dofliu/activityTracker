@@ -4,7 +4,7 @@
 >
 > 主要驗證平台：Windows 11、Python 3.12、Chrome/Edge MV3
 
-本文件提供可直接執行的安裝、啟動、Browser Extension 配對、每日使用、備份與故障排查流程。架構決策另見 [ADR-001](ADR-001-p2-5-trust-boundary.md)、[ADR-002](ADR-002-extension-monitor-and-usage-milestones.md)、[ADR-003](ADR-003-versioned-sqlite-migrations.md)、[ADR-004](ADR-004-packaged-runtime-layout.md)、[ADR-006](ADR-006-derived-context-sessions-and-related-history.md)、[ADR-007](ADR-007-proposal-only-secretary.md)、[ADR-011](ADR-011-safe-local-repository-sync.md)、[ADR-012](ADR-012-secretary-memory.md)、[ADR-013](ADR-013-telegram-secretary-chat.md) 與 [Release Checklist](RELEASE_CHECKLIST.md)。
+本文件提供可直接執行的安裝、啟動、Browser Extension 配對、每日使用、備份與故障排查流程。架構決策另見 [ADR-001](ADR-001-p2-5-trust-boundary.md)、[ADR-002](ADR-002-extension-monitor-and-usage-milestones.md)、[ADR-003](ADR-003-versioned-sqlite-migrations.md)、[ADR-004](ADR-004-packaged-runtime-layout.md)、[ADR-006](ADR-006-derived-context-sessions-and-related-history.md)、[ADR-007](ADR-007-proposal-only-secretary.md)、[ADR-011](ADR-011-safe-local-repository-sync.md)、[ADR-012](ADR-012-secretary-memory.md)、[ADR-013](ADR-013-telegram-secretary-chat.md)、[ADR-014](ADR-014-multi-channel-push-and-arm-code.md) 與 [Release Checklist](RELEASE_CHECKLIST.md)。
 
 ## 1. 安裝與初始化
 
@@ -580,6 +580,49 @@ proactive_secretary:
 
 安全邊界：token 與 chat id 只存在本機（config.yaml 或環境變數），瀏覽器永遠拿不回明文——`GET /api/v1/config` 一律回 `***REDACTED***`，狀態 API 只回報「已設定／未設定」與來源；若已設定環境變數 `TELEGRAM_BOT_TOKEN`／`TELEGRAM_CHAT_ID` 則**優先使用且不會複製進檔案**；「解除」只清除 config 內的值，不動環境變數。測試訊息內容固定，不含任何工作資料。
 
+### 選 LINE 還是 Telegram？（2026-09-03，ADR-014）
+
+兩個都可以設定，也可以同時開——但**能做的事不一樣**，原因是 API 本身的差異：
+
+| | Telegram | LINE |
+| :-- | :-- | :-- |
+| 收推播（晨報／晚報／日報／停滯提醒） | ✅ | ✅ |
+| 提問、記筆記 | ✅ | ❌ |
+| 按鈕批准 L0/L1 | ✅ | ❌ |
+| 費用 | 免費、沒有則數上限 | 免費方案有**每月推播則數上限** |
+
+**為什麼 LINE 只能推播**：Telegram 有 `getUpdates` 長輪詢，本機服務是主動往外拿訊息，不必開任何對外 port；LINE Messaging API 只有 webhook，要收到你的訊息就得讓 LINE 平台連到一個公開網址，那會打破本專案「只在 127.0.0.1」的邊界。所以**提問與批准請用 Telegram，LINE 當純通知**。
+
+**LINE 設定（「設定 → 03 LINE 通知」）**：
+
+1. 在 [LINE Developers Console](https://developers.line.biz/) 建立 Messaging API channel，發行 **Channel access token（long-lived）** 貼進第一欄。
+2. 用手機把這個官方帳號**加為好友**，再從 Console「Basic settings → Your user ID」複製 **userId**（U 開頭的長字串）貼進第二欄——那不是 LINE ID（@xxxx）。
+3. 按「📡 測試連線」會實際呼叫 LINE API 驗 token 並發一則固定內容的測試訊息；按「✅ 測試並儲存啟用」才會寫入 config。驗證失敗時 config 完全不動。
+
+```yaml
+notifiers:
+  line:
+    enabled: false            # 預設關閉
+    access_token_env: LINE_CHANNEL_ACCESS_TOKEN   # 環境變數優先，且不會被複製進 config
+    to_env: LINE_TO_ID
+    access_token: ''
+    to: ''
+```
+
+token 與 userId 只存本機、瀏覽器永遠拿不回明文；token 只走 `Authorization` header，不會出現在 URL 或 log。`GET /api/v1/notifications/channels` 可看到兩個通道的開關與能力（LINE 會如實標示 `receive: false`）。
+
+`python main.py notify briefing --channel telegram --dry-run` 會印出**與實際送出完全相同**的內容（不加 `--dry-run` 則推到所有啟用的通道）。
+
+### 從手機解鎖批准：一次性解鎖碼（2026-09-03，ADR-014）
+
+`/arm` 不再接受 execution token——手機不必、也不應該持有長期 secret：
+
+1. 儀表板「設定 → Telegram 通知」按 **🔑 產生解鎖碼**（需 execution token），畫面顯示一組 6 位數。
+2. 5 分鐘內在手機傳 `/arm 123456`。碼**只能用一次**，猜錯一次就作廢，`/disarm` 與服務重啟都會銷毀它。
+3. 解鎖成功後的授權窗仍是 24 小時；能批准的仍只有白名單 L0/L1，L2 一律回儀表板走確認碼。
+
+需要先勾「允許用 /arm 從手機解鎖批准」（`allow_remote_arm`，預設關閉）。`/disarm`（上鎖）不受任何開關限制、隨時可用。
+
 ### 在手機上用小秘書（Telegram 對話，2026-09-03，ADR-013，預設關閉）
 
 儀表板只開在 `127.0.0.1`，人不在電腦前就看不到。手機通道走既有的 Telegram（outbound-only 長輪詢，不開任何 port）：勾選「設定 → Telegram 通知 → 啟用小秘書對話」並儲存後，在綁定的對話裡——
@@ -587,7 +630,7 @@ proactive_secretary:
 - **直接打字＝提問**：走與儀表板交辦框**同一條管線**（記憶區脈絡＋知識庫檢索＋所選 LLM）。回覆會附「📎 引用：檔名」與「🧠 參考記憶區 N 筆」。第一則先回「🤔 查一下…」，答案在模型回完後送出；同一時間只回答一題，太長的答案會分段而不是截斷。
 - **記下來：… ／ 偏好：… ／ 決定：…**（或 `/note` `/pref` `/decision` `remember:`）直接寫進記憶區（ADR-012），**不送 LLM**；可帶 `@專案`。偏好寫「不要提醒 repo_needs_push」之後，提案清單立刻不再出現該類建議。
 - **指令**：`/today`（上次做到哪＋早晨包＋前三個建議含「為什麼是現在」）、`/proposals`（附批准按鈕）、`/notes`、`/status`、`/help`。
-- **批准**：仍只有 server 白名單的 L0/L1，且通道要先解鎖。預設只能在儀表板按「🔓 解鎖遠端批准」；若另外勾選「允許用 /arm <token> 從手機解鎖」，可在手機送 `/arm <execution token>`——**服務一收到就刪掉那則訊息**，token 不寫 log、不進任何回覆。`/disarm`（上鎖）不受開關限制、隨時可用，手機掉了就傳它。
+- **批准**：仍只有 server 白名單的 L0/L1，且通道要先解鎖。預設只能在儀表板按「🔓 解鎖遠端批准」；若另外勾選「允許用 /arm 從手機解鎖」，可在手機送 `/arm <6 位數碼>`（碼在儀表板產生，見下一節；手機不必持有 execution token）。`/disarm`（上鎖）不受開關限制、隨時可用，手機掉了就傳它。
 
 ```yaml
 notifiers:
