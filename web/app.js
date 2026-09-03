@@ -226,6 +226,9 @@ const I18N = {
     btn_tg_disconnect: "解除",
     tg_boundary: "③ 「測試連線」會即時呼叫 getMe 驗證 token，並向所選對話實發一則固定內容的測試訊息；全部通過才會寫入本機 config.yaml 並啟用晨報／晚報推播。token 與 chat id 只存在本機，瀏覽器永遠拿不回明文（顯示為 ***REDACTED***）；若已設定環境變數 TELEGRAM_BOT_TOKEN／TELEGRAM_CHAT_ID 則優先使用且不會複製進檔案。inline 批准只處理綁定 chat 的按鈕、只能執行 L0/L1 白名單動作（L2 一律回儀表板）；批准通道需以 execution token 解鎖，重啟服務即自動上鎖。",
     tg_approvals_label: "啟用 inline 批准（晨報／晚報附「✅ 批准」按鈕，僅 L0/L1）",
+    tg_secretary_chat_label: "啟用小秘書對話（手機上直接提問／記筆記；提問與回答會經過 Telegram）",
+    tg_remote_arm_label: "允許用 /arm <token> 從手機解鎖批准（訊息會被自動刪除；不開則只能在這裡解鎖）",
+    tg_chat_boundary: "小秘書對話：手機上直接打字即可提問（會帶今日狀態、建議與記憶區筆記），「記下來：…」直接寫進記憶區不送 LLM，/today /notes /status /proposals 為指令。這是本專案唯一會把「你的提問與秘書的回答」送出本機的通道——內容會經過 Telegram 伺服器（引用只送檔名，不送文件內容）；若對話 provider 選雲端供應商，內容另會送往該供應商。預設關閉。",
     btn_tg_arm: "🔓 解鎖遠端批准（需 execution token）",
     btn_tg_disarm: "🔒 上鎖",
     gh_opt1_title: "快捷方式 1 (推薦)：本機 GITHUB CLI",
@@ -490,6 +493,9 @@ const I18N = {
     btn_tg_disconnect: "Disconnect",
     tg_boundary: "③ Test connection calls getMe live to validate the token and sends one fixed test message to the selected chat; only when everything passes are the settings written to local config.yaml and the morning/evening pushes enabled. Token and chat id stay on this machine — the browser never gets the plaintext back (shown as ***REDACTED***). If TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID env vars exist they take precedence and are never copied into the file. Inline approvals only accept buttons from the bound chat and only run L0/L1 whitelist actions (L2 always goes back to the dashboard); the approval channel must be unlocked with the execution token and re-locks on every service restart.",
     tg_approvals_label: "Enable inline approvals (✅ buttons on morning/evening pushes, L0/L1 only)",
+    tg_secretary_chat_label: "Enable secretary chat (ask and take notes from your phone; questions and answers pass through Telegram)",
+    tg_remote_arm_label: "Allow /arm <token> to unlock approvals from the phone (the message is deleted automatically; otherwise unlock here only)",
+    tg_chat_boundary: "Secretary chat: type in the bound chat to ask (today's status, proposals and your notes are included); “remember: …” writes straight to memory without calling the LLM; /today /notes /status /proposals are commands. This is the only channel that sends your questions and the secretary's answers off this machine — content passes through Telegram's servers (citations send filenames only, never document content), and a cloud chat provider also receives the content. Off by default.",
     btn_tg_arm: "🔓 Unlock remote approvals (execution token)",
     btn_tg_disarm: "🔒 Lock",
     gh_opt1_title: "Option 1 (Recommended): Local GITHUB CLI",
@@ -2571,6 +2577,9 @@ async function loadConfig() {
     $("select-agent-cli").value = (executor.agent_cli && executor.agent_cli.binary) === "codex" ? "codex" : "claude";
     $("toggle-scheduled-tasks").checked = !!(executor.scheduled_tasks && executor.scheduled_tasks.enabled === true);
     $("toggle-tg-approvals").checked = !!(executor.telegram_approvals && executor.telegram_approvals.enabled === true);
+    $("toggle-tg-remote-arm").checked = !!(executor.telegram_approvals && executor.telegram_approvals.allow_remote_arm === true);
+    const tgChat = ((currentConfig.notifiers || {}).telegram || {}).chat || {};
+    $("toggle-tg-chat").checked = tgChat.enabled === true;
     loadScheduledTasks();
     loadTelegramStatus();
     loadTelegramApprovalsStatus();
@@ -2697,6 +2706,11 @@ async function saveSettings() {
   executorCfg.scheduled_tasks.enabled = $("toggle-scheduled-tasks").checked;
   executorCfg.telegram_approvals = executorCfg.telegram_approvals || {};
   executorCfg.telegram_approvals.enabled = $("toggle-tg-approvals").checked;
+  executorCfg.telegram_approvals.allow_remote_arm = $("toggle-tg-remote-arm").checked;
+  cfg.notifiers = cfg.notifiers || {};
+  cfg.notifiers.telegram = cfg.notifiers.telegram || {};
+  cfg.notifiers.telegram.chat = cfg.notifiers.telegram.chat || {};
+  cfg.notifiers.telegram.chat.enabled = $("toggle-tg-chat").checked;
 
   cfg.usage_tracking = cfg.usage_tracking || {};
   cfg.usage_tracking.enabled = $("toggle-usage-tracking").checked;
@@ -3018,6 +3032,11 @@ async function loadTelegramApprovalsStatus() {
       parts.push(zh ? "🔒 已上鎖（按「解鎖遠端批准」啟用）" : "🔒 locked (press Unlock to enable)");
     }
     parts.push((zh ? "輪詢器：" : "poller: ") + (st.poller_running ? (zh ? "運行中" : "running") : (zh ? "未運行（啟用後重載設定）" : "not running")));
+    try {
+      const chat = await getJSON("/api/v1/telegram/chat/status");
+      parts.push((zh ? "對話：" : "chat: ") + (chat.enabled ? (zh ? "開" : "on") : (zh ? "關" : "off")));
+      if (chat.enabled && chat.remote_arm_enabled) parts.push(zh ? "允許 /arm" : "/arm allowed");
+    } catch (e) {}
     box.textContent = parts.join(" · ");
   } catch (e) {
     box.textContent = "";

@@ -51,6 +51,7 @@
 | [ADR-010](ADR-010-verified-background-agent-task-time.md) | 可驗證背景 Agent 任務時間 | 成對 receipt 才計時的邊界 |
 | [ADR-011](ADR-011-safe-local-repository-sync.md) | 受控本機 Repository 同步（含 P4.3 Onboarding Addendum） | Git 同步中心安全預設、對帳與 init/attach/clone/create 確認式動作 |
 | [ADR-012](ADR-012-secretary-memory.md) | 小秘書記憶區（大腦） | 筆記表 migration 017、觀察可刪、對話注入有上限附收據、提案讀偏好、報告併入 RAG |
+| [ADR-013](ADR-013-telegram-secretary-chat.md) | Telegram 小秘書對話（手機通道） | 對話與網頁同一條管線、預設關閉、內容經 Telegram 的邊界、/arm 需開關且訊息即刪、/disarm 永遠可用 |
 
 ## 功能規格與驗證
 

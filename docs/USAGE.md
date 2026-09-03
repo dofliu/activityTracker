@@ -4,7 +4,7 @@
 >
 > 主要驗證平台：Windows 11、Python 3.12、Chrome/Edge MV3
 
-本文件提供可直接執行的安裝、啟動、Browser Extension 配對、每日使用、備份與故障排查流程。架構決策另見 [ADR-001](ADR-001-p2-5-trust-boundary.md)、[ADR-002](ADR-002-extension-monitor-and-usage-milestones.md)、[ADR-003](ADR-003-versioned-sqlite-migrations.md)、[ADR-004](ADR-004-packaged-runtime-layout.md)、[ADR-006](ADR-006-derived-context-sessions-and-related-history.md)、[ADR-007](ADR-007-proposal-only-secretary.md)、[ADR-011](ADR-011-safe-local-repository-sync.md)、[ADR-012](ADR-012-secretary-memory.md) 與 [Release Checklist](RELEASE_CHECKLIST.md)。
+本文件提供可直接執行的安裝、啟動、Browser Extension 配對、每日使用、備份與故障排查流程。架構決策另見 [ADR-001](ADR-001-p2-5-trust-boundary.md)、[ADR-002](ADR-002-extension-monitor-and-usage-milestones.md)、[ADR-003](ADR-003-versioned-sqlite-migrations.md)、[ADR-004](ADR-004-packaged-runtime-layout.md)、[ADR-006](ADR-006-derived-context-sessions-and-related-history.md)、[ADR-007](ADR-007-proposal-only-secretary.md)、[ADR-011](ADR-011-safe-local-repository-sync.md)、[ADR-012](ADR-012-secretary-memory.md)、[ADR-013](ADR-013-telegram-secretary-chat.md) 與 [Release Checklist](RELEASE_CHECKLIST.md)。
 
 ## 1. 安裝與初始化
 
@@ -579,6 +579,34 @@ proactive_secretary:
 4. **儲存啟用**：「✅ 測試並儲存啟用」重跑同一組驗證，**全部通過才**寫入本機 `config.yaml` 並熱套用排程（晨報 09:00／晚報 23:30 可調）；驗證失敗時設定完全不動。
 
 安全邊界：token 與 chat id 只存在本機（config.yaml 或環境變數），瀏覽器永遠拿不回明文——`GET /api/v1/config` 一律回 `***REDACTED***`，狀態 API 只回報「已設定／未設定」與來源；若已設定環境變數 `TELEGRAM_BOT_TOKEN`／`TELEGRAM_CHAT_ID` 則**優先使用且不會複製進檔案**；「解除」只清除 config 內的值，不動環境變數。測試訊息內容固定，不含任何工作資料。
+
+### 在手機上用小秘書（Telegram 對話，2026-09-03，ADR-013，預設關閉）
+
+儀表板只開在 `127.0.0.1`，人不在電腦前就看不到。手機通道走既有的 Telegram（outbound-only 長輪詢，不開任何 port）：勾選「設定 → Telegram 通知 → 啟用小秘書對話」並儲存後，在綁定的對話裡——
+
+- **直接打字＝提問**：走與儀表板交辦框**同一條管線**（記憶區脈絡＋知識庫檢索＋所選 LLM）。回覆會附「📎 引用：檔名」與「🧠 參考記憶區 N 筆」。第一則先回「🤔 查一下…」，答案在模型回完後送出；同一時間只回答一題，太長的答案會分段而不是截斷。
+- **記下來：… ／ 偏好：… ／ 決定：…**（或 `/note` `/pref` `/decision` `remember:`）直接寫進記憶區（ADR-012），**不送 LLM**；可帶 `@專案`。偏好寫「不要提醒 repo_needs_push」之後，提案清單立刻不再出現該類建議。
+- **指令**：`/today`（上次做到哪＋早晨包＋前三個建議含「為什麼是現在」）、`/proposals`（附批准按鈕）、`/notes`、`/status`、`/help`。
+- **批准**：仍只有 server 白名單的 L0/L1，且通道要先解鎖。預設只能在儀表板按「🔓 解鎖遠端批准」；若另外勾選「允許用 /arm <token> 從手機解鎖」，可在手機送 `/arm <execution token>`——**服務一收到就刪掉那則訊息**，token 不寫 log、不進任何回覆。`/disarm`（上鎖）不受開關限制、隨時可用，手機掉了就傳它。
+
+```yaml
+notifiers:
+  telegram:
+    chat:
+      enabled: false      # 預設關閉
+      provider: ''        # 空＝沿用 rag.active_provider；留 ollama 就只有 Telegram 看得到內容
+      model: ''
+      enable_rag: true
+      max_question_chars: 1000
+proactive_secretary:
+  executor:
+    telegram_approvals:
+      allow_remote_arm: false   # 開啟才能用 /arm；/disarm 不受限
+```
+
+> **隱私邊界（請先讀）**：這是本專案唯一會把「你的提問與秘書的回答」送出本機的通道——內容會經過 Telegram 伺服器。引用只送**檔名**，不送被檢索到的文件內容切片；若對話 provider 選雲端供應商，內容另會送往該供應商（與網頁相同）。全本機請把 provider 留成 `ollama`。不想外送任何內容就別開這個開關——通知、`/proposals` 與 inline 批准不受影響。
+
+**想要完整儀表板而不是對話？** 目前沒有內建的遠端網頁存取（`security.allow_remote_clients` 是「全有全無」且沒有認證，不建議直接開）。可行且不外送內容的做法是在電腦與手機各裝一次 Tailscale／WireGuard，讓手機以私有網路連回 `127.0.0.1:8765`；儀表板在 494px 已無水平溢出，手機瀏覽器可直接用。這需要另外放寬 loopback 邊界並加上認證，尚未實作（見 docs/TODO.md）。
 
 ### Telegram inline 批准與晚間交接（P5-R4b，預設關閉）
 

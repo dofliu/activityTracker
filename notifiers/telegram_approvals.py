@@ -358,6 +358,7 @@ def handle_telegram_update(
     transport: Optional[Transport] = None,
     execute: Optional[Callable[..., dict[str, Any]]] = None,
     push_proposals: Optional[Callable[..., dict[str, Any]]] = None,
+    chat_handler: Optional[Callable[..., dict[str, Any]]] = None,
 ) -> dict[str, Any]:
     """處理單一 update；回傳非敏感 receipt 供 log 與 contract tests。"""
     global _IGNORED_FOREIGN_UPDATES
@@ -451,21 +452,37 @@ def handle_telegram_update(
             with _STATE_LOCK:
                 _IGNORED_FOREIGN_UPDATES += 1
             return {"handled": "ignored_foreign_chat"}
-        text = str(message.get("text") or "").strip().lower()
+        text_raw = str(message.get("text") or "").strip()
+        text = text_raw.lower()
         if text.startswith("/proposals"):
             push = push_proposals or push_proposals_to_telegram
             push(cfg=cfg, transport=transport)
             return {"handled": "proposals_pushed"}
+        # ADR-013：對話開關開啟時，其餘訊息交給小秘書對話層（提問／筆記／指令）。
+        from notifiers.telegram_chat import handle_chat_message, telegram_chat_enabled
+
+        if telegram_chat_enabled(cfg):
+            handler = chat_handler or handle_chat_message
+            return handler(
+                text_raw,
+                cfg=cfg,
+                token=token,
+                chat=str(chat_configured),
+                message_id=message.get("message_id"),
+                transport=transport,
+                now=now,
+            )
         if text.startswith("/start") or text.startswith("/help"):
             _send_text(
                 token,
                 chat_configured,
                 "OmniContext 秘書通知通道已連通。指令：/proposals 取得目前建議"
-                "（批准按鈕需先在儀表板解鎖批准通道）。",
+                "（批准按鈕需先在儀表板解鎖批准通道）。開啟"
+                "「小秘書對話」後可直接在這裡提問與記筆記。",
                 transport=transport,
             )
             return {"handled": "help_sent"}
-        # 其他訊息一律不回應：這是通知/批准通道，不是聊天介面。
+        # 對話未啟用時，其他訊息一律不回應：這是通知/批准通道，不是聊天介面。
         return {"handled": "message_ignored"}
 
     return {"handled": "unsupported_update"}

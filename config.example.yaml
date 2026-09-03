@@ -272,6 +272,11 @@ proactive_secretary:
       enabled: false
       arm_ttl_hours: 24
       max_actions_per_push: 4
+      # ADR-013：允許在 Telegram 用 `/arm <execution token>` 從手機解鎖批准
+      # 通道。預設關閉——開啟等於同意 execution token 會以訊息形式經過
+      # Telegram（服務收到後立刻刪除該訊息、不寫 log、不進 receipt）；較
+      # 安全的做法仍是在儀表板解鎖。`/disarm`（上鎖）不受此開關限制。
+      allow_remote_arm: false
     agent_cli:
       binary: claude          # 或 codex
       args: ['-p', '{prompt}']  # codex 範例：['exec', '{prompt}']
@@ -301,6 +306,18 @@ notifiers:
     chat_id: ''
     morning_briefing_time: 09:00
     evening_summary_time: '23:30'
+    # ADR-013 小秘書對話（預設關閉）：開啟後在綁定 chat 直接打字就是提問，
+    # 走與儀表板交辦框同一條管線（記憶區脈絡＋知識庫檢索＋所選 LLM）；
+    # 「記下來：…／偏好：…／決定：…」直接寫記憶區不送 LLM。
+    # 注意：這是唯一會把「你的提問與秘書的回答」送出本機的通道——內容會
+    # 經過 Telegram 伺服器（引用只送檔名，不送文件內容切片）；provider 選
+    # 雲端供應商時內容另會送往該供應商。全本機請留 provider: ollama。
+    chat:
+      enabled: false
+      provider: ''        # 空＝沿用 rag.active_provider
+      model: ''           # 空＝沿用該 provider 的預設模型
+      enable_rag: true
+      max_question_chars: 1000
 exporters:
   daily_brief:
     enabled: true
