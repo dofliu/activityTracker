@@ -1018,6 +1018,9 @@ details.trust-panel[open] summary { border-bottom: none; }
 .greeting-headline { font-size: 15px; font-weight: 700; }
 .greeting-list { margin: 2px 0 8px 18px; padding: 0; font-size: 13px; line-height: 1.6; }
 .greeting-encourage { color: var(--accent); font-weight: 600; }
+.greeting-schedule { color: var(--tx); opacity: 0.92; }
+.calendar-source { margin-top: 12px; padding: 12px 14px 10px; border-top: 1px dashed var(--bd); }
+.calendar-source .taglist { margin-bottom: 8px; }
 .greeting-stats { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
 .greeting-stats .pchip { margin-left: 0; font-size: 10.5px; padding: 2px 8px; }
 .greeting-card .context-memory-boundary { margin: 8px 0 0; }

@@ -340,6 +340,22 @@ def build_today_view(
         presets = presets_status(database=database, now=now)
     except Exception as exc:  # noqa: BLE001 — 排程表讀不到也不該讓今日視圖消失
         presets = {"error": type(exc).__name__}
+    calendar: dict[str, Any] = {"enabled": False, "count": 0, "line": None}
+    try:
+        from core.calendar_agenda import day_agenda, schedule_sentence
+
+        agenda = day_agenda(now=now, database=database, cfg=cfg)
+        calendar = {
+            "enabled": agenda["enabled"],
+            "count": agenda["count"],
+            "remaining_count": agenda["remaining_count"],
+            "ongoing": agenda["ongoing"],
+            "next": agenda["next"],
+            "line": schedule_sentence(agenda),
+            "claim_boundary": agenda["claim_boundary"],
+        }
+    except Exception as exc:  # noqa: BLE001 — 行事曆讀不到也不該讓今日視圖消失
+        calendar = {"enabled": False, "error": type(exc).__name__, "count": 0, "line": None}
     memory: dict[str, Any] = {"enabled": False, "counts": {}, "total": 0}
     try:
         from core.secretary_memory import list_notes, memory_enabled
@@ -356,6 +372,7 @@ def build_today_view(
         "pack": pack,
         "pack_line": pack_summary_line(pack),
         "memory": memory,
+        "calendar": calendar,
         "schedules": {
             "executor_enabled": executor_enabled(cfg),
             "scheduled_tasks_enabled": scheduled_tasks_enabled(cfg),

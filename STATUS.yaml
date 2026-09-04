@@ -6,7 +6,7 @@ progress_basis: "依 P0-P8 加權里程碑估計；不是 release readiness 百�
 status: active_hardening
 release_ready: false
 last_updated: "2026-09-04"
-current_phase: "ADR-008 P5-R1～R5 全階段完成（秘書執行器／Telegram inline 批准／L0 排程任務，全部預設關閉）+ P4.3 Repo Onboarding + 儀表板資訊架構重整與配色主題 + RAG 檢索移至常駐 worker（ADR-009 Addendum）+ Repo 同步全覽／批次／秘書同步報告（ADR-011 Addendum B）+ 儀表板資訊整併與秘書每日包（早晨包／活躍專案 Handoff／為什麼是現在）；進入等待使用者側 live 收據階段"
+current_phase: "ADR-008 P5-R1～R5 全階段完成（秘書執行器／Telegram inline 批准／L0 排程任務，全部預設關閉）+ P4.3 Repo Onboarding + 儀表板資訊架構重整與配色主題 + RAG 檢索移至常駐 worker（ADR-009 Addendum）+ Repo 同步全覽／批次／秘書同步報告（ADR-011 Addendum B）+ 儀表板資訊整併與秘書每日包（早晨包／活躍專案 Handoff／為什麼是現在）+ 秘書記憶區／Telegram 對話／多通道推播／問候卡（ADR-012～014）+ 本機行事曆採集（ADR-015）；進入等待使用者側 live 收據階段"
 next_milestone: "取得使用者側 live 收據（全天 coverage ledger、Telegram 設定＋inline 批准、L2 draft→apply、P4.3 onboarding 一輪實操）後重評 release_ready；功能面依需求擴充 template 或評估 P4 其餘來源"
 planned_features:
   - id: FEATURE-001
@@ -504,6 +504,7 @@ quality_gates:
   telegram_secretary_chat: implemented_same_pipeline_as_web_chat_notes_and_readonly_commands_l0_l1_approvals_unchanged_remote_arm_switch_default_off_message_deleted_26_contract_tests_container_e2e_live_receipt_pending
   multi_channel_push_and_arm_code: implemented_message_render_split_telegram_and_line_adapters_line_push_only_by_api_design_fanout_isolated_one_time_arm_code_single_use_burn_on_miss_58_contract_tests_container_e2e_live_receipt_pending
   secretary_greeting_card: implemented_today_2h_and_bounded_yesterday_windows_counts_traceable_to_tables_email_calendar_declared_out_of_scope_rule_based_encouragement_seeded_per_day_llm_polish_default_off_with_numeric_fact_guard_leads_morning_briefing_with_yesterday_fallback_accent_tinted_card_26_contract_tests_container_playwright_and_dry_run_live_receipt_pending
+  local_calendar_source_adr_015: implemented_read_only_local_ics_polling_stdlib_parser_rrule_exdate_override_tz_to_local_no_description_attendees_or_urls_stored_replace_per_source_within_horizon_migration_018_greeting_briefing_today_panel_integration_17_contract_tests_container_e2e_live_receipt_pending
   ollama_chain_live_diagnostic: passed_windows_llm_test_2026_08_31_reachable_llama31_8b_generation_8_36s_default_provider_gemini_by_config
   live_receipt_acceptance_scripts: passed_localhost_e2e_background_tasks_and_extension
   autonomous_execution: blocked_by_p2_5

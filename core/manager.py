@@ -18,6 +18,7 @@ from watchers.file_watcher import FileWatcherService
 from watchers.git_watcher import GitWatcherService
 from watchers.window_watcher import WindowWatcherService
 from watchers.agent_log_watcher import AgentLogWatcherService
+from watchers.calendar_watcher import CalendarWatcherService, calendar_effective
 from synthesizer.scheduler import SynthesisScheduler
 
 logger = logging.getLogger("OmniContext.Manager")
@@ -85,6 +86,7 @@ class WatcherManager:
         self.git_watcher = GitWatcherService()
         self.window_watcher = WindowWatcherService()
         self.agent_log_watcher = AgentLogWatcherService()
+        self.calendar_watcher = CalendarWatcherService()
         self.scheduler = SynthesisScheduler()
         self._healing_history: list[Dict[str, Any]] = []
 
@@ -98,6 +100,7 @@ class WatcherManager:
             ("git_watcher", self.git_watcher),
             ("window_watcher", self.window_watcher),
             ("agent_log_watcher", self.agent_log_watcher),
+            ("calendar_watcher", self.calendar_watcher),
             ("scheduler", self.scheduler),
         ]:
             if hasattr(service, "check_health_and_heal"):
@@ -178,6 +181,7 @@ class WatcherManager:
             self.git_watcher.start()
             self.window_watcher.start()
             self.agent_log_watcher.start()
+            self.calendar_watcher.start()
             self.scheduler.start()
             self._is_running = True
             try:
@@ -196,6 +200,7 @@ class WatcherManager:
             self.git_watcher.stop()
             self.window_watcher.stop()
             self.agent_log_watcher.stop()
+            self.calendar_watcher.stop()
             self.scheduler.shutdown()
             self._is_running = False
             try:
@@ -270,6 +275,8 @@ class WatcherManager:
             "git_watcher": cfg.get("watchers.git_watcher.enabled", True),
             "window_watcher": cfg.get("watchers.window_watcher.enabled", True) and sys.platform == "win32",
             "agent_log_watcher": cfg.get("watchers.agent_log_watcher.enabled", True),
+            # ADR-015：啟用且有路徑才算在採集；沒路徑＝停用，不報「尚無紀錄」假警報
+            "calendar_watcher": calendar_effective(cfg),
             "scheduler": (
                 cfg.get("synthesizer.schedule.enabled", True)
                 or cfg.get("synthesizer.periodic_checkpoint.enabled", True)
@@ -309,18 +316,31 @@ class WatcherManager:
                 else "running" if _thread_alive(self.agent_log_watcher)
                 else "stopped"
             ),
+            "calendar_watcher": (
+                "disabled" if not watchers_cfg["calendar_watcher"]
+                else "running" if _thread_alive(self.calendar_watcher)
+                else "stopped"
+            ),
             "scheduler": (
                 "disabled" if not watchers_cfg["scheduler"]
                 else "running" if _thread_alive(self.scheduler)
                 else "stopped"
             ),
         }
+        calendar_diagnostics = self.calendar_watcher.get_diagnostics()
 
         collector_health = {
             "file_watcher": _calc_health(watchers_cfg["file_watcher"], last_file),
             "git_watcher": _calc_health(watchers_cfg["git_watcher"], last_git),
             "window_watcher": _calc_health(watchers_cfg["window_watcher"], last_win),
             "agent_log_watcher": _calc_health(watchers_cfg["agent_log_watcher"], last_ai),
+            # 行事曆以「最近一次掃描」為健康依據（沒有行程不代表採集器壞了）
+            "calendar_watcher": (
+                "disabled" if not watchers_cfg["calendar_watcher"]
+                else "stopped" if collector_runtime["calendar_watcher"] != "running"
+                else "healthy" if calendar_diagnostics.get("scan_count", 0) > 0
+                else "idle"
+            ),
             "scheduler": (
                 "disabled" if not watchers_cfg["scheduler"]
                 else "healthy" if collector_runtime["scheduler"] == "running"
@@ -361,6 +381,11 @@ class WatcherManager:
             and git_diagnostics.get("degraded_repos_count", 0) > 0
         ):
             collector_health["git_watcher"] = "degraded"
+        if (
+            collector_runtime["calendar_watcher"] == "running"
+            and calendar_diagnostics.get("degraded_sources_count", 0) > 0
+        ):
+            collector_health["calendar_watcher"] = "degraded"
 
         monitoring_state, degraded_collectors = derive_monitoring_state(
             self._is_running,
@@ -398,6 +423,7 @@ class WatcherManager:
                 "git_watcher": git_diagnostics,
                 "window_watcher": window_diagnostics,
                 "agent_log_watcher": agent_diagnostics,
+                "calendar_watcher": calendar_diagnostics,
             },
             "self_healing": {
                 "healing_events_count": len(self._healing_history),
@@ -411,6 +437,9 @@ class WatcherManager:
                 "git_watcher": last_git.strftime("%Y-%m-%d %H:%M:%S") if last_git else None,
                 "window_watcher": last_win.strftime("%Y-%m-%d %H:%M:%S") if last_win else None,
                 "agent_log_watcher": last_ai.strftime("%Y-%m-%d %H:%M:%S") if last_ai else None,
+                "calendar_watcher": (
+                    str(calendar_diagnostics.get("last_scan_at") or "").replace("T", " ") or None
+                ),
             },
             "metrics": {
                 "ai_prompts_count": ai_count,

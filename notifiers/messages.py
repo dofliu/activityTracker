@@ -124,8 +124,28 @@ def _greeting_section(now: datetime, cfg: Any | None = None) -> Section | None:
     lines.extend(f"• {item}" for item in greeting.get("achievements") or [])
     if greeting.get("recent_summary"):
         lines.append(f"剛剛在做：{greeting['recent_summary']}")
+    if greeting.get("schedule_line"):
+        lines.append(f"📅 {greeting['schedule_line']}")
     lines.append(str(greeting.get("encouragement") or ""))
     return Section(lines=tuple(line for line in lines if line))
+
+
+def _calendar_section(now: datetime, cfg: Any | None = None, limit: int = 8) -> Section | None:
+    """ADR-015：晨報的「📅 今日行程」；行事曆沒啟用、沒行程或讀不到就省略。"""
+    try:
+        from core.calendar_agenda import day_agenda, format_event_line
+
+        agenda = day_agenda(now=now, cfg=cfg)
+    except Exception as exc:  # noqa: BLE001 — 行事曆讀不到不該讓晨報消失
+        logger.debug("calendar unavailable for briefing: %s", type(exc).__name__)
+        return None
+    if not agenda.get("enabled") or not agenda.get("count"):
+        return None
+    events = agenda["events"]
+    lines = [f"• {format_event_line(event)}" for event in events[:limit]]
+    if len(events) > limit:
+        lines.append(f"  …還有 {len(events) - limit} 場")
+    return Section(heading=f"📅 今日行程（{agenda['count']} 場）：", lines=tuple(lines))
 
 
 def _secretary_section(limit: int = 2) -> Section | None:
@@ -172,6 +192,9 @@ def build_morning_briefing(
     greeting = _greeting_section(now, cfg) if include_greeting else None
     if greeting:
         sections.append(greeting)
+    calendar = _calendar_section(now, cfg) if include_greeting else None
+    if calendar:
+        sections.append(calendar)
     if active:
         sections.append(Section(
             heading="🔥 今日重點活躍專案：",

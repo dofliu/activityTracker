@@ -563,3 +563,32 @@ class SecretaryNote(Base):
     __table_args__ = (
         Index("ix_secretary_notes_kind_created", "kind", "created_at"),
     )
+
+
+class CalendarEvent(Base):
+    """本機行事曆採集（ADR-015）：從 `.ics` 展開後的**單一行程實例**。
+
+    只存決策需要的欄位（時間、標題、地點、狀態、來源檔）；DESCRIPTION／與會者／
+    連結一律不落地。``store_titles`` 關閉時 summary／location 為空字串。
+    同一來源檔在每次掃描時以「檔案 × 視野」整批替換，取消或移動的行程不殘留。
+    """
+    __tablename__ = "calendar_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    uid = Column(String(255), nullable=False, index=True)
+    instance_start = Column(DateTime, nullable=False, index=True)
+    instance_end = Column(DateTime, nullable=False)
+    all_day = Column(Boolean, nullable=False, default=False)
+    summary = Column(String(200), nullable=False, default="")
+    location = Column(String(200), nullable=False, default="")
+    status = Column(String(24), nullable=False, default="CONFIRMED")
+    recurring = Column(Boolean, nullable=False, default=False)
+    calendar_name = Column(String(120), nullable=True)
+    source_path = Column(String(1024), nullable=False, index=True)
+    last_modified = Column(DateTime, nullable=True)
+    last_seen_at = Column(DateTime, default=get_local_now, nullable=False)
+
+    __table_args__ = (
+        Index("ux_calendar_events_source_uid_start", "source_path", "uid", "instance_start", unique=True),
+        Index("ix_calendar_events_start_end", "instance_start", "instance_end"),
+    )

@@ -1,6 +1,6 @@
 # 待辦事項與已知問題（Backlog）
 
-> 最後更新：2026-09-02。這頁是**唯一的待辦清單入口**；現況數據以
+> 最後更新：2026-09-04。這頁是**唯一的待辦清單入口**；現況數據以
 > [STATUS.yaml](../STATUS.yaml) 為準，接手路徑見 [NEXT_SESSION.md](NEXT_SESSION.md)。
 >
 > 每一項都標明**完成判準（收據）**——沒有收據就不算完成，這是本專案的一貫原則。
@@ -35,6 +35,7 @@
 | A10 | **手機 Telegram 對話實機收據** | 「設定 → Telegram 通知」勾「啟用小秘書對話」→ 儲存 → 重載設定 → 在手機對 bot 送「/today」「記下來：測試」與一句提問；若要試遠端解鎖另勾「允許 /arm」，在儀表板按「🔑 產生解鎖碼」後送 `/arm <6 位數碼>` | `/today` 回今日清單、提問有答案且附「🧠 參考記憶區 N 筆」、筆記出現在儀表板 01 記憶區（source=telegram）；`/arm <碼>` 送出後 `GET /api/v1/telegram/approvals/status` 的 `armed=true`（且同一組碼再送一次會被拒），`/disarm` 立刻回 false。若對話沒反應，先看 `/status` 的「長輪詢」是否運行中 | 🟡 P1 |
 | A11 | **LINE 推播實機收據** | 在 LINE Developers Console 建 Messaging API channel → 發行 long-lived token →「設定 → 03 LINE 通知」貼上 token 與 userId → 按「測試並儲存啟用」→ `python main.py notify briefing --channel telegram`（會推到所有啟用通道） | 手機 LINE 收到晨報且為**純文字**（沒有裸 `<b>` 標籤）；`GET /api/v1/notifications/channels` 的 `push_ready` 含 `line`；同時開 Telegram 時兩邊內容一致。若回 `invalid_request`，通常是收件 id 填了 LINE ID（@xxxx）而不是 userId；若回 `quota_or_rate_limited` 則是免費方案的每月推播額度用完 | 🟡 P1 |
 | A12 | **小秘書問候卡實機收據** | 「系統設定 → 秘書與自動化」填問候稱呼 → 儲存 → 回 01 分頁看最上方「🤗 小秘書的話」；切 `近 2 小時` 再按 ↻；（選配）把 `proactive_secretary.greeting.llm.enabled` 設 true 後重載；隔天早上看 Telegram 晨報第一段 | 卡上每個數字都能在 03 專案卡／04 統計／同步中心對得上（滑過 chip 看來源表），沒有郵件、行事曆之類未採集的數字；今天早上與下午同一視窗的鼓勵語相同；開 LLM 後徽章變 `LLM · 供應商`，且 `GET /api/v1/secretary/greeting` 回應沒有 `llm_rejected`（若有，代表 LLM 編了數字、已自動退回規則版，屬預期行為）；晨報第一段是同一段話，07:30 收到時若今天還沒活動應寫「昨天你：」而非「今天還沒偵測到」 | 🟢 P2 |
+| A13 | **本機行事曆實機收據** | 從 Outlook／Google 匯出一份 `.ics`（或設定行事曆軟體同步到本機資料夾）→「系統設定 → 採集來源 → 本機行事曆」加入路徑 → 儲存並套用 → 看「系統健康」與 01 首頁 | 系統健康「行事曆（.ics）」顯示「運作中 · N 個檔 · 視野內 M 筆」且沒有來源錯誤；01 今日面板出現「📅 今天 N 場行程，下一場 …」且與你的行事曆一致（取消的不出現、重複的週會有出現）；`GET /api/v1/calendar/agenda` 的 events 沒有任何描述／與會者欄位；隔天 Telegram 晨報有「📅 今日行程」段。若某檔顯示來源錯誤，把 `collector_diagnostics.calendar_watcher.degraded_sources` 的 error 回報即可續查 | 🟡 P1 |
 
 > A1 是唯一還在擋 `release_ready` 的**能力型**缺口；A2、A6 是修復／重構後的回歸確認（A6 對應原 B1「首次檢索在主程序載入」，程式面已於 2026-09-02 完成，剩實機收據）。
 
@@ -56,7 +57,7 @@
 | :-- | :--- | :--- | :--- | :--- |
 | C1 | **更多 L2 template** | 依 [ADR-008](ADR-008-gated-agent-executor.md) Addendum 模式**一次一個**審查新增；寫入型一律套用兩段式批准與 worktree 前置 | 依需求 | ⚪ P2 |
 | C2 | **更多可排程 template** | 依 P5-R5 模式新增 **L0 唯讀**排程動作；L1/L2 永遠不可排程（模組載入即強制） | 依需求 | ⚪ P2 |
-| C3 | **P4 其餘採集來源** | 瀏覽器閱讀、行事曆、terminal history、未 commit 狀態 | 每項先過「能否改變決策」檢驗才納入 | ⚪ P2 |
+| C3 | **P4 其餘採集來源** | 瀏覽器閱讀、terminal history、未 commit 狀態（行事曆已於 2026-09-04 以 ADR-015 納入） | 每項先過「能否改變決策」檢驗才納入 | ⚪ P2 |
 | C4 | **更多配色主題** | 外觀已拆成 `data-theme` × `data-accent` 兩軸，新增一套只需加一組 CSS 變數區塊，不動任何元件樣式 | 依喜好 | ⚪ P2 |
 | C5 | **遠端網頁存取（私有網路）** | 讓手機用瀏覽器看完整儀表板：把 `security.allow_remote_clients` 換成 CIDR allowlist（預設只放行 Tailscale／WireGuard 網段）＋登入憑證＋PWA。**不做公開反向代理。** 需要先寫 ADR（認證形狀、失敗即拒、收據） | ADR-013 已先以 Telegram 覆蓋「觀察＋對話」 | ⚪ P2 |
 | C6 | **LINE 雙向（webhook）** | 讓 LINE 也能提問與批准：需公開 HTTPS 入口（Cloudflare Tunnel／中繼）＋`x-line-signature` 驗證＋postback 按鈕，並修改 ADR-001 的 loopback 邊界。先寫 ADR 再動工 | ADR-014 已先用推播覆蓋 LINE；雙向仍建議走 Telegram | ⚪ P2 |

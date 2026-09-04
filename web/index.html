@@ -90,6 +90,7 @@
           <div class="secretary-inbox-body">
             <div id="today-resume" class="today-resume"><div class="placeholder" data-i18n="ph_loading_projects">載入進行中工作…</div></div>
             <div id="today-pack" class="today-pack mono-mini muted" hidden></div>
+            <div id="today-calendar" class="today-pack mono-mini muted" hidden></div>
             <div class="secretary-inbox-tools">
               <span data-i18n="secretary_inbox_hint">待您判斷的建議；不等於現在需要處理。</span>
             </div>
@@ -595,6 +596,23 @@
             <label class="source"><input type="checkbox" id="toggle-chatgpt" checked><span class="mono">chatgpt.com</span><span class="trust ok">OK</span></label>
             <label class="source"><input type="checkbox" id="toggle-claude-web" checked><span class="mono">claude.ai</span><span class="trust ok">OK</span></label>
             <label class="source"><input type="checkbox" id="toggle-window-focus" checked><span class="mono">window focus</span><span class="trust ok">OK</span></label>
+          </div>
+          <div class="calendar-source" id="calendar-source-block">
+            <div class="mono-mini muted mb-6" data-i18n="cal_title">📅 本機行事曆（.ics，唯讀，ADR-015）</div>
+            <label class="setting-check"><input type="checkbox" id="toggle-calendar" checked><span data-i18n="cal_enabled_label">啟用行事曆採集（沒有路徑時等於停用）</span></label>
+            <div class="mono-mini muted mb-6" style="margin-top:10px;" data-i18n="cal_paths_label">ICS 檔或含 .ics 的資料夾</div>
+            <div id="calendar-path-list" class="taglist"></div>
+            <div class="input-row">
+              <input type="text" id="input-new-calendar-path" placeholder="例如 C:/Users/you/Calendars/work.ics 或整個資料夾" data-i18n-ph="ph_ics_path">
+              <button class="btn btn-ghost" id="btn-browse-calendar" title="瀏覽選取本機資料夾" data-i18n="btn_browse">📁 瀏覽…</button>
+              <button class="btn btn-ghost" id="btn-add-calendar-path" data-i18n="btn_add">新增</button>
+            </div>
+            <div class="fields usage-settings-fields">
+              <div><div class="mono-mini muted mb-6" data-i18n="cal_horizon_label">重複行程展開未來天數</div>
+                <input type="number" id="input-calendar-horizon" min="1" max="366" value="30" class="mono"></div>
+              <label class="setting-check" style="align-self:end;"><input type="checkbox" id="toggle-calendar-titles" checked><span data-i18n="cal_store_titles_label">保存標題與地點（關閉則只留時間）</span></label>
+            </div>
+            <div class="usage-boundary" data-i18n="cal_note">只讀本機 .ics 的時間／標題／地點／狀態；描述、與會者、連結一律不落地，不連任何雲端 API、不寫回檔案。把 Outlook／Google／Apple 匯出或同步的 .ics 放到本機資料夾即可；晨報與問候卡會如實帶入今天的行程。</div>
           </div>
         </div>
         </section>

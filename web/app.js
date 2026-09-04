@@ -16,6 +16,7 @@ let currentSummaryMarkdown = "";
 let currentCheckpointMarkdown = "";
 let summaryView = "day";
 let configDirs = [];
+let configCalendarPaths = [];
 let configRepos = [];
 let githubStatus = null;
 let showAllProjects = false;
@@ -152,7 +153,15 @@ const I18N = {
     collector_git: "Git 掃描",
     collector_window: "視窗焦點",
     collector_agent: "Agent 日誌",
+    collector_calendar: "行事曆（.ics）",
     collector_scheduler: "定時排程",
+    cal_title: "📅 本機行事曆（.ics，唯讀，ADR-015）",
+    cal_enabled_label: "啟用行事曆採集（沒有路徑時等於停用）",
+    cal_paths_label: "ICS 檔或含 .ics 的資料夾",
+    ph_ics_path: "例如 C:/Users/you/Calendars/work.ics 或整個資料夾",
+    cal_horizon_label: "重複行程展開未來天數",
+    cal_store_titles_label: "保存標題與地點（關閉則只留時間）",
+    cal_note: "只讀本機 .ics 的時間／標題／地點／狀態；描述、與會者、連結一律不落地，不連任何雲端 API、不寫回檔案。把 Outlook／Google／Apple 匯出或同步的 .ics 放到本機資料夾即可；晨報與問候卡會如實帶入今天的行程。",
     collector_enabled: "● 運作中",
     collector_disabled: "○ 已關閉",
     settings_p1_title: "監控路徑",
@@ -436,7 +445,15 @@ const I18N = {
     collector_git: "Git Scanner",
     collector_window: "Window Focus",
     collector_agent: "Agent Logs",
+    collector_calendar: "Calendar (.ics)",
     collector_scheduler: "Scheduler",
+    cal_title: "📅 Local calendar (.ics, read-only, ADR-015)",
+    cal_enabled_label: "Collect calendar events (no paths = off)",
+    cal_paths_label: "ICS files or folders containing .ics",
+    ph_ics_path: "e.g. C:/Users/you/Calendars/work.ics or a folder",
+    cal_horizon_label: "Expand recurring events (days ahead)",
+    cal_store_titles_label: "Store titles and locations (off = times only)",
+    cal_note: "Reads only time, title, location and status from local .ics files; descriptions, attendees and links are never stored, no cloud API is called and nothing is written back. Export or sync your Outlook/Google/Apple calendar to a local folder; the briefing and greeting card will reflect today's schedule.",
     collector_enabled: "● Active",
     collector_disabled: "○ Off",
     settings_p1_title: "Monitored Paths",
@@ -1053,6 +1070,7 @@ function renderCollectors(w, lastEvents = {}, health = {}, diagnostics = {}) {
     { key: "git_watcher", name: t("collector_git"), on: w.git_watcher, last: lastEvents.git_watcher, h: health.git_watcher || "stale", d: diagnostics.git_watcher },
     { key: "window_watcher", name: t("collector_window"), on: w.window_watcher, last: lastEvents.window_watcher, h: health.window_watcher || "stale", d: diagnostics.window_watcher },
     { key: "agent_log_watcher", name: t("collector_agent"), on: w.agent_log_watcher, last: lastEvents.agent_log_watcher, h: health.agent_log_watcher || "stale", d: diagnostics.agent_log_watcher },
+    { key: "calendar_watcher", name: t("collector_calendar"), on: w.calendar_watcher, last: lastEvents.calendar_watcher, h: health.calendar_watcher || "disabled", d: diagnostics.calendar_watcher },
     { key: "scheduler", name: t("collector_scheduler"), on: w.scheduler, last: null, h: health.scheduler || "healthy", d: diagnostics.scheduler }
   ];
 
@@ -1089,6 +1107,18 @@ function renderCollectors(w, lastEvents = {}, health = {}, diagnostics = {}) {
       diagnosticText = currentLang === "zh-TW"
         ? `前景 probe 不可用 · ${Number(it.d.unavailable_seconds || 0)}s`
         : `Foreground probe unavailable · ${Number(it.d.unavailable_seconds || 0)}s`;
+    }
+    if (it.key === "calendar_watcher" && it.d) {
+      if (it.d.state === "unconfigured") {
+        diagnosticText = currentLang === "zh-TW" ? "尚未設定 .ics 路徑（系統設定 → 採集來源）" : "No .ics paths configured (Settings → Sources)";
+      } else if (Number(it.d.degraded_sources_count || 0) > 0) {
+        const names = (it.d.degraded_sources || []).map(s => s.source_name).join(", ");
+        diagnosticText = `${currentLang === "zh-TW" ? "來源錯誤" : "Source error"}: ${names}`;
+      } else if (it.d.scan_count) {
+        diagnosticText = currentLang === "zh-TW"
+          ? `${it.d.last_scan_files} 個檔 · 視野內 ${it.d.last_scan_instances} 筆`
+          : `${it.d.last_scan_files} file(s) · ${it.d.last_scan_instances} in horizon`;
+      }
     }
     if (it.key === "agent_log_watcher" && it.d && it.d.sources) {
       const failed = Object.entries(it.d.sources).filter(([, value]) => value.state === "error").map(([key]) => key);
@@ -1755,6 +1785,17 @@ async function loadTodayView() {
   }
   const zh = currentLang === "zh-TW";
   const sched = todayViewCache.schedules || {};
+  const calBox = $("today-calendar");
+  if (calBox) {
+    const cal = todayViewCache.calendar || {};
+    if (cal.enabled && cal.line) {
+      calBox.textContent = `📅 ${cal.line}`;
+      calBox.title = cal.claim_boundary || "";
+      calBox.hidden = false;
+    } else {
+      calBox.hidden = true;
+    }
+  }
   if (pack) {
     if (todayViewCache.pack_line) {
       const when = String((todayViewCache.pack || {}).finished_at || "").slice(5, 16).replace("T", " ");
@@ -1847,6 +1888,7 @@ function renderGreeting() {
       <p class="greeting-line">${esc(g.lead)}</p>
       ${items ? `<ul class="greeting-list">${items}</ul>` : ""}
       ${g.recent_summary ? `<p class="greeting-line muted">${zh ? "剛剛在做：" : "Just now: "}${esc(g.recent_summary)}</p>` : ""}
+      ${g.schedule_line ? `<p class="greeting-line greeting-schedule">📅 ${esc(g.schedule_line)}</p>` : ""}
       <p class="greeting-line greeting-encourage">${esc(g.encouragement)}</p>`;
   }
   if (source) {
@@ -1863,6 +1905,7 @@ function renderGreeting() {
     add(zh ? "AI 對話" : "AI turns", stats.ai_turns, g.evidence && g.evidence.ai_turns);
     add(zh ? "文件" : "docs", stats.files_writing, g.evidence && g.evidence.files);
     add(zh ? "收掉" : "resolved", stats.loops_resolved, g.evidence && g.evidence.loops_resolved);
+    add(zh ? "會議" : "meetings", stats.meetings, g.evidence && g.evidence.meetings);
     if (stats.foreground_minutes >= 15) add(zh ? "專注" : "focus", `${Math.round(stats.foreground_minutes)} min`, g.evidence && g.evidence.foreground_minutes);
     statsBox.innerHTML = chips.join("");
     statsBox.hidden = chips.length === 0;
@@ -2629,6 +2672,24 @@ function initSettingsForm() {
     } catch (e) { console.error("Browse dir error", e); }
   });
 
+  $("btn-add-calendar-path").addEventListener("click", () => {
+    const input = $("input-new-calendar-path");
+    const v = input.value.trim();
+    if (v && !configCalendarPaths.includes(v)) { configCalendarPaths.push(v); renderTagList("calendar-path-list", configCalendarPaths, removeCalendarPath); input.value = ""; }
+  });
+  $("btn-browse-calendar").addEventListener("click", async () => {
+    try {
+      const res = await postJSON("/api/v1/utils/browse-folder");
+      if (res && res.status === "success" && res.path) {
+        $("input-new-calendar-path").value = res.path;
+        if (!configCalendarPaths.includes(res.path)) {
+          configCalendarPaths.push(res.path);
+          renderTagList("calendar-path-list", configCalendarPaths, removeCalendarPath);
+        }
+      }
+    } catch (e) { console.error("Browse calendar error", e); }
+  });
+
   $("btn-add-repo").addEventListener("click", () => {
     const input = $("input-new-repo");
     const v = input.value.trim();
@@ -2692,6 +2753,7 @@ function renderTagList(id, list, onRemove) {
 }
 function removeDir(i) { configDirs.splice(i, 1); renderTagList("dir-list", configDirs, removeDir); }
 function removeRepo(i) { configRepos.splice(i, 1); renderTagList("repo-list", configRepos, removeRepo); }
+function removeCalendarPath(i) { configCalendarPaths.splice(i, 1); renderTagList("calendar-path-list", configCalendarPaths, removeCalendarPath); }
 
 async function loadConfig() {
   try {
@@ -2727,6 +2789,12 @@ async function loadConfig() {
     $("toggle-chatgpt").checked = browser.chatgpt !== false;
     $("toggle-claude-web").checked = browser.claude_web !== false;
     $("toggle-window-focus").checked = !(w.window_watcher && w.window_watcher.enabled === false);
+    const calendar = w.calendar_watcher || {};
+    $("toggle-calendar").checked = calendar.enabled !== false;
+    configCalendarPaths = Array.isArray(calendar.paths) ? calendar.paths.slice() : [];
+    renderTagList("calendar-path-list", configCalendarPaths, removeCalendarPath);
+    $("input-calendar-horizon").value = Number(calendar.horizon_days || 30);
+    $("toggle-calendar-titles").checked = calendar.store_titles !== false;
     const executor = (currentConfig.proactive_secretary || {}).executor || {};
     $("toggle-executor-enabled").checked = executor.enabled === true;
     $("input-greeting-name").value = ((currentConfig.proactive_secretary || {}).greeting || {}).display_name || "";
@@ -2830,6 +2898,12 @@ async function saveSettings() {
 
   cfg.watchers.window_watcher = cfg.watchers.window_watcher || { enabled: true };
   cfg.watchers.window_watcher.enabled = $("toggle-window-focus").checked;
+
+  cfg.watchers.calendar_watcher = cfg.watchers.calendar_watcher || { enabled: true, scan_interval_seconds: 900 };
+  cfg.watchers.calendar_watcher.enabled = $("toggle-calendar").checked;
+  cfg.watchers.calendar_watcher.paths = configCalendarPaths;
+  cfg.watchers.calendar_watcher.horizon_days = Math.max(1, Math.min(366, Number($("input-calendar-horizon").value) || 30));
+  cfg.watchers.calendar_watcher.store_titles = $("toggle-calendar-titles").checked;
 
   cfg.synthesizer = cfg.synthesizer || {};
   cfg.synthesizer.schedule = cfg.synthesizer.schedule || { enabled: true };
