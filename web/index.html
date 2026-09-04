@@ -60,6 +60,23 @@
       <section id="tab-assistant" class="pane active">
         <div class="assistant-columns">
           <div class="assistant-col assistant-col-today">
+        <!-- 小秘書問候卡：今天／近兩小時做了什麼＋一句鼓勵；數字全部來自本機統計，每 10 分鐘自動整理 -->
+        <section class="panel greeting-card mb-14" id="greeting-card">
+          <div class="panel-head">
+            <span class="mono-label accent" data-i18n="greeting_title">🤗 小秘書的話</span>
+            <span id="greeting-source" class="trust ok">RULES</span>
+            <span class="head-right greeting-tools">
+              <button class="chip active" data-window="today" data-i18n="greeting_win_today">今天</button>
+              <button class="chip" data-window="2h" data-i18n="greeting_win_2h">近 2 小時</button>
+              <button class="btn btn-ghost btn-sm" id="btn-greeting-refresh" title="重新整理（每 10 分鐘也會自動整理）">↻</button>
+            </span>
+          </div>
+          <div class="greeting-body">
+            <div id="greeting-text" class="greeting-text"><span class="placeholder" data-i18n="ph_loading_greeting">小秘書正在整理你今天做了什麼…</span></div>
+            <div id="greeting-stats" class="greeting-stats"></div>
+            <div class="context-memory-boundary" id="greeting-boundary"></div>
+          </div>
+        </section>
         <section class="panel secretary-inbox mb-14" id="today-panel">
           <div class="panel-head">
             <span class="mono-label accent" data-i18n="today_title">TODAY · 今日行動清單</span>
@@ -387,6 +404,9 @@
               <label class="setting-check"><input type="checkbox" id="toggle-scheduled-tasks"><span data-i18n="sched_tasks_enabled_label">啟用自訂排程任務（僅 L0 唯讀動作）</span></label>
             </div>
             <div class="fields usage-settings-fields">
+              <div><div class="mono-mini muted mb-6" data-i18n="greeting_name_label">問候卡稱呼</div>
+                <input type="text" id="input-greeting-name" maxlength="40" data-i18n-ph="greeting_name_ph" placeholder="例如 Dof（留空就不帶名字）">
+              </div>
               <div><div class="mono-mini muted mb-6" data-i18n="executor_cli_label">AGENT CLI</div>
                 <select id="select-agent-cli">
                   <option value="claude">claude（Claude Code）</option>

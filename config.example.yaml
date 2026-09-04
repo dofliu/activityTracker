@@ -227,6 +227,16 @@ proactive_secretary:
   enabled: true
   max_proposals: 6
   stalled_open_loop_hours: 48
+  # 01 首頁「小秘書的話」問候卡：今天／近兩小時做了什麼（只數採集器看到的活動）
+  # ＋一句規則挑選的鼓勵語（以日期為種子，同一天同一句）。display_name 是卡片
+  # 稱呼（如 Dof）；llm.enabled 開啟時用 llm_advisor 的 provider 潤飾語氣，
+  # 輸出裡出現統計以外的數字會整段丟掉、退回規則版（不得新增事實）。
+  greeting:
+    display_name: ''
+    llm:
+      enabled: false
+      timeout_seconds: 20
+      cache_minutes: 30
   # P5-R1 LLM advisory（預設關閉）：只能為既有建議附加唯讀註解與排序提示，
   # 不能新增/刪除/執行任何項目；失敗自動回退純規則結果。
   # provider 選 ollama 為全本機；選 gemini/anthropic/openai 代表同意將建議的

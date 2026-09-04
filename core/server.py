@@ -568,6 +568,17 @@ class ScheduledTaskUpdateRequest(BaseModel):
     params: Optional[Dict[str, Any]] = None
 
 
+@app.get("/api/v1/secretary/greeting")
+def get_secretary_greeting(window: str = Query("today")):
+    """小秘書問候卡：今天／近兩小時做了什麼＋一句鼓勵。只讀本機統計，數字皆可回溯。"""
+    from core.secretary_greeting import GreetingRejected, build_greeting
+
+    try:
+        return build_greeting(window=window)
+    except GreetingRejected as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
+
+
 @app.get("/api/v1/secretary/today")
 def get_secretary_today():
     """「01 今天」的唯讀彙整：上次做到哪、最近一次早晨包收據、預設排程狀態。"""

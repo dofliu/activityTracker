@@ -170,6 +170,14 @@ def _today_text(cfg: Any, now: datetime) -> str:
     except Exception as exc:  # noqa: BLE001
         return f"（今日視圖讀不到：{type(exc).__name__}）"
     lines = [f"📅 今天 {now.strftime('%m-%d %H:%M')}"]
+    # 先來一句小秘書的話（今天做了什麼＋鼓勵）；讀不到就略過
+    try:
+        from core.secretary_greeting import build_greeting, plain_text
+
+        greeting = build_greeting(window="today", now=now, cfg=cfg, use_llm=False)
+        lines.extend([plain_text(greeting), ""])
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("greeting unavailable for /today: %s", type(exc).__name__)
     resume = view.get("resume") or {}
     if resume.get("display_name") or resume.get("project_key"):
         lines.append(
