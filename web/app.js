@@ -60,6 +60,12 @@ const I18N = {
     tab_summaries: "05 · 摘要與統計",
     rail_stats_title: "今日統計",
     today_title: "TODAY · 今日行動清單",
+    greeting_title: "🤗 小秘書的話",
+    greeting_win_today: "今天",
+    greeting_win_2h: "近 2 小時",
+    greeting_name_label: "問候卡稱呼",
+    greeting_name_ph: "例如 Dof（留空就不帶名字）",
+    ph_loading_greeting: "小秘書正在整理你今天做了什麼…",
     btn_create_presets: "📦 建立每日排程",
     today_resume_label: "上次做到哪",
     why_now_label: "為什麼是現在",
@@ -338,6 +344,12 @@ const I18N = {
     tab_summaries: "05 · Summaries & Stats",
     rail_stats_title: "Today's stats",
     today_title: "TODAY · Action list",
+    greeting_title: "🤗 From your secretary",
+    greeting_win_today: "Today",
+    greeting_win_2h: "Last 2 h",
+    greeting_name_label: "Greeting name",
+    greeting_name_ph: "e.g. Dof (leave empty for no name)",
+    ph_loading_greeting: "Your secretary is tallying what you did today…",
     btn_create_presets: "📦 Create daily schedules",
     today_resume_label: "Resume here",
     why_now_label: "Why now",
@@ -714,6 +726,10 @@ document.addEventListener("DOMContentLoaded", () => {
   setInterval(() => { refreshStatus(); refreshFeed(); }, POLL_MS);
   setInterval(loadUsagePanels, 30000);
   setInterval(loadAssistantStrip, 30000);
+  // 問候卡：小秘書每 10 分鐘自動重新整理（統計只讀本機，成本很低）
+  loadGreeting();
+  initGreetingCard();
+  setInterval(loadGreeting, 10 * 60 * 1000);
 });
 
 // ---------------------------------------------------- collapsible panels
@@ -781,7 +797,7 @@ function initTabs() {
       tab.classList.add("active");
       const id = tab.dataset.tab;
       $(id).classList.add("active");
-      if (id === "tab-assistant") { loadSecretaryProposals(); loadAssistantStrip(); syncAssistantModelControls(); loadProjects(); loadTodayView(); loadMemoryPanel(); }
+      if (id === "tab-assistant") { loadSecretaryProposals(); loadAssistantStrip(); syncAssistantModelControls(); loadProjects(); loadTodayView(); loadMemoryPanel(); loadGreeting(); }
       if (id === "tab-knowledge") { loadRAGFolders(); loadRAGSessions(); loadRAGProgress(); }
       if (id === "tab-projects") { loadProjects(); loadRepoSnapshot(); }
       if (id === "tab-repos") loadRepositorySyncStatus();  // 切到分頁才掃描本機 Git，不在開頁時付這個成本
@@ -1797,6 +1813,72 @@ async function createSchedulePresets() {
   }
 }
 
+// ---------------------------------------------------------------- 小秘書問候卡（今天／近 2 小時做了什麼＋一句鼓勵）
+let greetingWindow = "today";
+let greetingCache = null;
+
+async function loadGreeting() {
+  const textBox = $("greeting-text");
+  if (!textBox) return;
+  try {
+    greetingCache = await getJSON(`/api/v1/secretary/greeting?window=${encodeURIComponent(greetingWindow)}`);
+  } catch (e) {
+    textBox.innerHTML = `<span class="placeholder">${currentLang === "zh-TW" ? "問候卡暫時讀不到。" : "Greeting unavailable."}</span>`;
+    return;
+  }
+  renderGreeting();
+}
+
+function renderGreeting() {
+  const g = greetingCache;
+  const textBox = $("greeting-text");
+  const statsBox = $("greeting-stats");
+  const source = $("greeting-source");
+  const boundary = $("greeting-boundary");
+  if (!g || !textBox) return;
+  const zh = currentLang === "zh-TW";
+  const stats = g.stats || {};
+  if (g.source === "llm" && g.text) {
+    textBox.innerHTML = `<p class="greeting-line">${esc(g.text)}</p>`;
+  } else {
+    const items = (g.achievements || []).map(a => `<li>${esc(a)}</li>`).join("");
+    textBox.innerHTML = `
+      <p class="greeting-line greeting-headline">${esc(g.headline)}</p>
+      <p class="greeting-line">${esc(g.lead)}</p>
+      ${items ? `<ul class="greeting-list">${items}</ul>` : ""}
+      ${g.recent_summary ? `<p class="greeting-line muted">${zh ? "剛剛在做：" : "Just now: "}${esc(g.recent_summary)}</p>` : ""}
+      <p class="greeting-line greeting-encourage">${esc(g.encouragement)}</p>`;
+  }
+  if (source) {
+    source.textContent = g.source === "llm" ? `LLM · ${String(g.llm_provider || "").toUpperCase()}` : "RULES";
+    source.className = "trust ok";
+    source.title = zh ? `鼓勵語池：${g.encouragement_pool || ""}` : `pool: ${g.encouragement_pool || ""}`;
+  }
+  if (statsBox) {
+    const chips = [];
+    const add = (label, value, title) => { if (value) chips.push(`<span class="pchip" title="${esc(title || "")}">${esc(label)} ${esc(String(value))}</span>`); };
+    add(zh ? "專案" : "projects", stats.projects_touched, g.evidence && g.evidence.projects);
+    add("commit", stats.commits, g.evidence && g.evidence.commits);
+    add("PR", stats.prs_touched, g.evidence && g.evidence.prs);
+    add(zh ? "AI 對話" : "AI turns", stats.ai_turns, g.evidence && g.evidence.ai_turns);
+    add(zh ? "文件" : "docs", stats.files_writing, g.evidence && g.evidence.files);
+    add(zh ? "收掉" : "resolved", stats.loops_resolved, g.evidence && g.evidence.loops_resolved);
+    if (stats.foreground_minutes >= 15) add(zh ? "專注" : "focus", `${Math.round(stats.foreground_minutes)} min`, g.evidence && g.evidence.foreground_minutes);
+    statsBox.innerHTML = chips.join("");
+    statsBox.hidden = chips.length === 0;
+  }
+  if (boundary) boundary.textContent = g.claim_boundary || "";
+  document.querySelectorAll(".greeting-tools .chip").forEach(c => c.classList.toggle("active", c.dataset.window === greetingWindow));
+}
+
+function initGreetingCard() {
+  document.querySelectorAll(".greeting-tools .chip").forEach(chip => {
+    chip.addEventListener("click", () => { greetingWindow = chip.dataset.window || "today"; loadGreeting(); });
+  });
+  const refresh = $("btn-greeting-refresh");
+  if (refresh) refresh.addEventListener("click", loadGreeting);
+}
+
 // ---------------------------------------------------------------- ADR-012 小秘書記憶區
 let memoryCache = null;
 const MEMORY_COMMANDS = [
@@ -2647,6 +2729,7 @@ async function loadConfig() {
     $("toggle-window-focus").checked = !(w.window_watcher && w.window_watcher.enabled === false);
     const executor = (currentConfig.proactive_secretary || {}).executor || {};
     $("toggle-executor-enabled").checked = executor.enabled === true;
+    $("input-greeting-name").value = ((currentConfig.proactive_secretary || {}).greeting || {}).display_name || "";
     $("toggle-executor-l2").checked = !!(executor.l2 && executor.l2.enabled === true);
     $("toggle-executor-l2-write").checked = !!(executor.l2 && executor.l2.allow_write === true);
     $("select-agent-cli").value = (executor.agent_cli && executor.agent_cli.binary) === "codex" ? "codex" : "claude";
@@ -2769,6 +2852,8 @@ async function saveSettings() {
   cfg.proactive_secretary.executor = cfg.proactive_secretary.executor || {};
   const executorCfg = cfg.proactive_secretary.executor;
   executorCfg.enabled = $("toggle-executor-enabled").checked;
+  cfg.proactive_secretary.greeting = cfg.proactive_secretary.greeting || {};
+  cfg.proactive_secretary.greeting.display_name = ($("input-greeting-name").value || "").trim().slice(0, 40);
   executorCfg.l2 = executorCfg.l2 || {};
   executorCfg.l2.enabled = $("toggle-executor-l2").checked;
   executorCfg.l2.allow_write = $("toggle-executor-l2-write").checked;
