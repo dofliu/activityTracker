@@ -349,7 +349,7 @@ Invoke-RestMethod `
 - **視窗切換**：右上 `今天`／`近 2 小時` 兩個 chip，↻ 手動更新；卡每 10 分鐘自動更新，切回 01 分頁也會更新。
 - **鼓勵語是規則挑的**：依深夜（22:00 後）、長時間（前景 6 小時以上）、週末、衝很快（開工 4 小時內產出多）、穩定等情境從不同池子挑句，同一天同一視窗固定同一句，不會每次重載都變。
 - **LLM 潤飾（預設關）**：`proactive_secretary.greeting.llm.enabled: true` 會請所選 LLM（沿用 `llm_advisor.provider`）把規則版重寫得更像人話，徽章會從 `RULES` 變成 `LLM · 供應商`。安全閥：LLM 版**只能改語氣，不能多出統計裡沒有的數字**，否則退回規則版並在 API 回應標 `llm_rejected: fact_guard`；LLM 失敗也退回規則版；結果快取 30 分鐘。
-- **同一段話也出現在 Telegram `/today` 的開頭**（純規則版，不呼叫 LLM）。API：`GET /api/v1/secretary/greeting?window=today|2h`。
+- **同一段話也推到晨報**（Telegram／LINE 都有，`proactive_secretary.greeting.in_morning_briefing`，預設開）：晨報第一段就是小秘書的話。07:30 多半還沒有今日活動，這時會改說**昨天**做了什麼（有上界的視窗，不會把今天混進去）；昨天也沒看到就誠實說今天還沒偵測到。`python main.py notify briefing --channel telegram --dry-run` 可預覽。Telegram `/today` 開頭也是同一段（純規則版）。API：`GET /api/v1/secretary/greeting?window=today|2h|yesterday`。
 
 ### 查看目前工作
 

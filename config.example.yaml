@@ -233,6 +233,8 @@ proactive_secretary:
   # 輸出裡出現統計以外的數字會整段丟掉、退回規則版（不得新增事實）。
   greeting:
     display_name: ''
+    # 晨報（Telegram／LINE）開頭也帶這段話；07:30 多半還沒有今日活動，會改說昨天
+    in_morning_briefing: true
     llm:
       enabled: false
       timeout_seconds: 20
