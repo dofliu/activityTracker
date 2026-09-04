@@ -146,6 +146,23 @@ def test_two_hour_window_is_narrower_than_today():
     assert stats["window_label"] == "過去兩小時" and stats["foreground_minutes"] is None
 
 
+def test_yesterday_window_has_an_upper_bound_and_no_elapsed_hours():
+    db = _seed(TempDatabase())
+    stats = collect_activity_stats(window="yesterday", now=NOW, database=db, cfg=_cfg(), include_usage=False)
+    # 昨天：1 個 commit（old）、1 輪 AI（gemini）；今天的 3 commit／5 輪都不能混進來
+    assert stats["commits"] == 1 and stats["commit_repos"] == ["old"]
+    assert stats["ai_turns"] == 1 and stats["ai_platforms"] == ["gemini"]
+    assert stats["prs_touched"] == 0 and stats["files_changed"] == 0 and stats["projects_touched"] == 0
+    assert stats["since"] == "2026-09-03T00:00:00" and stats["until"] == "2026-09-04T00:00:00"
+    assert stats["window_label"] == "昨天" and stats["observed_anything"] is True
+    # 有上界的視窗沒有「開工多久」這個概念
+    assert stats["hours_since_first_activity"] is None
+    greeting = compose_greeting(stats, now=NOW, name="Dof")
+    assert greeting["lead"] == "昨天你：" and greeting["achievements"][0].startswith("1 個 commit")
+    # 今天／近兩小時沒有上界
+    assert collect_activity_stats(window="today", now=NOW, database=db, cfg=_cfg(), include_usage=False)["until"] is None
+
+
 def test_empty_database_is_reported_honestly():
     stats = collect_activity_stats(window="today", now=NOW, database=TempDatabase(), cfg=_cfg(), include_usage=False)
     assert stats["observed_anything"] is False and stats["hours_since_first_activity"] is None

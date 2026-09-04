@@ -1004,6 +1004,14 @@ details.trust-panel[open] summary { border-bottom: none; }
 }
 
 /* 小秘書問候卡 */
+/* 問候卡：淡淡的主色底與左側色條，讓它在首頁跳出來但不搶戲（color-mix 不支援時退回一般面板色） */
+.greeting-card {
+  background: var(--s1);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--s1)), color-mix(in srgb, var(--accent) 4%, var(--s1)));
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--bd));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.greeting-card .panel-head { border-bottom-color: color-mix(in srgb, var(--accent) 22%, var(--bd)); }
 .greeting-card .panel-head .greeting-tools { display: flex; gap: 6px; align-items: center; }
 .greeting-body { padding: 12px 14px 10px; }
 .greeting-line { margin: 0 0 6px; font-size: 13.5px; line-height: 1.6; }

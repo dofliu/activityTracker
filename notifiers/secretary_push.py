@@ -70,7 +70,7 @@ def push_morning_briefing(
     now: datetime | None = None,
     channels: Sequence[ChannelAdapter] | None = None,
 ) -> dict[str, Any]:
-    return _push("morning_briefing", lambda: build_morning_briefing(now=now), cfg, channels)
+    return _push("morning_briefing", lambda: build_morning_briefing(now=now, cfg=cfg), cfg, channels)
 
 
 def push_evening_handoff(

@@ -97,6 +97,37 @@ def _pack_line(now: datetime) -> str | None:
         return None
 
 
+def _greeting_section(now: datetime, cfg: Any | None = None) -> Section | None:
+    """晨報開頭的「小秘書的話」：今天做了什麼＋鼓勵。
+
+    07:30 的晨報多半還沒有今日活動，這時改說昨天（有上界的視窗，不會混進今天）；
+    昨天也沒看到就誠實說今天還沒偵測到。讀不到或關閉（``in_morning_briefing``）就省略。
+    """
+    try:
+        from core.config import get_config
+        from core.secretary_greeting import build_greeting
+
+        cfg = cfg or get_config()
+        if not bool(cfg.get("proactive_secretary.greeting.in_morning_briefing", True)):
+            return None
+        greeting = build_greeting(window="today", now=now, cfg=cfg)
+        if not (greeting.get("stats") or {}).get("observed_anything"):
+            yesterday = build_greeting(window="yesterday", now=now, cfg=cfg)
+            if (yesterday.get("stats") or {}).get("observed_anything"):
+                greeting = yesterday
+    except Exception as exc:  # noqa: BLE001 — 問候讀不到不該讓晨報消失
+        logger.debug("greeting unavailable for briefing: %s", type(exc).__name__)
+        return None
+    if greeting.get("source") == "llm" and greeting.get("text"):
+        return Section(lines=(str(greeting["text"]),))
+    lines: list[str] = [str(greeting.get("headline") or ""), str(greeting.get("lead") or "")]
+    lines.extend(f"• {item}" for item in greeting.get("achievements") or [])
+    if greeting.get("recent_summary"):
+        lines.append(f"剛剛在做：{greeting['recent_summary']}")
+    lines.append(str(greeting.get("encouragement") or ""))
+    return Section(lines=tuple(line for line in lines if line))
+
+
 def _secretary_section(limit: int = 2) -> Section | None:
     """秘書 top 建議（唯讀）；秘書層失敗不阻斷推播本體。"""
     try:
@@ -130,12 +161,17 @@ def build_morning_briefing(
     projects: Sequence[dict[str, Any]] | None = None,
     open_loops: Sequence[dict[str, Any]] | None = None,
     include_secretary: bool = True,
+    include_greeting: bool = True,
+    cfg: Any | None = None,
 ) -> Message:
     now = now or get_local_now()
     projects, open_loops = _projects_and_loops(projects, open_loops)
     active = [p for p in projects if p.get("status") == "active"][:5]
 
     sections: list[Section] = []
+    greeting = _greeting_section(now, cfg) if include_greeting else None
+    if greeting:
+        sections.append(greeting)
     if active:
         sections.append(Section(
             heading="🔥 今日重點活躍專案：",

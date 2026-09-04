@@ -32,7 +32,7 @@ from core.time_utils import get_local_now
 
 logger = logging.getLogger("OmniContext.SecretaryGreeting")
 
-WINDOWS: dict[str, str] = {"today": "今天", "2h": "過去兩小時"}
+WINDOWS: dict[str, str] = {"today": "今天", "2h": "過去兩小時", "yesterday": "昨天"}
 DEFAULT_LLM_TIMEOUT_SECONDS = 20
 LLM_MAX_CHARS = 320
 
@@ -66,7 +66,16 @@ def window_start(window: str, now: datetime) -> datetime:
         return datetime.combine(now.date(), dtime.min)
     if window == "2h":
         return now - timedelta(hours=2)
+    if window == "yesterday":
+        return datetime.combine(now.date(), dtime.min) - timedelta(days=1)
     raise GreetingRejected("invalid_window", f"window 必須是 {', '.join(WINDOWS)} 之一")
+
+
+def window_end(window: str, now: datetime) -> datetime | None:
+    """視窗上界；只有「昨天」有（今天 00:00），其餘視窗開放到現在。"""
+    if window == "yesterday":
+        return datetime.combine(now.date(), dtime.min)
+    return None
 
 
 def display_name(cfg: Any | None = None) -> str:
@@ -102,17 +111,27 @@ def collect_activity_stats(
     database = database or get_db()
     now = _naive(now or get_local_now())
     since = window_start(window, now)
+    until = window_end(window, now)
+
+    def within(col):
+        return (col >= since) if until is None else ((col >= since) & (col < until))
+
+    def inside(value: datetime | None) -> bool:
+        value = _naive(value)
+        return bool(value and value >= since and (until is None or value < until))
+
     stats: dict[str, Any] = {
         "window": window,
         "window_label": WINDOWS[window],
         "since": since.isoformat(timespec="seconds"),
+        "until": until.isoformat(timespec="seconds") if until else None,
         "now": now.isoformat(timespec="seconds"),
         "sources": {},
     }
     first_seen: list[datetime] = []
 
     with database.session_scope() as session:
-        commits = session.query(GitActivityEvent).filter(GitActivityEvent.timestamp >= since).all()
+        commits = session.query(GitActivityEvent).filter(within(GitActivityEvent.timestamp)).all()
         stats["commits"] = len(commits)
         stats["commit_repos"] = sorted({c.repo_name for c in commits if c.repo_name})
         stats["insertions"] = int(sum(int(c.insertions or 0) for c in commits))
@@ -120,22 +139,22 @@ def collect_activity_stats(
         stats["sources"]["commits"] = "git_activity_events"
 
         prs = session.query(GitHubPREvent).filter(
-            (GitHubPREvent.created_at >= since) | (GitHubPREvent.merged_at >= since) | (GitHubPREvent.updated_at >= since)
+            within(GitHubPREvent.created_at) | within(GitHubPREvent.merged_at) | within(GitHubPREvent.updated_at)
         ).all()
-        stats["prs_opened"] = sum(1 for p in prs if p.created_at and _naive(p.created_at) >= since)
-        stats["prs_merged"] = sum(1 for p in prs if p.merged_at and _naive(p.merged_at) >= since)
+        stats["prs_opened"] = sum(1 for p in prs if inside(p.created_at))
+        stats["prs_merged"] = sum(1 for p in prs if inside(p.merged_at))
         stats["prs_touched"] = len(prs)
         stats["pr_repos"] = sorted({p.repo_name for p in prs if p.repo_name})
         stats["sources"]["prs"] = "github_pr_events"
 
-        ai_rows = session.query(AIPromptEvent.platform, AIPromptEvent.timestamp).filter(AIPromptEvent.timestamp >= since).all()
+        ai_rows = session.query(AIPromptEvent.platform, AIPromptEvent.timestamp).filter(within(AIPromptEvent.timestamp)).all()
         stats["ai_turns"] = len(ai_rows)
         stats["ai_platforms"] = sorted({str(p or "").strip() for p, _ in ai_rows if p})
         first_seen.extend(_naive(ts) for _, ts in ai_rows if ts)
         stats["sources"]["ai_turns"] = "ai_prompt_events"
 
         files = session.query(FileActivityEvent.file_type, FileActivityEvent.timestamp).filter(
-            FileActivityEvent.timestamp >= since
+            within(FileActivityEvent.timestamp)
         ).all()
         types = [str(t or "").lower() for t, _ in files]
         stats["files_changed"] = len(files)
@@ -146,7 +165,7 @@ def collect_activity_stats(
 
         projects = (
             session.query(ProjectState)
-            .filter(ProjectState.last_activity_at >= since)
+            .filter(within(ProjectState.last_activity_at))
             .order_by(ProjectState.last_activity_at.desc())
             .all()
         )
@@ -157,14 +176,14 @@ def collect_activity_stats(
 
         resolved = session.query(func.count(OpenLoop.id)).filter(
             OpenLoop.status == "resolved",
-            func.coalesce(OpenLoop.resolved_at, OpenLoop.updated_at) >= since,
+            within(func.coalesce(OpenLoop.resolved_at, OpenLoop.updated_at)),
         ).scalar()
         stats["loops_resolved"] = int(resolved or 0)
         stats["sources"]["loops_resolved"] = "open_loops"
 
         micro = (
             session.query(ActivityMicroSummary)
-            .filter(ActivityMicroSummary.period_end >= since)
+            .filter(within(ActivityMicroSummary.period_end))
             .order_by(ActivityMicroSummary.period_start.desc())
             .limit(2)
             .all()
@@ -174,7 +193,7 @@ def collect_activity_stats(
 
     stats["first_activity_at"] = min(first_seen).isoformat(timespec="seconds") if first_seen else None
     stats["hours_since_first_activity"] = (
-        round((now - min(first_seen)).total_seconds() / 3600, 1) if first_seen else None
+        round((now - min(first_seen)).total_seconds() / 3600, 1) if (first_seen and until is None) else None
     )
 
     stats["foreground_minutes"] = None
@@ -354,6 +373,8 @@ def compose_greeting(
         lead = f"今天才開工約 {elapsed}，你已經："
     elif window == "today":
         lead = "今天到目前為止，你已經："
+    elif window == "yesterday":
+        lead = "昨天你："
     else:
         lead = "過去兩小時，你："
     encouragement, pool = choose_encouragement(stats, now=now, seed=seed)
@@ -487,7 +508,7 @@ def build_greeting(
     name: str | None = None,
     use_llm: bool = True,
 ) -> dict[str, Any]:
-    """卡片、Telegram /today 與晨報共用的單一入口。"""
+    """卡片、Telegram /today 與晨報共用的單一入口；window 可為 today／2h／yesterday。"""
     cfg = cfg or get_config()
     now = _naive(now or get_local_now())
     if window not in WINDOWS:
