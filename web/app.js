@@ -77,17 +77,24 @@ const I18N = {
     ph_loading_memory: "載入記憶區…",
     related_history_note: "輸入目前的問題，從本機 semantic index 找相似歷史",
     sec_sessions: "近期工作階段",
-    tab_dashboard: "06 · 即時情報流",
-    tab_settings: "07 · ⚙️ 設定",
-    tab_system_health: "08 · 🛡️ 系統健康",
+    tab_settings: "06 · ⚙️ 系統設定",
+    snav_secretary: "🤖 秘書與自動化",
+    snav_telegram: "✈️ Telegram 通知",
+    snav_line: "💬 LINE 通知",
+    snav_paths: "📁 監控路徑",
+    snav_sources: "🧲 採集來源",
+    snav_llm: "🧠 摘要與 LLM",
+    snav_usage: "⏱️ 使用時間與里程碑",
+    snav_github: "🐙 GitHub 雲端整合",
+    snav_group_ops: "維運",
+    snav_feed: "📡 即時情報流",
+    snav_health: "🛡️ 系統健康",
+    settings_nav_hint: "左側選擇要檢視的區塊；「儲存並套用」只影響設定類區塊。",
     rag_merged_title: "知識庫與 RAG（完整對話、引用與索引管理）",
     rag_merged_note: "與 01 小秘書交辦框共用同一條對話與歷史",
-    settings_group_common: "🤖 秘書與自動化（常用）",
-    settings_group_other: "🧩 其他設定（較少變動，點標題展開）",
     tg_setup_summary: "連線設定（bot token／chat id／測試）",
     checkpoints_panel_title: "活動快照（週期 checkpoint 日誌）",
     checkpoints_panel_note: "需要回看原始時段紀錄時再展開",
-    settings_collapsed_hint: "較少變動的設定已收合，點標題展開。",
     assistant_title: "🤖 小秘書 · 交辦與提問",
     assistant_input_ph: "請小秘書查資料、寫摘要、建議下一步…",
     btn_assistant_send: "交辦 ⚡",
@@ -348,17 +355,24 @@ const I18N = {
     ph_loading_memory: "Loading memory…",
     related_history_note: "Describe your current question to find similar history in the local semantic index",
     sec_sessions: "Recent work sessions",
-    tab_dashboard: "06 · Live Feed",
-    tab_settings: "07 · ⚙️ Settings",
-    tab_system_health: "08 · 🛡️ System Health",
+    tab_settings: "06 · ⚙️ System Settings",
+    snav_secretary: "🤖 Secretary & Automation",
+    snav_telegram: "✈️ Telegram",
+    snav_line: "💬 LINE",
+    snav_paths: "📁 Monitored Paths",
+    snav_sources: "🧲 Collector Sources",
+    snav_llm: "🧠 Synthesis & LLM",
+    snav_usage: "⏱️ Usage & Milestones",
+    snav_github: "🐙 GitHub Integration",
+    snav_group_ops: "Operations",
+    snav_feed: "📡 Live Feed",
+    snav_health: "🛡️ System Health",
+    settings_nav_hint: "Pick a section on the left; “Save & Apply” only affects configuration sections.",
     rag_merged_title: "Knowledge & RAG (full conversation, citations, index management)",
     rag_merged_note: "Shares the same conversation and history as the 01 Assistant chat box",
-    settings_group_common: "🤖 Secretary & Automation (frequently used)",
-    settings_group_other: "🧩 Other settings (rarely changed — click a title to expand)",
     tg_setup_summary: "Connection setup (bot token / chat id / test)",
     checkpoints_panel_title: "Activity Snapshots (periodic checkpoint logs)",
     checkpoints_panel_note: "Expand only when you need the raw per-period logs",
-    settings_collapsed_hint: "Rarely-changed settings are collapsed — click a title to expand.",
     assistant_title: "🤖 ASSISTANT · ASK OR DELEGATE",
     assistant_input_ph: "Ask for documents, summaries, or the next step…",
     btn_assistant_send: "Send ⚡",
@@ -663,6 +677,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initLanguage();
   initTheme();
   initTabs();
+  initSettingsNav();
   initControls();
   initSettingsForm();
   initGitHubSection();
@@ -770,11 +785,47 @@ function initTabs() {
       if (id === "tab-knowledge") { loadRAGFolders(); loadRAGSessions(); loadRAGProgress(); }
       if (id === "tab-projects") { loadProjects(); loadRepoSnapshot(); }
       if (id === "tab-repos") loadRepositorySyncStatus();  // 切到分頁才掃描本機 Git，不在開頁時付這個成本
-      if (id === "tab-settings") loadConfig();
+      if (id === "tab-settings") { loadConfig(); activateSettingsPane(currentSettingsPane()); }
       if (id === "tab-summaries") { loadSummaries(); loadCheckpoints(); loadUsagePanels(); }
-      if (id === "tab-system-health") loadSystemHealth();
     });
   });
+}
+
+// ---------------------------------------------------------------- 06 系統設定：左欄切換
+const SETTINGS_PANE_KEY = "omni-settings-pane";
+const SETTINGS_CONFIG_PANES = new Set(["secretary", "telegram", "line", "paths", "sources", "llm", "usage", "github"]);
+
+function currentSettingsPane() {
+  let saved = null;
+  try { saved = localStorage.getItem(SETTINGS_PANE_KEY); } catch (_) { /* 無 localStorage 時用預設 */ }
+  return saved && document.querySelector(`.settings-pane[data-pane="${saved}"]`) ? saved : "secretary";
+}
+
+function activateSettingsPane(key) {
+  const pane = document.querySelector(`.settings-pane[data-pane="${key}"]`);
+  if (!pane) return;
+  document.querySelectorAll(".settings-pane").forEach(p => p.classList.toggle("active", p === pane));
+  document.querySelectorAll(".settings-nav-item").forEach(b => b.classList.toggle("active", b.dataset.pane === key));
+  try { localStorage.setItem(SETTINGS_PANE_KEY, key); } catch (_) { /* 同上 */ }
+  // 儲存列只對設定類區塊有意義；情報流與系統健康是唯讀觀察
+  const bar = document.querySelector(".settings-actionbar");
+  if (bar) bar.hidden = !SETTINGS_CONFIG_PANES.has(key);
+  if (key === "feed") { refreshStatus(); refreshFeed(); }
+  if (key === "health") loadSystemHealth();
+}
+
+function initSettingsNav() {
+  document.querySelectorAll(".settings-nav-item").forEach(btn => {
+    btn.addEventListener("click", () => activateSettingsPane(btn.dataset.pane));
+  });
+  activateSettingsPane(currentSettingsPane());
+}
+
+// 其他分頁若要導到系統健康／情報流，走這個入口而不是直接切分頁
+function openSettingsPane(key) {
+  const tab = document.querySelector('.tab[data-tab="tab-settings"]');
+  if (tab) tab.click();
+  activateSettingsPane(key);
 }
 
 // ---------------------------------------------------------------- controls

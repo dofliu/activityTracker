@@ -89,7 +89,7 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8765/api/v1/repos/sync-fet
 Invoke-RestMethod "http://127.0.0.1:8765/api/v1/repos/sync-batch-plan?action=pull_ff_only"
 ```
 
-**讓小秘書每天確認**：在「設定 → 小秘書執行器 → 排程任務」新增 `repo_sync_report`（L0 唯讀），它每天掃描全部 repo 的 cached 狀態、寫報告到 `reports/repo_sync/RepoSync_YYYYMMDD.md`，並留下快照讓小秘書在提案與晨報中列出「N 個 repo 需要 pull／push」。需要 pull 的 repo 會附「批准執行」（L1 `repo_pull_ff`，可在儀表板或 Telegram inline 批准；執行時仍重檢 clean 與可 fast-forward）；需要 push 的只提供 fetch，push 請回同步中心確認。報告不會 fetch，所以它反映的是上次 fetch 之後的認知——想要即時，先按「全部 Fetch」或批准 fetch 提案。
+**讓小秘書每天確認**：在「系統設定 → 秘書與自動化 → 排程任務」新增 `repo_sync_report`（L0 唯讀），它每天掃描全部 repo 的 cached 狀態、寫報告到 `reports/repo_sync/RepoSync_YYYYMMDD.md`，並留下快照讓小秘書在提案與晨報中列出「N 個 repo 需要 pull／push」。需要 pull 的 repo 會附「批准執行」（L1 `repo_pull_ff`，可在儀表板或 Telegram inline 批准；執行時仍重檢 clean 與可 fast-forward）；需要 push 的只提供 fetch，push 請回同步中心確認。報告不會 fetch，所以它反映的是上次 fetch 之後的認知——想要即時，先按「全部 Fetch」或批准 fetch 提案。
 
 同步中心分頁下方是 **Repo Onboarding／對帳（P4.3）**：按「🔍 掃描對帳」列出三種尚未納管的情況，每種都提供一次一個 repository 的確認式動作：
 
@@ -526,7 +526,7 @@ proactive_secretary:
 
 **P5-R3 L2 Dispatcher（選用，獨立開關，預設關閉）**：啟用後，停滯／未收尾的建議卡會多一顆「🛡️ 批准執行（L2）」，讓秘書調度**你本機已登入的 agent CLI**（預設 `claude -p`，可改 `codex exec`）為該事項起草重啟行動計畫，結果自動複製到剪貼簿並存於 `agent_outputs/execution_<id>.md`。
 
-不想手動編輯 YAML 的話，「設定」分頁最上方就是「小秘書執行器」卡片（常用設定預設展開）：兩個開關（執行器／L2）與 agent CLI 下拉選單，按「儲存並套用」即寫回 config.yaml 並熱套用；等效的手動設定如下：
+不想手動編輯 YAML 的話，「06 · 系統設定 → 🤖 秘書與自動化」就是「小秘書執行器」卡片：兩個開關（執行器／L2）與 agent CLI 下拉選單，按「儲存並套用」即寫回 config.yaml 並熱套用；等效的手動設定如下：
 
 ```yaml
 proactive_secretary:
@@ -554,7 +554,7 @@ L2 每次執行都是**三道門**：execution token → 單鍵批准 → 回填
 | `monthly_report_rollup` | 彙整**上一個完整月**的每日摘要成月報 | `reports/Monthly_Rollup_YYYY-MM.md` |
 | `status_snapshot_draft` | 點名 `STATUS.yaml` 的 `last_updated` 落後觀測活動 ≥7 天的 repo（**草稿，絕不改 repo**） | `reports/status_drafts/Status_Draft_<日期>.md` |
 
-啟用（「設定 → 小秘書執行器」卡片的第四個開關，或手動設定）：
+啟用（「系統設定 → 秘書與自動化」卡片的第四個開關，或手動設定）：
 
 ```yaml
 proactive_secretary:
@@ -571,7 +571,7 @@ proactive_secretary:
 
 ### Telegram 推播：介面上完成設定與即時連線測試
 
-「設定 → Telegram 通知」卡片提供完整設定流程，不必手動編輯 config.yaml 或設環境變數：
+「系統設定 → Telegram 通知」卡片提供完整設定流程，不必手動編輯 config.yaml 或設環境變數：
 
 1. **建 bot**：在 Telegram 搜尋 `@BotFather` → `/newbot` → 複製 API Token 貼到卡片的 BOT TOKEN 欄。
 2. **取得 chat id**：先在 Telegram 對你的 bot 送出任意訊息（例如 `/start`），再按「🔍 偵測 CHAT ID」——系統以 `getUpdates` 列出最近對話，點選即回填。
@@ -593,7 +593,7 @@ proactive_secretary:
 
 **為什麼 LINE 只能推播**：Telegram 有 `getUpdates` 長輪詢，本機服務是主動往外拿訊息，不必開任何對外 port；LINE Messaging API 只有 webhook，要收到你的訊息就得讓 LINE 平台連到一個公開網址，那會打破本專案「只在 127.0.0.1」的邊界。所以**提問與批准請用 Telegram，LINE 當純通知**。
 
-**LINE 設定（「設定 → 03 LINE 通知」）**：
+**LINE 設定（「系統設定 → LINE 通知」）**：
 
 1. 在 [LINE Developers Console](https://developers.line.biz/) 建立 Messaging API channel，發行 **Channel access token（long-lived）** 貼進第一欄。
 2. 用手機把這個官方帳號**加為好友**，再從 Console「Basic settings → Your user ID」複製 **userId**（U 開頭的長字串）貼進第二欄——那不是 LINE ID（@xxxx）。
@@ -617,7 +617,7 @@ token 與 userId 只存本機、瀏覽器永遠拿不回明文；token 只走 `A
 
 `/arm` 不再接受 execution token——手機不必、也不應該持有長期 secret：
 
-1. 儀表板「設定 → Telegram 通知」按 **🔑 產生解鎖碼**（需 execution token），畫面顯示一組 6 位數。
+1. 儀表板「系統設定 → Telegram 通知」按 **🔑 產生解鎖碼**（需 execution token），畫面顯示一組 6 位數。
 2. 5 分鐘內在手機傳 `/arm 123456`。碼**只能用一次**，猜錯一次就作廢，`/disarm` 與服務重啟都會銷毀它。
 3. 解鎖成功後的授權窗仍是 24 小時；能批准的仍只有白名單 L0/L1，L2 一律回儀表板走確認碼。
 
@@ -625,7 +625,7 @@ token 與 userId 只存本機、瀏覽器永遠拿不回明文；token 只走 `A
 
 ### 在手機上用小秘書（Telegram 對話，2026-09-03，ADR-013，預設關閉）
 
-儀表板只開在 `127.0.0.1`，人不在電腦前就看不到。手機通道走既有的 Telegram（outbound-only 長輪詢，不開任何 port）：勾選「設定 → Telegram 通知 → 啟用小秘書對話」並儲存後，在綁定的對話裡——
+儀表板只開在 `127.0.0.1`，人不在電腦前就看不到。手機通道走既有的 Telegram（outbound-only 長輪詢，不開任何 port）：勾選「系統設定 → Telegram 通知 → 啟用小秘書對話」並儲存後，在綁定的對話裡——
 
 - **直接打字＝提問**：走與儀表板交辦框**同一條管線**（記憶區脈絡＋知識庫檢索＋所選 LLM）。回覆會附「📎 引用：檔名」與「🧠 參考記憶區 N 筆」。第一則先回「🤔 查一下…」，答案在模型回完後送出；同一時間只回答一題，太長的答案會分段而不是截斷。
 - **記下來：… ／ 偏好：… ／ 決定：…**（或 `/note` `/pref` `/decision` `remember:`）直接寫進記憶區（ADR-012），**不送 LLM**；可帶 `@專案`。偏好寫「不要提醒 repo_needs_push」之後，提案清單立刻不再出現該類建議。

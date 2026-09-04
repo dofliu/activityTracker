@@ -190,15 +190,16 @@ input, select, button { font-family: inherit; }
 .btn-block { width: 100%; padding: 8px 10px; }
 .btn:disabled { opacity: 0.55; cursor: default; }
 
+/* hidden 屬性永遠優先：任何 .foo { display: flex/grid } 都不得蓋掉它（已踩過三次） */
+[hidden] { display: none !important; }
+
 .tabs { padding: 0 22px; display: flex; gap: 4px; }
 .tab { cursor: pointer; border: none; border-top: 2px solid transparent; background: transparent; color: var(--mu); padding: 9px 15px; font-size: 12.5px; font-weight: 700; }
 .tab:hover { color: var(--tx); }
 .tab.active { background: var(--bg); color: var(--tx); border-top-color: var(--accent); }
-/* 次要分頁（設定、維運類）：預設弱化，hover/選取時恢復 */
-.tab-secondary { font-size: 11.5px; font-weight: 600; opacity: 0.55; }
-.tab-secondary:hover, .tab-secondary.active { opacity: 1; }
 
-/* ---------- 可折疊卡片（少用設定預設收合） ---------- */
+
+/* ---------- 可折疊卡片（系統健康區塊的檢查清單） ---------- */
 details.panel-collapsible > summary.panel-head { cursor: pointer; user-select: none; list-style: none; display: flex; align-items: center; gap: 10px; }
 details.panel-collapsible > summary.panel-head::-webkit-details-marker { display: none; }
 details.panel-collapsible > summary.panel-head::after { content: "▸"; margin-left: auto; color: var(--mu); font-size: 12px; transition: transform 0.15s ease; }
@@ -208,9 +209,6 @@ details.panel-collapsible:not([open]) > summary.panel-head { border-bottom: none
 /* 設定分頁固定儲存列 */
 .settings-actionbar { position: sticky; top: 92px; z-index: 6; display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 14px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08); }
 .mt-14 { margin-top: 14px; }
-
-/* 設定分頁分區標頭 */
-.settings-group-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--mu); margin: 4px 2px 8px; text-transform: uppercase; }
 
 /* 卡片內的巢狀折疊區（排程任務、Telegram 連線設定等） */
 details.sub-collapsible > summary { cursor: pointer; user-select: none; list-style: none; display: flex; align-items: center; gap: 8px; padding: 6px 0; }
@@ -888,8 +886,7 @@ details.trust-panel[open] summary { border-bottom: none; }
 /* Repo 全覽與批次（ADR-011 Addendum B） */
 .repo-overview-toolbar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-content: flex-start; }
 .repo-overview-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 8px; }
-/* 同上：display 規則必須為 hidden 屬性留退路 */
-.repo-overview-filters[hidden] { display: none; }
+
 .repo-overview-filters .repo-overview-chip { padding: 3px 9px; border: 1px solid var(--bd); border-radius: 999px; background: var(--s2); color: var(--mu); font-family: "JetBrains Mono", monospace; font-size: 10px; cursor: pointer; }
 .repo-overview-filters .repo-overview-chip.is-active { border-color: var(--accent); color: var(--accent); background: rgba(237, 115, 35, 0.10); }
 .repo-overview-table { overflow-x: auto; border: 1px solid var(--bd); background: var(--s1); }
@@ -985,6 +982,23 @@ details.trust-panel[open] summary { border-bottom: none; }
 
 /* ADR-014 一次性解鎖碼 */
 .arm-code-box { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin-top: 6px; border: 1px solid var(--accent); border-radius: 6px; background: var(--s2); }
-/* display:flex 會蓋掉 hidden 屬性的 display:none，必須明確還原 */
-.arm-code-box[hidden] { display: none; }
 .arm-code { font-family: "JetBrains Mono", monospace; font-size: 20px; font-weight: 700; letter-spacing: 4px; color: var(--accent); }
+
+/* ---------- 06 系統設定：左欄切換（ADR 無；純 IA） ---------- */
+.settings-layout { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 14px; align-items: start; }
+.settings-nav { position: sticky; top: 150px; display: flex; flex-direction: column; gap: 2px; padding: 8px; border: 1px solid var(--bd); border-radius: 8px; background: var(--s1); }
+.settings-nav-item { text-align: left; border: none; background: transparent; color: var(--mu); padding: 8px 10px; border-radius: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer; border-left: 2px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.settings-nav-item:hover { color: var(--tx); background: var(--s2); }
+.settings-nav-item.active { color: var(--tx); background: var(--s2); border-left-color: var(--accent); }
+.settings-nav-group { margin: 8px 10px 2px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: var(--mu); text-transform: uppercase; }
+.settings-panes { min-width: 0; }
+.settings-pane { display: none; }
+.settings-pane.active { display: block; }
+.settings-pane > .panel:last-child { margin-bottom: 0; }
+@media (max-width: 900px) {
+  .settings-layout { grid-template-columns: 1fr; }
+  .settings-nav { position: static; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; gap: 4px; padding: 6px; }
+  .settings-nav-item { border-left: none; border-bottom: 2px solid transparent; border-radius: 6px 6px 0 0; flex: 0 0 auto; }
+  .settings-nav-item.active { border-bottom-color: var(--accent); }
+  .settings-nav-group { display: none; }
+}
