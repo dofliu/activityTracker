@@ -40,6 +40,14 @@ GREETING_CLAIM_BOUNDARY = (
     "只統計採集器看到的活動（Git commit、GitHub PR、AI 對話、檔案異動、專案、前景時間、"
     "未結事項）；沒被採集到的工作不代表沒做，郵件與行事曆目前不在採集範圍。"
 )
+GREETING_CLAIM_BOUNDARY_WITH_CALENDAR = (
+    "只統計採集器看到的活動（Git commit、GitHub PR、AI 對話、檔案異動、專案、前景時間、"
+    "未結事項、本機行事曆）；沒被採集到的工作不代表沒做，郵件目前不在採集範圍。"
+)
+
+
+def claim_boundary_text(calendar_enabled: bool) -> str:
+    return GREETING_CLAIM_BOUNDARY_WITH_CALENDAR if calendar_enabled else GREETING_CLAIM_BOUNDARY
 
 WRITING_TYPES = {".tex", ".bib", ".docx", ".doc", ".md", ".txt", ".rst", ".pptx", ".xlsx"}
 CODE_TYPES = {".py", ".js", ".ts", ".tsx", ".jsx", ".go", ".rs", ".java", ".c", ".cpp", ".h", ".css", ".html", ".yaml", ".yml", ".json", ".toml", ".sh"}
@@ -191,6 +199,22 @@ def collect_activity_stats(
         stats["recent_summaries"] = [str(m.summary_text)[:160] for m in micro]
         stats["sources"]["recent_summaries"] = "activity_micro_summaries"
 
+    # ADR-015：視窗內已開始的會（開會負擔）；行事曆沒啟用就是 0 且 calendar_enabled=False
+    stats["calendar_enabled"] = False
+    stats["meetings"] = 0
+    stats["meeting_minutes"] = 0
+    try:
+        from core.calendar_agenda import meetings_started_between
+
+        meetings = meetings_started_between(since, until or now, database=database, cfg=cfg)
+        stats["calendar_enabled"] = bool(meetings.get("enabled"))
+        if meetings.get("enabled"):
+            stats["meetings"] = int(meetings.get("count") or 0)
+            stats["meeting_minutes"] = int(meetings.get("minutes") or 0)
+            stats["sources"]["meetings"] = "calendar_events"
+    except Exception as exc:  # noqa: BLE001 — 行事曆讀不到不該讓卡片消失
+        logger.debug("calendar unavailable for greeting: %s", type(exc).__name__)
+
     stats["first_activity_at"] = min(first_seen).isoformat(timespec="seconds") if first_seen else None
     stats["hours_since_first_activity"] = (
         round((now - min(first_seen)).total_seconds() / 3600, 1) if (first_seen and until is None) else None
@@ -218,7 +242,7 @@ def collect_activity_stats(
 
     stats["observed_anything"] = any(
         int(stats.get(key) or 0) > 0
-        for key in ("commits", "prs_touched", "ai_turns", "files_changed", "projects_touched", "loops_resolved")
+        for key in ("commits", "prs_touched", "ai_turns", "files_changed", "projects_touched", "loops_resolved", "meetings")
     )
     return stats
 
@@ -278,6 +302,9 @@ def achievement_lines(stats: dict[str, Any]) -> list[str]:
         lines.append(f"和 AI 對話 {stats['ai_turns']} 輪" + (f"（{platforms}）" if platforms else ""))
     if stats.get("loops_resolved"):
         lines.append(f"收掉 {stats['loops_resolved']} 個未結事項")
+    if stats.get("meetings"):
+        minutes = int(stats.get("meeting_minutes") or 0)
+        lines.append(f"開了 {stats['meetings']} 場會" + (f"（{minutes} 分鐘）" if minutes else ""))
     minutes = stats.get("foreground_minutes")
     if minutes and minutes >= 15:
         hours, rem = divmod(int(minutes), 60)
@@ -357,9 +384,33 @@ def compose_greeting(
     *,
     now: datetime,
     name: str = "",
+    agenda: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """規則版：問候＋成就清單＋鼓勵語；全部可回溯到 stats。"""
+    """規則版：問候＋成就清單＋（今天視窗）行程一句＋鼓勵語；全部可回溯到 stats。"""
     window = stats.get("window", "today")
+    schedule_line = None
+    schedule: dict[str, Any] | None = None
+    if agenda and window == "today" and agenda.get("enabled") and agenda.get("count"):
+        from core.calendar_agenda import schedule_sentence
+
+        schedule_line = schedule_sentence(agenda)
+        nxt = agenda.get("next") or {}
+        schedule = {
+            "count": int(agenda.get("count") or 0),
+            "remaining": agenda.get("remaining_count"),
+            "next_summary": nxt.get("summary"),
+            "next_start": nxt.get("start"),
+            "next_minutes": nxt.get("minutes_until_start"),
+            "ongoing_summary": (agenda.get("ongoing") or {}).get("summary"),
+        }
+        # 讓事實閘認得這句話裡會出現的數字（場數、剩餘、分鐘、下一場的時／分）
+        stats = dict(stats)
+        stats["schedule_count"] = schedule["count"]
+        stats["schedule_remaining"] = int(schedule["remaining"] or 0)
+        stats["schedule_next_minutes"] = int(schedule["next_minutes"] or 0)
+        if nxt.get("start"):
+            stats["schedule_next_hour"] = int(nxt["start"][11:13])
+            stats["schedule_next_minute"] = int(nxt["start"][14:16])
     seed = f"{now.date().isoformat()}:{window}"
     who = f"{name}，" if name else ""
     headline = f"{who}{_time_greeting(now)}。"
@@ -386,13 +437,15 @@ def compose_greeting(
         "lead": lead,
         "achievements": lines,
         "recent_summary": recent[0] if (window == "2h" and recent) else None,
+        "schedule_line": schedule_line,
+        "schedule": schedule,
         "encouragement": encouragement,
         "encouragement_pool": pool,
         "source": "rules",
         "generated_at": now.isoformat(timespec="seconds"),
         "stats": {k: v for k, v in stats.items() if k not in ("sources",)},
         "evidence": stats.get("sources", {}),
-        "claim_boundary": GREETING_CLAIM_BOUNDARY,
+        "claim_boundary": claim_boundary_text(bool(stats.get("calendar_enabled"))),
     }
 
 
@@ -438,7 +491,7 @@ def llm_text_is_safe(text: str, stats: dict[str, Any]) -> bool:
         elif isinstance(value, list):
             allowed.add(str(len(value)))
     allowed.update({"1", "2"})  # 「兩小時」「一件事」這類常見用語
-    return all(number in allowed for number in _NUMBER_RE.findall(text))
+    return all(str(int(number)) in allowed for number in _NUMBER_RE.findall(text))
 
 
 def polish_with_llm(
@@ -514,7 +567,15 @@ def build_greeting(
     if window not in WINDOWS:
         raise GreetingRejected("invalid_window", f"window 必須是 {', '.join(WINDOWS)} 之一")
     stats = collect_activity_stats(window=window, now=now, database=database, cfg=cfg)
-    greeting = compose_greeting(stats, now=now, name=display_name(cfg) if name is None else name)
+    agenda = None
+    if window == "today" and stats.get("calendar_enabled"):
+        try:
+            from core.calendar_agenda import day_agenda
+
+            agenda = day_agenda(now=now, database=database, cfg=cfg)
+        except Exception as exc:  # noqa: BLE001 — 行程讀不到只少一句話
+            logger.debug("agenda unavailable for greeting: %s", type(exc).__name__)
+    greeting = compose_greeting(stats, now=now, name=display_name(cfg) if name is None else name, agenda=agenda)
     greeting["text"] = plain_text(greeting)
     if use_llm:
         greeting = polish_with_llm(greeting, cfg=cfg, now=now)
@@ -528,5 +589,7 @@ def plain_text(greeting: dict[str, Any]) -> str:
         parts.append("；".join(greeting["achievements"]) + "。")
     if greeting.get("recent_summary"):
         parts.append(f"剛剛在做：{greeting['recent_summary']}")
+    if greeting.get("schedule_line"):
+        parts.append(f"📅 {greeting['schedule_line']}")
     parts.append(greeting["encouragement"])
     return " ".join(p for p in parts if p)

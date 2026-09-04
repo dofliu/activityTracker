@@ -611,6 +611,45 @@ def _migration_017_secretary_notes(connection: Connection) -> None:
     ))
 
 
+def _migration_018_calendar_events(connection: Connection) -> None:
+    """ADR-015 本機行事曆：從 .ics 展開的行程實例（只存時間／標題／地點／狀態／來源檔）。"""
+    connection.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS calendar_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            uid VARCHAR(255) NOT NULL,
+            instance_start DATETIME NOT NULL,
+            instance_end DATETIME NOT NULL,
+            all_day BOOLEAN NOT NULL DEFAULT 0,
+            summary VARCHAR(200) NOT NULL DEFAULT '',
+            location VARCHAR(200) NOT NULL DEFAULT '',
+            status VARCHAR(24) NOT NULL DEFAULT 'CONFIRMED',
+            recurring BOOLEAN NOT NULL DEFAULT 0,
+            calendar_name VARCHAR(120),
+            source_path VARCHAR(1024) NOT NULL,
+            last_modified DATETIME,
+            last_seen_at DATETIME NOT NULL
+        );
+        """
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_calendar_events_uid ON calendar_events(uid);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_calendar_events_instance_start ON calendar_events(instance_start);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_calendar_events_source_path ON calendar_events(source_path);"
+    ))
+    connection.execute(text(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_calendar_events_source_uid_start "
+        "ON calendar_events(source_path, uid, instance_start);"
+    ))
+    connection.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_calendar_events_start_end ON calendar_events(instance_start, instance_end);"
+    ))
+
+
 MIGRATIONS: tuple[MigrationDefinition, ...] = (
     MigrationDefinition(
         1,
@@ -729,6 +768,14 @@ MIGRATIONS: tuple[MigrationDefinition, ...] = (
         "kinds:user_note,preference,decision,observation;privacy:no_prompt_or_response_text;"
         "contract:observations_deletable_dedupe_by_source_ref",
         _migration_017_secretary_notes,
+    ),
+    MigrationDefinition(
+        18,
+        "calendar_events_local_ics",
+        "calendar_events:create;indexes:uid,instance_start,source_path,start_end,"
+        "unique_source_uid_start;privacy:no_description_no_attendees_no_url;"
+        "contract:read_only_local_ics_replace_per_source_within_horizon",
+        _migration_018_calendar_events,
     ),
 )
 

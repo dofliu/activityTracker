@@ -579,6 +579,20 @@ def get_secretary_greeting(window: str = Query("today")):
         raise HTTPException(status_code=exc.http_status, detail=exc.error_code) from exc
 
 
+@app.get("/api/v1/calendar/agenda")
+def get_calendar_agenda(date: Optional[str] = Query(None, max_length=10)):
+    """ADR-015：某一天（預設今天）的本機行事曆行程，唯讀；每個回應都帶 claim boundary。"""
+    from core.calendar_agenda import day_agenda
+
+    target = None
+    if date:
+        try:
+            target = datetime.strptime(date, "%Y-%m-%d")
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="date must use YYYY-MM-DD") from exc
+    return day_agenda(target)
+
+
 @app.get("/api/v1/secretary/today")
 def get_secretary_today():
     """「01 今天」的唯讀彙整：上次做到哪、最近一次早晨包收據、預設排程狀態。"""

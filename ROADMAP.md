@@ -1,6 +1,6 @@
 # OmniContext 開發規劃與成果紀錄 — P0 ~ P8
 
-> 最新更新日期：2026-08-29　｜　目前狀態：**personal alpha / P2.6 + P3 context memory + P4.2 local Git sync + P5-1 proposal-only alpha**。P3-1～P3-5、Windows Toast E2E、formal rollback、Windows/macOS/Linux CI、P5-1、collector runtime diagnostics、Extension 1.3.1 live-verification harness 與本機 Git 同步中心已完成；ChatGPT live selectors 已修復。Claude.ai 本輪 PASS receipt 與 Extension live heartbeat 尚未完成，整體不具 release-ready 或 autonomous-ready 資格。
+> 最新更新日期：2026-09-04　｜　目前狀態：**personal alpha（v1.3.0a5 pre-release）／P0–P8 全數完成＋ADR-008 P5-R1～R5 全階段落地**。P2.6 coverage ledger、P3 context memory、P4.2/4.3 Git 同步與對帳、P5 分級執行器與排程、P6 發佈整備、P7 DeskRAG、P8 自我修復，以及秘書記憶區（ADR-012）／Telegram 對話（ADR-013）／多通道推播（ADR-014）／問候卡／本機行事曆（ADR-015）均已實作，危險能力一律預設關閉。Extension 1.3.1 與 P2.7 三平台背景任務已取得 live PASS receipt。**仍不具 release-ready 資格**：全天 coverage ledger 實測與各功能的使用者實機收據未齊（見 §12 與 [docs/TODO.md](docs/TODO.md)）。
 > 本文件記錄 OmniContext 從 0 到 1 的缺陷修復歷程、已完成之架構改造與未來的維運與延伸規劃。
 
 ---
@@ -563,7 +563,7 @@ P2.5-S1 API 安全邊界
 
 ---
 
-## 11. 2026-08-30 專案檢視後的下一步提案（待討論）
+## 11. 2026-08-30 專案檢視的下一步提案與後續成果紀錄（已完成）
 
 > 背景：本日已完成 repository 整理——所有分支收斂於 `main`（`wip/p5-2-agent-executor` 內容已完整包含於 main 歷史，分支指標移除；如需回溯 executor 實作，checkout `871ee29`），並補齊文件索引（`docs/INDEX.md`）與 README 修訂。以下依「先把已實作變成已驗證，再擴張」原則排序。
 
@@ -588,7 +588,9 @@ P2.5-S1 API 安全邊界
   ▶ 2026-08-30：已於 Linux container 完成一輪發佈預演——`python -m build`、`verify_release_artifacts`（content + privacy receipt PASS）、乾淨 venv 安裝 wheel、`init`／`assets-status`／`migration-status`（13/13）、web server HTTP smoke 與 `verify_installed_package` checks 全數通過。
   ▶ ✅ 2026-08-31：**v1.3.0a5 已發佈**為 GitHub pre-release——新增 `.github/workflows/release.yml`（推 tag 或 workflow_dispatch 即自動 build → verify → release），附 wheel/sdist 與 SHA-256 receipt，交叉驗證一致。<https://github.com/dofliu/activityTracker/releases/tag/v1.3.0a5>
 
-### 長期（>6 週）：P5-2 executor 重啟與 P4 收集層
+### ✅ 長期（>6 週）：P5-2 executor 重啟與 P4 收集層
+
+> 以下 ▶ 條目是 2026-08-31 之後所有功能的**成果紀錄**（依日期排序），不再只限 executor 主題；接下來的方向見 §12。
 - P5-2 executor 曾於 `871ee29` 實作、`f8f5400` revert 回 ADR-007 proposal-only 契約；重啟條件：P2.5 gate 全綠 + allowlist、dirty-worktree check、timeout/cancel、audit receipt、L0/L1/L2 分級批准全數就位，並以獨立 ADR 驗收。
   ▶ 2026-08-31：重啟契約已定稿於 [ADR-008](docs/ADR-008-gated-agent-executor.md)（Proposed）——白名單 action template、三級實質分級、獨立 execution token、L2 一次性 confirm code、audit receipt（migration 014）、失敗封閉；實作依 P5-R1～R5 分階段。
   ▶ ✅ 2026-08-31：**P5-R1 已實作**——`core/secretary_advisor.py` annotate-only LLM 註解層（預設關閉、Ollama 優先、白名單 prompt 欄位、失敗回退 deterministic），11 項 contract tests 與 localhost fallback E2E 通過。
@@ -615,3 +617,51 @@ P2.5-S1 API 安全邊界
   ▶ ✅ 2026-09-03：**系統設定合併與左欄切換**——依使用者要求把 07 設定改名「06 · 系統設定」，並將 06 即時情報流、08 系統健康收進去；設定內部改為左側欄切換 10 個區塊（秘書與自動化、Telegram、LINE、監控路徑、採集來源、摘要與 LLM、使用時間、GitHub；維運：即時情報流、系統健康），取代原本的「常用／其他」折疊分組。導覽由 8 分頁收斂為 6。所有元件 id 與載入邏輯不變（只重新掛載），最後檢視的區塊記在 localStorage，儲存列只在設定類區塊顯示；900px 以下左欄轉為水平可捲動的分區列。
   ▶ ✅ 2026-09-04：**小秘書問候卡（01 首頁）**——依使用者要求在 01 分頁最上方加一張秘書主動說話的卡：說明「今天」或「近 2 小時」做了什麼，再接一句鼓勵。所有數字都可回溯到資料表（`core/secretary_greeting.collect_activity_stats`：commit／PR 開與合併／AI 對話輪數／檔案異動並區分論文文檔與程式／推進的專案／收掉的未結事項／前景時間；近 2 小時另帶最近一段時段摘要），沒被採集到的工作不代表沒做，**郵件與行事曆不在採集範圍**，卡上寫明。文案由規則產生（有名字就帶、開工不到 4 小時就說「才開工約 N 小時」、什麼都沒看到就誠實說），鼓勵語依深夜／長時間／週末／衝很快／穩等情境選池，同一天同一視窗固定同一句不會跳動；`proactive_secretary.greeting.llm.enabled`（預設關）可讓所選 LLM 潤飾語氣，但**多出統計裡沒有的數字就退回規則版**，失敗也退回。顯示名稱在「系統設定 → 秘書與自動化」；卡每 10 分鐘自動更新；Telegram `/today` 開頭同一段話。`GET /api/v1/secretary/greeting?window=today|2h`。`tests/test_secretary_greeting.py` 22 項。
   ▶ ✅ 2026-09-04：**問候卡進晨報＋卡片淡底色**——依使用者要求：01 的問候卡改用主色淡漸層底與左側色條強調（`color-mix`，不支援時退回一般面板色，三套配色×明暗皆可）；晨報（Telegram／LINE 共用 `build_morning_briefing`）第一段加入小秘書的話，`proactive_secretary.greeting.in_morning_briefing` 預設開。因 07:30 多半還沒有今日活動，新增有上界的 `yesterday` 視窗（今天 00:00 為界，所有查詢同時套下界與上界，且不算「開工多久」），今天沒活動就改說昨天、昨天也沒有才誠實說今天還沒偵測到；LLM 潤飾沿用卡片的設定與事實閘。問候讀不到只省略那段，晨報本體不受影響。`tests/test_notification_channels.py` +3、`tests/test_secretary_greeting.py` +1。
+  ▶ ✅ 2026-09-04：**本機行事曆採集來源（ADR-015）**——TODO C3 的行事曆先過「能否改變決策」檢驗（現在該不該開始大任務／今天怎麼排／時間花去哪，三題都會改變行為）才納入。**唯讀輪詢本機 `.ics` 檔或資料夾**（Outlook／Google／Apple 匯出或同步皆可），不接任何雲端 API、不寫回。解析器 `core/ics_parser.py` 只用標準函式庫＋dateutil：折行、全天、TZID／UTC 換成本地時間、RRULE＋EXDATE、RECURRENCE-ID 覆寫、CANCELLED、跳過 VALARM；**只取時間／標題／地點／狀態**，DESCRIPTION／與會者／連結一律不落地（`store_titles: false` 連標題都不存）。`watchers/calendar_watcher.py` 與其他採集器同形（自我修復、壞檔隔離、診斷），每次掃描以「檔案 × 視野」整批替換（migration 018 `calendar_events`，`(source_path, uid, instance_start)` 唯一），消失的來源會清掉。只在三處使用且都可回溯：問候卡多「開了 N 場會」與「📅 今天 N 場行程，下一場 14:00 …」（claim boundary 改寫為只有郵件不在範圍）、晨報多「📅 今日行程」分節、01 今日面板多一行下一場。沒設路徑就是停用，系統健康不報假警報。`GET /api/v1/calendar/agenda?date=`。`tests/test_calendar_source.py` 17 項；migration 測試同步到 18。
+
+---
+
+## 12. 下一階段規劃（2026-09-04 檢視）
+
+> §11 的三個時間桶（短期驗證債、中期 P4.3／P6、長期 P5-2 重啟）**都已完成**，成果紀錄留在上面。
+> 這一節是接下來的方向與取捨；**待辦條目與完成判準一律以 [docs/TODO.md](docs/TODO.md) 為準**，這裡只寫「為什麼先做這個」。
+
+### 12.1 現在的形狀
+
+程式面已經走完 P0–P8 與 ADR-008 全階段，**剩下的缺口幾乎都不是「還沒寫的程式」**：
+
+| 類型 | 內容 | 為什麼卡在這裡 |
+| :--- | :--- | :--- |
+| 🔴 能力缺口（1 項） | 全天 coverage ledger 實測（TODO A1） | 只能由 Windows 實機跨午夜連續運行產生；這是唯一還擋 `release_ready` 的能力型缺口 |
+| 👤 實機收據（A2–A13） | 雲端 provider 複測、Telegram 設定與 inline 批准、L2 draft→apply、P4.3 對帳、大索引檢索、Repo 批次、記憶區、LINE 推播、問候卡、行事曆 | 功能都有 contract tests 與容器 E2E，但本專案不把「測試通過」當「實機可用」 |
+| ⚪ 技術債（B1–B3） | legacy AI rows 無 provenance、Extension 只驗過 ChatGPT/Claude.ai、PyPI 不在範圍 | 都已如實標記邊界，不回填假資料 |
+
+**結論：下一階段的價值主要來自「把已實作變成已驗證」，而不是再加功能。** 功能候選只在使用者明確要求時啟動。
+
+### 12.2 三條功能候選路線（依需求啟動，非排序）
+
+1. **C5 私有網路遠端存取（工作量最大，安全邊界要改）**
+   - 目標：手機用瀏覽器看完整儀表板，而不只是 Telegram 文字。
+   - 前置：先寫 ADR——認證形狀（不是無認證的 `allow_remote_clients` 全有全無開關）、CIDR allowlist（預設只放行 Tailscale／WireGuard 網段）、失敗即拒、每次存取留收據；PWA 為選配。
+   - 代價：這是**唯一會動到 [ADR-001](docs/ADR-001-p2-5-trust-boundary.md) loopback 邊界**的路線，必須獨立驗收；**不做公開反向代理**。
+
+2. **C6 LINE 雙向（受平台限制，價值有限）**
+   - 目標：LINE 也能提問與批准，而不只是收推播。
+   - 前置：公開 HTTPS 入口（Cloudflare Tunnel／中繼）＋ `x-line-signature` 驗證＋ postback 按鈕，同樣要改 ADR-001。
+   - 代價：與 C5 撞同一個邊界，但換來的能力 Telegram 已經有（[ADR-014](docs/ADR-014-multi-channel-push-and-arm-code.md) 已說明 LINE 只能推播的原因）。**建議 C5 先於 C6**；若真要雙向，優先走 Telegram。
+
+3. **C3 其餘採集來源（增量小、可逐項評估）**
+   - 已納入：行事曆（2026-09-04，[ADR-015](docs/ADR-015-local-calendar-source.md)）。
+   - 剩餘候選：瀏覽器閱讀、terminal history、未 commit 的工作狀態。
+   - 門檻不變：**每項先過「能否改變決策」檢驗**（像 ADR-015 開頭那張表一樣寫出來），過不了就不納入——採集越多不等於越有用，只會增加隱私面與噪音。
+
+另有隨時可做的低風險項：C1 更多 L2 template（一次一個審查）、C2 更多 L0 可排程 template（L1/L2 永遠不可排程）、C4 更多配色（只加一組 CSS 變數）。
+
+### 12.3 `release_ready: true` 的收斂條件
+
+同時滿足才重評，缺一不改旗標：
+
+1. TODO A1 全天 coverage ledger 取得實機收據，`meets_full_coverage: true`；
+2. A2–A13 中屬於**預設開啟路徑**的收據齊備（雲端 provider 複測、大索引檢索、問候卡與行事曆呈現）；預設關閉的危險能力（L2、Telegram 批准、LINE）可標為 optional-verified；
+3. `docs/RELEASE_CHECKLIST.md` 走完一輪，且跨平台 CI 在該 commit 上有自己的 run receipt（不沿用舊 run）；
+4. STATUS.yaml 的 `known_blockers` 不再有 🔴 項目，且每個 quality gate 都是 `passed_*`（`implemented_*` 不算）。

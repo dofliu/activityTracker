@@ -53,6 +53,17 @@ watchers:
     enabled: true
     repositories: []
     scan_interval_seconds: 300
+  # ADR-015 本機行事曆（唯讀）：把 Outlook／Google／Apple 匯出或同步的 .ics 檔
+  # 或含 .ics 的資料夾加進 paths；沒有路徑就等於停用。只讀時間／標題／地點／
+  # 狀態，DESCRIPTION、與會者、連結一律不落地；不連任何雲端 API、不寫回檔案。
+  calendar_watcher:
+    enabled: true
+    paths: []
+    scan_interval_seconds: 900
+    # 重複行程只展開到未來這麼多天（另含過去 7 天供回顧）
+    horizon_days: 30
+    # false → 連標題與地點都不存，只留時間（共用機器或敏感行事曆用）
+    store_titles: true
 repository_sync:
   # 本機 Git 同步中心與 git_watcher 共用這些明示設定的 repository roots。
   # 沒有排程自動 fetch / pull / commit / push；單一動作由 Dashboard 個別確認，
