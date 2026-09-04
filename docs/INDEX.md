@@ -1,6 +1,6 @@
 # 📚 OmniContext 文件總覽（Documentation Index）
 
-> 最後整理：2026-09-01。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
+> 最後整理：2026-09-04。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
 
 ## 我該從哪裡開始？
 
@@ -10,7 +10,8 @@
 | **看還有什麼待辦、已知問題** | [TODO.md](TODO.md) —— 待辦清單（含完成判準）、技術債、功能候選 |
 | 快速了解專案是什麼、能做什麼 | [README.md](../README.md)（繁中）/ [README_en.md](../README_en.md)（English） |
 | 安裝、Extension 配對、日常操作、備份與故障排查 | [USAGE.md](USAGE.md) —— **使用手冊** |
-| 了解目前開發到哪、下一步是什麼 | [ROADMAP.md](../ROADMAP.md) + [STATUS.yaml](../STATUS.yaml) |
+| 了解目前開發到哪 | [ROADMAP.md](../ROADMAP.md) §11 成果紀錄 + [STATUS.yaml](../STATUS.yaml) |
+| 了解下一階段方向與取捨 | [ROADMAP.md](../ROADMAP.md) §12「下一階段規劃」 |
 | 了解產品定位與「不宣稱什麼」的證據邊界 | [PRODUCT_POSITIONING.md](PRODUCT_POSITIONING.md) |
 | 修改架構前先看相關決策 | 下方 ADR 一覽 |
 | 發佈前檢查 | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) |
@@ -53,6 +54,7 @@
 | [ADR-012](ADR-012-secretary-memory.md) | 小秘書記憶區（大腦） | 筆記表 migration 017、觀察可刪、對話注入有上限附收據、提案讀偏好、報告併入 RAG |
 | [ADR-013](ADR-013-telegram-secretary-chat.md) | Telegram 小秘書對話（手機通道） | 對話與網頁同一條管線、預設關閉、內容經 Telegram 的邊界、/arm 需開關且訊息即刪、/disarm 永遠可用 |
 | [ADR-014](ADR-014-multi-channel-push-and-arm-code.md) | 多通道推播（LINE）與一次性解鎖碼 | 內容與呈現分離、adapter 能力宣告、LINE 只能推播的原因、/arm 改用短效碼 |
+| [ADR-015](ADR-015-local-calendar-source.md) | 本機行事曆採集來源（.ics，唯讀） | 「能否改變決策」檢驗、只讀時間／標題／地點／狀態、整批替換與壞檔隔離、不接雲端 API |
 
 ## 功能規格與驗證
 
@@ -80,5 +82,5 @@
 | [NEXT_SESSION.md](NEXT_SESSION.md) | 下一個開發 session 的接手指南（現況、待辦、環境備忘） |
 | [../promo/](../promo/) | 3 分鐘介紹影片的 18 個場景源檔、分鏡表與渲染腳本（可單景重渲） |
 | [assets/](assets/) | 文件用圖片（架構與 roadmap 卡片等） |
-| `../tests/` | 44 個 contract test 模組（261 項）；執行 `python -m pytest tests/ -v` |
+| `../tests/` | 53 個 contract test 模組（425 項，424 passed + 1 skipped）；執行 `python -m pytest tests/ -v` |
 | `../scripts/` | 驗證、清理、autostart 與 E2E 腳本 |

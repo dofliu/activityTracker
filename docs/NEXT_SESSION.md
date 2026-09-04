@@ -1,52 +1,70 @@
 # 下一個 Session 接手指南
 
-> 最後更新:2026-09-03(session `claude/stoic-hamilton-4oicm4`:RAG 檢索移至常駐 worker、Repo 同步全覽／批次／秘書同步報告、01 三欄與知識庫分頁、**小秘書記憶區 ADR-012**、**Telegram 手機對話 ADR-013**、**多通道推播與短效解鎖碼 ADR-014**,TODO B1/B2 結案)。
-> 這頁是給「下一個開發 session(人或 AI)」的最短接手路徑;現況以
-> [STATUS.yaml](../STATUS.yaml) 與 [ROADMAP.md](../ROADMAP.md) §11 為準,
-> **待辦清單一律以 [TODO.md](TODO.md) 為準**(含每項的完成判準)。
+> 最後更新：2026-09-04（session `claude/stoic-hamilton-4oicm4`：小秘書記憶區 ADR-012、Telegram 手機對話 ADR-013、多通道推播與短效解鎖碼 ADR-014、系統設定合併為左欄切換、**小秘書問候卡**、**本機行事曆採集 ADR-015**，並整理全套文件）。
+>
+> 這頁是給「下一個開發 session（人或 AI）」的**最短接手路徑**，只放現況、地圖與環境備忘。
+> 細節一律不在這裡重寫：**做過什麼**看 [ROADMAP.md](../ROADMAP.md) §11、**為什麼這樣設計**看對應 ADR、
+> **還要做什麼**看 [TODO.md](TODO.md)（每項附完成判準）、**機器可讀現況**看 [STATUS.yaml](../STATUS.yaml)。
 
 ## 一分鐘現況
 
-- **版本**:v1.3.0a5 已發佈為 GitHub pre-release(release workflow 自動建置,SHA-256 receipt 交叉驗證);`release_ready: false`,唯一缺口是全天 coverage ledger 實測。
-- **Schema**:migration 17/17(append-only + checksum;新表勿繞過 registry;017 = `secretary_notes`)。
-- **測試**:425 項 contract tests(424 passed + 1 skipped);容器/雲端環境缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因,不再是失敗。
-- **秘書(P5)**:R1 LLM 註解 → R2 L1 白名單代辦 → R3 L2 subprocess dispatcher(三道門+冷卻)→ 寫入 Addendum(`agent_apply_plan` 兩段式改檔、永不 commit)→ R4a 晨報 → R4b Telegram inline 批准(getUpdates 長輪詢 outbound-only;批准通道需 execution token 解鎖、in-memory TTL 重啟即失效;只批 L0/L1)→ **R5 自訂排程任務**(僅 L0 唯讀 template 可排程:Handoff/週報/月報 rollup/STATUS 過期點名草稿;migration 016;錯過只補跑一次;每次執行寫 audit receipt),**ADR-008 R1–R5 全階段實作完成、全部預設關閉**;開關集中在儀表板「設定」分頁(小秘書執行器 + Telegram 通知兩張常用卡片,其餘設定預設收合)。契約見 [ADR-008](ADR-008-gated-agent-executor.md)。
-- **摘要**:兩層增量(checkpoint 微摘要 map @本機 Ollama → 日報 reduce),`synthesizer.daily_from_micro` 預設開;日報 prompt 有逐事件截斷與總量上限;週/月報 rollup 只彙整既有每日摘要(`synthesizer/rollup.py`,缺日誠實列出、LLM 失敗回退 deterministic)。
-- **UI**(2026-09-01 資訊架構重整,兩輪;2026-09-02 加知識庫分頁;**2026-09-03 收斂為 6 分頁**):導覽 6 分頁——01 小秘書(**三欄**:左＝今日行動清單〔上次做到哪＋早晨包＋提案〕、中＝交辦與提問、右＝全站 rail〔今日統計可收合＋Focus Now〕)/**02 知識庫**(2026-09-02 依使用者要求從 01 拆回獨立分頁;與 01 交辦框共用同一條 RAG 對話)/03 進行中工作(**只留專案卡**,含 git／建議 chip,展開有工作階段)/**04 Git 同步中心**(從進行中工作的折疊卡獨立成分頁,切到分頁才掃描;含逐一動作、全覽與批次、P4.3 對帳)/05 摘要與統計(**前景使用／資料收集／背景任務三面板自進行中工作移入**)/**06 系統設定**(2026-09-03:原 07 設定＋06 情報流＋08 系統健康合併;**左欄切換** 10 個區塊——秘書與自動化、Telegram、LINE、監控路徑、採集來源、摘要與 LLM、使用時間、GitHub,維運類的即時情報流、系統健康;`activateSettingsPane()` 記住最後看的區塊於 localStorage `omni-settings-pane`,儲存列只在設定類區塊顯示;所有元件 id 不變,只是重新掛載;`openSettingsPane(key)` 供其他分頁導向)。執行器內的排程任務、Telegram 連線設定仍為巢狀折疊(sub-collapsible)。活動快照併入 04(底部折疊卡);**本機 Git 同步中心+對帳已獨立為 03 分頁**(切到分頁才做 git 掃描);「系統設定」頂部固定「儲存並套用」列。各分頁桌面與 494px 皆無水平溢出(Playwright 實測)。**外觀為兩個獨立的軸**:`data-theme`(dark/light)× `data-accent`(naruto/forest/ocean),CSS 全面走 `var(--accent)`(66 處)、`--accent-hover`、`--accent-ink`;新配色只需加一組 `html[data-theme=X][data-accent=Y]` 變數區塊,不動任何元件樣式。偏好存 localStorage(`omni-theme`/`omni-palette`),extension-monitor 以 head 內小 script 讀同一個 key。
-- **P4.3 Repo Onboarding**:已實作(同步中心「掃描對帳」:未 init 資料夾/無 remote repo/未 clone 的 GitHub repo;已 clone 與否只認 remote URL、同名僅提示不自動配對;init/attach/clone/create 皆單一目標確認式、不覆寫非空目錄、永不代為 push;契約在 ADR-011 Addendum)。既定 next milestone 已完成,STATUS `next_milestone` 改為「收使用者側 live 收據後重評 release_ready」。
-- **RAG 對話契約**(2026-09-01 修):`resolve_secret_env` 回傳 `SecretResolution` 物件,**必須取 `.value`**——rag/ 內 4 處漏取導致 Gemini/OpenAI/Claude 走 RAG 一律失敗(物件恆為真值使「未設金鑰」判斷失效,且 repr 被帶進 URL)。金鑰現改走 header 不進 URL;SSE `event_generator` 全程 try/finally **保證送出 done**(瀏覽器只靠它解除「回覆中」),檢索移入 generator 並有 60 秒逾時,前端另有 120 秒閒置 abort。契約由 `tests/test_rag_chat_stream.py`(10 項)鎖住。
-- **RAG 檢索 worker**(2026-09-02,ADR-009 Addendum):檢索預設在常駐子程序 `python -m rag.retrieval_worker` 執行(`rag/retrieval_client.py` 以 stdin/stdout JSON lines 驅動),**主服務 import `core.server` 不得載入 chromadb/fastembed/rank_bm25/jieba**(乾淨直譯器契約測試守門;`rag/retrieval/__init__.py` 已改 lazy export,`/strategies` 讀靜態 `catalog.py`——新增 retriever 要同步更新目錄)。啟動後有索引才背景預熱;逾時即 kill、下次提問自動重啟;崩潰/錯誤一律降級照常回答。`rag.retrieval.mode: in_process` 保留舊行為(測試用 `monkeypatch.setattr(router_module, "retrieval_mode", lambda: "in_process")` 切換)。狀態/預熱/釋放 API 在 `/api/v1/rag/retrieval/*`,知識庫區塊有對應卡片。契約在 `tests/test_rag_retrieval_worker.py`(20 項,用假 worker 腳本,不碰真實索引)。
-- **儀表板整併與秘書每日包**(2026-09-02):**01 今天**＝「上次做到哪」(Resume 卡自 02 移入)＋早晨包一行摘要＋秘書提案(每項附 `why_now`;停滯事項提示可開 L2 起草);**02 專案**只留專案卡(git 狀態 chip 來自 `GET /api/v1/repos/sync-snapshot` 快照、💡 建議 chip 來自提案快取;展開卡內有近期工作階段;Related History 為底部折疊卡);統計三面板移到 **04 摘要與統計**。後端:`core/secretary_packs.py`(L0 `morning_pack`／`handoff_active_projects`、`ensure_default_schedules` 預設 07:30／21:30、`latest_pack_summary`、`build_today_view`)、`GET /api/v1/secretary/today`、`POST /api/v1/secretary/scheduled-tasks/presets`(需 token);晨報加早晨包一行與 top 建議的 why_now。契約在 `tests/test_secretary_packs.py`(9 項)。**沒有自動 pull／push,L1/L2 仍不可排程。**
-- **Repo 同步全覽與批次**(2026-09-02,ADR-011 Addendum B):`GET /api/v1/repos/sync-status?scope=all`(全部 repo＋`last_fetch_at`＋summary)、`POST /repos/sync-fetch-all`(唯一不需列清單的批次:只動 remote-tracking refs)、`GET /repos/sync-batch-plan?action=`＋`POST /repos/sync-batch`(先列符合條件清單→確認→逐一在 lock 內重檢;批次 push 需 `repository_sync.batch.allow_push`,預設關)。小秘書:L0 排程 template `repo_sync_report`(`core/repo_sync_report.py`,唯讀不連網,寫 `reports/repo_sync/` 報告＋`latest.json` 快照)→ `build_action_proposals` 讀 ≤36h 的快照產生 `repo_needs_pull/repo_needs_push/repo_diverged`(subject_ref=`repo:<id>`)→ executor 對應 L1 `repo_pull_ff`(pull)／`repo_fetch`(push 不代辦)。**沒有每日自動 pull**(ADR-008 L1 不可排程)。契約在 `tests/test_repo_sync_batch.py`(9 項,真 tmp git repo)。
-- **小秘書記憶區**(2026-09-02,[ADR-012](ADR-012-secretary-memory.md)):`core/secretary_memory.py`——`secretary_notes`(migration 017;kind = user_note/preference/decision/observation;observation 只由 L0 收據產生、依 `source_ref` 每日去重、可單筆或 `DELETE ?kind=observation` 整類刪);對話前綴 `parse_note_command`(前後端同一套規則,「記下來：」不送 LLM);`memory_context()` 固定順序(今日狀態→top 3 提案→偏好決定→筆記→未過期觀察)、字數上限、回收據,`rag/router.py` chat 把它接在 system prompt 與檢索切片之間並送 SSE `memory` 事件;`build_action_proposals` 讀偏好 `不要提醒 X`/`mute: X` 壓提案(`inputs.memory_muted`)、附 `memory_note`;`build_morning_pack(database=)` 尾端寫觀察且故障隔離;`activity_indexer` 新增 secretary_note/micro_summary/report_* 切片(reports_dir 白名單子目錄+根目錄固定檔名),RAG worker job `activity_sync`(`POST /api/v1/rag/memory/sync`)在獨立程序併入。API `GET/POST/DELETE /api/v1/secretary/memory*`。**沒有 LLM 自動寫記憶;偏好只影響提案呈現,不變成執行。**契約在 `tests/test_secretary_memory.py`(20 項)。
-- **手機通道**(2026-09-03,[ADR-013](ADR-013-telegram-secretary-chat.md)):儀表板仍只在 loopback(`allow_remote_clients` 是無認證的全有全無開關,別開);手機走既有 Telegram 長輪詢。`core/secretary_ask.ask_secretary()` 把交辦框那條管線(記憶區脈絡＋`rag.router._retrieve_citations`＋LLM)收成同步呼叫,**rag import 一律在函式內**(ADR-009 乾淨 import 契約由 `tests/test_telegram_chat.py` 末項守門);`notifiers/telegram_chat.py` 是通道層(自由文字→問答、`parse_note_command`→筆記 source=telegram、`/today` `/notes` `/status` `/help`、`/arm`＋`/disarm`)。開關:`notifiers.telegram.chat.enabled`、`executor.telegram_approvals.allow_remote_arm`,**皆預設關閉**;poller 條件改為 `telegram_updates_poller_enabled`(批准或對話任一)。批准仍只 L0/L1＋需 arm;`/arm` 的訊息一收到就 `deleteMessage`,token 不進 log/receipt;`/disarm` 不受開關限制。問答在背景執行緒、同時只一題、長答案分段。**已知邊界:這是唯一會把提問與回答送出本機的通道(內容經 Telegram;引用只送檔名)。**契約在 `tests/test_telegram_chat.py`(26 項,fake transport／fake gateway,不碰網路與索引)。
-- **推播通道**(2026-09-03,[ADR-014](ADR-014-multi-channel-push-and-arm-code.md)):內容與呈現已分離——`notifiers/messages.py` 是通道中立的 `Message`／`Section`＋組裝函式(晨報／晚間交接／日報／停滯提醒),`render_plain`(LINE、CLI)與 `render_telegram_html`(Telegram,內容一律 `html.escape`)各自呈現;`notifiers/channels.py` 的 adapter 宣告能力(`receive`／`buttons`／`delete_message`／`rich_text`),`notifiers/secretary_push.py` 組裝一次扇出多通道(逐通道 try/except)。**LINE 只能推播**(`notifiers/line_setup.py`;token 只走 Authorization header,絕不進 URL/log/receipt)——LINE Messaging API 沒有輪詢介面,接收訊息要公開 webhook,會打破 ADR-001;因此提問／筆記／批准仍只有 Telegram,雙向留在 TODO C6。`TelegramNotifier` 現在只是相容外殼(73 行,不再自己發 HTTP);scheduler 改用 `push_*`,`main.py notify --dry-run` 與實際送出共用組裝。**`/arm` 已改為一次性 6 位數碼**(`issue_arm_code`／`consume_arm_code`:只存雜湊、300 秒、單次、猜錯即焚、disarm 與重啟即銷毀),手機不再需要 execution token;儀表板「🔑 產生解鎖碼」＋`POST /api/v1/telegram/approvals/arm-code`。設定分頁新增「03 LINE 通知」卡(其餘卡片順延為 04–08)。契約在 `tests/test_notification_channels.py`(29 項)與 `tests/test_telegram_chat.py`(29 項)。
-- **問候卡**(2026-09-04):`core/secretary_greeting.py`——`collect_activity_stats(window=today|2h)` 只數視窗內、可回溯到資料表的活動(commit／PR／AI 輪數／檔案分文檔與程式／專案／收掉的 loop／前景時間;2h 另帶最近一段 micro summary),`compose_greeting` 規則組句(名字來自 `proactive_secretary.greeting.display_name`;開工<4h 說「才開工約 N 小時」;無活動誠實說),`choose_encouragement` 依情境選池、以日期＋視窗為 seed 固定同一句;`polish_with_llm` 預設關、沿用 advisor provider、`llm_text_is_safe` 擋掉統計裡沒有的數字、失敗退回規則版、記憶體快取 30 分。`GET /api/v1/secretary/greeting`;前端 `loadGreeting`/`renderGreeting`,10 分鐘自動更新;Telegram `/today` 開頭同一段(不呼叫 LLM);晨報 `build_morning_briefing` 第一段也是它(`_greeting_section`,`in_morning_briefing` 預設開,今天沒活動改用有上界的 `yesterday` 視窗,失敗只省略該段)。卡片用 `color-mix` 主色淡底強調。**郵件與行事曆不在採集範圍**,claim boundary 寫在卡底。契約在 `tests/test_secretary_greeting.py`(23 項)與 `tests/test_notification_channels.py` 晨報三項。
-- **行事曆**(2026-09-04,[ADR-015](ADR-015-local-calendar-source.md)):`core/ics_parser.py`(純 stdlib＋dateutil 的 VEVENT 展開;只取 UID／SUMMARY／LOCATION／DTSTART／DTEND／DURATION／RRULE／EXDATE／RECURRENCE-ID／STATUS,`DROPPED_PROPERTIES` 一律丟;TZID 查不到退回本地時間並留 warning)→`watchers/calendar_watcher.py`(`CalendarWatcherService`,與 git_watcher 同形;`calendar_effective` = enabled 且有 paths;`scan_sources` 以檔案×視野整批替換,壞檔進 `degraded_sources`,消失的來源清掉)→`calendar_events`(migration 018)→`core/calendar_agenda.py`(`day_agenda`／`meetings_started_between`／`schedule_sentence`／`format_event_line`,每個回傳帶 claim boundary)。消費端:問候卡 `stats["meetings"]`＋`schedule_line`＋`claim_boundary_text(calendar_enabled)`、晨報 `_calendar_section`、`build_today_view()["calendar"]`、`GET /api/v1/calendar/agenda`。manager 已接 `calendar_watcher`(supervise／status／diagnostics)。**不做**:雲端 API、webcal URL、寫回、會前提醒、DESCRIPTION 進 RAG。契約在 `tests/test_calendar_source.py`(17 項)。
-- **介紹影片**:3 分鐘 MP4 已交付使用者;場景源檔在 [`promo/`](../promo/)(單景可重渲,見其 README)。
+| 項目 | 現況 |
+| :--- | :--- |
+| 版本 | v1.3.0a5 已發佈為 GitHub pre-release（release workflow 自動 build → verify → release，SHA-256 receipt 交叉驗證）。`release_ready: false`，唯一**能力型**缺口是全天 coverage ledger 實測（TODO A1）。 |
+| Schema | migration **18/18**（append-only + checksum；**新表一律進 registry，不得靠 `create_all` 繞過**）。017 = `secretary_notes`、018 = `calendar_events`。 |
+| 測試 | **53 個 contract test 模組、425 項**（424 passed + 1 skipped）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
+| 導覽 | 6 分頁：01 小秘書（三欄）／02 知識庫／03 進行中工作／04 Git 同步中心／05 摘要與統計／06 系統設定（左欄 10 區塊）。桌面與 494px 皆無水平溢出（Playwright 實測）。 |
+| 外觀 | 兩個獨立軸：`data-theme`（dark/light）× `data-accent`（naruto/forest/ocean），CSS 全走 `var(--accent)`；新配色只需加一組變數區塊。偏好存 localStorage（`omni-theme`／`omni-palette`／`omni-settings-pane`）。 |
+| 危險能力 | 執行器、L2、L2 寫入、自訂排程、Telegram 對話、`allow_remote_arm`、LINE、問候卡 LLM 潤飾——**全部預設關閉**；行事曆預設開但沒設路徑就等於停用。 |
+
+## 功能地圖（要改哪裡就看這張表）
+
+| 功能 | 主要程式 | 契約測試 | 決策 |
+| :--- | :--- | :--- | :--- |
+| 採集器與自我修復 | `watchers/*.py`、`core/manager.py`（`supervise_and_heal`、`get_status`） | `test_collector_self_healing.py` | — |
+| 本機行事曆（.ics 唯讀） | `core/ics_parser.py`、`watchers/calendar_watcher.py`、`core/calendar_agenda.py` | `test_calendar_source.py`（17） | [ADR-015](ADR-015-local-calendar-source.md) |
+| 專案歸戶與 Open Loops | `core/project_engine.py`、`core/project_paths.py` | `test_project_paths.py`、`test_project_engine_concurrency.py`、`test_open_loop_lifecycle.py` | — |
+| Semantic index／omni ask | `core/semantic_index.py` | `test_semantic_index.py` | [ADR-005](ADR-005-local-semantic-index-and-ask.md) |
+| RAG 對話與檢索 worker | `rag/router.py`、`rag/retrieval_worker.py`、`rag/retrieval_client.py` | `test_rag_chat_stream.py`（10）、`test_rag_retrieval_worker.py`（20） | [ADR-009](ADR-009-deskrag-worker-index-lifecycle.md) ＋ Addendum |
+| 秘書提案（proposal-only） | `core/proactive_secretary.py`、`core/secretary_advisor.py` | `test_proactive_secretary.py`、`test_secretary_advisor.py` | [ADR-007](ADR-007-proposal-only-secretary.md) |
+| 分級執行器 L0/L1/L2 | `core/agent_executor.py`、`core/agent_dispatch.py`、`core/scheduled_tasks.py` | `test_agent_executor.py`、`test_agent_dispatch_l2.py`、`test_scheduled_tasks.py` | [ADR-008](ADR-008-gated-agent-executor.md) |
+| 秘書記憶區（大腦） | `core/secretary_memory.py` | `test_secretary_memory.py`（20） | [ADR-012](ADR-012-secretary-memory.md) |
+| 每日包與今日視圖 | `core/secretary_packs.py` | `test_secretary_packs.py`（9） | [ADR-008](ADR-008-gated-agent-executor.md) L0 |
+| 問候卡（01 首頁＋晨報開頭） | `core/secretary_greeting.py` | `test_secretary_greeting.py`（23）＋晨報三項 | ROADMAP §11（2026-09-04） |
+| 推播組裝與通道 | `notifiers/messages.py`、`notifiers/channels.py`、`notifiers/secretary_push.py` | `test_notification_channels.py`（32） | [ADR-014](ADR-014-multi-channel-push-and-arm-code.md) |
+| Telegram 對話與批准 | `notifiers/telegram_chat.py`、`notifiers/telegram_approvals.py`、`core/secretary_ask.py` | `test_telegram_chat.py`（29） | [ADR-013](ADR-013-telegram-secretary-chat.md) |
+| Git 同步中心與對帳 | `core/repo_sync.py`、`core/repo_onboarding.py`、`core/repo_sync_report.py` | `test_repo_sync*.py`、`test_repo_onboarding.py` | [ADR-011](ADR-011-safe-local-repository-sync.md) ＋ Addendum A/B |
+| Schema migration | `core/migrations.py`（`MIGRATIONS` registry） | `test_database_migration.py` | [ADR-003](ADR-003-versioned-sqlite-migrations.md) |
+| API 邊界與 secret | `core/security.py`、`core/secret_resolver.py` | `test_api_boundary.py`（18） | [ADR-001](ADR-001-p2-5-trust-boundary.md) |
+
+前端只有三個檔：`web/index.html`（結構與 `data-i18n`）、`web/app.js`（`I18N` 中英字典、各分頁 `load*`／`render*`、設定的 load/save）、`web/style.css`（`var(--accent)` 為主）。新增字串要**同時**補 zh-TW 與 en。
+
+## 踩過的坑（別再踩）
+
+- **secret 解析要取 `.value`**：`resolve_secret_env()` 回傳 `SecretResolution` 物件，物件恆為真值——漏取 `.value` 會讓「未設金鑰」判斷失效，還會把 repr 帶進 URL。2026-09-01 曾因此讓所有雲端 provider 的 RAG 對話全滅。
+- **主服務不得 import 索引函式庫**：`core.server` 一旦載入 chromadb／fastembed／rank_bm25／jieba 就會拖慢啟動並吃掉數百 MB；檢索走常駐 worker 子程序，`rag` 的 import 一律寫在函式內（乾淨直譯器契約測試會抓）。
+- **SSE 一定要送 `done`**：瀏覽器只靠它解除「回覆中」狀態，`event_generator` 全程 try/finally。
+- **`display` 會蓋掉 `hidden` 屬性**：專案已加全域 `[hidden] { display: none !important; }`，新元件不要再用行內 `style="display:flex"` 對抗它。
+- **migration 測試會鎖版本清單**：加 migration 要同步改 `test_database_migration.py` 的 `[1..N]` 與「未知的更新版本」那筆（用 N+1）。
+- **`pkill -f` 的 pattern 會殺到自己的 shell**（exit 144）：寫成 `main[.]py` 這種形式，且與啟動指令分開兩次呼叫。
 
 ## 待辦與下一步
 
-**一律看 [TODO.md](TODO.md)**（每項都附完成判準）。目前的形狀是：
+- **待辦一律看 [TODO.md](TODO.md)**：A 段是等待使用者側 live 收據（👤 需在 Windows 實機操作，不是程式工作，A1 是唯一還擋 `release_ready` 的能力缺口）、B 段是已知問題與技術債、C 段是功能候選。
+- **方向與取捨看 [ROADMAP.md](../ROADMAP.md) §12「下一階段規劃」**：三條候選路線（C5 私有網路遠端存取、C6 LINE 雙向、C3 其餘採集來源）各自的前置與代價都寫在那裡。
+- 新增待辦請寫進 TODO.md、成果寫進 ROADMAP §11，**不要在本頁另開清單**——這頁保持一分鐘讀完。
 
-- **A. 等待使用者側 live 收據**(👤 需在 Windows 實機操作,不是程式工作):全天 coverage ledger(唯一還擋 `release_ready` 的能力缺口)、RAG 雲端 provider 複測、Telegram 設定＋inline 批准、L2 執行器試用、P4.3 對帳實操、檢索 worker 大索引實測、Repo 同步全覽與批次實操、小秘書每日包與記憶區實機收據、LINE 推播實機收據。
-- **B. 已知問題與技術債**:legacy AI rows、Extension 覆蓋邊界、PyPI 不在範圍(原 B1 檢索在主程序載入、B2 缺 xdg-open 測試失敗已於 2026-09-02 結案;B1 的實機收據轉為 A6)。
-- **C. 功能候選**:更多 L2／可排程 template、P4 其餘採集來源、更多配色。
+## 工程慣例（照舊）
 
-> 這頁只保留「現況與環境」;新增待辦請寫進 TODO.md,不要在這裡另開清單。
+- **分支**：在當次 session 的指定分支開發 → push → 開 draft PR → 使用者 merge 進 `main`（所有成果都要落在 main）。
+- **誠實文化**：每個聲明附 receipt／claim boundary；測試失敗如實回報；migration 永遠 append-only；危險能力預設關閉；沒被採集到的資料不推測。
+- **文件同步**：功能落地時同步 USAGE（怎麼用）／ROADMAP §11（做了什麼）／STATUS（quality gate ＋ known_blockers）／TODO（實機收據判準）／必要時 README 與新 ADR，並更新 [INDEX.md](INDEX.md) 的 ADR 一覽。
 
-## 工程慣例(照舊)
+## 遠端容器環境備忘（在 Claude Code 雲端 session 內開發時）
 
-- **分支**:在當次 session 的指定分支開發 → push → `main` fast-forward → push(使用者要求所有成果都落在 main)。
-- **誠實文化**:每個聲明附 receipt/claim boundary;測試失敗如實回報;migration 永遠 append-only;危險能力預設關閉。
-- **文件同步**:功能落地時同步 USAGE / ROADMAP §11 / STATUS(quality gate + known_blockers)/ 必要時 README 與 ADR。
-
-## 遠端容器環境備忘(在 Claude Code 雲端 session 內開發時)
-
-- 依賴裝在 scratchpad venv(系統 pip 缺新 setuptools,jieba 會建置失敗);`pip install -e .` 後跑測試。
-- Playwright 用 `executable_path=/opt/pw-browsers/chromium` + `--no-sandbox`;**Playwright 內建 ffmpeg 沒有 PNG 解碼器**,要完整 ffmpeg 用 `pip install imageio-ffmpeg`。
-- `pkill -f` 的 pattern 會殺到自己的 shell(exit 144),用 `main[.]py` 這種寫法。
-- Extension 寫入被拒時 server 現在回 403 detail `extension ingest token missing/mismatch`＋每 60 秒一則節流 WARNING(原本只有一串裸 403)。
-- 容器沒有 xdg-open(對應測試會 skip)、git 憑證只能推分支不能推 tag(發佈走 release workflow 的 workflow_dispatch)。
-- 檢索 worker 在容器內可真的啟動(`POST /api/v1/rag/retrieval/warmup`);空索引預熱會觸發 fastembed 模型下載(約 4 秒,經 proxy),worker RSS 約 335 MB、主服務約 88 MB。
-- E2E 對 localhost server 要用 port 8765(Origin allowlist 綁定預設埠)。
+- 依賴裝在 scratchpad venv（系統 pip 缺新 setuptools，jieba 會建置失敗）；`pip install -e .` 後跑測試。
+- Playwright 用 `executable_path=/opt/pw-browsers/chromium` ＋ `--no-sandbox`；**內建 ffmpeg 沒有 PNG 解碼器**，要完整 ffmpeg 用 `pip install imageio-ffmpeg`。
+- E2E 對 localhost server 要用 **port 8765**（Origin allowlist 綁定預設埠）；另開 `OMNICONTEXT_HOME` 當測試家目錄，不要碰使用者資料。
+- 容器沒有 xdg-open（對應測試會 skip）、git 憑證只能推分支不能推 tag（發佈走 release workflow 的 workflow_dispatch）。
+- 檢索 worker 在容器內可真的啟動（`POST /api/v1/rag/retrieval/warmup`）；空索引預熱會觸發 fastembed 模型下載（約 4 秒，經 proxy），worker RSS 約 335 MB、主服務約 88 MB。
+- Extension 寫入被拒時 server 回 403 detail `extension ingest token missing/mismatch`＋每 60 秒一則節流 WARNING。

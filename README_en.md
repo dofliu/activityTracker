@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **Current status: Personal Alpha (v1.3.0a5 published as a GitHub pre-release).** Windows milestone WinRT Toast E2E, schema 17/17, formal package+database rollback, P3-2 through P3-5 Context Memory Alpha, collector runtime diagnostics, the P2.6 continuous coverage ledger, and the cross-platform CI matrix have passed; Extension 1.3.1 obtained a live PASS receipt for ChatGPT and Claude.ai on 2026-08-31 and the P2.7 background-task live acceptance passed for all three platforms. **The secretary has completed all [ADR-008](docs/ADR-008-gated-agent-executor.md) stages P5-R1 through R5** (LLM notes, L0/L1 whitelist actions, L2 dispatch of your local agent CLI to draft plans / apply an approved plan, Telegram inline approvals with an evening handoff push, and L0 read-only custom scheduled tasks with weekly/monthly rollups and a STATUS draft — all off by default), plus the morning briefing (P5-R4a), two-tier incremental summaries, and the assistant-home UI. P4.3 repo onboarding/reconciliation (confirmed single-target init / attach-remote / clone / create-GitHub-repo flows) has landed, and the dashboard went through an information-architecture pass (6 tabs split into primary/secondary, set-once settings collapsed) plus optional color palettes (Naruto Orange / Forest Green / Ocean Blue x dark/light). 44 contract-test modules, 261 tests. Remaining gap: a real full-day coverage-ledger receipt plus the user's live on-machine acceptance receipts (release_ready stays false); the full backlog lives in [docs/TODO.md](docs/TODO.md).
+> **Current status: Personal Alpha (v1.3.0a5 published as a GitHub pre-release).** Windows milestone WinRT Toast E2E, schema 18/18, formal package+database rollback, P3-2 through P3-5 Context Memory Alpha, collector runtime diagnostics, the P2.6 continuous coverage ledger, and the cross-platform CI matrix have passed; Extension 1.3.1 obtained a live PASS receipt for ChatGPT and Claude.ai on 2026-08-31 and the P2.7 background-task live acceptance passed for all three platforms. **The secretary has completed all [ADR-008](docs/ADR-008-gated-agent-executor.md) stages P5-R1 through R5** (LLM notes, L0/L1 whitelist actions, L2 dispatch of your local agent CLI to draft plans / apply an approved plan, Telegram inline approvals with an evening handoff push, and L0 read-only custom scheduled tasks with weekly/monthly rollups and a STATUS draft — all off by default), plus the morning briefing (P5-R4a), two-tier incremental summaries, and the assistant-home UI. P4.3 repo onboarding/reconciliation (confirmed single-target init / attach-remote / clone / create-GitHub-repo flows) has landed, and the dashboard went through an information-architecture pass (6 tabs split into primary/secondary, System Settings consolidated into a 10-section left nav) plus optional color palettes (Naruto Orange / Forest Green / Ocean Blue x dark/light). Between 2026-09-02 and 09-04 it also gained the **secretary memory area** ([ADR-012](docs/ADR-012-secretary-memory.md)), **Telegram chat from your phone** ([ADR-013](docs/ADR-013-telegram-secretary-chat.md)), **multi-channel push for LINE/Telegram with a one-time arm code** ([ADR-014](docs/ADR-014-multi-channel-push-and-arm-code.md)), the **secretary greeting card** (home tab and the top of the morning briefing), and a **local calendar source** ([ADR-015](docs/ADR-015-local-calendar-source.md), read-only .ics) — each off by default, or inert until you configure a path. 53 contract-test modules, 425 tests. Remaining gap: a real full-day coverage-ledger receipt plus the user's live on-machine acceptance receipts (release_ready stays false); the full backlog lives in [docs/TODO.md](docs/TODO.md) and the direction in [ROADMAP section 12](ROADMAP.md).
 
 **Documentation:** [📚 Documentation index](docs/INDEX.md) · [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
 
@@ -40,18 +40,18 @@ It is purpose-built to answer three fundamental questions at any moment:
 │          └───────────────────────┼───────────────────────┘               │
 │                                  ▼                                       │
 │                      [ Local SQLite Database ]                           │
-│               (omni_context.db · local; cloud LLM is opt-in)            │
+│              (omni_context.db · local; cloud LLM is opt-in)              │
 │                                  │                                       │
 │          ┌───────────────────────┼───────────────────────┐               │
 │          ▼                       ▼                       ▼               │
 │  [ Web Dashboard UI ]    [ DeskRAG Subsystem ]     [ AI Synthesis ]      │
 │  • 01 · 🤖 Assistant     • PDF/Docx/Pptx/Xlsx/Md   • Multi-Day Reviews   │
-│    (chat + suggestions)  • FastEmbed + ChromaDB    • Periodic Snapshots  │
-│  • 02 · Workstreams      • Jieba + BM25 Keyword    • Telegram Push       │
-│  • 03 · Knowledge & RAG  • Hybrid RRF Retrieval    • Multi-LLM (Gemini/  │
-│  • 04 · Summaries        • Multi-LLM SSE Chat        Claude/OpenAI/Ollama│
-│  • 05 · Checkpoints · 06 · Live Feed · Explorer Reveal                   │
-│  • 07 · Settings · 08 · System Health  · 🌐 Bilingual (EN/ZH)            │
+│    (greeting + today     • FastEmbed + ChromaDB    • Periodic Snapshots  │
+│     list+chat+memory)    • Jieba + BM25 Keyword    • Telegram/LINE Push  │
+│  • 02 · Knowledge base   • Hybrid RRF Retrieval    • Multi-LLM (Gemini/  │
+│  • 03 · Workstreams      • Multi-LLM SSE Chat        Claude/OpenAI/Ollama│
+│  • 04 · Git Sync Center · 05 · Summaries & Stats · Explorer Reveal       │
+│  • 06 · System Settings (10-section left nav) · 🌐 Bilingual (EN/ZH)     │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 

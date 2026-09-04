@@ -64,14 +64,14 @@
 
 將 DeskRAG 的後端核心邏輯遷移至 `activityTracker/rag/`，重構路徑與設定依賴，使其與 OmniContext 的 `runtime_paths` 與 `config.yaml` 深度結合。
 
-#### [NEW] [rag/\_\_init\_\_.py](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/rag/__init__.py)
+#### [NEW] `rag/__init__.py`
 - 初始化 `rag` 模組導出。
 
-#### [NEW] [rag/config.py](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/rag/config.py)
+#### [NEW] `rag/config.py`
 - 定義 RAG 專屬常數（支援副檔名、系統忽略黑名單、切分參數、預設 FastEmbed 模型）。
 - 與 OmniContext `core/config.py` 整合，動態讀取 `config.yaml` 內的 `rag` 設定。
 
-#### [NEW] [rag/parsers/](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/rag/parsers)
+#### [NEW] `rag/parsers/`
 - `base.py`：解析器基礎抽象類別。
 - `parser_hub.py`：多格式檔案解析路由中樞。
 - `pdf_parser.py`：PyMuPDF 高效能 PDF 頁面解析器。
@@ -79,20 +79,20 @@
 - `text_parser.py`：Markdown、TXT 與各類原始碼檔解析。
 - `image_parser.py`：RapidOCR 圖片光學字元辨識。
 
-#### [NEW] [rag/chunker.py](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/rag/chunker.py)
+#### [NEW] `rag/chunker.py`
 - 階層滑動窗口切分器，為每個 chunk 標註精準的來源資訊（頁碼 `page`、投影片編號 `slide`、工作表名稱 `sheet`、章節標題 `title`）。
 
-#### [NEW] [rag/embeddings.py](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/rag/embeddings.py)
+#### [NEW] `rag/embeddings.py`
 - 本地 FastEmbed (ONNX `bge-small-zh-v1.5`)、Ollama、OpenAI 向量嵌入服務。
 
-#### [NEW] [rag/vector_store.py](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/rag/vector_store.py)
+#### [NEW] `rag/vector_store.py`
 - 本地 ChromaDB 向量資料庫封裝，支援增量 Upsert、批次寫入、單檔刪除與餘弦相似度檢索。
 - 自動將向量存於 `runtime_data_root / "chroma"`。
 
-#### [NEW] [rag/retriever.py](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/rag/retriever.py)
+#### [NEW] `rag/retriever.py`
 - Jieba 中文分詞 + BM25 稀疏關鍵字索引服務，支援本地 Pickle 持久化與增量更新。
 
-#### [NEW] [rag/retrieval/](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/rag/retrieval)
+#### [NEW] `rag/retrieval/`
 - 檢索策略模式（Strategy Pattern）：
   - `base.py`：`BaseRetriever` 與 `CitationSource` 結構定義。
   - `registry.py`：策略註冊表（支援動態擴充與列舉）。
@@ -101,31 +101,31 @@
   - `vector_retriever.py`：純稠密向量檢索。
   - `bm25_retriever.py`：純 BM25 關鍵字檢索。
 
-#### [NEW] [rag/scanner.py](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/rag/scanner.py)
+#### [NEW] `rag/scanner.py`
 - 本地目錄遞迴掃描引擎、MD5 增量變更感知、非同步背景工作排程與即時進度狀態廣播。
 
-#### [NEW] [rag/llm_gateway.py](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/rag/llm_gateway.py)
+#### [NEW] `rag/llm_gateway.py`
 - 多模型調度器（OpenAI, Claude, Gemini, Ollama）與 SSE 串流打字機產生器。
 
 ---
 
 ### 2. 資料庫與模型層 (`core/`)
 
-#### [MODIFY] [core/models.py](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/core/models.py)
+#### [MODIFY] `core/models.py`
 - 新增 RAG 相關 SQLAlchemy 資料表模型：
   - `RAGIndexedFolder` (`rag_indexed_folders`)
   - `RAGIndexedFile` (`rag_indexed_files`)
   - `RAGChatSession` (`rag_chat_sessions`)
   - `RAGChatMessage` (`rag_chat_messages`)
 
-#### [MODIFY] [core/database.py](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/core/database.py)
+#### [MODIFY] `core/database.py`
 - 確保新模型在 `init_db()` 時自動建立或遷移，並支援 RAG 所需的 Helper 查詢。
 
 ---
 
 ### 3. API 路由與伺服器整合 (`core/server.py`)
 
-#### [MODIFY] [core/server.py](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/core/server.py)
+#### [MODIFY] `core/server.py`
 - 整合 DeskRAG 的所有 API 路由，掛載於 `/api/v1/rag/`：
   - `GET /api/v1/rag/folders`：列出已索引資料夾
   - `POST /api/v1/rag/folders`：新增監控資料夾並觸發掃描
@@ -145,7 +145,7 @@
 
 ### 4. 設定檔整合 (`config.yaml` & `config.example.yaml`)
 
-#### [MODIFY] [config.example.yaml](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/config.example.yaml)
+#### [MODIFY] `config.example.yaml`
 - 新增 `rag` 區塊設定：
   ```yaml
   rag:
@@ -166,25 +166,25 @@
 
 ### 5. 前端 Web 儀表板 (`web/`)
 
-#### [MODIFY] [web/index.html](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/web/index.html)
+#### [MODIFY] `web/index.html`
 - 頂部導航列新增 `📚 知識庫與 RAG 對話 (Knowledge & Chat)` 標籤。
 - 新增 RAG 對話與資料夾管理面板：
   - 左側：已索引目錄管理（新增目錄、一鍵掃描、即時進度條、檔案清單手風琴）。
   - 右側：AI 對話視窗（模型切換、檢索策略下拉選單、Top-K / Alpha 調整、即時打字機訊息流、引用來源卡片與「在總管開啟」按鈕）。
 
-#### [MODIFY] [web/app.js](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/web/app.js)
+#### [MODIFY] `web/app.js`
 - 實作 SSE 串流解析客戶端（處理 `event: citations`, `event: message`, `event: done`）。
 - 實作資料夾新增、刪除、掃描進度定時輪詢與引文卡片點擊喚起 Windows 總管。
 - 整合 i18n 繁中/英文雙語系對應。
 
-#### [MODIFY] [web/style.css](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/web/style.css)
+#### [MODIFY] `web/style.css`
 - 增加 RAG 聊天氣泡、引文來源標籤（頁碼/投影片/相關度得分）、進度指示條與響應式排版樣式。
 
 ---
 
 ### 6. 相依套件更新 (`requirements.txt` & `pyproject.toml`)
 
-#### [MODIFY] [requirements.txt](file:///d:/Project_CodingSimulation/PersonalHelper/activityTracker/requirements.txt)
+#### [MODIFY] `requirements.txt`
 - 加入必要套件：
   ```txt
   chromadb>=0.4.24

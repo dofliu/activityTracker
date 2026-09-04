@@ -156,3 +156,22 @@ python main.py extension-path
 Claude Desktop Cowork／local-agent Windows incremental scan曾新增 148 turns、125 筆非空 response、117 筆 `final_candidate`，stable parser 重跑不新增重複 turn。這是本機 Cowork／local-agent receipt，不外推為一般 Claude 雲端聊天 coverage。
 
 同批資料完成 incremental semantic index：來源與索引均為 4,380，`indexed=285 / unchanged=4095 / failures=0`；新增數包含掃描期間其他合法來源，不等同全部來自 Claude Desktop。
+
+## 現況與各功能的契約矩陣（2026-09-04）
+
+本機完整 `pytest tests/` 為 **425 項（424 passed + 1 skipped）／53 個模組**；skip 的那一項是容器缺 `xdg-open` 時的 `test_open_command_is_argv_not_shell_string`，會標註原因而非失敗。以下為 P2.5 之後新增的主要契約矩陣，各自守住一條「不能退步」的邊界：
+
+| 模組 | 項數 | 守什麼 |
+| :--- | ---: | :--- |
+| `test_api_boundary.py` | 18 | Origin allowlist、secret redaction、hostile origin 403 |
+| `test_database_migration.py` | — | append-only registry、checksum、未知新版本 fail-closed、不得靠 `create_all` 繞過 |
+| `test_agent_executor.py` / `test_agent_dispatch_l2.py` / `test_scheduled_tasks.py` | — | ADR-008 三級閘門、argv 白名單禁 shell、env allowlist 不轉發金鑰、L1/L2 永不可排程、audit receipt |
+| `test_rag_chat_stream.py` | 10 | 金鑰走 header 不進 URL、SSE 一定送 `done`、檢索逾時降級 |
+| `test_rag_retrieval_worker.py` | 20 | 主服務不得 import 索引函式庫（乾淨直譯器）、worker 逾時即 kill 並自動重啟 |
+| `test_secretary_memory.py` | 20 | 記憶只由使用者或 L0 收據寫入、對話注入有上限附收據、偏好不變成執行 |
+| `test_telegram_chat.py` | 29 | 與網頁同一條管線、只批 L0/L1、arm code 單次／過期／猜錯即焚／不回顯 |
+| `test_notification_channels.py` | 32 | 內容與呈現分離且一律 escape、adapter 能力宣告、扇出逐通道隔離、晨報缺料只省略該段 |
+| `test_secretary_greeting.py` | 23 | 數字只能來自資料表、鼓勵語同日同句、LLM 潤飾不得新增統計外的數字 |
+| `test_calendar_source.py` | 17 | 只取時間／標題／地點／狀態（描述與與會者不落地）、整批替換不殘留、壞檔隔離 |
+
+新增功能時的最低要求：**至少一項測試證明「說不出來的事不會被說出來」**（claim boundary），以及一項證明「上游失敗時只降級不消失」（故障隔離）。

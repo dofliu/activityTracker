@@ -7,7 +7,7 @@
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **目前狀態：Personal Alpha（v1.3.0a5 已發佈為 GitHub pre-release）。** Windows milestone WinRT Toast E2E、schema 17/17、formal package+DB rollback、P3-2～P3-5、collector runtime diagnostics、P2.6 continuous coverage ledger 與跨平台 CI 已通過；Extension 1.3.1 已於 2026-08-31 取得 ChatGPT＋Claude.ai live PASS receipt，P2.7 三平台背景任務 live 驗收亦全數 PASS。**秘書已依 [ADR-008](docs/ADR-008-gated-agent-executor.md) 完成 P5-R1～R5 全階段**（LLM 註解、L0/L1 白名單代辦、L2 調度本機 agent CLI 起草／依批准計畫改檔、Telegram inline 批准與晚間交接、L0 唯讀自訂排程任務含週/月報 rollup 與 STATUS 草稿，全部預設關閉），並有秘書晨報（P5-R4a）、兩層增量摘要與小秘書首頁 UI。P4.3 Repo Onboarding／對帳（init／連結 remote／clone／建立 GitHub repo 的單一目標確認式流程）已實作；儀表板已完成資訊架構重整（6 分頁分主次、少用設定收合）與可選配色主題（火影橘／森林綠／海洋藍 × 深淺）。目前 44 個 contract test 模組共 261 項。剩餘缺口:全天 coverage ledger 實測與各功能的使用者實機 live 收據（release_ready 仍為 false）；完整待辦見 [docs/TODO.md](docs/TODO.md)。
+> **目前狀態：Personal Alpha（v1.3.0a5 已發佈為 GitHub pre-release）。** Windows milestone WinRT Toast E2E、schema 18/18、formal package+DB rollback、P3-2～P3-5、collector runtime diagnostics、P2.6 continuous coverage ledger 與跨平台 CI 已通過；Extension 1.3.1 已於 2026-08-31 取得 ChatGPT＋Claude.ai live PASS receipt，P2.7 三平台背景任務 live 驗收亦全數 PASS。**秘書已依 [ADR-008](docs/ADR-008-gated-agent-executor.md) 完成 P5-R1～R5 全階段**（LLM 註解、L0/L1 白名單代辦、L2 調度本機 agent CLI 起草／依批准計畫改檔、Telegram inline 批准與晚間交接、L0 唯讀自訂排程任務含週/月報 rollup 與 STATUS 草稿，全部預設關閉），並有秘書晨報（P5-R4a）、兩層增量摘要與小秘書首頁 UI。P4.3 Repo Onboarding／對帳（init／連結 remote／clone／建立 GitHub repo 的單一目標確認式流程）已實作；儀表板已完成資訊架構重整（6 分頁分主次、系統設定以左欄切換 10 個區塊）與可選配色主題（火影橘／森林綠／海洋藍 × 深淺）。2026-09-02～04 另加入**小秘書記憶區**（[ADR-012](docs/ADR-012-secretary-memory.md)）、**手機上的 Telegram 對話**（[ADR-013](docs/ADR-013-telegram-secretary-chat.md)）、**LINE／Telegram 多通道推播與一次性解鎖碼**（[ADR-014](docs/ADR-014-multi-channel-push-and-arm-code.md)）、**小秘書問候卡**（首頁與晨報開頭）與**本機行事曆採集**（[ADR-015](docs/ADR-015-local-calendar-source.md)，唯讀 .ics），全部預設關閉或沒設路徑即停用。目前 53 個 contract test 模組共 425 項。剩餘缺口：全天 coverage ledger 實測與各功能的使用者實機 live 收據（release_ready 仍為 false）；完整待辦見 [docs/TODO.md](docs/TODO.md)、方向見 [ROADMAP.md](ROADMAP.md) §12「下一階段規劃」。
 
 **文件入口：**[📚 文件總覽](docs/INDEX.md) · [完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
 
@@ -45,13 +45,16 @@
 │          ┌───────────────────────┼───────────────────────┐               │
 │          ▼                       ▼                       ▼               │
 │  [ Web 視覺化儀表板 ]    [ DeskRAG 知識庫 ]      [ AI 摘要與主動提醒 ]   │
-│  • 01 · 🤖 小秘書首頁    • PDF/Office/Md 解析    • 多日自訂區間日報回顧  │
-│    （對話交辦+建議+概況）• FastEmbed + ChromaDB  • 週期性 Checkpoint     │
-│  • 02 · 進行中工作       • Jieba + BM25 關鍵字   • 桌面通知 / Telegram   │
-│  • 小秘書與知識庫分頁    • Hybrid RRF 混合檢索   • 多供應商 (Gemini /    │
-│  • 04 · 每日摘要         • 多模型 SSE 串流問答     Claude/OpenAI/Ollama) │
-│  • 05 · 快照 · 06 · 情報流 · 檔案總管精準定位                            │
-│  • 06 · 系統設定（左欄：秘書／Telegram／LINE／路徑／來源／LLM／使用時間／GitHub／情報流／系統健康）│
+│  • 01 · 🤖 小秘書        • PDF/Office/Md 解析    • 多日自訂區間日報回顧  │
+│    （問候卡+今日清單     • FastEmbed + ChromaDB  • 週期性 Checkpoint     │
+│     +交辦對話+記憶區）   • Jieba + BM25 關鍵字   • 桌面通知／Telegram／  │
+│  • 02 · 知識庫           • Hybrid RRF 混合檢索     LINE 多通道推播       │
+│  • 03 · 進行中工作       • 多模型 SSE 串流問答   • 多供應商 (Gemini /    │
+│  • 04 · Git 同步中心     • 常駐檢索 worker 隔離    Claude/OpenAI/Ollama) │
+│  • 05 · 摘要與統計 · 檔案總管精準定位                                    │
+│  • 06 · 系統設定（左欄 10 區塊：秘書與自動化／Telegram／LINE／           │
+│         監控路徑／採集來源／摘要與 LLM／使用時間／GitHub／               │
+│         維運：即時情報流／系統健康）                                     │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
