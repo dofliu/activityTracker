@@ -8,6 +8,7 @@
 | :--- | :--- |
 | **接手上一個開發 session、繼續往下做** | [NEXT_SESSION.md](NEXT_SESSION.md) —— 現況、等待中的收據、下一步候選、環境備忘 |
 | **看還有什麼待辦、已知問題** | [TODO.md](TODO.md) —— 待辦清單（含完成判準）、技術債、功能候選 |
+| **查實機收據做到哪了** | 儀表板「06 系統設定 → 驗收中心」或 `python main.py verify` —— TODO A 段每一項的本機收據現況（[ADR-016](ADR-016-acceptance-center.md)） |
 | 快速了解專案是什麼、能做什麼 | [README.md](../README.md)（繁中）/ [README_en.md](../README_en.md)（English） |
 | 安裝、Extension 配對、日常操作、備份與故障排查 | [USAGE.md](USAGE.md) —— **使用手冊** |
 | 了解目前開發到哪 | [ROADMAP.md](../ROADMAP.md) §11 成果紀錄 + [STATUS.yaml](../STATUS.yaml) |
@@ -55,6 +56,7 @@
 | [ADR-013](ADR-013-telegram-secretary-chat.md) | Telegram 小秘書對話（手機通道） | 對話與網頁同一條管線、預設關閉、內容經 Telegram 的邊界、/arm 需開關且訊息即刪、/disarm 永遠可用 |
 | [ADR-014](ADR-014-multi-channel-push-and-arm-code.md) | 多通道推播（LINE）與一次性解鎖碼 | 內容與呈現分離、adapter 能力宣告、LINE 只能推播的原因、/arm 改用短效碼 |
 | [ADR-015](ADR-015-local-calendar-source.md) | 本機行事曆採集來源（.ics，唯讀） | 「能否改變決策」檢驗、只讀時間／標題／地點／狀態、整批替換與壞檔隔離、不接雲端 API |
+| [ADR-016](ADR-016-acceptance-center.md) | 驗收中心（完成判準機器化） | 只讀便宜查詢、狀態字彙分「沒發生／查不到」、人工署名永不覆蓋機器判定、gate 對齊 ROADMAP §12.3 |
 
 ## 功能規格與驗證
 

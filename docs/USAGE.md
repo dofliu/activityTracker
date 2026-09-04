@@ -494,6 +494,38 @@ secretary_memory:
 
 記憶區只存您輸入的短文字與由本機唯讀收據推出的觀察，不存 prompt／response 原文、不寫進任何 repo；API：`GET/POST /api/v1/secretary/memory`、`DELETE /api/v1/secretary/memory/{id}`、`DELETE /api/v1/secretary/memory?kind=observation`。
 
+### 驗收中心：還有哪些實機收據沒拿到（2026-09-04，ADR-016）
+
+[docs/TODO.md](TODO.md) A 段列著 13 條「只能在你自己機器上取得的收據」。要一項項翻很累，也很容易憑印象以為做過了，所以有**驗收中心**：它直接去本機找收據，告訴你每一項現在是什麼狀態。
+
+儀表板走「**06 · 系統設定 → 🧾 驗收中心**」，或在終端機：
+
+```powershell
+python main.py verify                      # 全部 13 項 + ROADMAP §12.3 的四個 gate
+python main.py verify --item A1,A6         # 只看指定項目（此時不給 gate，見下）
+python main.py verify --json               # 完整 JSON
+python main.py verify --output receipt.json  # 另存一份收據
+```
+
+服務在跑時 CLI 會走 live API（跟 `python main.py status` 同一個模式），這樣才看得到只存在服務程序裡的狀態。
+
+**狀態怎麼讀**：
+
+| 狀態 | 意思 |
+| :--- | :--- |
+| ✅ 已取得收據 | 找到符合該項判準的本機證據 |
+| 🟡 部分收據 | 判準有多項，只完成一部分（例如同步報告產生了，但還沒有批准後的 pull 收據） |
+| ⬜ 尚未取得 | 前置齊備但還沒有任何收據 |
+| 👤 待你親眼確認 | 判準本來就要人眼比對（例如手機收到的是不是純文字、卡上數字對不對得上） |
+| ➖ 未啟用 | 該功能預設關閉或未設定——**這不是失敗**，只代表這條路徑沒開 |
+| 🌐 服務程序內才看得到 | 例如檢索 worker 的預熱狀態只存在主服務程序；CLI 另開程序看不到，所以不會謊報成「還沒做」 |
+
+**它只讀不做**：只查 SQLite、設定值與檔案是否存在，不跑 git、不連網、不呼叫 LLM、不載入索引，也不會替你執行任何驗收動作（自動跑出來的收據證明的是「程式能跑」，不是「你的機器能用」）。
+
+**人眼確認的項目**可以按「🖊 我親眼確認過」留下署名（存在 `reports/acceptance/confirmations.json`）。這是**另一種證據**，與機器找到的收據分開記帳，而且**永遠不會覆蓋機器判定**——對 A1 署名不會讓它變綠，ledger 查不到就是查不到。
+
+**gate**：報告最後依 [ROADMAP.md](../ROADMAP.md) §12.3 列出四個發佈收斂條件現在缺什麼。驗收中心**不會**改 `release_ready`，也不會寫 STATUS.yaml；只查部分項目時不給 gate（用一部分項目算出來的 gate 是誤導）。
+
 ### 主控台一串 `POST /api/v1/events/ai 403 Forbidden` 是什麼？
 
 那是 Browser Extension 在送對話事件與 heartbeat，但帶的 ingest token 缺少或與本機設定不符；extension 的離線佇列會每秒重送，所以會看到一整排。2026-09-02 起回應會直接說明：`detail: extension ingest token missing` 或 `extension ingest token mismatch`，主控台每 60 秒印一則 WARNING（附被壓掉的次數）。處理：在 Extension popup 重新貼上 `python main.py init` 顯示的 ingest token（或確認 `OMNICONTEXT_INGEST_TOKEN` 環境變數／`security.browser_extension_ingest_token` 與 popup 一致）。`Origin is not allowed` 則是非 extension 的來源被擋，屬正常防護。

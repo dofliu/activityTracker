@@ -21,6 +21,10 @@
 
 這些都不是「還沒寫的程式」，而是**只能在你自己機器上取得的證據**。功能已實作並有 contract tests，但本專案不把「測試通過」當成「實機可用」。
 
+> **不必自己一項項翻**：儀表板「06 系統設定 → 驗收中心」或 `python main.py verify` 會直接去本機找下表的收據，
+> 告訴你每一項現在是「已取得收據／部分／尚未取得／未啟用／待你親眼確認」（[ADR-016](ADR-016-acceptance-center.md)）。
+> 它只讀不做：不會替你執行任何驗收動作，也不跑 git、不連網。判準以本表為準——**本表改了，`core/acceptance.py` 的 `_ITEMS` 要跟著改**。
+
 | # | 項目 | 怎麼做 | 完成判準（收據） | 優先 |
 | :-- | :--- | :--- | :--- | :--- |
 | A1 | **全天 coverage ledger** | 讓 Windows 實機跨午夜連續運行一整天 | 儀表板 coverage 轉 `OBSERVED`，或隔日 `GET /api/v1/usage/coverage?date=YYYY-MM-DD` 回 `meets_full_coverage: true`；取得後更新 STATUS 的 `continuous_coverage_ledger` gate 與 `known_blockers` | 🔴 P0 |
@@ -48,6 +52,7 @@
 | B1 | **337 筆 legacy AI rows 無 `response_status`** | 早期資料缺 provenance 欄位，只保留為歷史，不進入 canonical synthesis/handoff 結論 | 維持現狀（不回填假資料）；如需清理只能標記不可用，不得推測 | ⚪ P2 |
 | B2 | **Extension 覆蓋邊界** | 2026-08-31 的 live PASS 只涵蓋 ChatGPT ＋ Claude.ai；**Gemini 未在該輪驗證**，且單輪 PASS 不等於連續／全天 capture coverage | 需要時對 Gemini 補一輪 `scripts/extension_live_acceptance.py` | ⚪ P2 |
 | B3 | **PyPI 發佈不在範圍** | 目前只發 GitHub pre-release（wheel/sdist + SHA-256 receipt） | 待 stable release 條件齊備後再評估 | ⚪ P2 |
+| B4 | **Repo onboarding 動作不留收據** | `init_folder`／`attach_remote`／`clone_repo`／`create_remote` 執行後只回傳結果，不寫任何本機紀錄，因此 A5 只能靠人眼確認（驗收中心對這項永遠回 `needs_human`） | 若要讓 A5 可機器驗，需為 onboarding 動作補一張收據（migration ＋ ADR-011 邊界討論）；在那之前維持誠實空白，不用旁證推測 | ⚪ P2 |
 
 ---
 
@@ -68,4 +73,5 @@
 
 1. **完成即移除**：項目做完後寫進 ROADMAP §11 的成果紀錄，並從本頁刪除。
 2. **每項都要有收據**：新增項目時一併寫下「怎樣才算完成」，避免出現無法驗收的待辦。
+   A 段新增或刪除項目時，同步更新 `core/acceptance.py` 的 `_ITEMS`（驗收中心是本表的可執行副本）。
 3. **誠實標記**：環境限制、外部前置（如需要使用者提供的憑證）要標出來，不要混在「還沒做」裡。

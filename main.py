@@ -766,6 +766,107 @@ def cmd_wal_checkpoint(mode: str = "TRUNCATE"):
     print(json.dumps(res, indent=2, ensure_ascii=False))
 
 
+_ACCEPTANCE_ICONS = {
+    "passed": "✅",
+    "attested": "🖊️",
+    "partial": "🟡",
+    "pending": "⬜",
+    "needs_human": "👤",
+    "not_configured": "➖",
+    "runtime_only": "🌐",
+}
+
+
+def _fetch_acceptance_report(item: Optional[str]) -> tuple[dict, str]:
+    """服務在跑就用 live API（檢索 worker 這類記憶體狀態只有那個程序看得到）。"""
+    import urllib.parse
+    import urllib.request
+
+    cfg = get_config()
+    try:
+        host = cfg.get("server.host", "127.0.0.1")
+        port = int(cfg.get("server.port", 8765))
+        live_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
+        url = f"http://{live_host}:{port}/api/v1/acceptance/checklist"
+        if item:
+            url += "?" + urllib.parse.urlencode({"item": item})
+        with urllib.request.urlopen(url, timeout=5) as response:
+            return json.loads(response.read().decode("utf-8")), "live API"
+    except Exception:
+        from core.acceptance import build_acceptance_report
+
+        only = [part.strip() for part in item.split(",") if part.strip()] if item else None
+        return build_acceptance_report(runtime=False, only=only), "local read-only"
+
+
+def cmd_verify(
+    item: Optional[str] = None,
+    as_json: bool = False,
+    output: Optional[str] = None,
+    confirm: Optional[str] = None,
+    note: str = "",
+    unconfirm: Optional[str] = None,
+):
+    """驗收中心：查 docs/TODO.md A 段每一項的本機收據現況（唯讀）。"""
+    from core.acceptance import record_human_confirmation
+
+    for target, confirmed in ((confirm, True), (unconfirm, False)):
+        if not target:
+            continue
+        try:
+            result = record_human_confirmation(target, confirmed=confirmed, note=note)
+        except ValueError as exc:
+            print(f"❌ {exc}")
+            return
+        verb = "已記下人工確認" if confirmed else "已取消人工確認"
+        print(f"🖊️  {verb}：{result['item_id']}（{result['path']}）")
+
+    report, source = _fetch_acceptance_report(item)
+
+    if output:
+        out_path = Path(output).expanduser()
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        print(f"📄 收據已寫入 {out_path}")
+
+    if as_json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return
+
+    summary = report["summary"]
+    print("\n" + "=" * 62)
+    print(f"🧾 驗收中心（來源：{report['source']}；讀取方式：{source}）")
+    print("=" * 62)
+    for entry in report["items"]:
+        icon = _ACCEPTANCE_ICONS.get(entry["status"], "•")
+        flag = " 🔴" if entry["blocks_release"] and entry["status"] not in ("passed", "attested") else ""
+        print(f"{icon} {entry['id']:<3} {entry['title']}{flag}")
+        print(f"     {entry['detail']}")
+        if entry["status"] in ("pending", "partial", "needs_human", "runtime_only"):
+            print(f"     怎麼做：{entry['how']}")
+    print("-" * 62)
+    counts = "、".join(f"{k}={v}" for k, v in sorted(summary["counts"].items()))
+    print(f"合計 {summary['total']} 項：{counts}")
+    if summary["blocking_release"]:
+        print(f"🔴 仍擋 release_ready：{'、'.join(summary['blocking_release'])}")
+    if report.get("release_gates_note"):
+        print(f"ℹ️  {report['release_gates_note']}")
+    if report["release_gates"]:
+        print("release gates（ROADMAP §12.3）：")
+    for gate in report["release_gates"]:
+        icon = _ACCEPTANCE_ICONS.get(gate["status"], "•")
+        pending_items = gate.get("outstanding") or []
+        shown = "、".join(pending_items[:4])
+        if len(pending_items) > 4:
+            shown += f" 等 {len(pending_items)} 項"
+        tail = f"（待辦：{shown}）" if pending_items else ""
+        print(f"  {icon} {gate['id']} {gate['text']}{tail}")
+    print(f"\n邊界：{report['claim_boundary']}")
+    print("=" * 62 + "\n")
+
+
 def main():
     parser = argparse.ArgumentParser(description="OmniContext - 個人全景上下文與進行中專案智慧中樞")
     subparsers = parser.add_subparsers(dest="command", help="子指令")
@@ -903,6 +1004,16 @@ def main():
     wal_parser = subparsers.add_parser("wal-checkpoint", help="手動執行 SQLite WAL Checkpoint")
     wal_parser.add_argument("--mode", default="TRUNCATE", choices=["PASSIVE", "FULL", "RESTART", "TRUNCATE"])
 
+    verify_parser = subparsers.add_parser(
+        "verify", help="驗收中心：檢查 docs/TODO.md A 段每一項的本機收據（唯讀）"
+    )
+    verify_parser.add_argument("--item", help="只看指定項目，例如 A1 或 A1,A6")
+    verify_parser.add_argument("--json", action="store_true", dest="as_json", help="輸出完整 JSON 收據")
+    verify_parser.add_argument("--output", help="把 JSON 收據另存到這個路徑")
+    verify_parser.add_argument("--confirm", help="記下「我親眼確認過」某一項（人工署名，不覆蓋機器判定）")
+    verify_parser.add_argument("--unconfirm", help="取消某一項的人工確認")
+    verify_parser.add_argument("--note", default="", help="人工確認的附註")
+
     args = parser.parse_args()
 
     if args.command in ["run", "web", None]:
@@ -1008,6 +1119,15 @@ def main():
         cmd_heal()
     elif args.command == "wal-checkpoint":
         cmd_wal_checkpoint(getattr(args, "mode", "TRUNCATE"))
+    elif args.command == "verify":
+        cmd_verify(
+            getattr(args, "item", None),
+            getattr(args, "as_json", False),
+            getattr(args, "output", None),
+            getattr(args, "confirm", None),
+            getattr(args, "note", ""),
+            getattr(args, "unconfirm", None),
+        )
     else:
         parser.print_help()
 

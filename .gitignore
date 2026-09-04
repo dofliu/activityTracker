@@ -30,7 +30,9 @@ data/*
 !data/.gitkeep
 
 # Local Generated Reports & Checkpoints
-reports/*.md
+# 報告與收據一律是本機產物（含 repo_sync/、handoffs/ 子目錄與
+# acceptance/confirmations.json 這類使用者自己寫的確認附註），全部不進版控。
+reports/**
 !reports/.gitkeep
 logs/*.log
 logs/checkpoints/*.md

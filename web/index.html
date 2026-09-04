@@ -389,6 +389,7 @@
           <div class="settings-nav-group" data-i18n="snav_group_ops">維運</div>
           <button class="settings-nav-item" data-pane="feed" data-i18n="snav_feed">📡 即時情報流</button>
           <button class="settings-nav-item" data-pane="health" data-i18n="snav_health">🛡️ 系統健康</button>
+          <button class="settings-nav-item" data-pane="acceptance" data-i18n="snav_acceptance">🧾 驗收中心</button>
         </nav>
           <div class="settings-panes" id="settings-panes">
           <section class="settings-pane" data-pane="secretary">
@@ -822,6 +823,33 @@
         </div>
       
         </section>
+
+          <!-- 驗收中心：docs/TODO.md A 段的實機收據現況（唯讀查詢） -->
+          <section class="settings-pane" data-pane="acceptance">
+        <div class="panel mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent">01</span>
+            <span class="panel-title" data-i18n="acceptance_p1_title">實機收據總覽與發佈收斂條件</span>
+            <span id="acceptance-summary-badge" class="trust">—</span>
+            <button id="btn-refresh-acceptance" class="btn btn-ghost btn-sm head-right" data-i18n="btn_refresh_acceptance">重新檢查</button>
+          </div>
+          <div class="trust-note" data-i18n="acceptance_intro">這裡只讀本機已經存在的收據：SQLite 紀錄、設定值與檔案是否存在。它不會替你執行任何驗收動作，也不跑 git、不連網、不載入索引。「已取得收據」代表找到了符合判準的證據，不代表功能在所有情境下都正確。</div>
+          <div id="acceptance-gates" class="acceptance-gates">
+            <div class="placeholder" data-i18n="acceptance_loading">正在檢查本機收據…</div>
+          </div>
+        </div>
+
+        <div class="panel mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent">02</span>
+            <span class="panel-title" data-i18n="acceptance_p2_title">逐項收據（docs/TODO.md A 段）</span>
+            <span id="acceptance-generated-at" class="mono-mini muted head-right"></span>
+          </div>
+          <div id="acceptance-items">
+            <div class="placeholder" data-i18n="acceptance_loading">正在檢查本機收據…</div>
+          </div>
+        </div>
+          </section>
           </div>
         </div>
       </section>

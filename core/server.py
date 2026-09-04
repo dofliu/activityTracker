@@ -848,6 +848,45 @@ def get_system_health():
     }
 
 
+class AcceptanceConfirmRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    item_id: str = Field(max_length=8)
+    confirmed: bool = True
+    note: str = Field("", max_length=500)
+
+
+@app.get("/api/v1/acceptance/checklist")
+def get_acceptance_checklist(item: Optional[str] = Query(None, max_length=100)):
+    """驗收中心：docs/TODO.md A 段每一項的本機收據現況。
+
+    唯讀且刻意便宜——只查 SQLite、設定與檔案是否存在，不跑 git、不連網、
+    不載入索引。runtime=True 因為這裡就是服務程序，檢索 worker 這類
+    記憶體狀態只有在這個程序內才看得到。
+    """
+    from core.acceptance import build_acceptance_report
+
+    only = [part.strip() for part in item.split(",") if part.strip()] if item else None
+    return build_acceptance_report(runtime=True, only=only)
+
+
+@app.post("/api/v1/acceptance/confirm")
+def confirm_acceptance_item(payload: AcceptanceConfirmRequest):
+    """記下「我親眼確認過這一項」。
+
+    這是人工署名收據，不是機器證據：只讓機器沒有判準可查的項目收斂，
+    永遠不會覆蓋機器已查到的結果。沒有外部效果，沿用 loopback 邊界即可。
+    """
+    from core.acceptance import record_human_confirmation
+
+    try:
+        return record_human_confirmation(
+            payload.item_id, confirmed=payload.confirmed, note=payload.note
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="unknown_acceptance_item") from exc
+
+
 class OpenPathRequest(BaseModel):
     path: Optional[str] = None
     action: Optional[str] = "explorer"  # "explorer" | "vscode" | "terminal" | "browser"
