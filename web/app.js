@@ -77,6 +77,10 @@ const I18N = {
     btn_memory_clear_obs: "🧹 清除觀察",
     memory_kind_user_note: "筆記",
     memory_kind_preference: "偏好",
+    memory_profile_priorities: "本期優先",
+    memory_profile_tone: "語氣",
+    memory_profile_hint: "宣告方式：在對話框打「偏好：優先：專案名」或「偏好：語氣：簡潔／直接／溫暖」；刪掉那則偏好就恢復",
+    memory_profile_none: "尚未宣告任何個人檔案（本期優先／語氣）",
     memory_kind_decision: "決定",
     memory_project_ph: "專案（選填）",
     memory_input_ph: "要小秘書記住的事；偏好可寫「不要提醒 <專案或提案類型>」",
@@ -392,9 +396,13 @@ const I18N = {
     btn_memory_clear_obs: "🧹 Clear observations",
     memory_kind_user_note: "Note",
     memory_kind_preference: "Preference",
+    memory_profile_priorities: "Priorities",
+    memory_profile_tone: "Tone",
+    memory_profile_hint: "Declare with “preference: priority: <project>” or “preference: tone: brief / direct / warm”; delete that preference to reset",
+    memory_profile_none: "No profile declared yet (priorities / tone)",
     memory_kind_decision: "Decision",
     memory_project_ph: "Project (optional)",
-    memory_input_ph: "Something the secretary should remember; a preference may say “mute <project or proposal type>”",
+    memory_input_ph: "Something the secretary should remember; a preference may say “mute <project>”, “priority: <project>” or “tone: brief”",
     memory_boundary: "Memory holds only short text you typed plus observations the secretary derives from local read-only receipts (deletable). The context injected into each chat is capped and comes with a receipt. Typing “remember: …” in the chat box writes here too.",
     memory_note_label: "You noted",
     ph_loading_memory: "Loading memory…",
@@ -717,6 +725,7 @@ function applyLanguage(lang) {
   renderRepositorySyncStatus();
   if (relatedContextCache) renderRelatedContext(relatedContextCache);
   if (acceptanceCache) renderAcceptance();
+  if (memoryCache) renderMemoryList();   // 記憶區清單與個人檔案列的字串也要跟著切換
   if ($("llm-key-status-badge")) renderLLMStatus();
 }
 
@@ -1975,6 +1984,7 @@ function initGreetingCard() {
 
 // ---------------------------------------------------------------- ADR-012 小秘書記憶區
 let memoryCache = null;
+let memoryProfileCache = null;
 const MEMORY_COMMANDS = [
   { kind: "user_note", re: /^\s*(?:記下來|記住|筆記|\/note|remember)\s*[:：]?\s*([\s\S]+)$/ },
   { kind: "preference", re: /^\s*(?:偏好|\/pref(?:erence)?)\s*[:：]?\s*([\s\S]+)$/ },
@@ -2031,6 +2041,7 @@ async function loadMemoryPanel() {
   if (!list) return;
   try {
     memoryCache = await getJSON("/api/v1/secretary/memory?limit=60");
+    try { memoryProfileCache = await getJSON("/api/v1/secretary/profile"); } catch (_) { memoryProfileCache = null; }
   } catch (e) {
     memoryCache = null;
     list.innerHTML = `<div class="placeholder">${currentLang === "zh-TW" ? "記憶區暫時讀不到。" : "Memory unavailable."}</div>`;
@@ -2053,13 +2064,21 @@ function renderMemoryList() {
     badge.className = `trust ${memoryCache.total ? "ok" : "noisy"}`;
   }
   if (clearBtn) clearBtn.disabled = !(counts.observation > 0);
+  // ADR-018：偏好筆記裡宣告的「本期優先」「語氣」——只是偏好的一種讀法，不是另一套資料。
+  const prof = memoryProfileCache;
+  const profileStrip = prof && prof.declared
+    ? `<div class="memory-profile" title="${esc(t("memory_profile_hint"))}">
+         ${(prof.priorities || []).length ? `<span class="mono-mini muted">${esc(t("memory_profile_priorities"))}</span> ${prof.priorities.map(p => `<span class="pchip">${esc(p)}</span>`).join(" ")}` : ""}
+         ${prof.tone_declared ? `<span class="mono-mini muted">${esc(t("memory_profile_tone"))}</span> <span class="trust ok">${esc(zh ? prof.tone_label : prof.tone)}</span>` : ""}
+       </div>`
+    : `<div class="memory-profile is-empty mono-mini muted" title="${esc(t("memory_profile_hint"))}">${esc(t("memory_profile_none"))}</div>`;
   if (!notes.length) {
-    list.innerHTML = `<div class="placeholder">${zh
+    list.innerHTML = profileStrip + `<div class="placeholder">${zh
       ? "還沒有任何記憶。上方輸入或在對話框打「記下來：…」；早晨包跑過後秘書也會留下觀察。"
       : "Nothing remembered yet. Use the form above or type “remember: …” in the chat; the morning pack also leaves observations."}</div>`;
     return;
   }
-  list.innerHTML = notes.map(n => {
+  list.innerHTML = profileStrip + notes.map(n => {
     const when = String(n.created_at || "").slice(0, 16).replace("T", " ");
     const proj = n.project_key ? `<span class="pchip">${esc(n.project_key)}</span>` : "";
     const title = n.title ? `<strong>${esc(n.title)}</strong> · ` : "";

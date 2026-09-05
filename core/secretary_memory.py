@@ -468,6 +468,21 @@ def memory_context(
         n for n in notes
         if n["kind"] == "observation" and n.get("created_at") and datetime.fromisoformat(n["created_at"]) >= ttl_cutoff
     ]
+    # ADR-018：偏好筆記裡明確宣告的「優先：」「語氣：」先用一行講清楚，讓秘書答題時知道
+    # 你現在在乎什麼；來源就是下面那些偏好筆記，不另外推斷。
+    try:
+        from core.secretary_profile import parse_profile_directives, profile_summary_line
+
+        summary = profile_summary_line(
+            parse_profile_directives(n["body"] for n in reversed(prefs) if n["kind"] == "preference")
+        )
+    except Exception as exc:  # noqa: BLE001 — 個人檔案解析失敗不該讓脈絡壞掉
+        logger.warning("profile summary unavailable: %s", type(exc).__name__)
+        summary = ""
+    if summary:
+        lines.append(f"個人檔案（你宣告的）：{summary}")
+        receipt["sections"].append("profile")
+
     used = 0
     for heading, bucket in (("偏好與決定：", prefs), ("使用者筆記：", plain), ("秘書觀察（可刪除）：", observations)):
         picked = bucket[: max(0, max_notes - used)]

@@ -739,6 +739,38 @@ def _check_a16(ctx: _Ctx) -> dict[str, Any]:
     }
 
 
+def _check_a17(ctx: _Ctx) -> dict[str, Any]:
+    """宣告式個人檔案（ADR-018）：機器只回報你現在宣告了什麼、加分值多少；「提案排序與問候
+    語氣是否如你所想」是人眼。沒宣告就是 pending——這是你還沒寫，不是壞掉。"""
+    from core.secretary_profile import load_profile, priority_boost_value
+
+    profile = load_profile(database=ctx.database)
+    evidence: dict[str, Any] = {
+        "basis": "secretary_profile.load_profile（只讀 secretary_notes.kind=preference）",
+        "priorities": profile["priorities"],
+        "tone": profile["tone"],
+        "tone_declared": profile["tone_declared"],
+        "ignored_directives": profile["ignored"],
+        "priority_boost": priority_boost_value(ctx.cfg),
+    }
+    if not profile["declared"]:
+        return {
+            "status": PENDING,
+            "detail": "還沒有任何「優先：」或「語氣：」宣告；在對話框打「偏好：優先：<專案>」或「偏好：語氣：簡潔」再看。",
+            "evidence": evidence,
+        }
+    parts = []
+    if profile["priorities"]:
+        parts.append("本期優先：" + "、".join(profile["priorities"]))
+    if profile["tone_declared"]:
+        parts.append(f"語氣：{profile['tone_label']}")
+    return {
+        "status": NEEDS_HUMAN,
+        "detail": "已宣告 " + "／".join(parts) + "；優先專案的提案是否排前面、問候是否只改措辭不改數字，要由你確認。",
+        "evidence": evidence,
+    }
+
+
 # ---- 項目清單 -------------------------------------------------------------
 
 _ITEMS: tuple[dict[str, Any], ...] = (
@@ -885,6 +917,15 @@ _ITEMS: tuple[dict[str, Any], ...] = (
         "how": "連續使用幾天後看 01 的秘書提案：沒有每日排程／被冷落的專案／主線加權",
         "criterion": "提案裡的天數與專案符合你的印象；建好排程後 no_daily_routine 消失（人眼確認）",
         "probe": _check_a16,
+    },
+    {
+        "id": "A17",
+        "title": "宣告式個人檔案實機收據",
+        "priority": "P1",
+        "blocks_release": False,
+        "how": "打「偏好：優先：<專案>」「偏好：語氣：簡潔」→ 看 01 提案排序、問候卡與記憶區頂端的個人檔案列",
+        "criterion": "優先專案的提案排前面並附理由；問候只少鼓勵語、標題與數字不變；刪掉筆記就恢復（人眼確認）",
+        "probe": _check_a17,
     },
 )
 
