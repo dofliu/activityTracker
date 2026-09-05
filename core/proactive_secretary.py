@@ -44,6 +44,9 @@ SUGGESTED_ACTIONS = {
     "repo_needs_pull": "確認沒有未保存的工作後批准 fast-forward pull；或先 Fetch 看看遠端是否又有新變更。",
     "repo_needs_push": "到同步中心確認這些 commit 該發佈後再 Push（不會 force）。",
     "repo_diverged": "本機與遠端各有新 commit；在 Git/IDE 手動 merge 或 rebase，系統不會代為處理。",
+    # ADR-017 模式感知：對應的都是既有 template，這裡只講該做的判斷。
+    "no_daily_routine": "在「01 小秘書 → 今日行動清單」按「📦 建立每日排程」（需 execution token）；之後每天早上會有早晨包與工作誌，記憶區才會累積。",
+    "neglected_active_project": "看一眼 Context Handoff 決定要接續還是明確放下；不決定的話脈絡會繼續流失。",
 }
 
 
@@ -74,6 +77,10 @@ def why_now(signal_type: str, age_days: float, extra: dict[str, Any] | None = No
         return "本機 commit 尚未備份到遠端，其他機器與 CI 都看不到"
     if signal_type == "repo_diverged":
         return "本機與遠端各自前進，越久越難合"
+    if signal_type == "no_daily_routine":
+        return "秘書只記得它跑過的日子；越早建立排程，記憶區越早有底"
+    if signal_type == "neglected_active_project":
+        return f"上週還很活躍、這週歸零；再放 {int(days)} 天就得重讀脈絡"
     return ""
 
 
@@ -171,11 +178,14 @@ def _signal_to_proposal(signal: dict[str, Any], now: datetime) -> dict[str, Any]
     # 未結事項只帶 source_ref，不帶標題：標題可能含使用者的原始提問內容。
     for ref in signal.get("open_loop_refs", []):
         evidence.append(_evidence(ref, "open_loop", signal.get("observed_at")))
+    # ADR-017：模式提案把已寫進記憶區的工作誌當旁證附上（有才附，沒有不編）。
+    for extra in signal.get("evidence_extra", []) or []:
+        evidence.append(_evidence(extra["source_ref"], extra.get("kind", "memory"), extra.get("observed_at")))
 
     evidence_refs = [item["source_ref"] for item in evidence]
     score = float(signal["score"])
 
-    return {
+    proposal = {
         "proposal_id": _proposal_id(
             signal["signal_type"], signal["project_key"], evidence_refs
         ),
@@ -197,6 +207,9 @@ def _signal_to_proposal(signal: dict[str, Any], now: datetime) -> dict[str, Any]
         "evidence": evidence,
         "score": round(score, 3),
     }
+    if signal.get("habit_boosted"):
+        proposal["habit_boosted"] = True
+    return proposal
 
 
 def build_action_proposals(
@@ -301,6 +314,24 @@ def build_action_proposals(
     counters["repo_sync_snapshot"] = repo_snapshot_meta
     signals = signals + repo_signals
 
+    # ADR-017 模式感知：只用（專案 × 日）活動計數、只算已結束的日子。
+    # (a) 新訊號：沒有每日例行、被冷落的專案；(b) 排序：主線專案的既有訊號加權。
+    pattern_meta: dict[str, Any] = {"used": False}
+    try:
+        from .activity_patterns import apply_habit_boost, collect_pattern_signals
+
+        loop_projects = {str(item["project_key"]) for item in loop_signals}
+        pattern_signals, pattern_meta = collect_pattern_signals(
+            database=database, cfg=cfg, now=now, exclude_projects=loop_projects
+        )
+        pattern_meta["habit_boosted"] = apply_habit_boost(
+            signals, cfg=cfg, recent_active=pattern_meta.get("recent_active_by_project", {})
+        )
+        signals = signals + pattern_signals
+    except Exception as exc:  # noqa: BLE001 — 模式層故障不得拖垮提案清單
+        pattern_meta = {"used": False, "reason": f"error:{type(exc).__name__}"}
+    counters["patterns"] = pattern_meta
+
     # 記憶區（ADR-012）：偏好筆記裡的「不要提醒 X」壓掉提案；決定／筆記附在同專案的提案卡上。
     mutes: set[str] = set()
     memory_lines: dict[str, list[str]] = {}
@@ -359,6 +390,7 @@ def build_action_proposals(
             "memory_muted": counters.get("memory_muted", 0),
             "repo_issue_backlog": counters.get("repo_issue_backlog", {}),
             "repo_sync_snapshot": counters.get("repo_sync_snapshot", {}),
+            "patterns": counters.get("patterns", {}),
             "max_per_project": max_per_project,
             "stalled_open_loop_hours": stalled_hours,
             "unfinished_recent_min_idle_hours": recent_idle_hours,

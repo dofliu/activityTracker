@@ -213,6 +213,9 @@ def _matching_repo(project_key: str, references: list[Any]):
 
 
 _REPO_SYNC_TYPES = {"repo_needs_pull", "repo_needs_push"}
+# 這些提案沒有「專案」可產 Handoff：extension 是系統本身；no_daily_routine 的
+# project_key 只是佔位（ADR-017）。
+_NO_HANDOFF_TYPES = {"verify_extension_heartbeat", "no_daily_routine"}
 
 
 def _repo_id_from_subject(proposal: dict[str, Any]) -> str | None:
@@ -308,7 +311,9 @@ def derive_action(
                 ),
             )
 
-    if project_key and proposal_type != "verify_extension_heartbeat":
+    # ADR-017：no_daily_routine 的 project_key 只是「OmniContext」這個佔位，為它產
+    # Handoff 沒有意義；其餘帶專案的提案（含 neglected_active_project）都給 L0 Handoff。
+    if project_key and proposal_type not in _NO_HANDOFF_TYPES:
         return ActionPlan(
             template_id="generate_handoff",
             risk_level=RISK_L0,

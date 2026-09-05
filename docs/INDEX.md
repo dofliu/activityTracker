@@ -57,6 +57,7 @@
 | [ADR-014](ADR-014-multi-channel-push-and-arm-code.md) | 多通道推播（LINE）與一次性解鎖碼 | 內容與呈現分離、adapter 能力宣告、LINE 只能推播的原因、/arm 改用短效碼 |
 | [ADR-015](ADR-015-local-calendar-source.md) | 本機行事曆採集來源（.ics，唯讀） | 「能否改變決策」檢驗、只讀時間／標題／地點／狀態、整批替換與壞檔隔離、不接雲端 API |
 | [ADR-016](ADR-016-acceptance-center.md) | 驗收中心（完成判準機器化） | 只讀便宜查詢、狀態字彙分「沒發生／查不到」、人工署名永不覆蓋機器判定、gate 對齊 ROADMAP §12.3 |
+| [ADR-017](ADR-017-pattern-aware-proposals.md) | 模式感知提案（秘書用它記得的東西） | （專案 × 日）活動矩陣、只算已結束的日子、沒有每日排程／被冷落的專案／主線加權、不新增可執行動作 |
 
 ## 功能規格與驗證
 
