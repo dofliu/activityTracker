@@ -13,7 +13,7 @@
 | 版本 | v1.3.0a5 已發佈為 GitHub pre-release（release workflow 自動 build → verify → release，SHA-256 receipt 交叉驗證）。`release_ready: false`，唯一**能力型**缺口是全天 coverage ledger 實測（TODO A1）。 |
 | 還缺什麼 | 別憑記憶：跑 `python main.py verify`（或看「06 系統設定 → 驗收中心」）就會列出 A1–A13 每一項現在有沒有收據，以及 ROADMAP §12.3 四個 gate 缺什麼。 |
 | Schema | migration **18/18**（append-only + checksum；**新表一律進 registry，不得靠 `create_all` 繞過**）。017 = `secretary_notes`、018 = `calendar_events`。 |
-| 測試 | **55 個 contract test 模組、480 項**（479 passed + 1 skipped）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
+| 測試 | **55 個 contract test 模組、481 項**（480 passed + 1 skipped）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
 | 導覽 | 6 分頁：01 小秘書（三欄）／02 知識庫／03 進行中工作／04 Git 同步中心／05 摘要與統計／06 系統設定（左欄 11 區塊，末項為**驗收中心**）。桌面與 494px 皆無水平溢出（Playwright 實測）。 |
 | 外觀 | 兩個獨立軸：`data-theme`（dark/light）× `data-accent`（naruto/forest/ocean），CSS 全走 `var(--accent)`；新配色只需加一組變數區塊。偏好存 localStorage（`omni-theme`／`omni-palette`／`omni-settings-pane`）。 |
 | 危險能力 | 執行器、L2、L2 寫入、自訂排程、Telegram 對話、`allow_remote_arm`、LINE、問候卡 LLM 潤飾——**全部預設關閉**；行事曆預設開但沒設路徑就等於停用。 |
@@ -54,6 +54,7 @@
 - **「clean worktree」不等於「沒有 untracked 檔案」**：pull/push 的門檻只看**已追蹤**檔案的未提交變更；把 untracked 算進去會讓幾乎每個真實專案（有 `.lock`、`build/`）永遠不能 pull，而且沒有多保護到任何東西——Git 自己對「untracked 會被覆蓋」已 fail-closed（ADR-011 Addendum C）。
 - **不要用人類可讀訊息的關鍵字做分類**：批次結果曾靠比對「前置」「僅限」等字串決定 skipped/failed，文案一改就壞。用 `RepositorySyncRejected(kind=...)` 這種機器可讀欄位。
 - **灰掉的按鈕要說為什麼**：同一句放諸四海的條件敘述等於沒說。理由要帶這個 repo 的實際數字，並直接顯示在列上，不要只放 tooltip。
+- **「今天的比例」不是「全天的比例」**：`get_daily_coverage` 對當天的分母是已過的時間，早上跑三小時就能顯示 97%。任何宣稱「全天／完整期間」的判定都只能採計**已結束**的日子（2026-09-05 驗收中心 A1 就是這樣出現假綠燈的）。
 - **記憶體狀態不能在 CLI 假裝查得到**：檢索 worker 的 `state`／預熱計數只存在主服務程序，另開一個 Python 程序永遠是 cold。驗收中心為此有 `runtime_only` 這一格——把它報成「還沒做」等於說謊。新增任何「查現況」功能時先問：這個數字在哪個程序裡？
 
 ## 待辦與下一步

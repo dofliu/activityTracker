@@ -27,7 +27,7 @@
 
 | # | 項目 | 怎麼做 | 完成判準（收據） | 優先 |
 | :-- | :--- | :--- | :--- | :--- |
-| A1 | **全天 coverage ledger** | 讓 Windows 實機跨午夜連續運行一整天 | 儀表板 coverage 轉 `OBSERVED`，或隔日 `GET /api/v1/usage/coverage?date=YYYY-MM-DD` 回 `meets_full_coverage: true`；取得後更新 STATUS 的 `continuous_coverage_ledger` gate 與 `known_blockers` | 🔴 P0 |
+| A1 | **全天 coverage ledger** | 讓 Windows 實機跨午夜連續運行一整天 | **隔日**查前一天：`GET /api/v1/usage/coverage?date=YYYY-MM-DD` 回 `meets_full_coverage: true`。⚠️ **當天的比例不算數**——該端點對今天的分母是「今天到目前為止經過的時間」，所以早上跑三小時就可能顯示 97%；那是「今天到現在覆蓋良好」（儀表板的 `OBSERVED` 就是這個意思，沒有錯），不是「全天」。驗收中心只採計**已結束的日子**。取得後更新 STATUS 的 `continuous_coverage_ledger` gate 與 `known_blockers` | 🔴 P0 |
 | A2 | **RAG 雲端 provider 複測** | pull 最新版後，在小秘書分頁選 Gemini（或 OpenAI／Claude）問一題 | 能得到真實回答；若失敗，錯誤訊息會明確指出是金鑰、網路或逾時——把訊息回報即可續查 | 🔴 P0 |
 | A3 | **Telegram 設定 + inline 批准** | 「設定 → Telegram 通知」走完設定流程 → 開「inline 批准」→ 按「🔓 解鎖遠端批准」→ 等晨報或傳 `/proposals` → 實批一次 L1 動作 | `GET /api/v1/secretary/executions` 出現一筆 `approved_via=telegram_inline` 的 receipt | 🟡 P1 |
 | A4 | **L2 執行器實機試用** | 開三個執行器開關 + `python main.py init --show-token`，實跑 draft →（可選）confirm → apply | 拿到 `agent_draft_plan` 的 succeeded receipt；若試 apply，確認改動留在 worktree 且未被 commit | 🟡 P1 |

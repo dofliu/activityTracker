@@ -171,15 +171,38 @@ def test_module_never_shells_out_or_goes_online():
 def test_a1_pending_without_any_interval(db, cfg):
     item = _item(_report(db, cfg), "A1")
     assert item["status"] == PENDING
-    assert item["evidence"]["days_with_ledger"] == 0
+    assert item["evidence"]["completed_days_with_ledger"] == 0
     assert item["blocks_release"] is True
 
 
 def test_a1_passes_on_a_full_day_ledger(db, cfg):
-    _full_day_ledger(db)
+    _full_day_ledger(db)                      # 昨天整天（已結束的一天）
     item = _item(_report(db, cfg), "A1")
     assert item["status"] == PASSED
-    assert any(day["meets_full_coverage"] for day in item["evidence"]["days"])
+    assert item["evidence"]["best_completed_day"]["meets_full_coverage"] is True
+
+
+def test_a1_never_passes_on_todays_partial_day(db, cfg):
+    """使用者實機回報 97.12% 通過，但那是「今天到現在」的比例——不是全天。
+
+    get_daily_coverage 對當天的分母只到現在，所以早上跑幾小時就能到 97%。
+    A1 的判準是跨午夜的完整一天，今天永遠只能當進度。
+    """
+    morning = datetime(2026, 9, 5, 3, 0)          # 今天才過了 3 小時
+    start = datetime.combine(morning.date(), datetime.min.time())
+    _add(db, CoverageLedgerInterval(
+        collector="window_watcher", started_at=start,
+        last_heartbeat_at=start + timedelta(hours=2, minutes=55),
+        heartbeat_count=35,
+    ))
+    report = build_acceptance_report(database=db, cfg=cfg, now=morning)
+    item = _item(report, "A1")
+
+    assert item["status"] == PENDING
+    assert item["evidence"]["today_partial"]["coverage_ratio"] > 0.95   # 今天確實很高
+    assert item["evidence"]["completed_days_with_ledger"] == 0          # 但沒有任何完整日
+    assert "不算全天" in item["detail"]
+    assert "A1" in report["summary"]["blocking_release"]
 
 
 def test_a1_reports_the_best_day_when_below_threshold(db, cfg):
@@ -193,8 +216,8 @@ def test_a1_reports_the_best_day_when_below_threshold(db, cfg):
     ))
     item = _item(_report(db, cfg), "A1")
     assert item["status"] == PENDING
-    assert item["evidence"]["best_day"]["coverage_ratio"] == pytest.approx(0.25, abs=0.01)
-    assert item["evidence"]["days_with_ledger"] == 1
+    assert item["evidence"]["best_completed_day"]["coverage_ratio"] == pytest.approx(0.25, abs=0.01)
+    assert item["evidence"]["completed_days_with_ledger"] == 1
 
 
 # ---- A2 雲端 provider ----

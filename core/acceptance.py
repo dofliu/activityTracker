@@ -140,6 +140,13 @@ def _latest_files(directory: Path, pattern: str, limit: int = 3) -> dict[str, An
 
 
 def _check_a1(ctx: _Ctx) -> dict[str, Any]:
+    """A1 的判準是「跨午夜連續運行**一整天**」，所以只有**已結束的日子**能算數。
+
+    ``get_daily_coverage`` 對當天的分母是「今天到目前為止經過的時間」，不是 24
+    小時——早上 03:00 觀測了 2.9 小時就會是 97%。拿那個當「全天 coverage」通過，
+    正是本專案最該拒絕的假綠燈（TODO A1 也明寫收據要**隔日**查）。今天只當作
+    進度顯示，永遠不能讓 A1 變綠。
+    """
     days: list[dict[str, Any]] = []
     threshold = 0.0
     for offset in range(COVERAGE_LOOKBACK_DAYS):
@@ -154,37 +161,55 @@ def _check_a1(ctx: _Ctx) -> dict[str, Any]:
                 "coverage_ratio": coverage["coverage_ratio"],
                 "meets_full_coverage": coverage["meets_full_coverage"],
                 "observed_seconds": coverage["observed_seconds"],
+                "elapsed_seconds": coverage["elapsed_seconds"],
                 "interval_count": coverage["interval_count"],
                 "ledger_available": coverage["ledger_available"],
+                # 當天還沒過完：分母只到現在，因此不是「全天」的證據。
+                "complete_day": offset > 0,
             }
         )
 
-    met = [d for d in days if d["meets_full_coverage"]]
-    observed = [d for d in days if d["ledger_available"]]
-    best = max(days, key=lambda d: d["coverage_ratio"]) if days else None
+    completed = [d for d in days if d["complete_day"]]
+    today_row = next((d for d in days if not d["complete_day"]), None)
+    met = [d for d in completed if d["meets_full_coverage"]]
+    observed = [d for d in completed if d["ledger_available"]]
+    best = max(completed, key=lambda d: d["coverage_ratio"]) if completed else None
     evidence = {
         "days": days,
         "threshold": threshold,
-        "best_day": best,
-        "days_with_ledger": len(observed),
+        "best_completed_day": best,
+        "completed_days_with_ledger": len(observed),
+        "today_partial": today_row,
+        "basis": "only_completed_days_count_today_denominator_is_elapsed_so_far",
     }
+    today_note = ""
+    if today_row and today_row["coverage_ratio"] > 0:
+        hours = today_row["elapsed_seconds"] / 3600
+        today_note = (
+            f"（今天目前 {today_row['coverage_ratio']:.1%}，但只涵蓋已過的 {hours:.1f} 小時，"
+            "不算全天；等跨過午夜再看這一項）"
+        )
+
     if met:
         return {
             "status": PASSED,
-            "detail": f"{met[0]['date']} 的 ledger coverage 達門檻（{met[0]['coverage_ratio']:.2%}）。",
+            "detail": f"{met[0]['date']}（完整的一天）ledger coverage 達門檻（{met[0]['coverage_ratio']:.2%}）。",
             "evidence": evidence,
         }
     if not observed:
         return {
             "status": PENDING,
-            "detail": "近 8 天沒有任何 coverage interval——服務尚未在這台機器連續運行過。",
+            "detail": (
+                "近 7 個完整日沒有任何 coverage interval——服務還沒在這台機器跨午夜連續運行過。"
+                + today_note
+            ),
             "evidence": evidence,
         }
     return {
         "status": PENDING,
         "detail": (
-            f"最好的一天是 {best['date']}（{best['coverage_ratio']:.2%}），"
-            f"還沒達到 {evidence['threshold']:.0%} 門檻。"
+            f"最好的完整日是 {best['date']}（{best['coverage_ratio']:.2%}），"
+            f"還沒達到 {threshold:.0%} 門檻。" + today_note
         ),
         "evidence": evidence,
     }
@@ -686,7 +711,7 @@ _ITEMS: tuple[dict[str, Any], ...] = (
         "priority": "P0",
         "blocks_release": True,
         "how": "讓實機跨午夜連續運行一整天",
-        "criterion": "任一天的 ledger coverage 達門檻（meets_full_coverage: true）",
+        "criterion": "任一**已結束**的日子 ledger coverage 達門檻（今天的比例不算，分母只到現在）",
         "probe": _check_a1,
     },
     {
