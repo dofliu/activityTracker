@@ -771,6 +771,48 @@ def _check_a17(ctx: _Ctx) -> dict[str, Any]:
     }
 
 
+# ---- A18 秘書桌面 ---------------------------------------------------------
+
+
+def _check_a18(ctx: _Ctx) -> dict[str, Any]:
+    """01 首頁（ADR-019）：機器只能回報桌面現在挑出什麼、哪一節壞了；「焦點與記得是不是你會挑的、
+    一天離開首頁幾次有沒有變少」是人眼——次數只在你的瀏覽器裡。"""
+    from core.secretary_home import build_home
+
+    home = build_home(database=ctx.database, cfg=ctx.cfg, now=ctx.now)
+    focus = (home.get("focus") or {}).get("proposal") or {}
+    pick = home.get("memory_pick") or {}
+    sections = home.get("sections") or {}
+    errors = {k: v for k, v in sections.items() if str(v).startswith("error")}
+    evidence: dict[str, Any] = {
+        "basis": "secretary_home.build_home（唯讀重排既有資料）",
+        "sections": sections,
+        "focus": {"type": focus.get("proposal_type"), "project": focus.get("project_key"), "title": focus.get("title")} if focus else None,
+        "memory_pick_rule": pick.get("rule"),
+        "details": home.get("details") or {},
+    }
+    if errors:
+        return {
+            "status": PARTIAL,
+            "detail": "桌面有一節讀不到：" + "、".join(f"{k}={v}" for k, v in errors.items()) + "；其他節照出。",
+            "evidence": evidence,
+        }
+    if not focus and not pick.get("note"):
+        return {
+            "status": PENDING,
+            "detail": "桌面還沒有東西可挑（沒有提案、也沒有筆記）；用幾天、記幾則再看。",
+            "evidence": evidence,
+        }
+    return {
+        "status": NEEDS_HUMAN,
+        "detail": (
+            f"桌面挑出焦點「{focus.get('title')}」" if focus else "桌面目前沒有焦點提案"
+        ) + (f"、記得一則（{pick.get('why_this')}）" if pick.get("note") else "、沒有可挑的記憶")
+        + "；是不是你會挑的、以及一天離開首頁幾次，要由你確認。",
+        "evidence": evidence,
+    }
+
+
 # ---- 項目清單 -------------------------------------------------------------
 
 _ITEMS: tuple[dict[str, Any], ...] = (
@@ -926,6 +968,15 @@ _ITEMS: tuple[dict[str, Any], ...] = (
         "how": "打「偏好：優先：<專案>」「偏好：語氣：簡潔」→ 看 01 提案排序、問候卡與記憶區頂端的個人檔案列",
         "criterion": "優先專案的提案排前面並附理由；問候只少鼓勵語、標題與數字不變；刪掉筆記就恢復（人眼確認）",
         "probe": _check_a17,
+    },
+    {
+        "id": "A18",
+        "title": "秘書桌面（01 首頁）實機收據",
+        "priority": "P1",
+        "blocks_release": False,
+        "how": "用 01 幾天：看桌面的焦點與「記得」、按詳情 chip 展開或跳分頁、看底下「今天離開首頁 N 次」",
+        "criterion": "焦點與記得是你會挑的；離開首頁的次數幾天後變少；詳情面板展開狀態會記住（人眼確認）",
+        "probe": _check_a18,
     },
 )
 
