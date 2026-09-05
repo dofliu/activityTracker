@@ -30,6 +30,7 @@ let focusCarouselTimer = null;
 let focusCarouselUserPaused = false;
 let focusCarouselPointerPaused = false;
 let repositorySyncCache = [];
+let acceptanceCache = null;
 
 const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t == null ? "" : t)
@@ -96,6 +97,29 @@ const I18N = {
     snav_group_ops: "維運",
     snav_feed: "📡 即時情報流",
     snav_health: "🛡️ 系統健康",
+    snav_acceptance: "🧾 驗收中心",
+    acceptance_p1_title: "實機收據總覽與發佈收斂條件",
+    acceptance_p2_title: "逐項收據（docs/TODO.md A 段）",
+    acceptance_loading: "正在檢查本機收據…",
+    acceptance_intro: "這裡只讀本機已經存在的收據：SQLite 紀錄、設定值與檔案是否存在。它不會替你執行任何驗收動作，也不跑 git、不連網、不載入索引。「已取得收據」代表找到了符合判準的證據，不代表功能在所有情境下都正確。",
+    btn_refresh_acceptance: "重新檢查",
+    acceptance_st_passed: "已取得收據",
+    acceptance_st_attested: "已人工確認",
+    acceptance_st_partial: "部分收據",
+    acceptance_st_pending: "尚未取得",
+    acceptance_st_needs_human: "待你親眼確認",
+    acceptance_st_not_configured: "未啟用",
+    acceptance_st_runtime_only: "服務程序內才看得到",
+    acceptance_how: "怎麼做",
+    acceptance_criterion: "完成判準",
+    acceptance_evidence: "查到的證據",
+    acceptance_confirm_btn: "🖊 我親眼確認過",
+    acceptance_unconfirm_btn: "↩ 取消確認",
+    acceptance_confirm_ask: "這會記下一筆「人工署名確認」，與機器找到的證據分開記帳，且不會覆蓋機器判定。確定嗎？",
+    acceptance_attested_by_you: "由你確認於",
+    acceptance_blocking: "仍擋 release_ready",
+    acceptance_gates_title: "release gates（ROADMAP §12.3）",
+    acceptance_outstanding: "待辦",
     settings_nav_hint: "左側選擇要檢視的區塊；「儲存並套用」只影響設定類區塊。",
     rag_merged_title: "知識庫與 RAG（完整對話、引用與索引管理）",
     rag_merged_note: "與 01 小秘書交辦框共用同一條對話與歷史",
@@ -388,6 +412,29 @@ const I18N = {
     snav_group_ops: "Operations",
     snav_feed: "📡 Live Feed",
     snav_health: "🛡️ System Health",
+    snav_acceptance: "🧾 Acceptance",
+    acceptance_p1_title: "Live receipts and release convergence",
+    acceptance_p2_title: "Item by item (docs/TODO.md section A)",
+    acceptance_loading: "Checking local receipts…",
+    acceptance_intro: "This only reads receipts that already exist on this machine: SQLite rows, config values, and whether files are there. It runs no acceptance step for you, and it never shells out to git, goes online, or loads an index. \"Receipt found\" means matching evidence exists — not that the feature is correct in every situation.",
+    btn_refresh_acceptance: "Re-check",
+    acceptance_st_passed: "Receipt found",
+    acceptance_st_attested: "Attested by you",
+    acceptance_st_partial: "Partial receipt",
+    acceptance_st_pending: "Not yet",
+    acceptance_st_needs_human: "Needs your eyes",
+    acceptance_st_not_configured: "Not enabled",
+    acceptance_st_runtime_only: "Visible only in the running service",
+    acceptance_how: "How",
+    acceptance_criterion: "Done when",
+    acceptance_evidence: "Evidence found",
+    acceptance_confirm_btn: "🖊 I checked this myself",
+    acceptance_unconfirm_btn: "↩ Undo confirmation",
+    acceptance_confirm_ask: "This records a human-signed confirmation, kept separate from machine evidence and never overriding a machine verdict. Continue?",
+    acceptance_attested_by_you: "Confirmed by you at",
+    acceptance_blocking: "still blocks release_ready",
+    acceptance_gates_title: "Release gates (ROADMAP §12.3)",
+    acceptance_outstanding: "Outstanding",
     settings_nav_hint: "Pick a section on the left; “Save & Apply” only affects configuration sections.",
     rag_merged_title: "Knowledge & RAG (full conversation, citations, index management)",
     rag_merged_note: "Shares the same conversation and history as the 01 Assistant chat box",
@@ -669,6 +716,7 @@ function applyLanguage(lang) {
   renderSecretaryProposals();
   renderRepositorySyncStatus();
   if (relatedContextCache) renderRelatedContext(relatedContextCache);
+  if (acceptanceCache) renderAcceptance();
   if ($("llm-key-status-badge")) renderLLMStatus();
 }
 
@@ -845,6 +893,7 @@ function activateSettingsPane(key) {
   if (bar) bar.hidden = !SETTINGS_CONFIG_PANES.has(key);
   if (key === "feed") { refreshStatus(); refreshFeed(); }
   if (key === "health") loadSystemHealth();
+  if (key === "acceptance") loadAcceptance();
 }
 
 function initSettingsNav() {
@@ -875,6 +924,8 @@ function initControls() {
   $("btn-quick-summary").addEventListener("click", () => generateSummary(null));
   $("btn-refresh-projects").addEventListener("click", () => loadProjects(true));
   $("btn-refresh-usage").addEventListener("click", loadUsagePanels);
+  const acceptanceBtn = $("btn-refresh-acceptance");
+  if (acceptanceBtn) acceptanceBtn.addEventListener("click", loadAcceptance);
   const presetBtn = $("btn-create-presets");
   if (presetBtn) presetBtn.addEventListener("click", createSchedulePresets);
   $("btn-refresh-proposals").addEventListener("click", loadSecretaryProposals);
@@ -5182,6 +5233,120 @@ function appendSystemConsole(title, data) {
     con.textContent = (con.textContent + "\n" + block).trim();
   }
   if (con.parentElement) con.parentElement.scrollTop = con.parentElement.scrollHeight;
+}
+
+// ---------------------------------------------------------------- 驗收中心
+// 只呈現後端查到的收據；狀態字彙與 core/acceptance.py 一一對應，前端不自己判斷通過與否。
+const ACCEPTANCE_STATUS_META = {
+  passed:         { icon: "✅", trust: "ok" },
+  attested:       { icon: "🖊", trust: "ok" },
+  partial:        { icon: "🟡", trust: "noisy" },
+  pending:        { icon: "⬜", trust: "" },
+  needs_human:    { icon: "👤", trust: "noisy" },
+  not_configured: { icon: "➖", trust: "" },
+  runtime_only:   { icon: "🌐", trust: "" }
+};
+
+function acceptanceStatusLabel(status) {
+  return t("acceptance_st_" + status) || status;
+}
+
+async function loadAcceptance() {
+  try {
+    acceptanceCache = await getJSON("/api/v1/acceptance/checklist");
+    renderAcceptance();
+  } catch (e) {
+    console.error("loadAcceptance error:", e);
+    const box = $("acceptance-items");
+    if (box) box.innerHTML = `<div class="placeholder">${currentLang === "zh-TW" ? "無法讀取驗收現況。" : "Acceptance status is unavailable."}</div>`;
+  }
+}
+
+function renderAcceptance() {
+  const data = acceptanceCache;
+  if (!data) return;
+  const zh = currentLang === "zh-TW";
+  const summary = data.summary || {};
+  const settled = (summary.passed || 0) + (summary.attested || 0);
+
+  const badge = $("acceptance-summary-badge");
+  if (badge) {
+    const blocking = (summary.blocking_release || []).length;
+    badge.className = "trust " + (blocking ? "broken" : settled === summary.total ? "ok" : "noisy");
+    badge.textContent = `${settled}/${summary.total || 0}`;
+  }
+  const stamp = $("acceptance-generated-at");
+  if (stamp) stamp.textContent = data.generated_at ? `${data.generated_at} · ${data.mode}` : "";
+
+  const gatesBox = $("acceptance-gates");
+  if (gatesBox) {
+    const blocking = summary.blocking_release || [];
+    const banner = blocking.length
+      ? `<div class="acceptance-banner broken">🔴 ${esc(blocking.join("、"))} ${esc(t("acceptance_blocking"))}</div>`
+      : "";
+    const gates = (data.release_gates || []).map(gate => {
+      const meta = ACCEPTANCE_STATUS_META[gate.status] || { icon: "•", trust: "" };
+      const pendingItems = gate.outstanding || [];
+      const shown = pendingItems.slice(0, 4).join("、") + (pendingItems.length > 4 ? ` … (${pendingItems.length})` : "");
+      return `<div class="acceptance-gate">
+        <div class="acceptance-gate-head">
+          <span class="acceptance-icon">${meta.icon}</span>
+          <span class="mono-mini muted">${esc(gate.id)}</span>
+          <span class="acceptance-gate-text">${esc(gate.text)}</span>
+        </div>
+        ${pendingItems.length ? `<div class="acceptance-gate-pending mono-mini muted">${esc(t("acceptance_outstanding"))}：${esc(shown)}</div>` : ""}
+      </div>`;
+    }).join("");
+    gatesBox.innerHTML = banner + `<div class="acceptance-gates-title mono-mini muted">${esc(t("acceptance_gates_title"))}</div>` + (gates || `<div class="placeholder">${zh ? "只查了部分項目，gate 需要完整清單。" : "Partial run — gates need the full checklist."}</div>`);
+  }
+
+  const box = $("acceptance-items");
+  if (!box) return;
+  box.innerHTML = (data.items || []).map(item => {
+    const meta = ACCEPTANCE_STATUS_META[item.status] || { icon: "•", trust: "" };
+    const flag = item.blocks_release && item.status !== "passed" && item.status !== "attested"
+      ? `<span class="trust broken">P0</span>` : "";
+    const attestable = item.status === "needs_human" || item.status === "attested";
+    const attested = item.status === "attested";
+    const button = attestable
+      ? `<button class="btn btn-ghost btn-sm acceptance-confirm" data-item="${esc(item.id)}" data-confirmed="${attested ? "1" : "0"}">${esc(t(attested ? "acceptance_unconfirm_btn" : "acceptance_confirm_btn"))}</button>`
+      : "";
+    const attestation = item.attestation
+      ? `<div class="acceptance-attestation mono-mini">🖊 ${esc(t("acceptance_attested_by_you"))} ${esc(item.attestation.confirmed_at)}${item.attestation.note ? " · " + esc(item.attestation.note) : ""}</div>`
+      : "";
+    return `<div class="acceptance-row">
+      <div class="acceptance-row-head">
+        <span class="acceptance-icon">${meta.icon}</span>
+        <span class="mono-mini muted">${esc(item.id)}</span>
+        <span class="acceptance-title">${esc(item.title)}</span>
+        <span class="trust ${meta.trust}">${esc(acceptanceStatusLabel(item.status))}</span>
+        ${flag}
+        <span class="head-right">${button}</span>
+      </div>
+      <div class="acceptance-detail">${esc(item.detail)}</div>
+      <div class="acceptance-meta mono-mini muted">${esc(t("acceptance_how"))}：${esc(item.how)}</div>
+      <div class="acceptance-meta mono-mini muted">${esc(t("acceptance_criterion"))}：${esc(item.criterion)}</div>
+      ${attestation}
+      <details class="acceptance-evidence">
+        <summary class="mono-mini muted">${esc(t("acceptance_evidence"))}</summary>
+        <pre>${esc(JSON.stringify(item.evidence || {}, null, 2))}</pre>
+      </details>
+    </div>`;
+  }).join("") || `<div class="placeholder">${zh ? "沒有項目。" : "No items."}</div>`;
+
+  box.querySelectorAll(".acceptance-confirm").forEach(btn => {
+    btn.addEventListener("click", () => confirmAcceptanceItem(btn.dataset.item, btn.dataset.confirmed !== "1"));
+  });
+}
+
+async function confirmAcceptanceItem(itemId, confirmed) {
+  if (confirmed && !confirm(t("acceptance_confirm_ask"))) return;
+  try {
+    await postJSON("/api/v1/acceptance/confirm", { item_id: itemId, confirmed, note: "" });
+    loadAcceptance();
+  } catch (e) {
+    alert(e.message);
+  }
 }
 
 async function loadSystemHealth() {

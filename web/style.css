@@ -1024,3 +1024,27 @@ details.trust-panel[open] summary { border-bottom: none; }
 .greeting-stats { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
 .greeting-stats .pchip { margin-left: 0; font-size: 10.5px; padding: 2px 8px; }
 .greeting-card .context-memory-boundary { margin: 8px 0 0; }
+
+/* ---------------------------------------------------------------- 驗收中心 */
+.acceptance-banner { padding: 9px 13px; font-size: 12px; font-weight: 700; border-bottom: 1px solid var(--bd); }
+.acceptance-banner.broken { color: var(--danger); background: rgba(214, 59, 42, 0.1); }
+.acceptance-gates-title { padding: 10px 13px 4px; }
+.acceptance-gate { padding: 5px 13px; font-size: 12px; line-height: 1.5; }
+.acceptance-gate:last-child { padding-bottom: 12px; }
+.acceptance-gate-head { display: flex; align-items: baseline; gap: 8px; }
+.acceptance-gate-text { flex: 1; min-width: 0; }
+.acceptance-gate-pending { margin: 2px 0 0 27px; line-height: 1.5; word-break: break-word; }
+.acceptance-icon { flex: 0 0 auto; font-size: 13px; }
+
+.acceptance-row { padding: 11px 13px; border-bottom: 1px solid var(--bd); }
+.acceptance-row:last-child { border-bottom: none; }
+.acceptance-row-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.acceptance-title { font-size: 13px; font-weight: 700; }
+.acceptance-detail { margin-top: 5px; font-size: 12.5px; line-height: 1.55; color: var(--tx); }
+.acceptance-meta { margin-top: 3px; line-height: 1.5; letter-spacing: 0.3px; font-weight: 500; }
+.acceptance-attestation { margin-top: 5px; color: var(--ok); letter-spacing: 0.3px; font-weight: 500; }
+.acceptance-evidence { margin-top: 6px; }
+.acceptance-evidence summary { cursor: pointer; }
+.acceptance-evidence pre { margin: 6px 0 0; padding: 9px 11px; background: var(--s2); border: 1px solid var(--bd);
+  font-family: "JetBrains Mono", monospace; font-size: 11px; line-height: 1.5; color: var(--mu);
+  max-height: 260px; overflow: auto; white-space: pre-wrap; word-break: break-word; }

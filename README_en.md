@@ -234,6 +234,7 @@ For Extension pairing, milestone configuration, backups, and troubleshooting, se
 | `python main.py maintain` | Run SQLite health maintenance (Checkpoint, prune, backup, rotate) | `python main.py maintain --retention-days 90` |
 | `python main.py heal` | Supervise and auto-restart degraded or dead collector workers | `python main.py heal` |
 | `python main.py wal-checkpoint` | Manually checkpoint and truncate the SQLite WAL log | `python main.py wal-checkpoint --mode TRUNCATE` |
+| `python main.py verify` | Acceptance center: check the local receipts for every item in `docs/TODO.md` section A (read-only; runs nothing) | `python main.py verify --item A1 --json` |
 
 With an installed wheel, replace `python main.py` with `omnicontext` or `omni`.
 

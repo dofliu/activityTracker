@@ -263,6 +263,7 @@ OmniContext 支援完整的終端命令列操作：
 | `python main.py maintain` | 執行資料庫健康維護（Checkpoint、修剪、線上備份、輪替） | `python main.py maintain --retention-days 90` |
 | `python main.py heal` | 巡檢背景採集器並自動修復異常線程 (Self-Healing) | `python main.py heal` |
 | `python main.py wal-checkpoint` | 手動截斷並同步 SQLite WAL 檔案至主庫 | `python main.py wal-checkpoint --mode TRUNCATE` |
+| `python main.py verify` | 驗收中心：查 `docs/TODO.md` A 段每一項的本機收據（唯讀，不做任何動作） | `python main.py verify --item A1 --json` |
 
 Installed wheel 可將表中的 `python main.py` 改為 `omnicontext` 或較短的 `omni`。
 
