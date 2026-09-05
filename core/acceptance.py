@@ -641,6 +641,42 @@ def _check_a14(ctx: _Ctx) -> dict[str, Any]:
     }
 
 
+# ---- A15 每日工作誌 -------------------------------------------------------
+
+
+def _check_a15(ctx: _Ctx) -> dict[str, Any]:
+    digests = [
+        note for note in ctx.session.query(SecretaryNote)
+        .filter(SecretaryNote.source == "daily_digest")
+        .order_by(SecretaryNote.created_at.desc())
+        .limit(RECEIPT_SCAN_LIMIT)
+        .all()
+    ]
+    days = sorted({(n.source_ref or "").split(":")[1] for n in digests if ":" in (n.source_ref or "")})
+    evidence = {
+        "digest_notes": len(digests),
+        "days_covered": days[-7:],
+        "day_count": len(days),
+        "enabled": bool(ctx.cfg.get("proactive_secretary.daily_digest.enabled", True)),
+        "basis": "secretary_notes.source=daily_digest",
+    }
+    if len(days) >= 2:
+        return {
+            "status": PASSED,
+            "detail": f"記憶區已有 {len(days)} 天的工作誌（{days[0]} ～ {days[-1]}）。",
+            "evidence": evidence,
+        }
+    if days:
+        return {
+            "status": PARTIAL,
+            "detail": f"只有 {days[0]} 一天的工作誌；連跑幾天才看得出去重與累積。",
+            "evidence": evidence,
+        }
+    if not evidence["enabled"]:
+        return {"status": NOT_CONFIGURED, "detail": "每日工作誌已關閉。", "evidence": evidence}
+    return {"status": PENDING, "detail": "還沒跑過 daily_digest。", "evidence": evidence}
+
+
 # ---- 項目清單 -------------------------------------------------------------
 
 _ITEMS: tuple[dict[str, Any], ...] = (
@@ -769,6 +805,15 @@ _ITEMS: tuple[dict[str, Any], ...] = (
         "how": "Git 同步中心 → 載入全覽 → 全部 Fetch → 對有 .lock 但落後遠端的 repo 按 Pull",
         "criterion": "該 repo 可 pull 且本機 .lock／build 檔不受影響；不能 pull 者顯示帶數字的具體理由（人眼確認）",
         "probe": _check_a14,
+    },
+    {
+        "id": "A15",
+        "title": "每日工作誌實機收據",
+        "priority": "P1",
+        "blocks_release": False,
+        "how": "排程任務新增 daily_digest 或按立即執行，隔天看 01 記憶區並問「我昨天做了什麼」",
+        "criterion": "記憶區有至少兩天的工作誌（同一天重跑不重複）",
+        "probe": _check_a15,
     },
 )
 

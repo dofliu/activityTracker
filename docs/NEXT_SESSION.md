@@ -1,6 +1,6 @@
 # 下一個 Session 接手指南
 
-> 最後更新：2026-09-05（session `claude/activity-tracker-next-steps-en44qo`：**驗收中心 ADR-016 已合併進 main**（PR #14，合併後 main CI 六個 job 全綠）＋**同步中心 pull/push 前置條件修正 ADR-011 Addendum C**；前一輪 `claude/stoic-hamilton-4oicm4`：秘書記憶區 ADR-012、Telegram 手機對話 ADR-013、多通道推播與短效解鎖碼 ADR-014、系統設定左欄切換、小秘書問候卡、本機行事曆採集 ADR-015）。
+> 最後更新：2026-09-05（session `claude/activity-tracker-next-steps-en44qo`：**驗收中心 ADR-016 已合併進 main**（PR #14，合併後 main CI 六個 job 全綠）＋**同步中心 pull/push 前置條件修正 ADR-011 Addendum C**＋**每日工作誌 ADR-012 Addendum A**；前一輪 `claude/stoic-hamilton-4oicm4`：秘書記憶區 ADR-012、Telegram 手機對話 ADR-013、多通道推播與短效解鎖碼 ADR-014、系統設定左欄切換、小秘書問候卡、本機行事曆採集 ADR-015）。
 >
 > 這頁是給「下一個開發 session（人或 AI）」的**最短接手路徑**，只放現況、地圖與環境備忘。
 > 細節一律不在這裡重寫：**做過什麼**看 [ROADMAP.md](../ROADMAP.md) §11、**為什麼這樣設計**看對應 ADR、
@@ -13,7 +13,7 @@
 | 版本 | v1.3.0a5 已發佈為 GitHub pre-release（release workflow 自動 build → verify → release，SHA-256 receipt 交叉驗證）。`release_ready: false`，唯一**能力型**缺口是全天 coverage ledger 實測（TODO A1）。 |
 | 還缺什麼 | 別憑記憶：跑 `python main.py verify`（或看「06 系統設定 → 驗收中心」）就會列出 A1–A13 每一項現在有沒有收據，以及 ROADMAP §12.3 四個 gate 缺什麼。 |
 | Schema | migration **18/18**（append-only + checksum；**新表一律進 registry，不得靠 `create_all` 繞過**）。017 = `secretary_notes`、018 = `calendar_events`。 |
-| 測試 | **54 個 contract test 模組、463 項**（462 passed + 1 skipped）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
+| 測試 | **55 個 contract test 模組、480 項**（479 passed + 1 skipped）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
 | 導覽 | 6 分頁：01 小秘書（三欄）／02 知識庫／03 進行中工作／04 Git 同步中心／05 摘要與統計／06 系統設定（左欄 11 區塊，末項為**驗收中心**）。桌面與 494px 皆無水平溢出（Playwright 實測）。 |
 | 外觀 | 兩個獨立軸：`data-theme`（dark/light）× `data-accent`（naruto/forest/ocean），CSS 全走 `var(--accent)`；新配色只需加一組變數區塊。偏好存 localStorage（`omni-theme`／`omni-palette`／`omni-settings-pane`）。 |
 | 危險能力 | 執行器、L2、L2 寫入、自訂排程、Telegram 對話、`allow_remote_arm`、LINE、問候卡 LLM 潤飾——**全部預設關閉**；行事曆預設開但沒設路徑就等於停用。 |
@@ -30,6 +30,7 @@
 | 秘書提案（proposal-only） | `core/proactive_secretary.py`、`core/secretary_advisor.py` | `test_proactive_secretary.py`、`test_secretary_advisor.py` | [ADR-007](ADR-007-proposal-only-secretary.md) |
 | 分級執行器 L0/L1/L2 | `core/agent_executor.py`、`core/agent_dispatch.py`、`core/scheduled_tasks.py` | `test_agent_executor.py`、`test_agent_dispatch_l2.py`、`test_scheduled_tasks.py` | [ADR-008](ADR-008-gated-agent-executor.md) |
 | 秘書記憶區（大腦） | `core/secretary_memory.py` | `test_secretary_memory.py`（20） | [ADR-012](ADR-012-secretary-memory.md) |
+| 每日工作誌（你做了什麼） | `core/activity_digest.py`（L0 template `daily_digest`，也是早晨包第四步） | `test_activity_digest.py`（17） | [ADR-012 Addendum A](ADR-012-secretary-memory.md) |
 | 每日包與今日視圖 | `core/secretary_packs.py` | `test_secretary_packs.py`（9） | [ADR-008](ADR-008-gated-agent-executor.md) L0 |
 | 問候卡（01 首頁＋晨報開頭） | `core/secretary_greeting.py` | `test_secretary_greeting.py`（23）＋晨報三項 | ROADMAP §11（2026-09-04） |
 | 推播組裝與通道 | `notifiers/messages.py`、`notifiers/channels.py`、`notifiers/secretary_push.py` | `test_notification_channels.py`（32） | [ADR-014](ADR-014-multi-channel-push-and-arm-code.md) |
@@ -49,6 +50,7 @@
 - **`display` 會蓋掉 `hidden` 屬性**：專案已加全域 `[hidden] { display: none !important; }`，新元件不要再用行內 `style="display:flex"` 對抗它。
 - **migration 測試會鎖版本清單**：加 migration 要同步改 `test_database_migration.py` 的 `[1..N]` 與「未知的更新版本」那筆（用 N+1）。
 - **`pkill -f` 的 pattern 會殺到自己的 shell**（exit 144）：寫成 `main[.]py` 這種形式，且與啟動指令分開兩次呼叫。
+- **要讓秘書「記得」，資料得進 `secretary_notes`**：採集到 ≠ 秘書知道。`memory_context()` 注入的是筆記與觀察，不是原始事件表——新的「秘書應該知道 X」需求，通常是缺一個把既有資料 reduce 成觀察的 L0 動作，而不是缺採集。
 - **「clean worktree」不等於「沒有 untracked 檔案」**：pull/push 的門檻只看**已追蹤**檔案的未提交變更；把 untracked 算進去會讓幾乎每個真實專案（有 `.lock`、`build/`）永遠不能 pull，而且沒有多保護到任何東西——Git 自己對「untracked 會被覆蓋」已 fail-closed（ADR-011 Addendum C）。
 - **不要用人類可讀訊息的關鍵字做分類**：批次結果曾靠比對「前置」「僅限」等字串決定 skipped/failed，文案一改就壞。用 `RepositorySyncRejected(kind=...)` 這種機器可讀欄位。
 - **灰掉的按鈕要說為什麼**：同一句放諸四海的條件敘述等於沒說。理由要帶這個 repo 的實際數字，並直接顯示在列上，不要只放 tooltip。

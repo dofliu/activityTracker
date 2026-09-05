@@ -116,6 +116,7 @@ def test_registry_only_contains_l0_read_only_templates():
         "morning_pack",
         "handoff_active_projects",
         "repo_sync_report",
+        "daily_digest",
         "status_snapshot_draft",
     }
     for template in SCHEDULABLE_TEMPLATES.values():

@@ -180,6 +180,17 @@ def build_morning_pack(
     hand = _step("handoff_active_projects", handoffs, _default_handoffs)
     if hand:
         receipt["handoffs_written"] = hand.get("handoffs_written")
+
+    def _default_digest() -> dict[str, Any]:
+        # 早晨跑的時候「昨天」已經是完整的一天，適合定稿成一則工作誌。
+        from core.activity_digest import build_daily_digest
+
+        return build_daily_digest(days_back=1, database=database, cfg=cfg, now=now)
+
+    digest = _step("daily_digest", None, _default_digest)
+    if digest:
+        receipt["digest_date"] = digest.get("date")
+        receipt["digest_notes_written"] = digest.get("notes_written")
     receipt["errors"] = errors
     receipt["generated_at"] = now.isoformat(timespec="seconds")
     # 秘書自己的觀察（ADR-012）：只寫當日一次、標記 observation、介面可一鍵刪除。
