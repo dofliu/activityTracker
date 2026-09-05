@@ -54,3 +54,33 @@
 
 不變的邊界：repo 只從設定 root 探索、API 只認 `repo_id`、argv 禁 shell、`GIT_TERMINAL_PROMPT=0`、輸出長度與 secret 遮蔽、每 repo lock、永不 force、永不 `git add`、不處理 merge conflict／rebase。
 
+
+## 2026-09-05 Addendum C：pull／push 的「clean worktree」只看已追蹤檔案
+
+使用者實測回報兩件事：（a）某個 repo 明明落後遠端卻沒得按 Pull；（b）好幾個 repo 因為有 `.lock` 檔就不能 pull。追查後這是同一個根因，而且是本專案自己的判斷過嚴，不是 Git 的限制。
+
+### 為什麼要改
+
+D4 原本寫「Pull 僅在 clean worktree……時啟用」，實作把 `clean` 定義為 `staged + unstaged + untracked + conflicted` 全為 0。**untracked 檔案被算進去**，於是 `uv.lock`、`package-lock.json`、`build/`、暫存檔——任何真實專案幾乎一定存在的東西——都會讓 Pull 永久灰掉。
+
+用真實 repo 實測 `git pull --ff-only` 的行為（三個情境都驗過）：
+
+| 情境 | Git 自己的行為 |
+| :--- | :--- |
+| 有與本次變更無關的 untracked 檔案 | **成功 fast-forward**，該檔案原封不動 |
+| untracked 檔案會被 incoming commit 覆蓋 | **Git 自己拒絕**（`untracked working tree files would be overwritten`）並保留本機內容 |
+| 已追蹤檔案有未提交的修改 | Git 拒絕 |
+
+也就是說：擋住 untracked 檔案並沒有多保護到任何東西——真正危險的「會被覆蓋」那一格，Git 本身已經 fail-closed 且保留本機資料；而 push 根本不碰 worktree，untracked 檔案與它完全無關。
+
+### 決策
+
+1. `pull_ff_only` 與 `push` 的前置條件改為「**沒有未提交的已追蹤變更**」（staged／unstaged／conflicted 為 0）。狀態多回一個 `tracked_clean` 欄位；`clean`（含 untracked）保留原義，繼續顯示計數。
+2. `attention_count` 與 summary 的 `dirty` 改看 `tracked_clean`——一堆 build 產物不該讓每個 repo 都被標成「需要處理」。
+3. **拒絕理由改為逐 repo 具體化**。原本不論哪個 repo 都回同一句「僅限 clean worktree、只落後遠端且可 fast-forward 的 branch」，使用者看到灰按鈕無從判斷是自己這個 repo 的哪一項沒過。現在依序回報第一個真正擋住的原因，並帶實際數字：沒有 upstream（附 `git push -u origin <branch>` 指令）／讀不到差距（請先 Fetch）／已分歧（領先 N、落後 M）／沒有落後（附上次 fetch 時間）／進行中的 Git 操作／衝突檔案數／未提交變更數。順序是**先回答「有沒有事要做」，再回答「能不能做」**——已經最新的 repo，主要事實是沒東西可 pull，而不是它剛好有未提交的變更。
+4. UI 把理由**直接顯示在該列**（不再只放 tooltip），批次對話框也列出被排除 repo 的原因，讓「我的專案怎麼不在清單裡」可以當場查到。
+5. `RepositorySyncRejected` 改帶 `kind`（`precondition`／`failed`）。批次結果原本靠**比對人類可讀訊息的關鍵字**來決定 skipped 還是 failed，文案一改分類就壞——這是既有的脆弱設計，一併修掉。
+
+### 不變的邊界
+
+仍然沒有排程自動同步、沒有 `git add`、沒有 force push；pull 仍限 `--ff-only`、仍需無分歧、仍在 lock 內重檢；有未提交的已追蹤變更、衝突或進行中的 Git 操作時一律拒絕。放寬的只有「untracked 檔案不再被當成髒 worktree」這一項，且理由是 Git 本身已對唯一危險的情境 fail-closed。

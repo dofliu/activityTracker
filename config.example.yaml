@@ -242,6 +242,13 @@ proactive_secretary:
   # ＋一句規則挑選的鼓勵語（以日期為種子，同一天同一句）。display_name 是卡片
   # 稱呼（如 Dof）；llm.enabled 開啟時用 llm_advisor 的 provider 潤飾語氣，
   # 輸出裡出現統計以外的數字會整段丟掉、退回規則版（不得新增事實）。
+  # 每日工作誌（ADR-012 Addendum A）：把當天的活動與已保存的時段微摘要 reduce 成
+  # 一則記憶區觀察，讓小秘書真的記得你每天做了什麼。唯讀、不呼叫 LLM、不新增
+  # 任何資料類別（微摘要本來就存著）；寫出的觀察可一鍵刪除，也會隨 TTL 過期。
+  daily_digest:
+    enabled: true
+    max_projects: 5      # 最多為幾個專案各留一則專案層觀察
+    max_highlights: 4    # 當日重點最多引用幾則時段微摘要
   greeting:
     display_name: ''
     # 晨報（Telegram／LINE）開頭也帶這段話；07:30 多半還沒有今日活動，會改說昨天

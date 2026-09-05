@@ -3463,6 +3463,8 @@ function repoSyncLabels() {
     truncated: "清單已達安全上限，請縮小 repositories 設定範圍或調高 config 上限。",
     clean: "CLEAN",
     dirty: "WORKTREE CHANGED",
+    untrackedOnly: "untracked only (does not block pull/push)",
+    untrackedOnly: "只有 untracked（不影響 pull／push）",
     synced: "已同步",
     ahead: "待 Push",
     behind: "待 Pull",
@@ -3484,7 +3486,7 @@ function repoSyncLabels() {
     confirmFetchAll: "對全部 repo 執行 fetch --prune？只更新遠端參照，不改任何 worktree、branch 或遠端。",
     fetchAllDone: (c) => `全部 Fetch 完成：成功 ${c.success}、失敗 ${c.failed}、跳過 ${c.skipped}`,
     batchNone: (a) => `目前沒有符合 ${a === "push" ? "Push" : "Pull (FF only)"} 前置條件的 repo。`,
-    batchConfirm: (a, names, excluded) => `將對以下 ${names.length} 個 repo 執行 ${a === "push" ? "Push（不 force）" : "fast-forward Pull"}：\n\n${names.join("\n")}\n\n另有 ${excluded} 個 repo 因前置條件不符會被跳過。執行時每個 repo 仍會重檢一次。繼續？`,
+    batchConfirm: (a, names, excluded, skipped = []) => `將對以下 ${names.length} 個 repo 執行 ${a === "push" ? "Push（不 force）" : "fast-forward Pull"}：\n\n${names.join("\n")}\n\n另有 ${excluded} 個 repo 因前置條件不符會被跳過${skipped.length ? `，例如：\n${skipped.join("\n")}` : "。"}\n\n執行時每個 repo 仍會重檢一次。繼續？`,
     batchDone: (a, c) => `批次 ${a === "push" ? "Push" : "Pull"} 完成：成功 ${c.success}、跳過 ${c.skipped}、失敗 ${c.failed}`,
     pushDisabled: "批次 Push 未啟用（config: repository_sync.batch.allow_push）；單一 repo 的 Push 仍可逐一執行。",
     staged: "staged",
@@ -3527,7 +3529,7 @@ function repoSyncLabels() {
     confirmFetchAll: "Run fetch --prune on every repository? Only remote-tracking refs change; no worktree, branch or remote is modified.",
     fetchAllDone: (c) => `Fetch all done: ${c.success} ok, ${c.failed} failed, ${c.skipped} skipped`,
     batchNone: (a) => `No repository currently meets the preconditions for ${a === "push" ? "Push" : "Pull (FF only)"}.`,
-    batchConfirm: (a, names, excluded) => `Run ${a === "push" ? "Push (never force)" : "fast-forward Pull"} on these ${names.length} repositories:\n\n${names.join("\n")}\n\n${excluded} other repositories are excluded by preconditions. Each repository is rechecked before it runs. Continue?`,
+    batchConfirm: (a, names, excluded, skipped = []) => `Run ${a === "push" ? "Push (never force)" : "fast-forward Pull"} on these ${names.length} repositories:\n\n${names.join("\n")}\n\n${excluded} other repositories are excluded by preconditions${skipped.length ? `, for example:\n${skipped.join("\n")}` : "."}\n\nEach repository is rechecked before it runs. Continue?`,
     batchDone: (a, c) => `Batch ${a === "push" ? "Push" : "Pull"} done: ${c.success} ok, ${c.skipped} skipped, ${c.failed} failed`,
     pushDisabled: "Batch push is disabled (config: repository_sync.batch.allow_push); single-repo Push still works.",
     staged: "staged",
@@ -3553,6 +3555,21 @@ function repoSyncStateText(repo, labels) {
   if (state === "behind" && Number.isInteger(repo.behind)) return `${base} ↓${repo.behind}`;
   if (state === "diverged") return `${base} ↑${repo.ahead ?? "?"} ↓${repo.behind ?? "?"}`;
   return base;
+}
+
+// 這個 repo 現在有事情要做、但按鈕是灰的——把後端給的具體理由直接顯示出來。
+// （使用者回報：repo 明明落後遠端卻沒得按 pull，灰按鈕沒有任何可見說明。）
+function repoBlockedReason(repo) {
+  const actions = repo.actions || {};
+  const state = repo.sync_state;
+  const pull = actions.pull_ff_only || {};
+  const push = actions.push || {};
+  if (state === "behind" || state === "diverged") return pull.allowed ? "" : (pull.reason || "");
+  if (state === "ahead") return push.allowed ? "" : (push.reason || "");
+  if (state === "no_upstream" || state === "detached_head" || state === "upstream_unavailable") {
+    return pull.reason || "";
+  }
+  return "";
 }
 
 function repoSyncActionButton(repo, action, label) {
@@ -3596,8 +3613,9 @@ function renderRepositorySyncStatus() {
         <div class="repo-sync-name">${esc(repo.name)} <span class="repo-sync-state">${esc(repoSyncStateText(repo, labels))}</span></div>
         <div class="repo-sync-meta"><code>${esc(branch)}</code> → <code>${esc(upstream)}</code></div>
         <div class="repo-sync-path" title="${esc(repo.path || "")}">${esc(repo.path || "")}</div>
-        <div class="repo-sync-worktree ${repo.clean ? "is-clean" : "is-dirty"}">${repo.clean ? labels.clean : `${labels.dirty}${counts.length ? ` · ${esc(counts.join(" · "))}` : ""}`}</div>
+        <div class="repo-sync-worktree ${repo.tracked_clean === false ? "is-dirty" : "is-clean"}">${repo.clean ? labels.clean : `${repo.tracked_clean === false ? labels.dirty : labels.untrackedOnly}${counts.length ? ` · ${esc(counts.join(" · "))}` : ""}`}</div>
         ${statusHint ? `<div class="repo-sync-warning">${esc(statusHint)}</div>` : ""}
+        ${repoBlockedReason(repo) ? `<div class="repo-sync-blocked">⛔ ${esc(repoBlockedReason(repo))}</div>` : ""}
       </div>
       <div class="repo-sync-actions">
         ${repoSyncActionButton(repo, "fetch", labels.fetch)}
@@ -3706,14 +3724,16 @@ function renderRepoOverview() {
       w.untracked_files ? `${w.untracked_files} ${labels.untracked}` : "",
       w.conflicted_files ? `${w.conflicted_files} ${labels.conflicts}` : "",
     ].filter(Boolean);
-    return repo.clean ? `<span class="is-clean">${esc(labels.clean)}</span>` : `<span class="is-dirty">${esc(parts.join(" · ") || labels.dirty)}</span>`;
+    if (repo.clean) return `<span class="is-clean">${esc(labels.clean)}</span>`;
+    const cls = repo.tracked_clean === false ? "is-dirty" : "is-clean";
+    return `<span class="${cls}">${esc(parts.join(" · ") || labels.dirty)}</span>`;
   };
   table.innerHTML = `<table><thead><tr>${labels.ovColumns.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${rows.map(repo => {
     const stateClass = `state-${String(repo.sync_state || "unknown").replace(/[^a-z_]/g, "")}`;
     return `<tr class="${stateClass}">
       <td class="repo-overview-name" title="${esc(repo.path || "")}">${esc(repo.name)}</td>
       <td><code>${esc(repo.branch || "—")}</code> → <code>${esc(repo.upstream || "—")}</code></td>
-      <td>${esc(repoSyncStateText(repo, labels))}${repo.error ? `<div class="repo-sync-warning">${esc(repo.error)}</div>` : ""}</td>
+      <td>${esc(repoSyncStateText(repo, labels))}${repo.error ? `<div class="repo-sync-warning">${esc(repo.error)}</div>` : ""}${repoBlockedReason(repo) ? `<div class="repo-sync-blocked">⛔ ${esc(repoBlockedReason(repo))}</div>` : ""}</td>
       <td>${worktreeText(repo)}</td>
       <td>${esc(formatFetchTime(repo.last_fetch_at, labels))}</td>
       <td class="repo-overview-actions">${repoSyncActionButton(repo, "fetch", labels.fetch)} ${repoSyncActionButton(repo, "pull_ff_only", labels.pull)} ${repoSyncActionButton(repo, "push", labels.push)}</td>
@@ -3764,12 +3784,21 @@ async function runRepoBatch(action) {
     const plan = await getJSON(`/api/v1/repos/sync-batch-plan?action=${encodeURIComponent(action)}`);
     const eligible = plan.eligible || [];
     if (!eligible.length) {
-      if (result) result.textContent = labels.batchNone(action);
+      const why = (plan.excluded || [])
+        .filter(r => r.sync_state !== "synced")
+        .slice(0, 3)
+        .map(r => `${r.name}: ${r.reason || "—"}`);
+      if (result) result.textContent = labels.batchNone(action) + (why.length ? ` · ${why.join(" · ")}` : "");
       return;
     }
     const names = eligible.map(r => `• ${r.name} (${r.branch || "—"}${action === "push" ? ` ↑${r.ahead ?? "?"}` : ` ↓${r.behind ?? "?"}`})`);
     const shown = names.length > 20 ? [...names.slice(0, 20), `… +${names.length - 20}`] : names;
-    if (!window.confirm(labels.batchConfirm(action, shown, plan.excluded_count || 0))) {
+    // 被排除的 repo 也要說明為什麼，否則「我的專案怎麼不在清單裡」無從查起。
+    const skipped = (plan.excluded || [])
+      .filter(r => r.sync_state !== "synced")
+      .slice(0, 8)
+      .map(r => `• ${r.name}: ${r.reason || "—"}`);
+    if (!window.confirm(labels.batchConfirm(action, shown, plan.excluded_count || 0, skipped))) {
       if (result) result.textContent = "";
       return;
     }

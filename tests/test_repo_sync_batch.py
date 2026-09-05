@@ -160,8 +160,9 @@ def test_batch_plan_and_pull_only_touch_eligible_repos(fleet):
     eligible = {item["name"] for item in plan["eligible"]}
     excluded = {item["name"]: item["reason"] for item in plan["excluded"]}
     assert eligible == {"behind"}
-    assert "dirty" in excluded and "clean" in excluded["dirty"]
-    assert "local_only" in excluded
+    # 理由要指出這個 repo 實際卡在哪，而不是複誦一句通用條件
+    assert "dirty" in excluded and "未提交的變更" in excluded["dirty"]
+    assert "local_only" in excluded and "git push -u" in excluded["local_only"]
 
     dirty_id = next(r["repo_id"] for r in service.list_statuses(scope="all")["repositories"] if r["name"] == "dirty")
     receipt = service.batch_execute("pull_ff_only", [item["repo_id"] for item in plan["eligible"]] + [dirty_id, dirty_id])
@@ -368,3 +369,26 @@ def test_approved_pull_executes_through_repo_sync_and_leaves_receipt():
     assert set(summary) == {"repo_name", "action", "status", "return_code"}
     with database.session_scope() as session:
         assert session.query(AgentExecutionReceipt).count() == 1
+
+
+def test_skipped_versus_failed_is_decided_by_kind_not_message_wording(fleet, monkeypatch):
+    """批次結果的分類不能靠比對人類可讀訊息——文案一改就會壞掉。"""
+    service = LocalRepositorySync(_Config(fleet["root"]))
+    service.fetch_all()
+    repo_id = next(
+        r["repo_id"] for r in service.list_statuses(scope="all")["repositories"] if r["name"] == "behind"
+    )
+
+    def reject_precondition(*_args, **_kwargs):
+        raise RepositorySyncRejected("完全不含任何舊關鍵字的說明", kind="precondition")
+
+    monkeypatch.setattr(service, "execute", reject_precondition)
+    receipt = service.batch_execute("pull_ff_only", [repo_id])
+    assert receipt["counts"] == {"success": 0, "failed": 0, "skipped": 1}
+
+    def reject_failure(*_args, **_kwargs):
+        raise RepositorySyncRejected("git 指令真的失敗了")
+
+    monkeypatch.setattr(service, "execute", reject_failure)
+    receipt = service.batch_execute("pull_ff_only", [repo_id])
+    assert receipt["counts"] == {"success": 0, "failed": 1, "skipped": 0}

@@ -204,6 +204,28 @@ def _run_morning_pack(_params: dict[str, Any]) -> Callable[[dict[str, Any]], dic
     return _runner
 
 
+def _validate_digest_params(params: dict[str, Any]) -> dict[str, Any]:
+    raw = params.get("days_back", 1)
+    try:
+        days_back = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ExecutionRejected("invalid_params", "days_back 必須是整數") from exc
+    if not 0 <= days_back <= 7:
+        raise ExecutionRejected("invalid_params", "days_back 只接受 0–7（0＝今天到目前為止）")
+    return {"days_back": days_back}
+
+
+def _run_daily_digest(params: dict[str, Any]) -> Callable[[dict[str, Any]], dict[str, Any]]:
+    days_back = int(params.get("days_back", 1))
+
+    def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
+        from core.activity_digest import build_daily_digest
+
+        return build_daily_digest(days_back=days_back)
+
+    return _runner
+
+
 def _run_repo_sync_report(_params: dict[str, Any]) -> Callable[[dict[str, Any]], dict[str, Any]]:
     def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
         from core.repo_sync_report import build_repo_sync_report
@@ -265,7 +287,8 @@ SCHEDULABLE_TEMPLATES: dict[str, SchedulableTemplate] = {
             build_runner=_run_morning_pack,
             receipt_fields=(
                 "repos_scanned", "needs_pull", "needs_push", "diverged",
-                "stale_status", "handoffs_written", "errors",
+                "stale_status", "handoffs_written", "digest_date",
+                "digest_notes_written", "errors",
             ),
             timeout_seconds=600,
         ),
@@ -279,6 +302,23 @@ SCHEDULABLE_TEMPLATES: dict[str, SchedulableTemplate] = {
             build_runner=_run_active_handoffs,
             receipt_fields=("hours", "projects_considered", "handoffs_written", "errors", "output_dir"),
             timeout_seconds=300,
+        ),
+        SchedulableTemplate(
+            template_id="daily_digest",
+            risk_level=RISK_L0,
+            label="每日工作誌：把當天的活動與時段微摘要寫成一則記憶區觀察",
+            description=(
+                "只 reduce 既有資料（可回溯計數＋已保存的微摘要），不呼叫 LLM、不改任何既有資料；"
+                "寫出的觀察可在記憶區一鍵刪除，也會隨 TTL 過期。"
+            ),
+            params_schema={"days_back": "回看第幾天（0–7，預設 1＝昨天整天）"},
+            validate_params=_validate_digest_params,
+            build_runner=_run_daily_digest,
+            receipt_fields=(
+                "date", "commits", "ai_turns", "files_changed", "projects_touched",
+                "micro_summaries", "notes_written", "llm_used",
+            ),
+            timeout_seconds=120,
         ),
         SchedulableTemplate(
             template_id="repo_sync_report",

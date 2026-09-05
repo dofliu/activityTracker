@@ -35,7 +35,16 @@ _REPO_LOCKS_GUARD = threading.Lock()
 
 
 class RepositorySyncRejected(RuntimeError):
-    """同步前置條件不成立時的可預期拒絕，不應被當成服務端例外。"""
+    """同步前置條件不成立時的可預期拒絕，不應被當成服務端例外。
+
+    ``kind`` 讓呼叫端（例如批次執行）不必去比對人類可讀的訊息字串來判斷這是
+    「前置條件不符所以跳過」還是「真的執行失敗」——訊息會隨文案調整而變，
+    分類不該跟著壞掉。
+    """
+
+    def __init__(self, message: str, *, kind: str = "failed"):
+        super().__init__(message)
+        self.kind = kind
 
 
 @dataclass(frozen=True)
@@ -330,6 +339,11 @@ class LocalRepositorySync:
             sync_state = "synced"
 
         clean = not any(counts.values())
+        # pull/push 真正在意的是「已追蹤檔案有沒有未提交的變更」；untracked
+        # 檔案（.lock、build 產物、暫存檔）不影響 fast-forward，也不影響 push。
+        tracked_clean = not (
+            counts["staged_files"] + counts["unstaged_files"] + counts["conflicted_files"]
+        )
         actions = self._allowed_actions(
             branch=branch,
             upstream=upstream,
@@ -339,6 +353,7 @@ class LocalRepositorySync:
             clean=clean,
             operation=operation,
             counts=counts,
+            last_fetch_at=last_fetch_at,
         )
         return {
             "repo_id": repo.repo_id,
@@ -355,6 +370,7 @@ class LocalRepositorySync:
             "operation_in_progress": operation,
             "worktree": counts,
             "clean": clean,
+            "tracked_clean": tracked_clean,
             "last_activity_at": last_activity_at,
             "last_activity_source": last_activity_source,
             "_sort_last_activity_epoch": activity_epoch,
@@ -362,7 +378,65 @@ class LocalRepositorySync:
         }
 
     @staticmethod
+    def _sync_blocker(
+        *,
+        direction: str,
+        branch: str | None,
+        upstream: str | None,
+        remote: str | None,
+        ahead: int | None,
+        behind: int | None,
+        operation: str | None,
+        counts: dict[str, int],
+        last_fetch_at: str | None,
+    ) -> str | None:
+        """``pull_ff_only``／``push`` 現在為什麼不能做——回一句帶實際數字的理由。
+
+        以前這裡只回一句放諸四海皆準的條件敘述（「僅限 clean worktree…」），
+        使用者看到灰掉的按鈕卻不知道是自己這個 repo 的哪一項沒過。條件依序檢查，
+        回報**第一個真正擋住的原因**。
+        """
+        if not branch:
+            return "目前是 detached HEAD，沒有 checkout 任何 branch"
+        if not remote:
+            return (
+                f"branch `{branch}` 還沒有對應的遠端分支"
+                f"（先 `git push -u origin {branch}` 才能比對與同步）"
+            )
+        if not upstream:
+            return f"branch `{branch}` 沒有設定 upstream，Git 不知道要跟哪個遠端分支比對"
+        if ahead is None or behind is None:
+            return f"讀不到與 `{upstream}` 的差距；remote-tracking ref 可能還不存在，請先 Fetch"
+        # 先回答「有沒有事要做」，再回答「能不能做」——一個已經是最新的 repo，
+        # 主要事實是沒東西可 pull，而不是它剛好有未提交的變更。
+        if ahead and behind:
+            return f"已分歧：本機領先 {ahead}、落後 {behind}，不能 fast-forward"
+        if direction == "pull" and not behind:
+            stale = f"（上次 fetch：{last_fetch_at}）" if last_fetch_at else "（本機還沒 fetch 過）"
+            return f"本機沒有落後 `{upstream}`，沒有可 fast-forward 的 commit{stale}"
+        if direction == "push" and not ahead:
+            return f"沒有可推送的本機 commit（與 `{upstream}` 一致）"
+
+        if operation:
+            return f"有進行中的 Git 操作（{operation}），請先完成或中止"
+        if counts["conflicted_files"]:
+            return f"有 {counts['conflicted_files']} 個衝突檔案待解決"
+
+        # untracked 檔案不算擋路：Git 對 fast-forward 只在「會被覆蓋」時才拒絕，
+        # 而那個情況 Git 自己會擋下並保留本機內容（見 ADR-011 Addendum C）。
+        tracked_changes = counts["staged_files"] + counts["unstaged_files"]
+        if tracked_changes:
+            parts = []
+            if counts["staged_files"]:
+                parts.append(f"staged {counts['staged_files']}")
+            if counts["unstaged_files"]:
+                parts.append(f"unstaged {counts['unstaged_files']}")
+            return f"有未提交的變更（{'、'.join(parts)}）；untracked 檔案不影響"
+        return None
+
+    @classmethod
     def _allowed_actions(
+        cls,
         *,
         branch: str | None,
         upstream: str | None,
@@ -372,23 +446,31 @@ class LocalRepositorySync:
         clean: bool,
         operation: str | None,
         counts: dict[str, int],
+        last_fetch_at: str | None = None,
     ) -> dict[str, dict[str, Any]]:
         blocked = operation or ("conflicted_worktree" if counts["conflicted_files"] else None)
-        upstream_ready = bool(branch and upstream and remote and ahead is not None and behind is not None)
 
-        def state(allowed: bool, reason: str) -> dict[str, Any]:
+        def state(allowed: bool, reason: str | None) -> dict[str, Any]:
             return {"allowed": allowed, "reason": None if allowed else reason}
+
+        def gate(direction: str) -> dict[str, Any]:
+            blocker = cls._sync_blocker(
+                direction=direction,
+                branch=branch,
+                upstream=upstream,
+                remote=remote,
+                ahead=ahead,
+                behind=behind,
+                operation=operation,
+                counts=counts,
+                last_fetch_at=last_fetch_at,
+            )
+            return state(blocker is None, blocker)
 
         return {
             "fetch": state(bool(remote), "目前 branch 未設定遠端 remote"),
-            "pull_ff_only": state(
-                bool(upstream_ready and clean and not blocked and behind and not ahead),
-                "僅限 clean worktree、只落後遠端且可 fast-forward 的 branch",
-            ),
-            "push": state(
-                bool(upstream_ready and clean and not blocked and ahead and not behind),
-                "僅限 clean worktree、只領先遠端且未分歧的 branch",
-            ),
+            "pull_ff_only": gate("pull"),
+            "push": gate("push"),
             "commit_staged": state(
                 bool(counts["staged_files"] and not blocked),
                 "請先在 Git/IDE 明確 stage 要提交的檔案，且解決衝突或進行中的 Git 操作",
@@ -444,7 +526,8 @@ class LocalRepositorySync:
         repository_count = len(references)
         attention_count = sum(
             1 for repository in repositories
-            if repository.get("sync_state") != "synced" or not repository.get("clean", False)
+            if repository.get("sync_state") != "synced"
+            or not repository.get("tracked_clean", repository.get("clean", False))
         )
         displayed = repositories if scope == "all" else repositories[: self.dashboard_recent_limit]
         for repository in displayed:
@@ -485,7 +568,9 @@ class LocalRepositorySync:
                 summary["no_upstream"] += 1
             else:
                 summary["unavailable"] += 1
-            if repo.get("clean") is False:
+            # 「dirty」指的是有未提交的**已追蹤**變更；一堆 build 產物或 .lock
+            # 不該讓每個 repo 都被標成需要處理。
+            if repo.get("tracked_clean") is False:
                 summary["dirty"] += 1
         return summary
 
@@ -613,7 +698,7 @@ class LocalRepositorySync:
                 counts["success"] += 1
             except RepositorySyncRejected as exc:
                 message = str(exc)
-                status = "skipped" if ("前置" in message or "僅限" in message or "正在執行" in message or "找不到" in message) else "failed"
+                status = "skipped" if getattr(exc, "kind", "failed") == "precondition" else "failed"
                 name = None
                 try:
                     name = self._reference_by_id(repo_id).path.name
@@ -635,7 +720,9 @@ class LocalRepositorySync:
         for repo in self._discover_references()[0]:
             if repo.repo_id == repo_id:
                 return repo
-        raise RepositorySyncRejected("找不到已設定範圍內的 repository；請重新整理同步狀態")
+        raise RepositorySyncRejected(
+            "找不到已設定範圍內的 repository；請重新整理同步狀態", kind="precondition"
+        )
 
     @staticmethod
     def _repo_lock(repo_id: str) -> threading.Lock:
@@ -649,13 +736,13 @@ class LocalRepositorySync:
         repo = self._reference_by_id(repo_id)
         lock = self._repo_lock(repo.repo_id)
         if not lock.acquire(blocking=False):
-            raise RepositorySyncRejected("此 repository 正在執行另一個同步動作")
+            raise RepositorySyncRejected("此 repository 正在執行另一個同步動作", kind="precondition")
         try:
             before = self._status_for(repo)
             allowed = before["actions"].get(action, {}).get("allowed", False)
             if not allowed:
                 reason = before["actions"].get(action, {}).get("reason") or "前置條件未通過"
-                raise RepositorySyncRejected(reason)
+                raise RepositorySyncRejected(reason, kind="precondition")
 
             if action == "commit_staged":
                 message = (commit_message or "").strip()
