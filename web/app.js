@@ -61,7 +61,7 @@ const I18N = {
     tab_repos: "04 · 🔁 Git 同步中心",
     tab_summaries: "05 · 摘要與統計",
     rail_stats_title: "今日統計",
-    today_title: "TODAY · 今日行動清單",
+    today_title: "TODAY · 全部提案（詳情）",
     greeting_title: "🤗 小秘書的話",
     greeting_win_today: "今天",
     greeting_win_2h: "近 2 小時",
@@ -81,6 +81,28 @@ const I18N = {
     memory_profile_tone: "語氣",
     memory_profile_hint: "宣告方式：在對話框打「偏好：優先：專案名」或「偏好：語氣：簡潔／直接／溫暖」；刪掉那則偏好就恢復",
     memory_profile_none: "尚未宣告任何個人檔案（本期優先／語氣）",
+    // ADR-019 秘書桌面（01 首頁）
+    home_desk_title: "🗂 秘書桌面 · 現在該看的",
+    ph_loading_home: "秘書正在挑現在該看的…",
+    home_unavailable: "桌面暫時讀不到；下方的詳情面板仍可使用。",
+    home_focus_label: "焦點 · 現在最該看的一件事",
+    home_memory_label: "記得 · 秘書為你挑的一則",
+    home_ask: "💬 問秘書",
+    home_ask_focus_prompt: "關於「{title}」（{project}）：{why} 我現在該怎麼處理？",
+    home_ask_memory_prompt: "你記得「{title}」——這對我現在的工作有什麼影響？",
+    home_more_proposals: "還有 {n} 項",
+    home_no_focus: "目前沒有超過門檻的建議；不代表所有工作都已完成。",
+    home_no_memory: "還沒有可挑的記憶；在對話框打「記下來：…」，或讓每日工作誌跑一天。",
+    home_why_now: "為什麼是現在",
+    home_why_this: "為什麼挑這則",
+    home_details_label: "詳情",
+    home_detail_proposals: "全部提案",
+    home_detail_memory: "記憶區",
+    home_detail_projects: "進行中專案",
+    home_detail_repos: "Git 同步中心",
+    home_detail_knowledge: "知識庫",
+    home_detail_summaries: "摘要與統計",
+    home_leaves: "今天離開首頁 {today} 次 · 昨天 {yesterday} 次（只算這個瀏覽器的分頁切換）",
     memory_kind_decision: "決定",
     memory_project_ph: "專案（選填）",
     memory_input_ph: "要小秘書記住的事；偏好可寫「不要提醒 <專案或提案類型>」",
@@ -380,7 +402,7 @@ const I18N = {
     tab_repos: "04 · 🔁 Git Sync Center",
     tab_summaries: "05 · Summaries & Stats",
     rail_stats_title: "Today's stats",
-    today_title: "TODAY · Action list",
+    today_title: "TODAY · All proposals (details)",
     greeting_title: "🤗 From your secretary",
     greeting_win_today: "Today",
     greeting_win_2h: "Last 2 h",
@@ -400,6 +422,28 @@ const I18N = {
     memory_profile_tone: "Tone",
     memory_profile_hint: "Declare with “preference: priority: <project>” or “preference: tone: brief / direct / warm”; delete that preference to reset",
     memory_profile_none: "No profile declared yet (priorities / tone)",
+    // ADR-019 secretary desk (01 home)
+    home_desk_title: "🗂 Secretary desk · what to look at now",
+    ph_loading_home: "The secretary is picking what to show…",
+    home_unavailable: "Desk unavailable right now; the detail panels below still work.",
+    home_focus_label: "Focus · the one thing to look at",
+    home_memory_label: "Remembered · one note the secretary picked",
+    home_ask: "💬 Ask the secretary",
+    home_ask_focus_prompt: "About “{title}” ({project}): {why} What should I do about it now?",
+    home_ask_memory_prompt: "You remembered “{title}” — how does it affect what I'm doing now?",
+    home_more_proposals: "{n} more",
+    home_no_focus: "No suggestion crossed the rule threshold; this does not mean everything is done.",
+    home_no_memory: "Nothing to pick yet; type “remember: …” in the chat, or let the daily digest run for a day.",
+    home_why_now: "Why now",
+    home_why_this: "Why this one",
+    home_details_label: "DETAILS",
+    home_detail_proposals: "All proposals",
+    home_detail_memory: "Memory",
+    home_detail_projects: "Active projects",
+    home_detail_repos: "Git sync center",
+    home_detail_knowledge: "Knowledge base",
+    home_detail_summaries: "Summaries & stats",
+    home_leaves: "Left home {today}× today · {yesterday}× yesterday (tab switches in this browser only)",
     memory_kind_decision: "Decision",
     memory_project_ph: "Project (optional)",
     memory_input_ph: "Something the secretary should remember; a preference may say “mute <project>”, “priority: <project>” or “tone: brief”",
@@ -726,6 +770,7 @@ function applyLanguage(lang) {
   if (relatedContextCache) renderRelatedContext(relatedContextCache);
   if (acceptanceCache) renderAcceptance();
   if (memoryCache) renderMemoryList();   // 記憶區清單與個人檔案列的字串也要跟著切換
+  if (homeCache) renderHome();
   if ($("llm-key-status-badge")) renderLLMStatus();
 }
 
@@ -804,6 +849,10 @@ document.addEventListener("DOMContentLoaded", () => {
   loadGreeting();
   initGreetingCard();
   setInterval(loadGreeting, 10 * 60 * 1000);
+  // ADR-019 秘書桌面：與問候卡同節奏重新挑
+  loadHome();
+  initHomeDesk();
+  setInterval(loadHome, 10 * 60 * 1000);
 });
 
 // ---------------------------------------------------- collapsible panels
@@ -866,12 +915,16 @@ function paintThemeBtn() {
 function initTabs() {
   document.querySelectorAll(".tab").forEach(tab => {
     tab.addEventListener("click", () => {
+      const prevTab = document.querySelector(".tab.active");
+      const prev = prevTab ? prevTab.dataset.tab : null;
       document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
       document.querySelectorAll(".pane").forEach(p => p.classList.remove("active"));
       tab.classList.add("active");
       const id = tab.dataset.tab;
       $(id).classList.add("active");
-      if (id === "tab-assistant") { loadSecretaryProposals(); loadAssistantStrip(); syncAssistantModelControls(); loadProjects(); loadTodayView(); loadMemoryPanel(); loadGreeting(); }
+      // ADR-019 的量測指標：「你一天要離開 01 幾次」——只算這個瀏覽器的分頁切換，存 localStorage
+      if (prev === "tab-assistant" && id !== "tab-assistant") recordHomeLeave();
+      if (id === "tab-assistant") { loadSecretaryProposals(); loadAssistantStrip(); syncAssistantModelControls(); loadProjects(); loadTodayView(); loadMemoryPanel(); loadGreeting(); loadHome(); }
       if (id === "tab-knowledge") { loadRAGFolders(); loadRAGSessions(); loadRAGProgress(); }
       if (id === "tab-projects") { loadProjects(); loadRepoSnapshot(); }
       if (id === "tab-repos") loadRepositorySyncStatus();  // 切到分頁才掃描本機 Git，不在開頁時付這個成本
@@ -1980,6 +2033,193 @@ function initGreetingCard() {
   });
   const refresh = $("btn-greeting-refresh");
   if (refresh) refresh.addEventListener("click", loadGreeting);
+}
+
+// ---------------------------------------------------------------- ADR-019 秘書桌面：01 是首頁
+// 卡片由秘書決定該顯示什麼（焦點一張、記得一則、上次做到哪）；完整清單降為可展開的詳情，
+// 其他分頁是更深的詳情。規則在後端（/api/v1/secretary/home），這裡只呈現＋接到對話框。
+let homeCache = null;
+const HOME_LEAVES_KEY = "omni-home-leaves";
+
+function localDateKey(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function readHomeLeaves() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(HOME_LEAVES_KEY) || "{}");
+    return raw && typeof raw === "object" ? raw : {};
+  } catch (_) { return {}; }
+}
+function recordHomeLeave() {
+  const data = readHomeLeaves();
+  const key = localDateKey();
+  data[key] = (Number(data[key]) || 0) + 1;
+  Object.keys(data).sort().slice(0, -14).forEach(k => delete data[k]);   // 只留 14 天
+  try { localStorage.setItem(HOME_LEAVES_KEY, JSON.stringify(data)); } catch (_) { /* 無 localStorage 就不量 */ }
+  renderHomeLeaves();
+}
+function homeLeaveCounts() {
+  const data = readHomeLeaves();
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  return { today: Number(data[localDateKey()]) || 0, yesterday: Number(data[localDateKey(y)]) || 0 };
+}
+function renderHomeLeaves() {
+  const el = $("home-leaves");
+  if (el) el.textContent = t("home_leaves", homeLeaveCounts());
+}
+
+async function loadHome() {
+  const slots = $("home-desk-slots");
+  if (!slots) return;
+  try {
+    homeCache = await getJSON("/api/v1/secretary/home");
+  } catch (e) {
+    homeCache = null;
+    slots.innerHTML = `<div class="placeholder">${esc(t("home_unavailable"))}</div>`;
+    return;
+  }
+  renderHome();
+}
+
+function homeActionButtons(item) {
+  const zh = currentLang === "zh-TW";
+  const actions = item.execution_available
+    ? (item.actions && item.actions.length ? item.actions : (item.action ? [item.action] : []))
+    : [];
+  return actions.map(act => {
+    const tier = esc(String(act.risk_level || "").split("_")[0] || "L?");
+    return `<button class="btn btn-ghost btn-sm" onclick="window.executeProposal('${esc(item.proposal_id)}', '${esc(act.template_id)}')">${act.requires_confirmation ? "🛡️" : "⚡"} ${zh ? "批准執行" : "Approve"}（${tier}）</button>`;
+  }).join("");
+}
+
+function renderHome() {
+  const h = homeCache;
+  const slots = $("home-desk-slots");
+  if (!h || !slots) return;
+  const zh = currentLang === "zh-TW";
+  const errors = Object.entries(h.sections || {}).filter(([, v]) => String(v).startsWith("error"));
+  const badge = $("home-desk-badge");
+  if (badge) {
+    badge.textContent = errors.length ? "PARTIAL" : "RULES";
+    badge.className = `trust ${errors.length ? "broken" : "ok"}`;
+    badge.title = errors.length ? errors.map(([k, v]) => `${k}: ${v}`).join("\n") : (h.claim_boundary || "");
+  }
+  const prof = $("home-desk-profile");
+  if (prof) { prof.textContent = h.profile_line || ""; prof.title = h.profile_line || ""; prof.hidden = !h.profile_line; }
+  const cal = $("home-desk-calendar");
+  const calendar = h.calendar || {};
+  if (cal) {
+    if (calendar.enabled && calendar.line) { cal.textContent = `📅 ${calendar.line}`; cal.title = calendar.claim_boundary || ""; cal.hidden = false; }
+    else cal.hidden = true;
+  }
+
+  // 焦點：提案引擎排序後的第一張
+  const focus = (h.focus || {}).proposal || null;
+  const remaining = (h.focus || {}).remaining || 0;
+  let focusHtml;
+  if (focus) {
+    const link = focus.url ? `<a class="btn btn-ghost btn-sm" href="${esc(focus.url)}" target="_blank" rel="noopener">GitHub →</a>` : "";
+    const ask = t("home_ask_focus_prompt", { title: focus.title || "", project: focus.project_key || "OmniContext", why: focus.why_now || focus.reason || "" });
+    focusHtml = `
+      <div class="home-slot home-slot-focus">
+        <div class="home-slot-label">${esc(t("home_focus_label"))}<span class="trust ${focus.priority === "high" ? "broken" : "noisy"}">${esc(String(focus.priority || "medium").toUpperCase())}</span></div>
+        <div class="home-slot-project">${esc(focus.project_key || "OmniContext")} · ${esc(focus.proposal_type || "")}</div>
+        <div class="home-slot-title">${esc(focus.title || "")}</div>
+        ${focus.detail ? `<div class="home-slot-body">${esc(focus.detail)}</div>` : ""}
+        ${focus.why_now ? `<div class="home-slot-why"><strong>${esc(t("home_why_now"))}：</strong>${esc(focus.why_now)}</div>` : ""}
+        ${focus.reason ? `<div class="home-slot-why">${esc(focus.reason)}</div>` : ""}
+        <div class="home-slot-actions">
+          ${homeActionButtons(focus)}${link}
+          <button class="btn btn-ghost btn-sm" data-home-ask="${esc(ask)}">${esc(t("home_ask"))}</button>
+          <button class="btn btn-ghost btn-sm" data-home-detail="proposals">${esc(remaining ? t("home_more_proposals", { n: remaining }) : t("home_detail_proposals"))} →</button>
+        </div>
+      </div>`;
+  } else {
+    focusHtml = `<div class="home-slot home-slot-focus is-empty"><div class="home-slot-label">${esc(t("home_focus_label"))}</div><div class="home-slot-body">${esc(t("home_no_focus"))}</div></div>`;
+  }
+
+  // 記得：依固定順序挑的一則
+  const pick = h.memory_pick || {};
+  const note = pick.note || null;
+  let memHtml;
+  if (note) {
+    const body = String(note.body || "");
+    const shortBody = body.length > 220 ? body.slice(0, 220) + "…" : body;
+    const ask = t("home_ask_memory_prompt", { title: note.title || shortBody.slice(0, 60) });
+    memHtml = `
+      <div class="home-slot home-slot-memory">
+        <div class="home-slot-label">${esc(t("home_memory_label"))}<span class="trust noisy">${esc(memoryKindLabel(note.kind))}</span></div>
+        <div class="home-slot-project">${note.project_key ? esc(note.project_key) + " · " : ""}${esc(String(note.created_at || "").slice(0, 16).replace("T", " "))}</div>
+        ${note.title ? `<div class="home-slot-title">${esc(note.title)}</div>` : ""}
+        <div class="home-slot-body">${esc(shortBody)}</div>
+        <div class="home-slot-why"><strong>${esc(t("home_why_this"))}：</strong>${esc(pick.why_this || "")}</div>
+        <div class="home-slot-actions">
+          <button class="btn btn-ghost btn-sm" data-home-ask="${esc(ask)}">${esc(t("home_ask"))}</button>
+          <button class="btn btn-ghost btn-sm" data-home-detail="memory">${esc(t("home_detail_memory"))} →</button>
+        </div>
+      </div>`;
+  } else {
+    memHtml = `<div class="home-slot home-slot-memory is-empty"><div class="home-slot-label">${esc(t("home_memory_label"))}</div><div class="home-slot-body">${esc(zh ? (pick.hint || t("home_no_memory")) : t("home_no_memory"))}</div></div>`;
+  }
+  slots.innerHTML = focusHtml + memHtml;
+
+  // 詳情：面板展開或跳分頁，並顯示「一天離開首頁幾次」
+  const d = h.details || {};
+  const det = $("home-desk-details");
+  if (det) {
+    const chip = (key, label, count) => `<button class="home-detail-chip" data-home-detail="${key}">${esc(label)}${count !== undefined && count !== null ? `<b>${esc(String(count))}</b>` : ""}</button>`;
+    det.innerHTML = `<span class="mono-label">${esc(t("home_details_label"))}</span>`
+      + chip("proposals", t("home_detail_proposals"), d.proposals)
+      + chip("memory", t("home_detail_memory"), d.notes)
+      + chip("projects", t("home_detail_projects"), d.active_projects)
+      + chip("repos", t("home_detail_repos"))
+      + chip("knowledge", t("home_detail_knowledge"))
+      + chip("summaries", t("home_detail_summaries"))
+      + `<span class="home-leaves" id="home-leaves"></span>`;
+    renderHomeLeaves();
+  }
+  const boundary = $("home-desk-boundary");
+  if (boundary) boundary.textContent = h.claim_boundary || "";
+}
+
+function askSecretaryAbout(text) {
+  const input = $("input-assistant-prompt");
+  if (!input) return;
+  input.value = String(text || "");
+  input.focus();
+  input.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function openDetailsPanel(id) {
+  const panel = $(id);
+  if (!panel) return;
+  panel.open = true;   // toggle 事件會把狀態記進 localStorage（initCollapsiblePanels）
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function homeDetailAction(kind) {
+  const tabs = { projects: "tab-projects", repos: "tab-repos", knowledge: "tab-knowledge", summaries: "tab-summaries" };
+  if (kind === "proposals") { openDetailsPanel("today-panel"); return; }
+  if (kind === "memory") { openDetailsPanel("memory-panel"); return; }
+  const btn = tabs[kind] ? document.querySelector(`.tab[data-tab="${tabs[kind]}"]`) : null;
+  if (btn) btn.click();
+}
+
+function initHomeDesk() {
+  const desk = $("home-desk");
+  if (!desk) return;
+  desk.addEventListener("click", (ev) => {
+    const ask = ev.target.closest("[data-home-ask]");
+    if (ask) { askSecretaryAbout(ask.dataset.homeAsk); return; }
+    const det = ev.target.closest("[data-home-detail]");
+    if (det) homeDetailAction(det.dataset.homeDetail);
+  });
+  const refresh = $("btn-home-refresh");
+  if (refresh) refresh.addEventListener("click", loadHome);
+  // 詳情面板的 summary 裡有按鈕：按按鈕不該同時開合面板
+  document.querySelectorAll("#today-panel summary button, #memory-panel summary button").forEach(btn => {
+    btn.addEventListener("click", (ev) => { ev.preventDefault(); ev.stopPropagation(); });
+  });
 }
 
 // ---------------------------------------------------------------- ADR-012 小秘書記憶區
