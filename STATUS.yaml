@@ -467,7 +467,7 @@ quality_gates:
   ingestion_provenance: passed_local_rescan_601_sources
   response_finalization: passed_as_final_candidate_contract_not_semantic_correctness
   open_loop_lifecycle: passed_local_db_reconciliation
-  automated_tests: passed_481_contract_tests_55_modules_480_passed_1_conditional_skip
+  automated_tests: passed_502_contract_tests_56_modules_501_passed_1_conditional_skip
   usage_milestone_alpha: passed_contract_and_windows_dashboard_api_smoke
   background_task_receipts: passed_all_three_platform_live_acceptance_48_completed_on_2026_08_29
   repository_sync: passed_contract_tests_and_localhost_read_only_status_smoke
@@ -508,10 +508,12 @@ quality_gates:
   acceptance_center_adr_016: passed_read_only_cheap_probes_only_no_git_no_network_no_index_row_counts_unchanged_after_run_runtime_only_separated_from_pending_human_attestation_never_overrides_machine_verdict_a1_counts_only_completed_days_because_todays_denominator_is_elapsed_so_far_gates_mirror_roadmap_12_3_31_contract_tests_container_playwright_1440_and_494px_cross_platform_run_33900879922_six_jobs_green_on_commit_5112314_merged_to_main_2026_09_05_pr_14_post_merge_run_33936839212_six_jobs_green_on_109b58c
   repo_sync_tracked_clean_gate_addendum_c: passed_untracked_files_no_longer_block_pull_or_push_verified_against_real_git_three_scenarios_per_repo_specific_blocked_reasons_with_counts_visible_in_ui_batch_skip_versus_fail_by_kind_not_message_substring_9_new_contract_tests_container_playwright_reproduction
   secretary_daily_digest_adr_012_addendum_a: implemented_l0_read_only_reduce_of_existing_micro_summaries_and_traceable_counts_no_llm_call_no_new_data_category_prompt_text_never_stored_day_and_project_level_observations_deduped_by_source_ref_deletable_and_ttl_bound_17_contract_tests_container_e2e_reaches_chat_memory_context_live_receipt_pending
+  pattern_aware_proposals_adr_017: implemented_deterministic_project_by_day_activity_matrix_completed_days_only_no_prompt_text_no_llm_no_daily_routine_self_extinguishing_neglected_active_project_l0_handoff_habit_boost_ranking_existing_snooze_mute_diversity_apply_21_contract_tests_live_api_e2e_both_types_live_receipt_pending
   ollama_chain_live_diagnostic: passed_windows_llm_test_2026_08_31_reachable_llama31_8b_generation_8_36s_default_provider_gemini_by_config
   live_receipt_acceptance_scripts: passed_localhost_e2e_background_tasks_and_extension
   autonomous_execution: blocked_by_p2_5
 known_blockers:
+  - "模式感知提案（ADR-017，2026-09-05）已實作：提案引擎開始用（專案 × 日）的活動計數注意到習慣——沒有每日排程就提、前一週活躍近一週歸零的專案就提、主線專案的既有提案加權排前面。**只算已結束的日子、不讀 prompt、不呼叫 LLM、不新增可執行動作**（對應全是既有 template）。容器 E2E 兩種提案都從真實 API 出來；殘餘：使用者連續使用幾天後的實機收據尚未取得（見 docs/TODO.md A16）"
   - "驗收中心的 A1 判定曾把**當天**的 coverage 比例當成「全天」收據（2026-09-05 使用者實機輸出顯示 97.12% passed）；`get_daily_coverage` 對今天的分母是「今天到目前為止經過的時間」，早上跑三小時就可能到 97%。已修正為**只採計已結束的日子**，今天只當進度顯示且永遠不會讓 A1 變綠（回歸測試守門）。**儀表板 usage 面板的 `OBSERVED` 不受影響也沒有錯**——它衡量的本來就是「今天到現在」的採集覆蓋。A1 因此回到 pending：全天 ledger 收據仍未取得"
   - "每日工作誌（ADR-012 Addendum A，2026-09-05）已實作：把當天的可回溯計數與**已保存的**時段微摘要 reduce 成記憶區觀察（日層＋專案層），由 memory_context 注入每次對話——秘書從此有「你每天做了什麼」的底。**不新增資料類別、不呼叫 LLM、沒有新 migration**；prompt 原文仍不落地（契約測試守門）。容器 E2E 已驗證觀察確實進入對話脈絡；殘餘：使用者實機連續幾天的收據尚未取得（見 docs/TODO.md A15）"
   - "Repo 同步中心的 pull/push 前置條件已於 2026-09-05 修正（ADR-011 Addendum C）：untracked 檔案（.lock、build 產物）不再擋 pull／push——以真實 repo 實測 git 對 fast-forward 的三種行為為依據，唯一危險的『untracked 會被覆蓋』情境 Git 自己已 fail-closed 並保留本機內容；拒絕理由改為逐 repo 具體化並顯示在介面上。**殘餘：使用者實機再走一輪 fetch → pull 的收據尚未取得**（原回報：uavMonitor 落後遠端卻沒得按 pull、多個 repo 因 .lock 無法 pull）"

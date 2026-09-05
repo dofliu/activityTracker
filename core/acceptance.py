@@ -702,6 +702,43 @@ def _check_a15(ctx: _Ctx) -> dict[str, Any]:
     return {"status": PENDING, "detail": "還沒跑過 daily_digest。", "evidence": evidence}
 
 
+# ---- A16 模式感知提案 -----------------------------------------------------
+
+
+def _check_a16(ctx: _Ctx) -> dict[str, Any]:
+    """模式提案的判準是「N 對得上你的印象、X 確實是你放下的」——那是人眼；機器只回報
+    模式層現在算出什麼，讓你有東西可以對。"""
+    from core.activity_patterns import collect_pattern_signals, pattern_settings
+
+    settings = pattern_settings(ctx.cfg)
+    evidence: dict[str, Any] = {"enabled": settings["enabled"], "basis": "activity_patterns.collect_pattern_signals"}
+    if not settings["enabled"]:
+        return {"status": NOT_CONFIGURED, "detail": "模式感知提案已關閉。", "evidence": evidence}
+    signals, meta = collect_pattern_signals(database=ctx.database, cfg=ctx.cfg, now=ctx.now)
+    evidence.update({
+        "recent_active_days": meta.get("recent_active_days"),
+        "recent_active_by_project": meta.get("recent_active_by_project", {}),
+        "routine_schedules": meta.get("routine_schedules", []),
+        "pattern_signals": [
+            {"type": s["signal_type"], "project": s["project_key"], "title": s["title"]} for s in signals
+        ],
+    })
+    if not meta.get("recent_active_days"):
+        return {
+            "status": PENDING,
+            "detail": "近一週（不含今天）沒有任何活動紀錄，模式層沒有東西可算；用幾天再看。",
+            "evidence": evidence,
+        }
+    return {
+        "status": NEEDS_HUMAN,
+        "detail": (
+            f"模式層算出 {len(signals)} 筆提案、近一週 {meta.get('recent_active_days')} 天有活動；"
+            "天數與「被冷落」的專案是否符合你的印象，要由你確認。"
+        ),
+        "evidence": evidence,
+    }
+
+
 # ---- 項目清單 -------------------------------------------------------------
 
 _ITEMS: tuple[dict[str, Any], ...] = (
@@ -839,6 +876,15 @@ _ITEMS: tuple[dict[str, Any], ...] = (
         "how": "排程任務新增 daily_digest 或按立即執行，隔天看 01 記憶區並問「我昨天做了什麼」",
         "criterion": "記憶區有至少兩天的工作誌（同一天重跑不重複）",
         "probe": _check_a15,
+    },
+    {
+        "id": "A16",
+        "title": "模式感知提案實機收據",
+        "priority": "P1",
+        "blocks_release": False,
+        "how": "連續使用幾天後看 01 的秘書提案：沒有每日排程／被冷落的專案／主線加權",
+        "criterion": "提案裡的天數與專案符合你的印象；建好排程後 no_daily_routine 消失（人眼確認）",
+        "probe": _check_a16,
     },
 )
 

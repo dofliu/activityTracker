@@ -249,6 +249,17 @@ proactive_secretary:
     enabled: true
     max_projects: 5      # 最多為幾個專案各留一則專案層觀察
     max_highlights: 4    # 當日重點最多引用幾則時段微摘要
+  # 模式感知提案（ADR-017）：秘書用（專案 × 日）的活動計數注意到你的習慣——
+  # 近一週在工作卻沒有每日排程、前一週活躍這週歸零的專案、主線專案的既有提案
+  # 加權排前面。只算已結束的日子、不讀 prompt 內容、不推測意圖；對應的動作全部
+  # 是既有 template，執行仍需批准。
+  patterns:
+    enabled: true
+    lookback_days: 7             # 「近一週」的長度；前一週用同樣長度往前推
+    routine_min_active_days: 4   # 近一週至少幾天在工作，才提「沒有每日排程」
+    neglect_min_prev_days: 3     # 前一週至少活躍幾天，近一週 0 天才提「被冷落」
+    habit_min_days: 3            # 近一週活躍幾天以上算主線，其既有提案加權
+    habit_boost: 0.15            # 加多少分（0 = 關閉加權）
   greeting:
     display_name: ''
     # 晨報（Telegram／LINE）開頭也帶這段話；07:30 多半還沒有今日活動，會改說昨天
