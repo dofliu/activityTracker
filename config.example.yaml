@@ -260,6 +260,9 @@ proactive_secretary:
     neglect_min_prev_days: 3     # 前一週至少活躍幾天，近一週 0 天才提「被冷落」
     habit_min_days: 3            # 近一週活躍幾天以上算主線，其既有提案加權
     habit_boost: 0.15            # 加多少分（0 = 關閉加權）
+  # ADR-018 宣告式個人檔案：偏好筆記裡的「優先：X、Y」與「語氣：簡潔｜直接｜溫暖」
+  profile:
+    priority_boost: 0.2          # 「優先：」宣告的專案，其提案加分（刻意大於 patterns.habit_boost；0 = 關閉）
   greeting:
     display_name: ''
     # 晨報（Telegram／LINE）開頭也帶這段話；07:30 多半還沒有今日活動，會改說昨天

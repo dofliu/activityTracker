@@ -209,6 +209,8 @@ def _signal_to_proposal(signal: dict[str, Any], now: datetime) -> dict[str, Any]
     }
     if signal.get("habit_boosted"):
         proposal["habit_boosted"] = True
+    if signal.get("priority_declared"):
+        proposal["priority_declared"] = True
     return proposal
 
 
@@ -332,6 +334,25 @@ def build_action_proposals(
         pattern_meta = {"used": False, "reason": f"error:{type(exc).__name__}"}
     counters["patterns"] = pattern_meta
 
+    # ADR-018 宣告式個人檔案：你標為「本期優先」的專案，所有訊號（含被冷落）加分。
+    # 加分刻意大於習慣加權——你說的優先勝過我從活動推出來的主線。
+    profile_meta: dict[str, Any] = {"declared": False}
+    try:
+        from .secretary_profile import apply_priority_boost, load_profile, priority_boost_value
+
+        profile = load_profile(database=database)
+        profile_meta = {
+            "declared": profile["declared"],
+            "priorities": profile["priorities"],
+            "tone": profile["tone"],
+            "priority_boosted": apply_priority_boost(
+                signals, profile["priorities"], boost=priority_boost_value(cfg)
+            ),
+        }
+    except Exception as exc:  # noqa: BLE001 — 個人檔案故障不得拖垮提案清單
+        profile_meta = {"declared": False, "reason": f"error:{type(exc).__name__}"}
+    counters["profile"] = profile_meta
+
     # 記憶區（ADR-012）：偏好筆記裡的「不要提醒 X」壓掉提案；決定／筆記附在同專案的提案卡上。
     mutes: set[str] = set()
     memory_lines: dict[str, list[str]] = {}
@@ -391,6 +412,7 @@ def build_action_proposals(
             "repo_issue_backlog": counters.get("repo_issue_backlog", {}),
             "repo_sync_snapshot": counters.get("repo_sync_snapshot", {}),
             "patterns": counters.get("patterns", {}),
+            "profile": counters.get("profile", {}),
             "max_per_project": max_per_project,
             "stalled_open_loop_hours": stalled_hours,
             "unfinished_recent_min_idle_hours": recent_idle_hours,

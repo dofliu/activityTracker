@@ -343,6 +343,12 @@ ENCOURAGEMENT_POOLS: dict[str, tuple[str, ...]] = {
         "週末還在推進專案，辛苦了；也記得留一段時間給自己。",
         "假日的進度都是加分。做到一個段落就放下，好好休息。",
     ),
+    # ADR-018「語氣：直接」：一句話、不安慰、不加油，只講下一步。
+    "direct": (
+        "下一步：挑一件最該收尾的，做完再看清單。",
+        "進度如上。接下來先處理排在最前面的那一項。",
+        "以上是事實。要動的話，從第一張提案開始。",
+    ),
 }
 
 
@@ -385,8 +391,13 @@ def compose_greeting(
     now: datetime,
     name: str = "",
     agenda: dict[str, Any] | None = None,
+    tone: str = "warm",
 ) -> dict[str, Any]:
-    """規則版：問候＋成就清單＋（今天視窗）行程一句＋鼓勵語；全部可回溯到 stats。"""
+    """規則版：問候＋成就清單＋（今天視窗）行程一句＋鼓勵語；全部可回溯到 stats。
+
+    ``tone``（ADR-018）只改鼓勵語怎麼講：``warm`` 沿用情境池、``direct`` 一句話、
+    ``brief`` 不講。它不碰任何數字——事實閘照樣生效。
+    """
     window = stats.get("window", "today")
     schedule_line = None
     schedule: dict[str, Any] | None = None
@@ -428,7 +439,13 @@ def compose_greeting(
         lead = "昨天你："
     else:
         lead = "過去兩小時，你："
-    encouragement, pool = choose_encouragement(stats, now=now, seed=seed)
+    if tone == "brief":
+        encouragement, pool = "", "brief_omitted"
+    elif tone == "direct":
+        encouragement, pool = _pick("direct", seed), "direct"
+    else:
+        tone = "warm"
+        encouragement, pool = choose_encouragement(stats, now=now, seed=seed)
     recent = stats.get("recent_summaries") or []
     return {
         "window": window,
@@ -441,6 +458,7 @@ def compose_greeting(
         "schedule": schedule,
         "encouragement": encouragement,
         "encouragement_pool": pool,
+        "tone": tone,
         "source": "rules",
         "generated_at": now.isoformat(timespec="seconds"),
         "stats": {k: v for k, v in stats.items() if k not in ("sources",)},
@@ -575,7 +593,16 @@ def build_greeting(
             agenda = day_agenda(now=now, database=database, cfg=cfg)
         except Exception as exc:  # noqa: BLE001 — 行程讀不到只少一句話
             logger.debug("agenda unavailable for greeting: %s", type(exc).__name__)
-    greeting = compose_greeting(stats, now=now, name=display_name(cfg) if name is None else name, agenda=agenda)
+    tone = "warm"
+    try:
+        from core.secretary_profile import load_profile
+
+        tone = load_profile(database=database).get("tone", "warm")
+    except Exception as exc:  # noqa: BLE001 — 個人檔案讀不到就用預設語氣
+        logger.debug("profile tone unavailable for greeting: %s", type(exc).__name__)
+    greeting = compose_greeting(
+        stats, now=now, name=display_name(cfg) if name is None else name, agenda=agenda, tone=tone
+    )
     greeting["text"] = plain_text(greeting)
     if use_llm:
         greeting = polish_with_llm(greeting, cfg=cfg, now=now)

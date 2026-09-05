@@ -682,6 +682,18 @@ def get_secretary_memory_context():
     return memory_context()
 
 
+@app.get("/api/v1/secretary/profile")
+def get_secretary_profile():
+    """ADR-018 宣告式個人檔案：從偏好筆記解析出的「本期優先」與「語氣」；唯讀。
+
+    沒有寫入端點——要改就在對話框或 Telegram 打「偏好：優先：…」「偏好：語氣：…」，
+    或刪掉那則偏好筆記；個人檔案永遠只是偏好筆記的一種讀法，不是第二套資料。
+    """
+    from core.secretary_profile import load_profile
+
+    return load_profile()
+
+
 @app.post("/api/v1/secretary/scheduled-tasks/presets")
 def create_secretary_schedule_presets(request: Request):
     """一鍵建立預設每日排程（早晨包 07:30、晚間 Handoff 21:30）；已存在者跳過。"""
