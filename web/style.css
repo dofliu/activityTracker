@@ -217,8 +217,8 @@ details.sub-collapsible > summary::before { content: "▸"; color: var(--mu); fo
 details.sub-collapsible[open] > summary::before { transform: rotate(90deg); }
 
 /* ---------- Shell ---------- */
-.shell { display: grid; grid-template-columns: minmax(0, 1fr) 272px; align-items: start; }
-.main { padding: 18px 22px 40px; min-width: 0; }
+.shell { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; }   /* 右欄已移入 05／06（ADR-019 Addendum B） */
+.main { padding: 18px 22px 24px; min-width: 0; }
 .rail { position: sticky; top: 100px; padding: 18px 22px 40px 0; display: flex; flex-direction: column; gap: 12px; }
 .pane { display: none; }
 .pane.active { display: block; }
@@ -934,10 +934,10 @@ details.trust-panel[open] summary { border-bottom: none; }
 }
 
 /* 01 小秘書：左＝今日行動清單、中＝交辦與提問；右欄為全站 rail（統計可收合＋Focus Now） */
-.assistant-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 14px; align-items: start; }
+.assistant-columns { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 14px; align-items: start; }
 .assistant-col { min-width: 0; }
 .assistant-col-chat .assistant-hero { margin-bottom: 0; }
-.assistant-col-chat .assistant-chat-messages { min-height: 320px; max-height: 60vh; }
+.assistant-col-chat .assistant-chat-messages { min-height: 220px; max-height: 42vh; }
 .assistant-col-today .secretary-inbox { margin-bottom: 0; }
 .rail-stats { padding: 0; }
 .rail-stats-head { cursor: pointer; list-style: none; user-select: none; }
@@ -1081,3 +1081,37 @@ details.trust-panel[open] summary { border-bottom: none; }
 @media (max-width: 640px) {
   .home-slot { border-right: none; }
 }
+
+/* ADR-019 Addendum B：首頁兩塊、一屏 */
+.home-greeting { padding: 10px 14px 8px; border-bottom: 1px solid var(--bd);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--s1)), color-mix(in srgb, var(--accent) 4%, var(--s1)));
+  box-shadow: inset 3px 0 0 var(--accent); }
+.home-greeting .greeting-line { margin: 0 0 3px; font-size: 13px; line-height: 1.5; }
+.home-greeting .greeting-headline { font-size: 14.5px; }
+.home-greeting .greeting-list { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 2px 0 4px; padding: 0; list-style: none; font-size: 12.5px; line-height: 1.5; }
+.home-greeting .greeting-list li::before { content: "· "; color: var(--accent); font-weight: 700; }
+.home-greeting .greeting-stats { margin: 4px 0 2px; }
+.home-greeting .context-memory-boundary { margin: 4px 0 0; }
+.home-desk-tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.home-slot-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.home-slot-body { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.home-more { border-top: 1px solid var(--bd); }
+.home-more > summary.panel-head { border-bottom: none; }
+.home-more[open] > summary.panel-head { border-bottom: 1px solid var(--bd); }
+.home-more .secretary-proposals-list { max-height: 380px; }
+.assistant-hero .memory-panel { border-top: 1px solid var(--bd); margin-top: 8px; }
+.assistant-hero .memory-panel > summary.panel-head { border-bottom: none; }
+.assistant-hero .memory-panel[open] > summary.panel-head { border-bottom: 1px solid var(--bd); }
+.summaries-rail-strip { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; align-items: start; }
+.summaries-rail-strip .focus-carousel { min-height: 260px; }
+@media (max-width: 900px) {
+  .summaries-rail-strip { grid-template-columns: 1fr; }
+}
+/* 邊界文字一行顯示、完整內容在 title（滑過可讀）；不隱藏，只省高度 */
+.home-desk .context-memory-boundary, .home-greeting .context-memory-boundary { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: help; }
+.home-greeting .greeting-stats { margin: 2px 0 0; }
+/* 1440×900 一屏：桌面各段再收 2px 內距 */
+.home-desk .today-resume { padding: 10px 14px; }
+.home-desk .home-slot { padding: 10px 14px; }
+.home-desk .home-desk-details { padding: 6px 14px; }
+.home-greeting { padding: 8px 14px 6px; }
