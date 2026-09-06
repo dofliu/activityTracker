@@ -170,8 +170,9 @@ def test_morning_pack_survives_memory_failure(monkeypatch, tmp_path):
     assert receipt["needs_pull"] == 1 and receipt["observations_written"] == 0
     # 每日工作誌是「讀資料」的步驟，資料庫真的壞掉時它如實記錯（其他步驟照跑），
     # 使用者才知道那天的工作誌沒寫成——這與「記憶層失敗要靜默」是兩件事。
-    assert receipt["errors"] == ["daily_digest: RuntimeError"]
-    assert receipt.get("digest_notes_written") is None
+    # ADR-020 的每週回顧同樣是讀資料的步驟，同一個壞掉的資料庫也如實記錯。
+    assert receipt["errors"] == ["daily_digest: RuntimeError", "weekly_review: RuntimeError"]
+    assert receipt.get("digest_notes_written") is None and receipt.get("weekly_review_label") is None
 
 
 # ---- 提案引擎讀偏好 ----

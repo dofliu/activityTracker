@@ -8,8 +8,9 @@
 
 - **焦點**：提案引擎排序後的第一張（分數已含 ADR-017 習慣加權與 ADR-018 你宣告的優先），
   附「為什麼是現在」與既有的可執行動作（executor 開著才有；執行仍需批准）。
-- **記得**：一則筆記，依固定順序挑——與焦點專案有關的決定／筆記 → 最近一天的工作誌
-  （日層、未過期）→ 你釘選的 → 你最近記下的；挑不到就如實說沒有。
+- **記得**：一則筆記，依固定順序挑——與焦點專案有關的決定／筆記 → 剛出爐的每週回顧
+  （ADR-020，三天內）→ 最近一天的工作誌（日層、未過期）→ 你釘選的 → 你最近記下的；
+  挑不到就如實說沒有。
 - **上次做到哪**、行事曆一句、個人檔案一行、各詳情面板的計數。
 
 不呼叫 LLM、不寫任何資料、沒有新表；每一節各自隔離失敗（``sections`` 如實回報），
@@ -18,7 +19,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from core.config import get_config
@@ -29,18 +30,20 @@ from core.time_utils import get_local_now
 
 HOME_CLAIM_BOUNDARY = (
     "首頁只重新排列既有的唯讀資料：焦點＝提案引擎排序後的第一張（含你宣告的優先與習慣加權）、"
-    "記得＝依固定順序挑的一則筆記（焦點專案的決定 → 最近一天的工作誌 → 釘選 → 最近記下的）。"
+    "記得＝依固定順序挑的一則筆記（焦點專案的決定 → 剛出爐的每週回顧 → 最近一天的工作誌 → 釘選 → 最近記下的）。"
     "規則是確定性的，不呼叫 LLM、不寫任何資料；完整清單仍在下方詳情與其他分頁。"
 )
 
 MEMORY_PICK_RULES: dict[str, str] = {
     "focus_project": "與焦點專案有關的決定／筆記",
+    "weekly_review": "剛出爐的每週回顧（說的 vs 做的）",
     "daily_digest": "最近一天的工作誌",
     "pinned": "你釘選的",
     "recent": "你最近記下的",
 }
 NO_MEMORY_HINT = "還沒有可挑的記憶；在對話框打「記下來：…」，或讓每日工作誌跑一天。"
 _MEMORY_SCAN_LIMIT = 300
+WEEKLY_REVIEW_FRESH_DAYS = 3   # 每週回顧只在剛出爐的幾天內優先於每日工作誌
 
 # 這兩種提案講的是 OmniContext 自己的設定（extension 沒 heartbeat、秘書沒有每日排程），不是你的工作。
 # 它們留在完整清單裡，但只有在沒有任何工作提案時才佔焦點——首頁的焦點該是你的事，不是工具的事。
@@ -93,6 +96,17 @@ def pick_memory(
         for note in notes:
             if note["kind"] in ("decision", "user_note") and str(note.get("project_key") or "").casefold() == wanted:
                 return _result(note, "focus_project")
+    # ADR-020：剛出爐的每週回顧（說的 vs 做的）比昨天的工作誌更值得先看，但只在頭幾天。
+    fresh_cutoff = now - timedelta(days=WEEKLY_REVIEW_FRESH_DAYS)
+    for note in notes:
+        created = _created(note)
+        if (
+            note["kind"] == "observation"
+            and note.get("source") == "weekly_review"
+            and created is not None
+            and created >= fresh_cutoff
+        ):
+            return _result(note, "weekly_review")
     cutoff = now - observation_ttl(cfg)
     for note in notes:
         created = _created(note)
