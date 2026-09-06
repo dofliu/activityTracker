@@ -694,6 +694,17 @@ def get_secretary_profile():
     return load_profile()
 
 
+@app.get("/api/v1/secretary/home")
+def get_secretary_home():
+    """ADR-019 秘書桌面：01 首頁「現在該看的」——焦點提案、一則記憶、上次做到哪、各詳情計數。
+
+    只重新排列既有唯讀資料，規則確定性、不呼叫 LLM、不寫任何東西；每一節各自隔離失敗。
+    """
+    from core.secretary_home import build_home
+
+    return build_home()
+
+
 @app.post("/api/v1/secretary/scheduled-tasks/presets")
 def create_secretary_schedule_presets(request: Request):
     """一鍵建立預設每日排程（早晨包 07:30、晚間 Handoff 21:30）；已存在者跳過。"""

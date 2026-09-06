@@ -77,18 +77,34 @@
             <div class="context-memory-boundary" id="greeting-boundary"></div>
           </div>
         </section>
-        <section class="panel secretary-inbox mb-14" id="today-panel">
+        <!-- ADR-019 秘書桌面：01 是首頁——由秘書決定「現在該看的一件事」「記得的一則」與「上次做到哪」；
+             完整的提案清單與記憶區降為下方可展開的詳情，其他分頁是更深的詳情。規則確定性、不呼叫 LLM。 -->
+        <section class="panel home-desk mb-14" id="home-desk">
           <div class="panel-head">
-            <span class="mono-label accent" data-i18n="today_title">TODAY · 今日行動清單</span>
+            <span class="mono-label accent" data-i18n="home_desk_title">🗂 秘書桌面 · 現在該看的</span>
+            <span id="home-desk-badge" class="trust noisy">RULES</span>
+            <span class="head-right" style="display:flex; gap:6px; align-items:center;">
+              <span id="home-desk-profile" class="mono-mini muted home-desk-profile" hidden></span>
+              <button class="btn btn-ghost btn-sm" id="btn-home-refresh" title="重新整理桌面">↻</button>
+            </span>
+          </div>
+          <div id="today-resume" class="today-resume"><div class="placeholder" data-i18n="ph_loading_projects">載入進行中工作…</div></div>
+          <div id="home-desk-calendar" class="today-pack mono-mini muted" hidden></div>
+          <div id="home-desk-slots" class="home-desk-slots"><div class="placeholder" data-i18n="ph_loading_home">秘書正在挑現在該看的…</div></div>
+          <div id="home-desk-details" class="home-desk-details"></div>
+          <div class="context-memory-boundary" id="home-desk-boundary"></div>
+        </section>
+        <details class="panel secretary-inbox panel-collapsible mb-14" id="today-panel">
+          <summary class="panel-head memory-head">
+            <span class="mono-label accent" data-i18n="today_title">TODAY · 全部提案（詳情）</span>
             <span class="trust noisy">PROPOSAL ONLY</span>
             <span id="secretary-proposals-badge" class="trust noisy">LOADING</span>
             <span class="head-right" style="display:flex; gap:6px; align-items:center;">
               <button id="btn-create-presets" class="btn btn-ghost btn-sm" data-i18n="btn_create_presets" title="建立每日 07:30 早晨包（同步報告＋STATUS 草稿＋活躍專案 Handoff）與 21:30 晚間 Handoff；全部 L0 唯讀，需 execution token">📦 建立每日排程</button>
               <button id="btn-refresh-proposals" class="btn btn-ghost btn-sm" data-i18n="btn_refresh_proposals">重新整理</button>
             </span>
-          </div>
+          </summary>
           <div class="secretary-inbox-body">
-            <div id="today-resume" class="today-resume"><div class="placeholder" data-i18n="ph_loading_projects">載入進行中工作…</div></div>
             <div id="today-pack" class="today-pack mono-mini muted" hidden></div>
             <div id="today-calendar" class="today-pack mono-mini muted" hidden></div>
             <div class="secretary-inbox-tools">
@@ -97,7 +113,7 @@
             <div id="secretary-proposals-list" class="secretary-proposals-list"><div class="placeholder" data-i18n="ph_loading_proposals">正在整理可追溯建議…</div></div>
             <div class="context-memory-boundary" data-i18n="secretary_boundary">只呈現本機 evidence 衍生建議；不保存、不會自動執行。LLM 註解（若啟用）僅供參考，預設使用本機模型。</div>
           </div>
-        </section>
+        </details>
           </div>
           <div class="assistant-col assistant-col-chat">
         <div class="panel assistant-hero mb-14">
@@ -118,7 +134,7 @@
         </div>
 
         <!-- ADR-012 小秘書記憶區：筆記／偏好／決定＋秘書觀察；也是對話與提案的固定參考來源 -->
-        <details class="panel memory-panel mb-14" id="memory-panel" open>
+        <details class="panel memory-panel panel-collapsible mb-14" id="memory-panel">
           <summary class="panel-head memory-head">
             <span class="mono-label accent" data-i18n="memory_title">🧠 小秘書記憶區</span>
             <span id="memory-badge" class="trust noisy">…</span>

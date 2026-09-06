@@ -467,7 +467,7 @@ quality_gates:
   ingestion_provenance: passed_local_rescan_601_sources
   response_finalization: passed_as_final_candidate_contract_not_semantic_correctness
   open_loop_lifecycle: passed_local_db_reconciliation
-  automated_tests: passed_529_contract_tests_57_modules_528_passed_1_conditional_skip
+  automated_tests: passed_543_contract_tests_58_modules_542_passed_1_conditional_skip
   usage_milestone_alpha: passed_contract_and_windows_dashboard_api_smoke
   background_task_receipts: passed_all_three_platform_live_acceptance_48_completed_on_2026_08_29
   repository_sync: passed_contract_tests_and_localhost_read_only_status_smoke
@@ -510,10 +510,12 @@ quality_gates:
   secretary_daily_digest_adr_012_addendum_a: implemented_l0_read_only_reduce_of_existing_micro_summaries_and_traceable_counts_no_llm_call_no_new_data_category_prompt_text_never_stored_day_and_project_level_observations_deduped_by_source_ref_deletable_and_ttl_bound_17_contract_tests_container_e2e_reaches_chat_memory_context_live_receipt_pending
   pattern_aware_proposals_adr_017: implemented_deterministic_project_by_day_activity_matrix_completed_days_only_no_prompt_text_no_llm_no_daily_routine_self_extinguishing_neglected_active_project_l0_handoff_habit_boost_ranking_existing_snooze_mute_diversity_apply_21_contract_tests_live_api_e2e_both_types_live_receipt_pending
   declared_profile_adr_018: implemented_priority_and_tone_directives_parsed_only_from_preference_notes_no_inference_from_activity_or_prompts_priority_boost_0_2_deliberately_outranks_habit_boost_0_15_and_includes_neglected_signals_tone_changes_encouragement_wording_only_facts_identical_across_tones_read_only_profile_endpoint_no_write_path_no_migration_27_contract_tests_live_receipt_pending
+  secretary_desk_home_adr_019: implemented_deterministic_pick_of_focus_and_one_memory_from_existing_read_only_data_system_setup_proposals_never_occupy_focus_while_work_proposals_exist_full_lists_collapsed_to_details_with_persisted_state_cards_prefill_the_chat_leave_home_counter_local_storage_only_no_llm_no_writes_read_only_endpoint_14_contract_tests_container_e2e_live_receipt_pending
   ollama_chain_live_diagnostic: passed_windows_llm_test_2026_08_31_reachable_llama31_8b_generation_8_36s_default_provider_gemini_by_config
   live_receipt_acceptance_scripts: passed_localhost_e2e_background_tasks_and_extension
   autonomous_execution: blocked_by_p2_5
 known_blockers:
+  - "秘書桌面（ADR-019，2026-09-05）已實作：01 成為首頁——秘書用確定性規則從既有資料挑焦點一張（第一張關於你的工作的提案；Extension heartbeat／沒有每日排程這類工具自身提醒不佔焦點）與記得一則（焦點專案的決定 → 最近一天的工作誌 → 釘選 → 最近記下的），完整清單降為預設收合的詳情，每張卡一鍵預填對話，桌面顯示「今天離開首頁 N 次」（只在瀏覽器）。**不用 LLM 挑、不寫任何資料、唯讀端點**。殘餘：實機收據尚未取得（見 docs/TODO.md A18）；個性化三步（ADR-017／018／019）到此完成，下一步等使用者用幾天後的回饋"
   - "宣告式個人檔案（ADR-018，2026-09-05）已實作：偏好筆記裡的「優先：X、Y」與「語氣：簡潔｜直接｜溫暖」變成會改變行為的設定——優先專案的所有提案加 0.2 分（刻意大於習慣加權 0.15，被冷落的優先專案也浮上來），語氣只改問候／晨報／today 的鼓勵語措辭、不改任何數字。**只認使用者明確寫下的字，不從活動或 prompt 推斷；沒有第二套資料，GET /api/v1/secretary/profile 唯讀**。殘餘：實機收據尚未取得（見 docs/TODO.md A17）；個性化第三步（01 成為真正的首頁）待使用者確認"
   - "模式感知提案（ADR-017，2026-09-05）已實作：提案引擎開始用（專案 × 日）的活動計數注意到習慣——沒有每日排程就提、前一週活躍近一週歸零的專案就提、主線專案的既有提案加權排前面。**只算已結束的日子、不讀 prompt、不呼叫 LLM、不新增可執行動作**（對應全是既有 template）。容器 E2E 兩種提案都從真實 API 出來；殘餘：使用者連續使用幾天後的實機收據尚未取得（見 docs/TODO.md A16）"
   - "驗收中心的 A1 判定曾把**當天**的 coverage 比例當成「全天」收據（2026-09-05 使用者實機輸出顯示 97.12% passed）；`get_daily_coverage` 對今天的分母是「今天到目前為止經過的時間」，早上跑三小時就可能到 97%。已修正為**只採計已結束的日子**，今天只當進度顯示且永遠不會讓 A1 變綠（回歸測試守門）。**儀表板 usage 面板的 `OBSERVED` 不受影響也沒有錯**——它衡量的本來就是「今天到現在」的採集覆蓋。A1 因此回到 pending：全天 ledger 收據仍未取得"

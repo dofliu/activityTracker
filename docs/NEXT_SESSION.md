@@ -1,6 +1,6 @@
 # 下一個 Session 接手指南
 
-> 最後更新：2026-09-05（session `claude/activity-tracker-next-steps-en44qo`：**驗收中心 ADR-016 已合併進 main**（PR #14，合併後 main CI 六個 job 全綠）＋**同步中心 pull/push 前置條件修正 ADR-011 Addendum C**＋**每日工作誌 ADR-012 Addendum A**＋**模式感知提案 ADR-017**＋**宣告式個人檔案 ADR-018**；前一輪 `claude/stoic-hamilton-4oicm4`：秘書記憶區 ADR-012、Telegram 手機對話 ADR-013、多通道推播與短效解鎖碼 ADR-014、系統設定左欄切換、小秘書問候卡、本機行事曆採集 ADR-015）。
+> 最後更新：2026-09-05（session `claude/activity-tracker-next-steps-en44qo`：**驗收中心 ADR-016 已合併進 main**（PR #14，合併後 main CI 六個 job 全綠）＋**同步中心 pull/push 前置條件修正 ADR-011 Addendum C**＋**每日工作誌 ADR-012 Addendum A**＋**模式感知提案 ADR-017**＋**宣告式個人檔案 ADR-018**＋**秘書桌面 ADR-019**；前一輪 `claude/stoic-hamilton-4oicm4`：秘書記憶區 ADR-012、Telegram 手機對話 ADR-013、多通道推播與短效解鎖碼 ADR-014、系統設定左欄切換、小秘書問候卡、本機行事曆採集 ADR-015）。
 >
 > 這頁是給「下一個開發 session（人或 AI）」的**最短接手路徑**，只放現況、地圖與環境備忘。
 > 細節一律不在這裡重寫：**做過什麼**看 [ROADMAP.md](../ROADMAP.md) §11、**為什麼這樣設計**看對應 ADR、
@@ -13,8 +13,8 @@
 | 版本 | v1.3.0a5 已發佈為 GitHub pre-release（release workflow 自動 build → verify → release，SHA-256 receipt 交叉驗證）。`release_ready: false`，唯一**能力型**缺口是全天 coverage ledger 實測（TODO A1）。 |
 | 還缺什麼 | 別憑記憶：跑 `python main.py verify`（或看「06 系統設定 → 驗收中心」）就會列出 A1–A17 每一項現在有沒有收據，以及 ROADMAP §12.3 四個 gate 缺什麼。 |
 | Schema | migration **18/18**（append-only + checksum；**新表一律進 registry，不得靠 `create_all` 繞過**）。017 = `secretary_notes`、018 = `calendar_events`。 |
-| 測試 | **57 個 contract test 模組、529 項**（528 passed + 1 skipped）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
-| 導覽 | 6 分頁：01 小秘書（三欄）／02 知識庫／03 進行中工作／04 Git 同步中心／05 摘要與統計／06 系統設定（左欄 11 區塊，末項為**驗收中心**）。桌面與 494px 皆無水平溢出（Playwright 實測）。 |
+| 測試 | **58 個 contract test 模組、543 項**（542 passed + 1 skipped）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
+| 導覽 | 6 分頁：01 小秘書（首頁：問候卡＋**秘書桌面**＋預設收合的全部提案與記憶區；中欄交辦框；右欄統計與 Focus Now）／02 知識庫／03 進行中工作／04 Git 同步中心／05 摘要與統計／06 系統設定（左欄 11 區塊，末項為**驗收中心**）。桌面與 494px 皆無水平溢出（Playwright 實測）。 |
 | 外觀 | 兩個獨立軸：`data-theme`（dark/light）× `data-accent`（naruto/forest/ocean），CSS 全走 `var(--accent)`；新配色只需加一組變數區塊。偏好存 localStorage（`omni-theme`／`omni-palette`／`omni-settings-pane`）。 |
 | 危險能力 | 執行器、L2、L2 寫入、自訂排程、Telegram 對話、`allow_remote_arm`、LINE、問候卡 LLM 潤飾——**全部預設關閉**；行事曆預設開但沒設路徑就等於停用。 |
 
@@ -33,6 +33,7 @@
 | 每日工作誌（你做了什麼） | `core/activity_digest.py`（L0 template `daily_digest`，也是早晨包第四步） | `test_activity_digest.py`（17） | [ADR-012 Addendum A](ADR-012-secretary-memory.md) |
 | 模式感知提案（秘書用它記得的東西） | `core/activity_patterns.py`（活動矩陣、`no_daily_routine`／`neglected_active_project`、習慣加權）；接在 `proactive_secretary.build_action_proposals` | `test_activity_patterns.py`（21） | [ADR-017](ADR-017-pattern-aware-proposals.md) |
 | 宣告式個人檔案（優先／語氣） | `core/secretary_profile.py`（`優先：`／`語氣：` 指令解析、優先加分、語氣）；接在 `build_action_proposals`、`memory_context`、`build_greeting`；`GET /api/v1/secretary/profile` 唯讀 | `test_secretary_profile.py`（27） | [ADR-018](ADR-018-declared-profile.md) |
+| 秘書桌面（01 首頁） | `core/secretary_home.py`（焦點＝第一張關於你的工作的提案、記得＝四級順序挑一則、詳情計數）；`GET /api/v1/secretary/home` 唯讀；前端 `renderHome`／`recordHomeLeave` | `test_secretary_home.py`（14） | [ADR-019](ADR-019-secretary-desk-home.md) |
 | 每日包與今日視圖 | `core/secretary_packs.py` | `test_secretary_packs.py`（9） | [ADR-008](ADR-008-gated-agent-executor.md) L0 |
 | 問候卡（01 首頁＋晨報開頭） | `core/secretary_greeting.py` | `test_secretary_greeting.py`（23）＋晨報三項 | ROADMAP §11（2026-09-04） |
 | 推播組裝與通道 | `notifiers/messages.py`、`notifiers/channels.py`、`notifiers/secretary_push.py` | `test_notification_channels.py`（32） | [ADR-014](ADR-014-multi-channel-push-and-arm-code.md) |
@@ -58,6 +59,7 @@
 - **灰掉的按鈕要說為什麼**：同一句放諸四海的條件敘述等於沒說。理由要帶這個 repo 的實際數字，並直接顯示在列上，不要只放 tooltip。
 - **新訊號就加一個 collector，不要改引擎核心**：`build_action_proposals` 的骨架是「收集 signals → snooze/mute → 排序 → diversity」。模式提案（ADR-017）只是多一個 `collect_*_signals` 與一段加權，形狀與其他 signal 一致就自動享有 snooze／mute／上限。
 - **「偏好」要能改變行為，否則只是注入的文字**：ADR-012 的偏好筆記原本只有 `mute:` 是真的。新的個人化需求先問「使用者能不能直接寫下來」——能就做成明確指令（ADR-018 的 `優先：`／`語氣：`），從偏好筆記解析、不開第二套資料、不從活動或 prompt 推斷；宣告的權重要壓過推出來的（0.2 > 0.15）。
+- **首頁的焦點是使用者的事，不是工具的事**：分數最高的提案不一定該上首頁——`verify_extension_heartbeat` 永遠 1.0 分，若不排除會永久占住焦點（ADR-019 容器 E2E 第一輪就看到）。任何「挑一張給使用者」的規則都先問：這張講的是他的工作，還是 OmniContext 自己的設定？
 - **「今天的比例」不是「全天的比例」**：`get_daily_coverage` 對當天的分母是已過的時間，早上跑三小時就能顯示 97%。任何宣稱「全天／完整期間」的判定都只能採計**已結束**的日子（2026-09-05 驗收中心 A1 就是這樣出現假綠燈的）。
 - **記憶體狀態不能在 CLI 假裝查得到**：檢索 worker 的 `state`／預熱計數只存在主服務程序，另開一個 Python 程序永遠是 cold。驗收中心為此有 `runtime_only` 這一格——把它報成「還沒做」等於說謊。新增任何「查現況」功能時先問：這個數字在哪個程序裡？
 
