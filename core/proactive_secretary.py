@@ -47,6 +47,8 @@ SUGGESTED_ACTIONS = {
     # ADR-017 模式感知：對應的都是既有 template，這裡只講該做的判斷。
     "no_daily_routine": "在「01 小秘書 → 今日行動清單」按「📦 建立每日排程」（需 execution token）；之後每天早上會有早晨包與工作誌，記憶區才會累積。",
     "neglected_active_project": "看一眼 Context Handoff 決定要接續還是明確放下；不決定的話脈絡會繼續流失。",
+    # ADR-020 每週回顧：說的 vs 做的——二選一，別讓宣告只是字。
+    "priority_drift": "決定一件事：下週把時間排給它（看一眼 Handoff 接續），或改宣告——在對話框打「偏好：優先：…」換成你真正在做的。",
 }
 
 
@@ -81,6 +83,8 @@ def why_now(signal_type: str, age_days: float, extra: dict[str, Any] | None = No
         return "秘書只記得它跑過的日子；越早建立排程，記憶區越早有底"
     if signal_type == "neglected_active_project":
         return f"上週還很活躍、這週歸零；再放 {int(days)} 天就得重讀脈絡"
+    if signal_type == "priority_drift":
+        return "上一個完整週剛結束，現在調整下週最划算；再放一週，宣告就只是字"
     return ""
 
 
@@ -334,6 +338,27 @@ def build_action_proposals(
         pattern_meta = {"used": False, "reason": f"error:{type(exc).__name__}"}
     counters["patterns"] = pattern_meta
 
+    # ADR-020 每週回顧：你宣告的優先 vs 上一個完整週的實際活動，不一致就一張 priority_drift。
+    # 同一個專案若同時被判「被冷落」，只留 priority_drift——它多講了「你說過這是優先」。
+    review_meta: dict[str, Any] = {"used": False}
+    try:
+        from .weekly_review import collect_priority_drift_signals
+
+        drift_signals, review_meta = collect_priority_drift_signals(database=database, cfg=cfg, now=now)
+        if drift_signals:
+            drift_projects = {str(item["project_key"]).casefold() for item in drift_signals}
+            signals = [
+                item for item in signals
+                if not (
+                    item.get("signal_type") == "neglected_active_project"
+                    and str(item.get("project_key") or "").casefold() in drift_projects
+                )
+            ]
+            signals = signals + drift_signals
+    except Exception as exc:  # noqa: BLE001 — 回顧層故障不得拖垮提案清單
+        review_meta = {"used": False, "reason": f"error:{type(exc).__name__}"}
+    counters["weekly_review"] = review_meta
+
     # ADR-018 宣告式個人檔案：你標為「本期優先」的專案，所有訊號（含被冷落）加分。
     # 加分刻意大於習慣加權——你說的優先勝過我從活動推出來的主線。
     profile_meta: dict[str, Any] = {"declared": False}
@@ -413,6 +438,7 @@ def build_action_proposals(
             "repo_sync_snapshot": counters.get("repo_sync_snapshot", {}),
             "patterns": counters.get("patterns", {}),
             "profile": counters.get("profile", {}),
+            "weekly_review": counters.get("weekly_review", {}),
             "max_per_project": max_per_project,
             "stalled_open_loop_hours": stalled_hours,
             "unfinished_recent_min_idle_hours": recent_idle_hours,

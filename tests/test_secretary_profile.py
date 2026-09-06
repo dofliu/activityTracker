@@ -232,7 +232,9 @@ def test_declared_priority_outranks_the_inferred_main_line(db, monkeypatch):
     assert pulls[0]["priority_declared"] is True and pulls[0]["score"] == pytest.approx(0.75)
     assert "本期優先" in pulls[0]["reason"]
     assert pulls[1]["habit_boosted"] is True and "priority_declared" not in pulls[1]
-    assert result["inputs"]["profile"] == {"declared": True, "priorities": ["thesis"], "tone": "warm", "priority_boosted": 1}
+    # ADR-020：thesis 是宣告的優先、上一個完整週 0 天而 uav 4 天 → 多一張 priority_drift，也吃到加分
+    assert [p["project_key"] for p in result["proposals"] if p["proposal_type"] == "priority_drift"] == ["thesis"]
+    assert result["inputs"]["profile"] == {"declared": True, "priorities": ["thesis"], "tone": "warm", "priority_boosted": 2}
     assert result["inputs"]["patterns"]["habit_boosted"] == 1
 
 

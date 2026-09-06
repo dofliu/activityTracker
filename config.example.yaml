@@ -263,6 +263,13 @@ proactive_secretary:
   # ADR-018 宣告式個人檔案：偏好筆記裡的「優先：X、Y」與「語氣：簡潔｜直接｜溫暖」
   profile:
     priority_boost: 0.2          # 「優先：」宣告的專案，其提案加分（刻意大於 patterns.habit_boost；0 = 關閉）
+  # 每週回顧（ADR-020）：說的 vs 做的。上一個完整週（週一～週日）各專案活躍幾天，對照你
+  # 宣告的本期優先；寫成一則回顧觀察（同一週只寫一次、可刪、會過期），不一致就多一張
+  # priority_drift 提案。只用（專案 × 日）計數、不讀 prompt、不呼叫 LLM、不推測原因。
+  weekly_review:
+    enabled: true
+    drift_max_days: 1            # 宣告優先的專案上週活躍 ≤ 幾天算「說了沒做」
+    drift_min_other_days: 3      # 且同週有別的專案 ≥ 幾天才算「時間去了別處」（整週安靜不算偏移）
   greeting:
     display_name: ''
     # 晨報（Telegram／LINE）開頭也帶這段話；07:30 多半還沒有今日活動，會改說昨天

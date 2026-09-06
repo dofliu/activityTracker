@@ -191,6 +191,17 @@ def build_morning_pack(
     if digest:
         receipt["digest_date"] = digest.get("date")
         receipt["digest_notes_written"] = digest.get("notes_written")
+
+    def _default_review() -> dict[str, Any]:
+        # ADR-020：每天都確認上一個完整週有沒有回顧；source_ref 去重，同一週只會寫一次。
+        from core.weekly_review import build_weekly_review
+
+        return build_weekly_review(weeks_back=1, database=database, cfg=cfg, now=now)
+
+    review = _step("weekly_review", None, _default_review)
+    if review:
+        receipt["weekly_review_label"] = review.get("period_label")
+        receipt["weekly_review_notes_written"] = review.get("notes_written")
     receipt["errors"] = errors
     receipt["generated_at"] = now.isoformat(timespec="seconds")
     # 秘書自己的觀察（ADR-012）：只寫當日一次、標記 observation、介面可一鍵刪除。

@@ -226,6 +226,28 @@ def _run_daily_digest(params: dict[str, Any]) -> Callable[[dict[str, Any]], dict
     return _runner
 
 
+def _validate_review_params(params: dict[str, Any]) -> dict[str, Any]:
+    raw = params.get("weeks_back", 1)
+    try:
+        weeks_back = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ExecutionRejected("invalid_params", "weeks_back 必須是整數") from exc
+    if not 1 <= weeks_back <= 4:
+        raise ExecutionRejected("invalid_params", "weeks_back 只接受 1–4（1＝上一個完整週）")
+    return {"weeks_back": weeks_back}
+
+
+def _run_weekly_review(params: dict[str, Any]) -> Callable[[dict[str, Any]], dict[str, Any]]:
+    weeks_back = int(params.get("weeks_back", 1))
+
+    def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
+        from core.weekly_review import build_weekly_review
+
+        return build_weekly_review(weeks_back=weeks_back)
+
+    return _runner
+
+
 def _run_repo_sync_report(_params: dict[str, Any]) -> Callable[[dict[str, Any]], dict[str, Any]]:
     def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
         from core.repo_sync_report import build_repo_sync_report
@@ -288,7 +310,7 @@ SCHEDULABLE_TEMPLATES: dict[str, SchedulableTemplate] = {
             receipt_fields=(
                 "repos_scanned", "needs_pull", "needs_push", "diverged",
                 "stale_status", "handoffs_written", "digest_date",
-                "digest_notes_written", "errors",
+                "digest_notes_written", "errors", "weekly_review_label", "weekly_review_notes_written",
             ),
             timeout_seconds=600,
         ),
@@ -317,6 +339,23 @@ SCHEDULABLE_TEMPLATES: dict[str, SchedulableTemplate] = {
             receipt_fields=(
                 "date", "commits", "ai_turns", "files_changed", "projects_touched",
                 "micro_summaries", "notes_written", "llm_used",
+            ),
+            timeout_seconds=120,
+        ),
+        SchedulableTemplate(
+            template_id="weekly_review",
+            risk_level=RISK_L0,
+            label="每週回顧：上一個完整週各專案活躍幾天，對照你宣告的本期優先（說的 vs 做的）",
+            description=(
+                "只用（專案 × 日）活動計數與偏好筆記，不讀 prompt、不呼叫 LLM、不改任何既有資料；"
+                "寫出的回顧同一週只有一則，可在記憶區一鍵刪除，也會隨 TTL 過期。早晨包每天也會補上週的。"
+            ),
+            params_schema={"weeks_back": "回看第幾個完整週（1–4，預設 1＝上週）"},
+            validate_params=_validate_review_params,
+            build_runner=_run_weekly_review,
+            receipt_fields=(
+                "period_label", "active_days", "declared", "drift", "aligned",
+                "digest_days", "notes_written", "llm_used",
             ),
             timeout_seconds=120,
         ),

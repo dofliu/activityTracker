@@ -813,6 +813,57 @@ def _check_a18(ctx: _Ctx) -> dict[str, Any]:
     }
 
 
+# ---- A19 每週回顧 ---------------------------------------------------------
+
+
+def _check_a19(ctx: _Ctx) -> dict[str, Any]:
+    """說的 vs 做的（ADR-020）：機器只回報寫了幾週的回顧、上一個完整週的宣告與偏移現在算出什麼；
+    「天數與你的印象相符、偏移提案合理」是人眼。"""
+    from core.models import SecretaryNote
+    from core.weekly_review import collect_priority_drift_signals, review_enabled, review_period
+
+    if not review_enabled(ctx.cfg):
+        return {"status": NOT_CONFIGURED, "detail": "每週回顧已關閉。", "evidence": {"enabled": False}}
+    start, end, label = review_period(ctx.now, 1)
+    with ctx.database.session_scope() as session:
+        rows = (
+            session.query(SecretaryNote.source_ref, SecretaryNote.created_at)
+            .filter(SecretaryNote.kind == "observation", SecretaryNote.source == "weekly_review")
+            .order_by(SecretaryNote.created_at.desc())
+            .limit(8)
+            .all()
+        )
+    signals, meta = collect_priority_drift_signals(database=ctx.database, cfg=ctx.cfg, now=ctx.now)
+    evidence: dict[str, Any] = {
+        "basis": "weekly_review.collect_priority_drift_signals（活動矩陣 × 偏好筆記，即時計算）",
+        "last_complete_week": {"label": label, "start": start.isoformat(), "end": end.isoformat()},
+        "reviews_written": [str(ref) for ref, _ in rows],
+        "declared": meta.get("declared"),
+        "aligned": meta.get("aligned"),
+        "drift_signals": [item["title"] for item in signals],
+        "reason": meta.get("reason"),
+    }
+    if not rows:
+        return {
+            "status": PENDING,
+            "detail": "還沒有任何一週的回顧；讓早晨包多跑一天（它會補上週的），或對 weekly_review 排程按立即執行。",
+            "evidence": evidence,
+        }
+    if meta.get("reason") == "no_priorities":
+        said = "你還沒宣告本期優先，所以只有活動天數、沒有「說的 vs 做的」"
+    elif signals:
+        said = f"上一個完整週有 {len(signals)} 項宣告優先「說了沒做」"
+    elif meta.get("aligned") is True:
+        said = "上一個完整週宣告的優先都有在做"
+    else:
+        said = "上一個完整週活動太少，不好比"
+    return {
+        "status": NEEDS_HUMAN,
+        "detail": f"已寫 {len(rows)} 週的回顧（最近 {rows[0][0]}）；{said}。天數與你的印象是否相符、偏移提案是否合理，要由你確認。",
+        "evidence": evidence,
+    }
+
+
 # ---- 項目清單 -------------------------------------------------------------
 
 _ITEMS: tuple[dict[str, Any], ...] = (
@@ -977,6 +1028,15 @@ _ITEMS: tuple[dict[str, Any], ...] = (
         "how": "用 01 幾天：看桌面的焦點與「記得」、按詳情 chip 展開或跳分頁、看底下「今天離開首頁 N 次」",
         "criterion": "焦點與記得是你會挑的；離開首頁的次數幾天後變少；詳情面板展開狀態會記住（人眼確認）",
         "probe": _check_a18,
+    },
+    {
+        "id": "A19",
+        "title": "每週回顧（說的 vs 做的）實機收據",
+        "priority": "P1",
+        "blocks_release": False,
+        "how": "宣告本期優先後用一週；下週一看記憶區的「W## 回顧」與 01 桌面有沒有「你說 X 優先，上週它只有 N 天」",
+        "criterion": "回顧的天數與你的印象相符；偏移提案只在真的沒做時出現，且改宣告或排時間後消失（人眼確認）",
+        "probe": _check_a19,
     },
 )
 
