@@ -929,7 +929,7 @@ function initTabs() {
       if (id === "tab-projects") { loadProjects(); loadRepoSnapshot(); }
       if (id === "tab-repos") loadRepositorySyncStatus();  // 切到分頁才掃描本機 Git，不在開頁時付這個成本
       if (id === "tab-settings") { loadConfig(); activateSettingsPane(currentSettingsPane()); }
-      if (id === "tab-summaries") { loadSummaries(); loadCheckpoints(); loadUsagePanels(); }
+      if (id === "tab-summaries") { loadSummaries(); loadCheckpoints(); loadUsagePanels(); loadAssistantStrip(); loadOpenLoops(); }   // 今日統計與 Focus Now 現在住這裡
     });
   });
 }
@@ -2008,7 +2008,9 @@ function renderGreeting() {
     source.textContent = g.source === "llm" ? `LLM · ${String(g.llm_provider || "").toUpperCase()}` : "RULES";
     source.className = "trust ok";
     source.title = zh ? `鼓勵語池：${g.encouragement_pool || ""}` : `pool: ${g.encouragement_pool || ""}`;
+    source.hidden = g.source !== "llm";   // 問候併進桌面後，規則版不重複掛第二顆 RULES；LLM 潤飾時才標示來源
   }
+  if (boundary) boundary.title = g.claim_boundary || "";
   if (statsBox) {
     const chips = [];
     const add = (label, value, title) => { if (value) chips.push(`<span class="pchip" title="${esc(title || "")}">${esc(label)} ${esc(String(value))}</span>`); };
@@ -2179,7 +2181,7 @@ function renderHome() {
     renderHomeLeaves();
   }
   const boundary = $("home-desk-boundary");
-  if (boundary) boundary.textContent = h.claim_boundary || "";
+  if (boundary) { boundary.textContent = h.claim_boundary || ""; boundary.title = h.claim_boundary || ""; }
 }
 
 function askSecretaryAbout(text) {
@@ -2215,7 +2217,7 @@ function initHomeDesk() {
     if (det) homeDetailAction(det.dataset.homeDetail);
   });
   const refresh = $("btn-home-refresh");
-  if (refresh) refresh.addEventListener("click", loadHome);
+  if (refresh) refresh.addEventListener("click", () => { loadHome(); loadGreeting(); });   // 問候併進桌面，共用一顆
   // 詳情面板的 summary 裡有按鈕：按按鈕不該同時開合面板
   document.querySelectorAll("#today-panel summary button, #memory-panel summary button").forEach(btn => {
     btn.addEventListener("click", (ev) => { ev.preventDefault(); ev.stopPropagation(); });
