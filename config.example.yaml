@@ -266,6 +266,14 @@ proactive_secretary:
   # 每週回顧（ADR-020）：說的 vs 做的。上一個完整週（週一～週日）各專案活躍幾天，對照你
   # 宣告的本期優先；寫成一則回顧觀察（同一週只寫一次、可刪、會過期），不一致就多一張
   # priority_drift 提案。只用（專案 × 日）計數、不讀 prompt、不呼叫 LLM、不推測原因。
+  # 文件落後程式（ADR-021）：文件檔最後異動後又累積了幾個 commit。超過門檻就提一張
+  # docs_behind_code，動作是既有的兩段式 L2（起草文件更新計畫 → 你讀過批准 → 實際改檔、
+  # 不 commit）。只比時間與數量、不判斷文件內容；沒有文件異動紀錄的專案一律不提。
+  docs_freshness:
+    enabled: true
+    min_commits: 8       # 文件最後更新後累積幾個 commit 才提
+    min_days: 2          # 且文件至少幾天沒動（避免剛改完就提）
+    lookback_days: 60    # 只看近幾天的事件（界定查詢範圍）
   weekly_review:
     enabled: true
     drift_max_days: 1            # 宣告優先的專案上週活躍 ≤ 幾天算「說了沒做」

@@ -1535,7 +1535,7 @@ window.executeProposal = async function (proposalId, templateId = null, confirmC
     const data = await res.json().catch(() => ({}));
     if (res.status === 401) {
       sessionStorage.removeItem("omni_execution_token");
-      alert(zh ? "execution token 無效，請重試。" : "Invalid execution token.");
+      alert(data.detail || (zh ? "execution token 無效，請重試。" : "Invalid execution token."));
       return;
     }
     if (res.status === 428 && data.confirm) {
@@ -1958,7 +1958,7 @@ async function createSchedulePresets() {
       method: "POST", headers: { "x-omnicontext-execution-token": token },
     });
     const data = await res.json().catch(() => ({}));
-    if (res.status === 401) { sessionStorage.removeItem("omni_execution_token"); alert(zh ? "execution token 無效。" : "Invalid execution token."); return; }
+    if (res.status === 401) { sessionStorage.removeItem("omni_execution_token"); alert(data.detail || (zh ? "execution token 無效。" : "Invalid execution token.")); return; }
     if (!res.ok) { alert((zh ? "未建立：" : "Not created: ") + (data.detail || `HTTP ${res.status}`)); return; }
     showToast(zh ? `已建立 ${(data.created || []).length} 個排程（${(data.already_present || []).length} 個原本就有）` : `${(data.created || []).length} schedules created (${(data.already_present || []).length} already existed)`);
     loadTodayView();

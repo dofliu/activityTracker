@@ -330,12 +330,33 @@ def derive_action(
 
 # ---- P5-R3：L2 subprocess template（調度本機 agent CLI） ----
 
-_DRAFT_PLAN_TYPES = {"stalled_open_loop", "unfinished_recent"}
+# ADR-021：文件落後也走同一條兩段式 L2（起草 → 批准 → 改檔），不新增第二套寫入路徑。
+_DRAFT_PLAN_TYPES = {"stalled_open_loop", "unfinished_recent", "docs_behind_code"}
+_DOCS_FACTS_LIMIT = 2400
 _DRAFT_PROMPT_FIELD_LIMITS = {"title": 120, "detail": 300, "suggested_action": 200}
+
+
+def _docs_draft_prompt(proposal: dict[str, Any]) -> str:
+    """ADR-021 文件更新計畫；事實區塊由 docs_freshness 於 server 端組好。"""
+    project_key = str(proposal.get("project_key") or "")[:80]
+    facts = str(proposal.get("docs_facts") or "")[:_DOCS_FACTS_LIMIT]
+    return (
+        "你是唯讀顧問。以下是這個 repo 由本機採集器統計出的現況事實（未經推測）。"
+        "請起草一份「文件更新計畫」：說明文件（README）、使用文件（USAGE）、"
+        "規劃文件（ROADMAP／STATUS）各自該補什麼、改什麼，逐項指出檔案與段落，"
+        "繁體中文、最多 60 行。\n"
+        "約束：只依據下列事實與 repo 內既有內容；**不要編造沒有依據的進度或成果**；"
+        "只輸出計畫本身，不要修改任何檔案、不要執行任何工具或命令。\n"
+        f"專案：{project_key}\n"
+        "【現況事實】\n"
+        f"{facts}\n"
+    )
 
 
 def _draft_prompt(proposal: dict[str, Any]) -> str:
     """server 端組 prompt；只用白名單欄位並截斷，呼叫端無法注入內容。"""
+    if str(proposal.get("proposal_type") or "") == "docs_behind_code":
+        return _docs_draft_prompt(proposal)
     parts = {
         key: str(proposal.get(key) or "").replace("\n", " ")[:limit]
         for key, limit in _DRAFT_PROMPT_FIELD_LIMITS.items()
@@ -436,7 +457,11 @@ def _maybe_agent_draft_plan(
     return ActionPlan(
         template_id="agent_draft_plan",
         risk_level=RISK_L2,
-        label=f"調度本機 {binary} 為此事項起草行動計畫（唯讀輸出，消耗 CLI 額度）",
+        label=(
+            f"調度本機 {binary} 起草文件更新計畫（唯讀輸出，消耗 CLI 額度）"
+            if str(proposal.get("proposal_type") or "") == "docs_behind_code"
+            else f"調度本機 {binary} 為此事項起草行動計畫（唯讀輸出，消耗 CLI 額度）"
+        ),
         call_description=f"agent_dispatch.run({binary}, cwd={project_key!r})",
         params={"project_key": project_key, "binary": binary, "cwd": cwd},
         timeout_seconds=timeout_seconds,

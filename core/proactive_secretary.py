@@ -49,6 +49,8 @@ SUGGESTED_ACTIONS = {
     "neglected_active_project": "看一眼 Context Handoff 決定要接續還是明確放下；不決定的話脈絡會繼續流失。",
     # ADR-020 每週回顧：說的 vs 做的——二選一，別讓宣告只是字。
     "priority_drift": "決定一件事：下週把時間排給它（看一眼 Handoff 接續），或改宣告——在對話框打「偏好：優先：…」換成你真正在做的。",
+    # ADR-021：這正是你最常手打的那句指令；秘書用既有的兩段式 L2 幫你走完。
+    "docs_behind_code": "開啟 L2 後按「起草文件更新計畫」，讀過那份計畫再批准「實際改檔」（不會 commit，改動留給你檢視）；也可以自己更新文件，卡就會消失。",
 }
 
 
@@ -85,6 +87,8 @@ def why_now(signal_type: str, age_days: float, extra: dict[str, Any] | None = No
         return f"上週還很活躍、這週歸零；再放 {int(days)} 天就得重讀脈絡"
     if signal_type == "priority_drift":
         return "上一個完整週剛結束，現在調整下週最划算；再放一週，宣告就只是字"
+    if signal_type == "docs_behind_code":
+        return f"commit 訊息還在、脈絡還記得；再放 {int(days)} 天就得回頭讀 diff 才寫得出文件"
     return ""
 
 
@@ -215,6 +219,9 @@ def _signal_to_proposal(signal: dict[str, Any], now: datetime) -> dict[str, Any]
         proposal["habit_boosted"] = True
     if signal.get("priority_declared"):
         proposal["priority_declared"] = True
+    # ADR-021：文件更新的事實區塊由 server 組好帶進提案，L2 prompt 直接引用（呼叫端無法注入）
+    if signal.get("docs_facts"):
+        proposal["docs_facts"] = str(signal["docs_facts"])
     return proposal
 
 
@@ -359,6 +366,17 @@ def build_action_proposals(
         review_meta = {"used": False, "reason": f"error:{type(exc).__name__}"}
     counters["weekly_review"] = review_meta
 
+    # ADR-021 文件落後程式：文件最後異動後又累積了幾個 commit（只比時間與數量）。
+    docs_meta: dict[str, Any] = {"used": False}
+    try:
+        from .docs_freshness import collect_docs_freshness_signals
+
+        docs_signals, docs_meta = collect_docs_freshness_signals(database=database, cfg=cfg, now=now)
+        signals = signals + docs_signals
+    except Exception as exc:  # noqa: BLE001 — 文件層故障不得拖垮提案清單
+        docs_meta = {"used": False, "reason": f"error:{type(exc).__name__}"}
+    counters["docs_freshness"] = docs_meta
+
     # ADR-018 宣告式個人檔案：你標為「本期優先」的專案，所有訊號（含被冷落）加分。
     # 加分刻意大於習慣加權——你說的優先勝過我從活動推出來的主線。
     profile_meta: dict[str, Any] = {"declared": False}
@@ -438,6 +456,8 @@ def build_action_proposals(
             "repo_sync_snapshot": counters.get("repo_sync_snapshot", {}),
             "patterns": counters.get("patterns", {}),
             "profile": counters.get("profile", {}),
+            "weekly_review": counters.get("weekly_review", {}),
+            "docs_freshness": counters.get("docs_freshness", {}),
             "weekly_review": counters.get("weekly_review", {}),
             "max_per_project": max_per_project,
             "stalled_open_loop_hours": stalled_hours,

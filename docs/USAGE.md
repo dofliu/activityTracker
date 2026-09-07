@@ -565,6 +565,26 @@ proactive_secretary:
     drift_min_other_days: 3   # 且同週有別的專案 ≥ 幾天才算「時間去了別處」
 ```
 
+### 文件落後了：那句你常打的指令（2026-09-06，ADR-021）
+
+你最常手打的「檢視同步狀態，然後更新說明文件、使用文件與規劃文件」，現在秘書會自己提。
+
+- **怎麼出現**：某個 repo 的文件檔（README／USAGE／ROADMAP／STATUS／`docs/` 下的 .md）最後一次更新之後，又累積了 8 個以上 commit、且文件已 2 天沒動，01 就會出現「X 的文件落後了：文件最後一次更新後又有 N 個 commit」。它**只比時間與數量，不判斷文件內容對不對**。
+- **怎麼用**：需要先在「06 → 秘書與自動化 → 小秘書執行器」開三個開關（執行器、L2、L2 寫入，全部預設關閉）。然後是兩次批准：
+  1. **起草文件更新計畫**——秘書用本機 agent CLI（`claude -p` 或 `codex exec`，看你的設定）讀這個 repo，產出一份「哪個檔案該補什麼」的計畫。這一步唯讀，不會改檔。
+  2. **讀過那份計畫再批准改檔**——agent 依計畫實際修改文件，**只能改這個 repo 內的檔案、不會 git commit 或 push**，執行前後都會確認 worktree 乾淨（讓你 `git diff` 一眼看出它改了什麼）。commit 由你自己按。
+- **它看的事實**：專案名、文件最後異動時間與檔名、之後的 commit 數與最近 12 筆 commit 訊息、該專案最近一則工作誌。這些由秘書準備好交給 agent，**不是讓 agent 自己去猜**；prompt 裡明寫「不要編造沒有依據的進度」。
+- **沒有文件紀錄的 repo 不會被提**：那可能是「真的沒有文件」，也可能是「文件目錄不在監控路徑」，機器分不出來就不說。被跳過的 repo 會列在 `GET /api/v1/secretary/proposals` 的 `inputs.docs_freshness.skipped_no_doc_baseline`。
+- **會消耗你的 CLI 額度**，兩次批准就是兩次調度。不想被提就 snooze，或在對話框說「偏好：不要提醒 docs_behind_code」。
+
+```yaml
+proactive_secretary:
+  docs_freshness:
+    enabled: true
+    min_commits: 8      # 文件最後更新後累積幾個 commit 才提
+    min_days: 2         # 且文件至少幾天沒動
+```
+
 ### 驗收中心：還有哪些實機收據沒拿到（2026-09-04，ADR-016）
 
 [docs/TODO.md](TODO.md) A 段列著 13 條「只能在你自己機器上取得的收據」。要一項項翻很累，也很容易憑印象以為做過了，所以有**驗收中心**：它直接去本機找收據，告訴你每一項現在是什麼狀態。
@@ -880,6 +900,31 @@ Windows isolated wheel fresh/upgrade/assets smoke 與 formal package+DB rollback
 | Autostart installer | Windows Task Scheduler | 尚未提供 |
 
 ## 8. 常見問題
+
+### 貼了 execution token 卻說「無效」
+
+先分清楚**三種**秘密，它們來源不同：
+
+| 名稱 | 從哪來 | 用在哪 |
+| :--- | :--- | :--- |
+| browser extension ingest token | `omnicontext init --show-token` 的**第一行** | 貼到 Chrome 擴充套件設定 |
+| execution token | `omnicontext init --show-token` 的**第二行** | 批准秘書的白名單動作（瀏覽器存在 sessionStorage） |
+| L2 確認碼 | **服務當場產生，直接顯示在批准對話框裡** | L2 動作的二次確認，6 位數、單次有效、打錯即作廢 |
+
+第三種不是 CLI 產生的。若你看到「原確認碼已作廢，請重新發起執行」，那就是這一種——重新按一次批准會拿到新的碼。
+
+若是 execution token 被拒，最常見的原因是**設定檔在服務啟動時只讀取一次**：先 `python main.py run`、之後才用 `init` 產生（或 `--rotate-token` 輪替）token 的話，正在跑的服務並不知道新值，於是**任何** token 都會被拒（fail-closed）。兩個解法選一個：
+
+1. 重啟服務（`Ctrl+C` 後重新 `python main.py run`）。
+2. 到「06 系統設定」按一次儲存套用——那條路徑會重新載入設定檔。
+
+還要排除一個陷阱：token 解析是**環境變數優先於設定檔**。若你設過 `OMNICONTEXT_EXECUTION_TOKEN`，服務會以它為準，而 `init --show-token` 印的是設定檔裡的值，兩者不同就永遠對不起來。
+
+```powershell
+echo $env:OMNICONTEXT_EXECUTION_TOKEN
+```
+
+自 2026-09-06 起，「服務沒有載入 token」與「token 不符」會顯示不同訊息，不再一律說「無效」（ADR-021 D6）。
 
 ### Extension Monitor 顯示 `configured_unverified`
 
