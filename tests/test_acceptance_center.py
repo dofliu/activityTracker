@@ -283,6 +283,33 @@ def test_a6_is_runtime_only_outside_the_service_process(db, cfg):
     assert item["evidence"]["basis"] == "in_memory_process_state"
 
 
+def test_a6_says_the_index_is_empty_instead_of_telling_you_to_wait(db, cfg, monkeypatch):
+    """index_present() 只看檔案在不在，不看 chunk 數。所以「索引目錄在但是空的」會讓
+    worker 預熱完成卻仍是 0 chunk——此時叫使用者「等預熱」是指錯方向（2026-09-07 實機）。"""
+    import rag.retrieval_client as rc
+
+    warm_but_empty = {
+        "mode": "worker", "state": "ready", "index_present": True, "warmup_at": "2026-09-06T13:47:09",
+        "warmup": {"bm25_chunks": 0, "vector_chunks": 0}, "requests_served": 1,
+        "last_retrieval_ms": 6, "last_error": None,
+    }
+    monkeypatch.setattr(rc.retrieval_client, "status", lambda: warm_but_empty)
+    item = _item(_report(db, cfg, runtime=True), "A6")
+    assert item["status"] == NOT_CONFIGURED
+    assert "0 個 chunk" in item["detail"] and "02 知識庫" in item["detail"]
+
+    # 還沒預熱過（沒有 warmup_at）才是真的「等預熱」
+    cold = {**warm_but_empty, "state": "starting", "warmup_at": None}
+    monkeypatch.setattr(rc.retrieval_client, "status", lambda: cold)
+    assert _item(_report(db, cfg, runtime=True), "A6")["status"] == PENDING
+
+    # 有內容就照舊 passed
+    loaded = {**warm_but_empty, "warmup": {"bm25_chunks": 1200, "vector_chunks": 1200}}
+    monkeypatch.setattr(rc.retrieval_client, "status", lambda: loaded)
+    passed = _item(_report(db, cfg, runtime=True), "A6")
+    assert passed["status"] == PASSED and "bm25=1200" in passed["detail"]
+
+
 # ---- A7／A8 報告與收據 ----
 
 
