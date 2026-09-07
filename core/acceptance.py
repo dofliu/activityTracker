@@ -401,6 +401,18 @@ def _check_a6(ctx: _Ctx) -> dict[str, Any]:
             "detail": f"預熱留下錯誤：{status['last_error']}",
             "evidence": evidence,
         }
+    # index_present() 只看檔案／目錄存不存在，不看有幾個 chunk。所以「索引目錄在、
+    # 但裡面是空的」會走到這裡——此時預熱其實已經完成，叫使用者「等預熱」是指錯方向
+    # （2026-09-07 實機：chroma 開了 2.5 秒、embedding 模型載好、chunks 仍是 0）。
+    if status.get("state") == "ready" and status.get("warmup_at"):
+        return {
+            "status": NOT_CONFIGURED,
+            "detail": (
+                "worker 已預熱完成，但索引裡是 0 個 chunk——索引目錄存在不代表有內容。"
+                "請先到「02 知識庫」加資料夾並建索引，再回來看這一項。"
+            ),
+            "evidence": evidence,
+        }
     return {
         "status": PENDING,
         "detail": f"worker 目前是 {status.get('state')}；預熱完成後這裡會顯示載入計數。",
