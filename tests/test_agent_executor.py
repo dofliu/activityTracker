@@ -470,6 +470,34 @@ def test_execute_endpoint_requires_token_and_ignores_request_body():
     assert response.status_code == 401
 
 
+def test_401_distinguishes_an_unconfigured_service_from_a_wrong_token(monkeypatch):
+    """ADR-021 D6：設定在啟動時只讀一次，所以「服務沒載入 token」是使用者最常踩到的情況；
+    它與「token 打錯」對排查是兩件事，訊息必須分得出來（安全性不變，兩者都是 401）。"""
+    import core.server as server
+
+    client = TestClient(app)
+    monkeypatch.setattr(server, "get_config", lambda: DictConfig({"security": {}}))
+    unconfigured = client.post(
+        "/api/v1/secretary/proposals/whatever/execute",
+        json={},
+        headers={"Origin": "http://127.0.0.1:8765", "x-omnicontext-execution-token": "anything"},
+    )
+    assert unconfigured.status_code == 401
+    detail = unconfigured.json()["detail"]
+    assert "重啟服務" in detail and "OMNICONTEXT_EXECUTION_TOKEN" in detail
+
+    monkeypatch.setattr(
+        server, "get_config", lambda: DictConfig({"security": {"execution_token": "the-real-one"}})
+    )
+    mismatch = client.post(
+        "/api/v1/secretary/proposals/whatever/execute",
+        json={},
+        headers={"Origin": "http://127.0.0.1:8765", "x-omnicontext-execution-token": "wrong"},
+    )
+    assert mismatch.status_code == 401
+    assert mismatch.json()["detail"] == "execution token is missing or invalid"
+
+
 def test_no_shell_subprocess_anywhere_in_core():
     """ADR-008 acceptance #2：程式庫不得出現 create_subprocess_shell。"""
     core_dir = Path(__file__).resolve().parents[1] / "core"

@@ -864,6 +864,65 @@ def _check_a19(ctx: _Ctx) -> dict[str, Any]:
     }
 
 
+# ---- A20 文件落後與文件更新 L2 ------------------------------------------
+
+
+def _check_a20(ctx: _Ctx) -> dict[str, Any]:
+    """ADR-021：機器能回報「哪些 repo 的文件落後幾個 commit」與 L2 三道門的狀態；
+    「起草的計畫值不值得批准、改出來的文件對不對」是人眼，且改動要由你 commit。"""
+    from core.docs_freshness import collect_docs_freshness_signals, docs_freshness_enabled
+
+    if not docs_freshness_enabled(ctx.cfg):
+        return {"status": NOT_CONFIGURED, "detail": "文件落後偵測已關閉。", "evidence": {"enabled": False}}
+    signals, meta = collect_docs_freshness_signals(database=ctx.database, cfg=ctx.cfg, now=ctx.now)
+    from core.agent_executor import executor_enabled, l2_enabled, l2_write_enabled
+
+    executor = executor_enabled(ctx.cfg)
+    l2 = l2_enabled(ctx.cfg)
+    l2_write = l2_write_enabled(ctx.cfg)
+    evidence: dict[str, Any] = {
+        "basis": "docs_freshness.collect_docs_freshness_signals（file_activity_events × git_activity_events）",
+        "repos_considered": meta.get("repos_considered", {}),
+        "skipped_no_doc_baseline": meta.get("skipped_no_doc_baseline", []),
+        "proposals": [item["title"] for item in signals],
+        "executor_enabled": executor,
+        "l2_enabled": l2,
+        "l2_write_enabled": l2_write,
+    }
+    if not meta.get("repos_considered"):
+        return {
+            "status": PENDING,
+            "detail": "近期沒有任何有文件異動紀錄的 repo，文件層沒有東西可比；用幾天再看。",
+            "evidence": evidence,
+        }
+    if not signals:
+        return {
+            "status": PENDING,
+            "detail": (
+                f"有 {len(meta['repos_considered'])} 個 repo 在比對範圍內，但都還沒超過門檻"
+                f"（{meta.get('min_commits')} 個 commit／{meta.get('min_days')} 天）——文件目前跟得上。"
+            ),
+            "evidence": evidence,
+        }
+    if not (executor and l2 and l2_write):
+        return {
+            "status": PARTIAL,
+            "detail": (
+                f"已提出 {len(signals)} 張文件落後提案，但 L2 寫入的三道門沒全開"
+                f"（executor={executor}、l2={l2}、l2_write={l2_write}），只能看提案不能請秘書改檔。"
+            ),
+            "evidence": evidence,
+        }
+    return {
+        "status": NEEDS_HUMAN,
+        "detail": (
+            f"已提出 {len(signals)} 張文件落後提案且 L2 寫入三道門全開；"
+            "起草的計畫是否值得批准、改出來的文件對不對，要由你讀過再 commit。"
+        ),
+        "evidence": evidence,
+    }
+
+
 # ---- 項目清單 -------------------------------------------------------------
 
 _ITEMS: tuple[dict[str, Any], ...] = (
@@ -1037,6 +1096,15 @@ _ITEMS: tuple[dict[str, Any], ...] = (
         "how": "宣告本期優先後用一週；下週一看記憶區的「W## 回顧」與 01 桌面有沒有「你說 X 優先，上週它只有 N 天」",
         "criterion": "回顧的天數與你的印象相符；偏移提案只在真的沒做時出現，且改宣告或排時間後消失（人眼確認）",
         "probe": _check_a19,
+    },
+    {
+        "id": "A20",
+        "title": "文件落後偵測與文件更新 L2 實機收據",
+        "priority": "P1",
+        "blocks_release": False,
+        "how": "開 L2 三個開關 → 01 看「X 的文件落後了」→ 起草文件更新計畫 → 讀過再批准實際改檔 → 自己 review 後 commit",
+        "criterion": "落後的 commit 數與你的印象相符；起草的計畫沒有編造進度；改檔後 git diff 只動文件且沒有被 commit（人眼確認）",
+        "probe": _check_a20,
     },
 )
 
