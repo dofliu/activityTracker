@@ -302,12 +302,17 @@ class RetrievalWorkerClient:
         finally:
             self._lock.release()
 
-    def warmup_in_background(self, reason: str = "manual") -> Dict[str, Any]:
-        """Kick off warm-up on a daemon thread; idempotent while one is running."""
+    def warmup_in_background(self, reason: str = "manual", force: bool = False) -> Dict[str, Any]:
+        """Kick off warm-up on a daemon thread; idempotent while one is running.
+
+        ``force`` 給「使用者明示要求預熱」用。原本只要 worker 活著且預熱過就直接回舊
+        收據，於是「建完索引 → 按預熱」永遠拿到重建之前的計數（2026-09-07 實機：索引
+        已有 4839 chunk，收據仍是 3）。自動路徑（啟動時）維持 idempotent；明示路徑一律重載。
+        """
         with self._lock:
             if self._warmup_thread is not None and self._warmup_thread.is_alive():
                 return self._status_locked()
-            if self._state == "ready" and self._warmup is not None and self._alive():
+            if not force and self._state == "ready" and self._warmup is not None and self._alive():
                 return self._status_locked()
             self._state = "warming"
 

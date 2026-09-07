@@ -37,6 +37,7 @@ from core.models import (
     CalendarEvent,
     CoverageLedgerInterval,
     RAGChatMessage,
+    RAGIndexedFile,
     SecretaryNote,
 )
 from core.server import app
@@ -308,6 +309,35 @@ def test_a6_says_the_index_is_empty_instead_of_telling_you_to_wait(db, cfg, monk
     monkeypatch.setattr(rc.retrieval_client, "status", lambda: loaded)
     passed = _item(_report(db, cfg, runtime=True), "A6")
     assert passed["status"] == PASSED and "bm25=1200" in passed["detail"]
+
+
+def test_a6_will_not_pass_on_a_stale_load(db, cfg, monkeypatch):
+    """索引重建之後，worker 記憶體裡的收據不會自己更新。載入的是舊索引就不該判綠
+    （2026-09-07 實機：索引已有 4839 chunk，收據仍是 3，A6 卻說 passed）。"""
+    import rag.retrieval_client as rc
+
+    ready = {
+        "mode": "worker", "state": "ready", "index_present": True, "warmup_at": "2026-09-07T21:11:55",
+        "warmup": {"bm25_chunks": 3, "vector_chunks": 3}, "requests_served": 0,
+        "last_retrieval_ms": None, "last_error": None,
+    }
+    monkeypatch.setattr(rc.retrieval_client, "status", lambda: ready)
+
+    # 索引來源計數遠大於 worker 載入的量 → 舊索引
+    with db.session_scope() as session:
+        session.add(RAGIndexedFile(
+            path="C:/docs/big.md", filename="big.md", extension="md",
+            chunk_count=4839, status="indexed",
+        ))
+    item = _item(_report(db, cfg, runtime=True), "A6")
+    assert item["status"] == PARTIAL
+    assert "舊索引" in item["detail"] and "4839" in item["detail"]
+    assert item["evidence"]["source_chunks"] == 4839
+
+    # 重新預熱、計數對上了才是 passed
+    reloaded = {**ready, "warmup": {"bm25_chunks": 4839, "vector_chunks": 4839}}
+    monkeypatch.setattr(rc.retrieval_client, "status", lambda: reloaded)
+    assert _item(_report(db, cfg, runtime=True), "A6")["status"] == PASSED
 
 
 # ---- A7／A8 報告與收據 ----

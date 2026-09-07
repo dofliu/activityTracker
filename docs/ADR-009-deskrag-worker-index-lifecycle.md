@@ -40,3 +40,21 @@ DeskRAG 原本以 FastAPI `BackgroundTasks` 執行 async function，但其中包
 - `/api/v1/rag/strategies` 改讀靜態目錄 `rag/retrieval/catalog.py`（有測試確認與 registry 一致），`rag/retrieval/__init__.py` 改為 lazy export，任何人新增 retriever 時要同步更新目錄。
 - 狀態卡片與 API 只描述程序狀態與載入計數，不宣稱檢索結果正確或索引完整；一致性仍以 §5 的 worker 驗證收據為準。
 
+## Addendum B（2026-09-07）：明示預熱一律重載；載入的是舊索引不算就緒
+
+### Context
+
+`warmup_in_background()` 原本只要「worker 活著且預熱過」就直接回上一次的收據，不管索引在那之後是否重建過。實機因此出現這一串：使用者在 02 知識庫建索引（`source_chunks` 從 3 變成 4,839、`consistency: matched`），按下「🔥 預熱檢索 worker」，拿回的卻是重建**之前**的收據——`bm25_chunks: 3`、`vector_chunks: 3`，`pid` 與 `warmup_at` 都沒變。驗收中心 A6 只看「`state: ready` 且 chunk 數 > 0」，於是報 ✅ passed，寫著 bm25=3／vector=3。
+
+兩件事都錯：預熱按鈕沒有預熱，而 A6 用一份舊收據判綠。
+
+### Decision
+
+11. `warmup_in_background(reason, force=False)`：**自動路徑**（服務啟動時的 `maybe_warmup_on_start`）維持 idempotent，不重複載入；**使用者明示要求的路徑**（`POST /api/v1/rag/retrieval/warmup`、儀表板按鈕）一律 `force=True`，即使 worker 已就緒也重新載入。預熱進行中仍然只有一個執行緒（重入回目前狀態），重載沿用同一個 worker 程序，不重啟。
+12. 驗收中心 A6 在判綠之前比對「worker 記憶體裡的載入計數」與「SQLite 裡的索引來源切片總數」（`rag_indexed_files.chunk_count` 之和，唯讀、不 import 任何索引套件）。載入計數**小於**來源計數就回 `partial`，並直說「worker 載入的是舊索引：記憶體裡 vector=N，但索引現在有 M 個 chunk」。取不到來源計數時退回原本的判定，並把原因記在 evidence，不猜。
+
+### Consequences
+
+- 「建完索引 → 按預熱」現在會真的重載，代價是使用者按下按鈕時要重新等載入（大索引可能數十秒）；狀態卡片在這段時間顯示「預熱中」。
+- A6 的完成判準因此比原本嚴格：不只要「有載入東西」，還要**載入的量不小於索引現在的內容**。它仍然不宣稱索引夠大或檢索結果正確——只是不再把過期的收據當成就緒。
+- 這與 A6 前一輪的修法（0 chunk 不叫使用者等預熱）同一條原則：**狀態訊息指向錯誤的下一步，和假綠燈是同一類 bug**。

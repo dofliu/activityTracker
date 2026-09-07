@@ -375,7 +375,8 @@ def retrieval_worker_warmup():
     """在背景把索引載進檢索 worker；主服務不等待、也不載入任何索引。"""
     if retrieval_mode() != "worker":
         raise HTTPException(status_code=409, detail="目前為 in_process 檢索模式，沒有可預熱的 worker")
-    return retrieval_client.warmup_in_background(reason="dashboard")
+    # 使用者明示按下預熱：一律重載，否則建完索引後只會拿到舊計數（ADR-009 Addendum B）
+    return retrieval_client.warmup_in_background(reason="dashboard", force=True)
 
 
 @router.post("/retrieval/shutdown")
