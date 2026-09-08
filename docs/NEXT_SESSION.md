@@ -1,6 +1,6 @@
 # 下一個 Session 接手指南
 
-> 最後更新：2026-09-05（session `claude/activity-tracker-next-steps-en44qo`：**驗收中心 ADR-016 已合併進 main**（PR #14，合併後 main CI 六個 job 全綠）＋**同步中心 pull/push 前置條件修正 ADR-011 Addendum C**＋**每日工作誌 ADR-012 Addendum A**＋**模式感知提案 ADR-017**＋**宣告式個人檔案 ADR-018**＋**秘書桌面 ADR-019**＋**每週回顧 ADR-020**＋**首頁一屏（ADR-019 Addendum B）**＋**文件落後程式 ADR-021**；前一輪 `claude/stoic-hamilton-4oicm4`：秘書記憶區 ADR-012、Telegram 手機對話 ADR-013、多通道推播與短效解鎖碼 ADR-014、系統設定左欄切換、小秘書問候卡、本機行事曆採集 ADR-015）。
+> 最後更新：2026-09-08（session `claude/activity-tracker-next-steps-en44qo`：**明示預熱一律重載＋A6 不拿舊收據判綠 ADR-009 Addendum B**＋**Chroma 空間回收 ADR-009 Addendum C**＋**超過 60 天的 PR／issue 不納入考量 ADR-007 Addendum**＋**會議秘書第一層 ADR-022**；先前：**驗收中心 ADR-016 已合併進 main**（PR #14，合併後 main CI 六個 job 全綠）＋**同步中心 pull/push 前置條件修正 ADR-011 Addendum C**＋**每日工作誌 ADR-012 Addendum A**＋**模式感知提案 ADR-017**＋**宣告式個人檔案 ADR-018**＋**秘書桌面 ADR-019**＋**每週回顧 ADR-020**＋**首頁一屏（ADR-019 Addendum B）**＋**文件落後程式 ADR-021**；前一輪 `claude/stoic-hamilton-4oicm4`：秘書記憶區 ADR-012、Telegram 手機對話 ADR-013、多通道推播與短效解鎖碼 ADR-014、系統設定左欄切換、小秘書問候卡、本機行事曆採集 ADR-015）。
 >
 > 這頁是給「下一個開發 session（人或 AI）」的**最短接手路徑**，只放現況、地圖與環境備忘。
 > 細節一律不在這裡重寫：**做過什麼**看 [ROADMAP.md](../ROADMAP.md) §11、**為什麼這樣設計**看對應 ADR、
@@ -13,7 +13,7 @@
 | 版本 | v1.3.0a5 已發佈為 GitHub pre-release（release workflow 自動 build → verify → release，SHA-256 receipt 交叉驗證）。`release_ready: false`，唯一**能力型**缺口是全天 coverage ledger 實測（TODO A1）。 |
 | 還缺什麼 | 別憑記憶：跑 `python main.py verify`（或看「06 系統設定 → 驗收中心」）就會列出 A1–A17 每一項現在有沒有收據，以及 ROADMAP §12.3 四個 gate 缺什麼。 |
 | Schema | migration **18/18**（append-only + checksum；**新表一律進 registry，不得靠 `create_all` 繞過**）。017 = `secretary_notes`、018 = `calendar_events`。 |
-| 測試 | **61 個 contract test 模組、606 項**（605 passed + 1 skipped）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
+| 測試 | **63 個 contract test 模組、626 項**（625 passed + 1 skipped）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
 | 導覽 | 6 分頁，**沒有右欄**（2026-09-06 依實機回饋移除；今日統計與 Focus Now 在 05 最上方、DATA TRUST 在 06 系統健康）：01 小秘書＝兩塊一屏（左：秘書桌面，問候併入、全部提案收合在底部；右：交辦與提問，記憶區收合在裡面）／02 知識庫／03 進行中工作／04 Git 同步中心／05 摘要與統計／06 系統設定（左欄 11 區塊，末項為**驗收中心**）。桌面與 494px 皆無水平溢出（Playwright 實測）。 |
 | 外觀 | 兩個獨立軸：`data-theme`（dark/light）× `data-accent`（naruto/forest/ocean），CSS 全走 `var(--accent)`；新配色只需加一組變數區塊。偏好存 localStorage（`omni-theme`／`omni-palette`／`omni-settings-pane`）。 |
 | 危險能力 | 執行器、L2、L2 寫入、自訂排程、Telegram 對話、`allow_remote_arm`、LINE、問候卡 LLM 潤飾——**全部預設關閉**；行事曆預設開但沒設路徑就等於停用。 |
@@ -36,6 +36,7 @@
 | 秘書桌面（01 首頁） | `core/secretary_home.py`（焦點＝第一張關於你的工作的提案、記得＝四級順序挑一則、詳情計數）；`GET /api/v1/secretary/home` 唯讀；前端 `renderHome`／`recordHomeLeave` | `test_secretary_home.py`（14） | [ADR-019](ADR-019-secretary-desk-home.md) |
 | 每週回顧（說的 vs 做的） | `core/weekly_review.py`（已結束的 ISO 週、活躍天數對照宣告優先、回顧觀察、`priority_drift` 訊號）；接在 `build_action_proposals`、`build_morning_pack` 第五步、L0 template `weekly_review` | `test_weekly_review.py`（20） | [ADR-020](ADR-020-weekly-review-said-vs-done.md) |
 | 文件落後程式（那句常打的指令） | `core/docs_freshness.py`（文件檔最後異動 vs 之後的 commit 數）；接既有兩段式 L2（`_DRAFT_PLAN_TYPES` ＋ 文件專用 draft prompt） | `test_docs_freshness.py`（25） | [ADR-021](ADR-021-docs-behind-code.md) |
+| 會議秘書（會後逐字稿） | `core/meeting_transcripts.py`（WebVTT parser、時間配對、摘要＋事實閘、候選待辦、`meeting_context`／`collect_meeting_signals`）；L0 template `meeting_notes`、`POST /api/v1/secretary/meetings/followups`（**唯一會寫 open_loops 的路徑**）、桌面 `#home-desk-meeting` | `test_meeting_transcripts.py`（19）＋A22 1 | [ADR-022](ADR-022-meeting-secretary.md) |
 | 每日包與今日視圖 | `core/secretary_packs.py` | `test_secretary_packs.py`（9） | [ADR-008](ADR-008-gated-agent-executor.md) L0 |
 | 問候卡（01 首頁＋晨報開頭） | `core/secretary_greeting.py` | `test_secretary_greeting.py`（23）＋晨報三項 | ROADMAP §11（2026-09-04） |
 | 推播組裝與通道 | `notifiers/messages.py`、`notifiers/channels.py`、`notifiers/secretary_push.py` | `test_notification_channels.py`（32） | [ADR-014](ADR-014-multi-channel-push-and-arm-code.md) |
@@ -65,6 +66,7 @@
 - **兩個事實放在一起就是洞見，不需要推測**：「你說 X 優先」與「上週 X 只有 1 天」各自都只是資料，並列才是秘書該說的話（ADR-020）。新增「秘書注意到 X」的功能時，先找有沒有兩個既有的事實可以並列，再考慮任何推論；期間一律用**已結束**的週／日。
 - **要秘書「做」一件重複的事，先問缺的是能力還是觸發**：使用者最常手打的指令（檢視同步狀態＋更新文件）其實兩半都已經有機制——L0 同步報告＋L2 agent CLI 調度——缺的只是一個確定性訊號（ADR-021）。新增功能前先查 `_DRAFT_PLAN_TYPES` 與既有 L0 template，能接上就不要開第二條寫入路徑。
 - **「東西在不在」不等於「東西有沒有內容」**：`index_present()` 只看檔案／目錄存在就回 true，於是空索引會讓 A6 停在「等預熱」而不是「去建索引」。任何 `*_present`／`configured` 類的判定都要問：它檢查的是存在還是內容？狀態訊息指向錯誤的下一步，和假綠燈一樣是 bug（2026-09-07）。
+- **供應商連不上時可能「回傳錯誤字串」而不是丟例外**：`LLMClient` 就是這樣，所以把回應直接送進下游檢查（事實閘、解析器）會讓錯誤訊息指錯原因——實機看到的是「摘要編造了數字 11434」，真相是 ollama 沒開。任何吃 LLM 回應的新程式碼，先用 `looks_like_llm_error()` 那類判斷攔一次（ADR-022 Addendum，2026-09-08）。
 - **年齡不是單調的**：分流訊號曾把「越久沒動」一路加分到底，於是放了 100 天的 PR 被說成「收益立即」。幾週沒動＝該提醒，幾個月沒動＝世界已經往前走。任何「越舊越急」的加權都要有一個「太舊就不算了」的上限，而且被排除的要在 inputs 點得出名字（ADR-007 Addendum 2026-09-08）。
 - **「進行中」要跟「失敗」分開講**：驗收項目讀非同步工作的收據時，先問「現在還在跑嗎」。把 running 講成「沒有完成，再跑一次」既不真也做不到（同時只能有一個索引工作）——這是「狀態訊息指錯下一步也是 bug」的第三次現身（2026-09-08）。
 - **「刪掉」不等於「空間還回來」**：Chroma 的 `delete_collection` 只做邏輯刪除——實測刪掉 4,000 切片再重建，目錄大小一個位元組都沒少（SQLite 空頁 ＋ 沒人引用的 HNSW 片段目錄）。任何「清空／移除」功能都要分開回答兩件事：**邏輯上不見了嗎？磁碟真的少了嗎？** 回收第三方儲存的空間必然要讀它的內部結構（這裡是 `segments` 表），所以規則寫成 fail-closed：讀不到就一律不刪（ADR-009 Addendum C，2026-09-07）。
@@ -79,7 +81,7 @@
   **A 段的現況直接跑 `python main.py verify` 查**（[ADR-016](ADR-016-acceptance-center.md)）；改 A 段的判準時要同步改 `core/acceptance.py` 的 `_ITEMS`。
 - **方向與取捨看 [ROADMAP.md](../ROADMAP.md) §12「下一階段規劃」**：三條候選路線（C5 私有網路遠端存取、C6 LINE 雙向、C3 其餘採集來源）各自的前置與代價都寫在那裡。
 - **個性化三步（2026-09-05 檢視後的方向）**：(1) 模式感知提案 [ADR-017](ADR-017-pattern-aware-proposals.md) ✅、(2) 宣告式個人檔案 [ADR-018](ADR-018-declared-profile.md) ✅、(3) **01 分頁成為真正的首頁**（把問候／今日／提案／記憶區依「今天先做什麼」重排，而不是再加卡）——待使用者確認後才開。刻意不走的路：用 LLM 推斷個性或優先、再多採集來源、C5 遠端存取。
-- **會議秘書**（2026-09-08 使用者提出）：[ADR-022](ADR-022-meeting-secretary.md) 已起草、**尚未實作**——先做第一層（會後逐字稿併入＋摘要＋候選待辦），即時音訊另案並要過五道門。動工前先讓使用者確認範圍與 `meetings.provider` 預設。
+- **會議秘書**（[ADR-022](ADR-022-meeting-secretary.md)）：第一層（會後逐字稿→觀察＋候選待辦）**已於 2026-09-08 實作**，實機收據待取得（TODO A22）。**第二層（即時字幕／翻譯＝錄下其他人的聲音）刻意沒做**——要做得先過 ADR-022 D6 的五道門並另寫 ADR。
 - 新增待辦請寫進 TODO.md、成果寫進 ROADMAP §11，**不要在本頁另開清單**——這頁保持一分鐘讀完。
 
 ## 工程慣例（照舊）

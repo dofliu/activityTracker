@@ -1456,6 +1456,19 @@ function renderSecretaryProposals() {
     const pending = item.same_project_pending
       ? `<span class="proposal-pending">${zh ? `此專案另有 ${item.same_project_pending} 項` : `+${item.same_project_pending} more here`}</span>`
       : "";
+    // ADR-022：會議候選待辦——你點了才成為未結事項，秘書自己不會。
+    const followups = Array.isArray(item.meeting_followups) ? item.meeting_followups : [];
+    const followupBlock = followups.length
+      ? `<div class="proposal-followups">
+           <div class="proposal-followups-hint">${zh ? "候選待辦（點「加入」才會成為未結事項）" : "Candidate follow-ups (only become open loops when you add them)"}</div>
+           ${followups.map(f => `
+             <div class="proposal-followup-row">
+               <span class="proposal-followup-text">${esc(f.text)}</span>
+               <button class="btn btn-ghost btn-sm" onclick="window.resolveMeetingFollowup(${Number(item.meeting_note_id)}, ${Number(f.index)}, 'accept', '${esc(String(item.project_key || ""))}')">${zh ? "加入未結事項" : "Add open loop"}</button>
+               <button class="btn btn-ghost btn-sm" onclick="window.resolveMeetingFollowup(${Number(item.meeting_note_id)}, ${Number(f.index)}, 'ignore', '')">${zh ? "忽略" : "Ignore"}</button>
+             </div>`).join("")}
+         </div>`
+      : "";
     const snoozeArgs = [item.proposal_type, item.project_key, item.subject_ref || ""]
       .map(v => `'${esc(String(v)).replace(/'/g, "\'")}'`).join(", ");
     return `
@@ -1472,6 +1485,7 @@ function renderSecretaryProposals() {
         <div class="proposal-action"><span>${zh ? "建議" : "Suggested"}</span>${esc(item.suggested_action)}</div>
         ${llmNote}
         ${actionLabel}
+        ${followupBlock}
         ${l2Hint}
         <div class="proposal-meta">
           <span>${esc(item.risk_level || "L0_READ_ONLY")}</span>
@@ -1485,6 +1499,27 @@ function renderSecretaryProposals() {
       </article>`;
   }).join("");
 }
+
+// ADR-022：候選待辦→未結事項。這是唯一會寫 open_loops 的路徑；忽略只改觀察正文。
+window.resolveMeetingFollowup = async function (noteId, index, action, projectKey) {
+  const zh = currentLang === "zh-TW";
+  try {
+    const res = await fetch("/api/v1/secretary/meetings/followups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note_id: noteId, index, action, project_key: projectKey || null }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    if (action === "accept" && data.open_loop_id) {
+      alert(zh ? `已加入未結事項：${data.text}` : `Added as an open loop: ${data.text}`);
+    }
+    await loadSecretaryProposals();
+    if (typeof loadProjects === "function") loadProjects();
+  } catch (e) {
+    alert((zh ? "處理候選待辦失敗: " : "Could not update the follow-up: ") + e.message);
+  }
+};
 
 // 回饋迴路：使用者說「這個先不用提醒」。沒有這個，分流清單永遠不會變準。
 window.snoozeProposal = async function (proposalType, projectKey, subjectRef, days) {
@@ -2127,6 +2162,18 @@ function renderHome() {
   if (cal) {
     if (calendar.enabled && calendar.line) { cal.textContent = `📅 ${calendar.line}`; cal.title = calendar.claim_boundary || ""; cal.hidden = false; }
     else cal.hidden = true;
+  }
+  // ADR-022：會議中／訊號不一致時如實說明差異（不讀會議內容、不錄音）
+  const meetingBox = $("home-desk-meeting");
+  if (meetingBox) {
+    const meeting = h.meeting || {};
+    if (meeting.line) {
+      meetingBox.textContent = meeting.line;
+      meetingBox.title = meeting.claim_boundary || "";
+      meetingBox.hidden = false;
+    } else {
+      meetingBox.hidden = true;
+    }
   }
 
   // 焦點：提案引擎排序後的第一張

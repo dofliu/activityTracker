@@ -12,7 +12,8 @@ class RAGSettings:
     # File extensions to index
     DOCUMENT_EXTS: Set[str] = {
         ".pdf", ".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls",
-        ".csv", ".tsv", ".txt", ".md", ".rtf", ".html", ".xml", ".tex"
+        ".csv", ".tsv", ".txt", ".md", ".rtf", ".html", ".xml", ".tex",
+        ".vtt",  # 會議逐字稿（ADR-022）：WebVTT 由 text parser 讀進來，時間戳在切片裡是噪音但可檢索
     }
 
     CODE_EXTS: Set[str] = {

@@ -415,6 +415,42 @@ def test_a21_says_the_reclamation_is_still_running_instead_of_unfinished(db, cfg
     assert _item(_report(db, cfg), "A21")["status"] == PASSED
 
 
+# ---- A22：會議秘書只回報查得到的，摘要品質留給人眼 ----
+
+
+def test_a22_reports_the_folder_and_followup_counts(db, cfg, tmp_path, monkeypatch):
+    """機器查得到「設了沒、整理過幾份、還有幾條沒處理」；摘要有沒有編造是人眼。"""
+    import core.meeting_transcripts as mt
+
+    unset = _item(_report(db, cfg), "A22")
+    assert unset["status"] == NOT_CONFIGURED and "transcript_dir" in unset["detail"]
+
+    directory = tmp_path / "meetings"
+    directory.mkdir()
+    monkeypatch.setattr(mt, "resolve_runtime_path", lambda value: __import__("pathlib").Path(value))
+    meeting_cfg = DictConfig({**cfg.data, "meetings": {"transcript_dir": str(directory)}})
+
+    empty = _item(_report(db, meeting_cfg), "A22")
+    assert empty["status"] == PENDING and "沒有逐字稿" in empty["detail"]
+
+    (directory / "m.vtt").write_text(
+        "WEBVTT\n\n1\n00:00:01.000 --> 00:00:02.000\nDof: hi\n", encoding="utf-8"
+    )
+    unprocessed = _item(_report(db, meeting_cfg), "A22")
+    assert unprocessed["status"] == PENDING and "還沒整理過" in unprocessed["detail"]
+    assert unprocessed["evidence"]["transcripts_found"] == 1
+
+    with db.session_scope() as session:
+        session.add(SecretaryNote(
+            kind="observation", title="會議紀錄：X", body="摘要：\n- x\n待辦候選：\n- [已加入] A\n- B",
+            source_ref="meeting:abc", source="meeting_notes", created_at=NOW,
+        ))
+    done = _item(_report(db, meeting_cfg), "A22")
+    assert done["status"] == NEEDS_HUMAN
+    assert done["evidence"]["followups_accepted"] == 1 and done["evidence"]["followups_pending"] == 1
+    assert done["evidence"]["provider"] == "ollama" and done["evidence"]["provider_is_cloud"] is False
+
+
 # ---- A7／A8 報告與收據 ----
 
 

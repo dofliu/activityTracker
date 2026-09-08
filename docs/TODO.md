@@ -48,6 +48,7 @@
 | A19 | **每週回顧（說的 vs 做的）實機收據** | 先宣告本期優先（「偏好：優先：<專案>」）→ 正常用一週 → 下週一開 01：看記憶區的「W## 回顧」與桌面的焦點／記得；也可對 `weekly_review` 排程按立即執行 | 回顧列出的各專案活躍天數與你的印象相符、每日工作誌天數對得上；宣告的優先真的沒做時桌面出現「你說 X 優先，上週它只有 N 天在動、Y 有 M 天」，改宣告（或下週真的排時間）後下一週消失；有在做時回顧寫「一致」、沒有偏移卡；宣告名字對不到活動時正文如實寫「沒有任何活動歸到這個名字」而不是硬算 | 🟡 P1 |
 | A20 | **文件落後偵測與文件更新 L2 實機收據** | 06 → 秘書與自動化開三個執行器開關（執行器、L2、L2 寫入）→ 01 看有沒有「X 的文件落後了：…又有 N 個 commit」→ 按「起草文件更新計畫」（批准＋確認碼）→ **讀過那份計畫** → 再批准「依計畫改檔」→ 自己 `git diff` 檢視後 commit | 落後的 commit 數與你的印象相符；起草的計畫沒有編造沒發生的進度；改檔後 `git diff` 只動文件、**沒有被 commit**；`inputs.docs_freshness.skipped_no_doc_baseline` 列出的 repo 確實是「文件不在採集範圍」而不是誤判。改完文件後這張卡消失 | 🟡 P1 |
 | A21 | **Chroma 空間回收** | 「02 知識庫」看儲存卡片的「Chroma 目錄／可回收」，按「🧹 回收 Chroma 空間」（大目錄要一兩分鐘），完成後按一次預熱 | worker 收據顯示回收前後位元組與刪掉的孤兒片段數；活著的索引仍可檢索（重新預熱後計數不變）。工作還在跑時這一項是 `pending`「回收正在進行中」，不是失敗——大目錄光 VACUUM 就要一兩分鐘。**背景**：Chroma 的 delete_collection 只做邏輯刪除，重建索引不會讓磁碟變小（實測 4,000 切片刪掉重建後目錄一個位元組都沒少），使用者實機是 4,839 切片對 4.24 GB 目錄 | 🟢 P2 |
+| A22 | **會議秘書（會後逐字稿）實機收據** | 設 `meetings.transcript_dir` → 開了轉錄的會議結束後把逐字稿放進去 → 排程或立即執行 `meeting_notes` → 看 01 的「會議紀錄」卡，點一條「加入未結事項」 | 摘要沒有編造你沒說過的事；配對到的會議標題正確（或如實寫未配對）；**點過的才出現在未結事項**、沒點的不見於任何計數；會議中桌面那行與實際狀況相符（人眼確認） | 🟢 P2 |
 
 > A1 是唯一還在擋 `release_ready` 的**能力型**缺口；A2、A6 是修復／重構後的回歸確認（A6 對應原 B1「首次檢索在主程序載入」，程式面已於 2026-09-02 完成，剩實機收據）。
 
@@ -74,7 +75,7 @@
 | C4 | **更多配色主題** | 外觀已拆成 `data-theme` × `data-accent` 兩軸，新增一套只需加一組 CSS 變數區塊，不動任何元件樣式 | 依喜好 | ⚪ P2 |
 | C5 | **遠端網頁存取（私有網路）** | 讓手機用瀏覽器看完整儀表板：把 `security.allow_remote_clients` 換成 CIDR allowlist（預設只放行 Tailscale／WireGuard 網段）＋登入憑證＋PWA。**不做公開反向代理。** 需要先寫 ADR（認證形狀、失敗即拒、收據） | ADR-013 已先以 Telegram 覆蓋「觀察＋對話」 | ⚪ P2 |
 | C6 | **LINE 雙向（webhook）** | 讓 LINE 也能提問與批准：需公開 HTTPS 入口（Cloudflare Tunnel／中繼）＋`x-line-signature` 驗證＋postback 按鈕，並修改 ADR-001 的 loopback 邊界。先寫 ADR 再動工 | ADR-014 已先用推播覆蓋 LINE；雙向仍建議走 Telegram | ⚪ P2 |
-| C7 | **會議秘書（第一層：會後逐字稿）** | 依 [ADR-022](ADR-022-meeting-secretary.md)：`meetings.transcript_dir` 一個資料夾、WebVTT parser、L0 template `meeting_notes`、觀察 `meeting:<sha1>`、提案 `meeting_followups`／`meeting_transcript_missing`；候選待辦要你點了才進未結事項；預設本機 LLM。即時音訊（第二層）不在此項，需另一份 ADR 並過 D6 五道門 | ADR 已起草（2026-09-08），待使用者確認範圍後開工；實作後對應驗收 A22 | 🟢 P2 |
+| C7 | **會議秘書（第一層：會後逐字稿）** | 依 [ADR-022](ADR-022-meeting-secretary.md)：`meetings.transcript_dir` 一個資料夾、WebVTT parser、L0 template `meeting_notes`、觀察 `meeting:<sha1>`、提案 `meeting_followups`／`meeting_transcript_missing`；候選待辦要你點了才進未結事項；預設本機 LLM。即時音訊（第二層）不在此項，需另一份 ADR 並過 D6 五道門 | ✅ 2026-09-08 已實作第一層（19 項契約測試＋容器實機收據）；實機收據見 A22。第二層（即時音訊）仍未實作 | 🟢 P2 |
 
 ---
 

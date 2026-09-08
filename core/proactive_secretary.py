@@ -52,6 +52,9 @@ SUGGESTED_ACTIONS = {
     # ADR-020 每週回顧：說的 vs 做的——二選一，別讓宣告只是字。
     "priority_drift": "決定一件事：下週把時間排給它（看一眼 Handoff 接續），或改宣告——在對話框打「偏好：優先：…」換成你真正在做的。",
     # ADR-021：這正是你最常手打的那句指令；秘書用既有的兩段式 L2 幫你走完。
+    # ADR-022 會議秘書：候選待辦是「你好像答應了」，只有你能讓它成為承諾。
+    "meeting_followups": "讀一遍候選待辦：要做的按「加入未結事項」，不做的按「忽略」；沒點的不會進任何計數。",
+    "meeting_transcript_missing": "若那場會有開轉錄，從 Teams 下載逐字稿放進 meetings.transcript_dir；沒開轉錄就忽略這張卡。",
     "docs_behind_code": "開啟 L2 後按「起草文件更新計畫」，讀過那份計畫再批准「實際改檔」（不會 commit，改動留給你檢視）；也可以自己更新文件，卡就會消失。",
 }
 
@@ -89,6 +92,10 @@ def why_now(signal_type: str, age_days: float, extra: dict[str, Any] | None = No
         return f"上週還很活躍、這週歸零；再放 {int(days)} 天就得重讀脈絡"
     if signal_type == "priority_drift":
         return "上一個完整週剛結束，現在調整下週最划算；再放一週，宣告就只是字"
+    if signal_type == "meeting_followups":
+        return "會議剛結束、脈絡還在，現在決定哪些真的要做最準" + (f"；已 {int(days)} 天" if days >= 1 else "")
+    if signal_type == "meeting_transcript_missing":
+        return f"{hours} 小時內剛結束；逐字稿在 Teams 上放久了你會忘記下載"
     if signal_type == "docs_behind_code":
         return f"commit 訊息還在、脈絡還記得；再放 {int(days)} 天就得回頭讀 diff 才寫得出文件"
     return ""
@@ -224,6 +231,11 @@ def _signal_to_proposal(signal: dict[str, Any], now: datetime) -> dict[str, Any]
     # ADR-021：文件更新的事實區塊由 server 組好帶進提案，L2 prompt 直接引用（呼叫端無法注入）
     if signal.get("docs_facts"):
         proposal["docs_facts"] = str(signal["docs_facts"])
+    # ADR-022：候選待辦帶進卡片，讓「加入未結事項／忽略」按鈕有東西可點；
+    # 這些字串來自 LLM 摘要，是候選而非承諾——沒被點過的不進任何計數。
+    if signal.get("meeting_followups"):
+        proposal["meeting_followups"] = list(signal["meeting_followups"])
+        proposal["meeting_note_id"] = signal.get("meeting_note_id")
     return proposal
 
 
@@ -399,6 +411,17 @@ def build_action_proposals(
         docs_meta = {"used": False, "reason": f"error:{type(exc).__name__}"}
     counters["docs_freshness"] = docs_meta
 
+    # ADR-022 會議秘書：待處理的候選待辦、剛結束卻沒有逐字稿的會議。
+    meetings_meta: dict[str, Any] = {"used": False}
+    try:
+        from .meeting_transcripts import collect_meeting_signals
+
+        meeting_signals, meetings_meta = collect_meeting_signals(database=database, cfg=cfg, now=now)
+        signals = signals + meeting_signals
+    except Exception as exc:  # noqa: BLE001 — 會議層故障不得拖垮提案清單
+        meetings_meta = {"used": False, "reason": f"error:{type(exc).__name__}"}
+    counters["meetings"] = meetings_meta
+
     # ADR-018 宣告式個人檔案：你標為「本期優先」的專案，所有訊號（含被冷落）加分。
     # 加分刻意大於習慣加權——你說的優先勝過我從活動推出來的主線。
     profile_meta: dict[str, Any] = {"declared": False}
@@ -484,6 +507,7 @@ def build_action_proposals(
             "profile": counters.get("profile", {}),
             "weekly_review": counters.get("weekly_review", {}),
             "docs_freshness": counters.get("docs_freshness", {}),
+            "meetings": counters.get("meetings", {}),
             "weekly_review": counters.get("weekly_review", {}),
             "max_per_project": max_per_project,
             "stalled_open_loop_hours": stalled_hours,

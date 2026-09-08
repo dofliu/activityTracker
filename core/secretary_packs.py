@@ -378,6 +378,14 @@ def build_today_view(
         }
     except Exception as exc:  # noqa: BLE001 — 行事曆讀不到也不該讓今日視圖消失
         calendar = {"enabled": False, "error": type(exc).__name__, "count": 0, "line": None}
+    # ADR-022 D2：「在開會」只用行事曆事件 ＋ 前景應用程式名稱兩個確定性訊號。
+    meeting: dict[str, Any] = {"enabled": False, "in_meeting": False, "line": None}
+    try:
+        from core.meeting_transcripts import meeting_context
+
+        meeting = meeting_context(database=database, cfg=cfg, now=now)
+    except Exception as exc:  # noqa: BLE001 — 會議訊號讀不到也不該讓今日視圖消失
+        meeting = {"enabled": False, "in_meeting": False, "line": None, "error": type(exc).__name__}
     memory: dict[str, Any] = {"enabled": False, "counts": {}, "total": 0}
     try:
         from core.secretary_memory import list_notes, memory_enabled
@@ -395,6 +403,7 @@ def build_today_view(
         "pack_line": pack_summary_line(pack),
         "memory": memory,
         "calendar": calendar,
+        "meeting": meeting,
         "schedules": {
             "executor_enabled": executor_enabled(cfg),
             "scheduled_tasks_enabled": scheduled_tasks_enabled(cfg),
