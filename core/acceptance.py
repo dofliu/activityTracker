@@ -34,6 +34,7 @@ from core.models import (
     AgentExecutionReceipt,
     CalendarEvent,
     RAGChatMessage,
+    RAGIndexedFile,
     SecretaryNote,
 )
 from core.runtime_paths import resolve_runtime_path, source_checkout_root
@@ -383,6 +384,32 @@ def _check_a6(ctx: _Ctx) -> dict[str, Any]:
         "last_error": status.get("last_error"),
     }
     chunks = (evidence["bm25_chunks"] or 0) + (evidence["vector_chunks"] or 0)
+    # 索引可能在預熱之後才重建；worker 記憶體裡的收據不會自己更新。只讀 SQLite 的
+    # 來源計數（不載入任何索引套件）就能看出「載入的是舊索引」——那不該判綠
+    # （2026-09-07 實機：索引 4839 chunk，收據仍是 3，A6 卻是 passed）。
+    source_chunks = None
+    try:
+        source_chunks = int(
+            ctx.session.query(func.coalesce(func.sum(RAGIndexedFile.chunk_count), 0)).scalar() or 0
+        )
+        evidence["source_chunks"] = source_chunks
+    except Exception as exc:  # noqa: BLE001 — 讀不到來源計數就退回原本的判定
+        evidence["source_chunks_error"] = type(exc).__name__
+    if (
+        status.get("state") == "ready"
+        and chunks > 0
+        and source_chunks
+        and (evidence["vector_chunks"] or 0) < source_chunks
+    ):
+        return {
+            "status": PARTIAL,
+            "detail": (
+                f"worker 載入的是舊索引：記憶體裡 vector={evidence['vector_chunks']}，"
+                f"但索引現在有 {source_chunks} 個 chunk。索引重建後要重新預熱"
+                "（POST /api/v1/rag/retrieval/warmup；舊版若沒重載請先 shutdown）。"
+            ),
+            "evidence": evidence,
+        }
     if status.get("state") == "ready" and chunks > 0:
         return {
             "status": PASSED,

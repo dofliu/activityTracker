@@ -449,7 +449,7 @@ DeskRAG 支援結合本機知識庫（PDF、Word、PPTX、Excel、代碼/Markdow
 
 檢索（Chroma 向量查詢、BM25、query embedding）預設在**常駐子程序**執行（`python -m rag.retrieval_worker`，由主服務以 stdin/stdout JSON lines 驅動），主服務只持有一條 pipe，不載入任何索引：
 
-- **預熱**：服務啟動後若已有索引，會在背景把 BM25／Chroma／embedding 模型載進 worker，第一次提問不必等數十秒載入；沒有索引時不啟動任何子程序。知識庫區塊的「檢索 worker」卡片顯示狀態（尚未啟動／預熱中／就緒／失敗）、載入切片數、預熱耗時與 worker 記憶體；也可按「🔥 預熱檢索 worker」手動觸發，或按「💤 釋放記憶體」結束 worker（下次提問自動重啟）。
+- **預熱**：服務啟動後若已有索引，會在背景把 BM25／Chroma／embedding 模型載進 worker，第一次提問不必等數十秒載入；沒有索引時不啟動任何子程序。知識庫區塊的「檢索 worker」卡片顯示狀態（尚未啟動／預熱中／就緒／失敗）、載入切片數、預熱耗時與 worker 記憶體；也可按「🔥 預熱檢索 worker」手動觸發，或按「💤 釋放記憶體」結束 worker（下次提問自動重啟）。**你按下的預熱一律重新載入**：重建索引之後 worker 記憶體裡還是舊的計數，所以明示預熱不會因為「已經就緒」就跳過（啟動時的自動預熱仍然不重複載入）。驗收中心 A6 也會比對「載入計數」與「索引現在的切片數」，載入的是舊索引就回「部分達成」而不是綠燈。
 - **卡住可救**：檢索超過 60 秒時終止 worker 而不是讓主服務的 thread 永遠卡住；下一次提問自動重新啟動，重啟次數與最近錯誤都在狀態卡片與 `GET /api/v1/rag/retrieval/status` 可見。
 - **設定**：`rag.retrieval.mode: worker | in_process`（預設 worker；`in_process` 為舊行為，在主服務內檢索）、`rag.retrieval.warmup_on_start: true | false`。
 

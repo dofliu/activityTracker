@@ -467,7 +467,7 @@ quality_gates:
   ingestion_provenance: passed_local_rescan_601_sources
   response_finalization: passed_as_final_candidate_contract_not_semantic_correctness
   open_loop_lifecycle: passed_local_db_reconciliation
-  automated_tests: passed_590_contract_tests_60_modules_589_passed_1_conditional_skip
+  automated_tests: passed_592_contract_tests_60_modules_591_passed_1_conditional_skip
   usage_milestone_alpha: passed_contract_and_windows_dashboard_api_smoke
   background_task_receipts: passed_all_three_platform_live_acceptance_48_completed_on_2026_08_29
   repository_sync: passed_contract_tests_and_localhost_read_only_status_smoke
@@ -517,6 +517,7 @@ quality_gates:
   live_receipt_acceptance_scripts: passed_localhost_e2e_background_tasks_and_extension
   autonomous_execution: blocked_by_p2_5
 known_blockers:
+  - "檢索 worker 的預熱與 A6 判定已於 2026-09-07 修正（ADR-009 Addendum B）：使用者建完索引（source_chunks 3 → 4839、consistency matched）後按下「預熱檢索 worker」，拿回的仍是重建之前的收據（bm25/vector 都是 3、pid 與 warmup_at 未變），A6 還據此報 ✅ passed——根因是 warmup_in_background() 只要 worker 活著且預熱過就短路回舊狀態，不管索引在那之後重建過。已改為啟動時的自動預熱維持 idempotent、使用者明示按下的預熱一律重載（同一個 worker 程序），且 A6 在判綠前比對載入計數與 SQLite 的 rag_indexed_files.chunk_count 之和，載入的是舊索引就回 partial 並直說原因。**A6 的完成判準因此從「有載入東西」升級為「載入的量不小於索引現在的內容」**；兩支回歸測試在舊行為下會失敗。A6 實機收據仍待使用者重新預熱後取得（docs/TODO.md A6）"
   - "文件落後程式（ADR-021，2026-09-06）已實作：文件檔最後異動後又累積 ≥8 個 commit 且文件 ≥2 天沒動就提一張 docs_behind_code，動作是既有的兩段式 L2（起草文件更新計畫 → 使用者讀過批准 → 依計畫改檔、不准 commit／push、前後驗 worktree 乾淨）。**只比時間與數量、不判斷文件內容；沒有文件異動紀錄的 repo 一律不提；事實由 server 端組好交給 agent，不讓它自己猜**。同輪修掉 execution token 的 401 訊息無法區分「服務沒載入 token（設定啟動時只讀一次）」與「token 不符」。殘餘：實機收據尚未取得（見 docs/TODO.md A20）——需要開 L2 三道門並實走兩次批准"
   - "每週回顧（ADR-020，2026-09-06）已實作：上一個完整週各專案活躍天數對照你宣告的本期優先——寫成一則「W## 回顧」觀察（早晨包每天補、同一週一則），不一致就一張 priority_drift 提案（即時算、吃到宣告優先加分、頂掉同專案的被冷落）。**只用可回溯計數、不讀 prompt、不呼叫 LLM、不推測原因；整週安靜不算偏移；名字對不到如實說**。殘餘：實機收據尚未取得（見 docs/TODO.md A19）——需要先宣告優先並用滿一週"
   - "秘書桌面（ADR-019，2026-09-05）已實作：01 成為首頁——秘書用確定性規則從既有資料挑焦點一張（第一張關於你的工作的提案；Extension heartbeat／沒有每日排程這類工具自身提醒不佔焦點）與記得一則（焦點專案的決定 → 最近一天的工作誌 → 釘選 → 最近記下的），完整清單降為預設收合的詳情，每張卡一鍵預填對話，桌面顯示「今天離開首頁 N 次」（只在瀏覽器）。**不用 LLM 挑、不寫任何資料、唯讀端點**。殘餘：實機收據尚未取得（見 docs/TODO.md A18）；個性化三步（ADR-017／018／019）到此完成，下一步等使用者用幾天後的回饋"

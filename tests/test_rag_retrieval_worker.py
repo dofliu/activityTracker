@@ -159,6 +159,35 @@ def test_background_warmup_is_idempotent(make_client):
     assert again["state"] == "ready" and client.status()["spawns"] == 1
 
 
+def test_explicit_warmup_reloads_even_when_already_ready(make_client):
+    """建完索引後按「預熱」必須真的重載。原本只要 worker 活著且預熱過就直接回舊收據，
+    於是永遠拿到重建之前的計數（2026-09-07 實機：索引 4839 chunk，收據仍是 3）。"""
+    client = make_client("ok")
+    loads = []
+    original = client.warmup
+
+    def _counting(timeout=600):
+        loads.append(timeout)
+        return original(timeout=timeout)
+
+    client.warmup = _counting  # 實例屬性蓋掉方法；背景執行緒呼叫的就是這個
+
+    client.warmup_in_background(reason="test")
+    client._warmup_thread.join(timeout=10)
+    assert client.status()["state"] == "ready" and len(loads) == 1
+
+    # 自動路徑（啟動預熱）維持 idempotent：不重載
+    client.warmup_in_background(reason="startup")
+    assert len(loads) == 1
+
+    # 明示路徑：一律重載，而且用同一個 worker（不重啟程序）
+    forced = client.warmup_in_background(reason="dashboard", force=True)
+    assert forced["state"] == "warming"
+    client._warmup_thread.join(timeout=10)
+    assert len(loads) == 2
+    assert client.status()["state"] == "ready" and client.status()["spawns"] == 1
+
+
 # ---- 2. 啟動預熱的閘門 ----
 
 
@@ -331,7 +360,7 @@ def test_retrieval_status_and_warmup_endpoints(monkeypatch):
     monkeypatch.setattr(router_module.retrieval_client, "status", lambda: dict(fake_state))
     monkeypatch.setattr(
         router_module.retrieval_client, "warmup_in_background",
-        lambda reason: {**fake_state, "state": "warming", "reason": reason},
+        lambda reason, force=False: {**fake_state, "state": "warming", "reason": reason, "forced": force},
     )
     monkeypatch.setattr(router_module.retrieval_client, "shutdown", lambda: {**fake_state, "state": "cold"})
 
@@ -341,6 +370,8 @@ def test_retrieval_status_and_warmup_endpoints(monkeypatch):
     monkeypatch.setattr(router_module, "retrieval_mode", lambda: "worker")
     res = client.post("/api/v1/rag/retrieval/warmup", headers={"Origin": _LOCAL_ORIGIN})
     assert res.status_code == 200 and res.json()["state"] == "warming" and res.json()["reason"] == "dashboard"
+    # 使用者明示按下預熱 → 一律重載，否則建完索引只會拿到舊計數
+    assert res.json()["forced"] is True
 
     monkeypatch.setattr(router_module, "retrieval_mode", lambda: "in_process")
     res = client.post("/api/v1/rag/retrieval/warmup", headers={"Origin": _LOCAL_ORIGIN})
