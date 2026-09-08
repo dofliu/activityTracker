@@ -74,6 +74,7 @@
 | C4 | **更多配色主題** | 外觀已拆成 `data-theme` × `data-accent` 兩軸，新增一套只需加一組 CSS 變數區塊，不動任何元件樣式 | 依喜好 | ⚪ P2 |
 | C5 | **遠端網頁存取（私有網路）** | 讓手機用瀏覽器看完整儀表板：把 `security.allow_remote_clients` 換成 CIDR allowlist（預設只放行 Tailscale／WireGuard 網段）＋登入憑證＋PWA。**不做公開反向代理。** 需要先寫 ADR（認證形狀、失敗即拒、收據） | ADR-013 已先以 Telegram 覆蓋「觀察＋對話」 | ⚪ P2 |
 | C6 | **LINE 雙向（webhook）** | 讓 LINE 也能提問與批准：需公開 HTTPS 入口（Cloudflare Tunnel／中繼）＋`x-line-signature` 驗證＋postback 按鈕，並修改 ADR-001 的 loopback 邊界。先寫 ADR 再動工 | ADR-014 已先用推播覆蓋 LINE；雙向仍建議走 Telegram | ⚪ P2 |
+| C7 | **會議秘書（第一層：會後逐字稿）** | 依 [ADR-022](ADR-022-meeting-secretary.md)：`meetings.transcript_dir` 一個資料夾、WebVTT parser、L0 template `meeting_notes`、觀察 `meeting:<sha1>`、提案 `meeting_followups`／`meeting_transcript_missing`；候選待辦要你點了才進未結事項；預設本機 LLM。即時音訊（第二層）不在此項，需另一份 ADR 並過 D6 五道門 | ADR 已起草（2026-09-08），待使用者確認範圍後開工；實作後對應驗收 A22 | 🟢 P2 |
 
 ---
 
