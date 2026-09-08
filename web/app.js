@@ -4793,6 +4793,26 @@ function initRAGTab() {
     });
   }
 
+  const compactChromaBtn = $("btn-rag-compact-chroma");
+  if (compactChromaBtn) {
+    compactChromaBtn.addEventListener("click", async () => {
+      let detail = "";
+      try {
+        const chroma = await getJSON("/api/v1/rag/storage/chroma");
+        detail = chroma.segments_readable
+          ? `\n\n目前 ${formatRAGBytes(chroma.total_bytes)}，其中可回收 ${formatRAGBytes(chroma.reclaimable_bytes)}（孤兒片段 ${chroma.orphan_dirs.length} 個、SQLite 空頁 ${formatRAGBytes(chroma.sqlite_free_bytes)}）。`
+          : `\n\n讀不到 segments 表（${chroma.reason || "未知原因"}），這次不會刪任何東西。`;
+      } catch (e) { detail = ""; }
+      if (!confirm(`回收 Chroma 目錄空間？${detail}\n\n只刪「不被 segments 表引用」的舊片段目錄並 VACUUM chroma.sqlite3；現有索引、來源檔與對話都不動。檢索 worker 會先釋放（下次提問或預熱自動重啟）。`)) return;
+      try {
+        await postJSON("/api/v1/rag/storage/compact-chroma", { confirm: true });
+        startRAGProgressPolling();
+      } catch (e) {
+        alert("無法啟動 Chroma 空間回收: " + e.message);
+      }
+    });
+  }
+
   const memorySyncBtn = $("btn-rag-memory-sync");
   if (memorySyncBtn) {
     memorySyncBtn.addEventListener("click", async () => {
@@ -5059,11 +5079,27 @@ async function refreshRAGStorage() {
   try {
     const data = await getJSON("/api/v1/rag/storage");
     const vectorCount = data.vector_chunks === null || data.vector_chunks === undefined ? "待驗證" : Number(data.vector_chunks).toLocaleString();
+    // Chroma 目錄另外算一次帳：刪掉的 collection 不會讓磁碟變小（ADR-009 Addendum C）。
+    let chroma = null;
+    try { chroma = await getJSON("/api/v1/rag/storage/chroma"); } catch (e) { chroma = null; }
+    let chromaLine = "";
+    let chromaAlert = "";
+    if (chroma) {
+      chromaLine = `<span>Chroma 目錄 ${formatRAGBytes(chroma.total_bytes)}</span><span>可回收 ${chroma.segments_readable ? formatRAGBytes(chroma.reclaimable_bytes) : "無法判斷"}</span>`;
+      if (!chroma.segments_readable) {
+        chromaAlert = `讀不到 chroma.sqlite3 的 segments 表（${chroma.reason || "未知原因"}），無法分辨哪些片段是刪掉沒回收的；不會刪任何東西。`;
+      } else if (chroma.reclaimable_bytes > 200 * 1024 * 1024) {
+        chromaAlert = `Chroma 目錄有 ${formatRAGBytes(chroma.reclaimable_bytes)} 是刪掉沒回收的（孤兒片段 ${chroma.orphan_dirs.length} 個 ${formatRAGBytes(chroma.orphan_bytes)}、SQLite 空頁 ${formatRAGBytes(chroma.sqlite_free_bytes)}）。按「回收 Chroma 空間」可取回。`;
+      }
+    }
+    const consistencyAlert = data.consistency === "matched" ? "" : (data.consistency === "unverified" ? "尚未以獨立 worker 驗證 Chroma／BM25，請按「驗證索引與空間」。" : `索引計數待檢查：向量差異 ${Number(data.vector_delta || 0).toLocaleString()}。`);
+    const alerts = [consistencyAlert, chromaAlert].filter(Boolean).map((text) => `<div class="rag-storage-alert">${text}</div>`).join("");
     card.innerHTML = `<div class="rag-storage-grid">
       <span>來源檔案 ${Number(data.source_files || 0).toLocaleString()}</span><span>來源大小 ${formatRAGBytes(data.source_bytes)}</span>
       <span>資料庫切片 ${Number(data.source_chunks || 0).toLocaleString()}</span><span>向量 ${vectorCount}</span>
       <span>索引空間 ${formatRAGBytes(data.index_bytes)}</span><span>SQLite ${formatRAGBytes(data.sqlite_bytes)}</span>
-    </div>${data.consistency === "matched" ? "" : `<div class="rag-storage-alert">${data.consistency === "unverified" ? "尚未以獨立 worker 驗證 Chroma／BM25，請按「驗證索引與空間」。" : `索引計數待檢查：向量差異 ${Number(data.vector_delta || 0).toLocaleString()}。`}</div>`}`;
+      ${chromaLine}
+    </div>${alerts}`;
   } catch (e) {
     card.textContent = "索引儲存空間暫時無法取得。";
   }

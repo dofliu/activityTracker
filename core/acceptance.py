@@ -35,6 +35,7 @@ from core.models import (
     CalendarEvent,
     RAGChatMessage,
     RAGIndexedFile,
+    RAGIndexJob,
     SecretaryNote,
 )
 from core.runtime_paths import resolve_runtime_path, source_checkout_root
@@ -962,6 +963,76 @@ def _check_a20(ctx: _Ctx) -> dict[str, Any]:
     }
 
 
+# ---- A21 Chroma 空間回收 --------------------------------------------------
+
+
+def _check_a21(ctx: _Ctx) -> dict[str, Any]:
+    """ADR-009 Addendum C：Chroma 的 delete_collection 只做邏輯刪除，磁碟不會變小。
+    這一項只認 worker 的回收收據——沒跑過就說沒跑過，不去猜目錄現在多大。"""
+    row = (
+        ctx.session.query(RAGIndexJob.status, RAGIndexJob.result_json, RAGIndexJob.completed_at)
+        .filter(RAGIndexJob.job_type == "compact_chroma")
+        .order_by(RAGIndexJob.completed_at.desc(), RAGIndexJob.requested_at.desc())
+        .first()
+    )
+    if row is None:
+        return {
+            "status": PENDING,
+            "detail": (
+                "還沒跑過 Chroma 空間回收。索引重建過幾輪之後，舊片段目錄與 SQLite 空頁"
+                "會一直留著（刪 collection 不會讓磁碟變小）——到「02 知識庫」按"
+                "「🧹 回收 Chroma 空間」，這裡就會有收據。"
+            ),
+            "evidence": {"receipt_available": False},
+        }
+    status, result_json, completed_at = row
+    try:
+        result = json.loads(result_json) if result_json else {}
+    except (TypeError, ValueError):
+        result = {}
+    evidence = {
+        "job_status": status,
+        "completed_at": completed_at.isoformat(timespec="seconds") if completed_at else None,
+        "reclaimed_bytes": result.get("reclaimed_bytes"),
+        "before_bytes": result.get("before_bytes"),
+        "after_bytes": result.get("after_bytes"),
+        "removed_dirs": len(result.get("removed_dirs") or []),
+        "failed_dirs": result.get("failed_dirs") or [],
+        "vacuum": result.get("vacuum"),
+        "still_reclaimable_bytes": (result.get("after") or {}).get("reclaimable_bytes"),
+    }
+    if status != "completed" or not result:
+        return {
+            "status": PARTIAL,
+            "detail": f"最近一次 Chroma 回收沒有完成（{status}）；再跑一次或看工作訊息。",
+            "evidence": evidence,
+        }
+    if evidence["failed_dirs"]:
+        return {
+            "status": PARTIAL,
+            "detail": (
+                f"有 {len(evidence['failed_dirs'])} 個孤兒片段刪不掉（多半是檔案還被開著）。"
+                "先按「💤 釋放記憶體」讓檢索 worker 放手，再回收一次。"
+            ),
+            "evidence": evidence,
+        }
+    reclaimed = int(evidence["reclaimed_bytes"] or 0)
+    if reclaimed <= 0:
+        return {
+            "status": PASSED,
+            "detail": "已跑過回收，當時沒有可回收的空間——目錄是乾淨的（這也是有效收據）。",
+            "evidence": evidence,
+        }
+    return {
+        "status": PASSED,
+        "detail": (
+            f"已回收 {reclaimed:,} bytes（{evidence['before_bytes']:,} → {evidence['after_bytes']:,}），"
+            f"刪掉 {evidence['removed_dirs']} 個不被引用的片段目錄。"
+        ),
+        "evidence": evidence,
+    }
+
+
 # ---- 項目清單 -------------------------------------------------------------
 
 _ITEMS: tuple[dict[str, Any], ...] = (
@@ -1144,6 +1215,15 @@ _ITEMS: tuple[dict[str, Any], ...] = (
         "how": "開 L2 三個開關 → 01 看「X 的文件落後了」→ 起草文件更新計畫 → 讀過再批准實際改檔 → 自己 review 後 commit",
         "criterion": "落後的 commit 數與你的印象相符；起草的計畫沒有編造進度；改檔後 git diff 只動文件且沒有被 commit（人眼確認）",
         "probe": _check_a20,
+    },
+    {
+        "id": "A21",
+        "title": "Chroma 空間回收",
+        "priority": "P2",
+        "blocks_release": False,
+        "how": "02 知識庫 →「🧹 回收 Chroma 空間」（大目錄可能要一兩分鐘；回收後按預熱重載）",
+        "criterion": "worker 收據顯示回收前後的位元組數與刪掉的孤兒片段數；現有索引仍可檢索（重新預熱後計數不變）",
+        "probe": _check_a21,
     },
 )
 

@@ -38,6 +38,7 @@ from core.models import (
     CoverageLedgerInterval,
     RAGChatMessage,
     RAGIndexedFile,
+    RAGIndexJob,
     SecretaryNote,
 )
 from core.server import app
@@ -338,6 +339,48 @@ def test_a6_will_not_pass_on_a_stale_load(db, cfg, monkeypatch):
     reloaded = {**ready, "warmup": {"bm25_chunks": 4839, "vector_chunks": 4839}}
     monkeypatch.setattr(rc.retrieval_client, "status", lambda: reloaded)
     assert _item(_report(db, cfg, runtime=True), "A6")["status"] == PASSED
+
+
+# ---- A21：Chroma 空間回收只認 worker 收據 ----
+
+
+def test_a21_reports_the_reclamation_receipt_or_says_there_is_none(db, cfg):
+    """Chroma 的 delete_collection 只做邏輯刪除，磁碟不會變小（ADR-009 Addendum C）。
+    這一項不去猜目錄現在多大——沒有收據就說沒跑過。"""
+    import json as _json
+
+    pending = _item(_report(db, cfg), "A21")
+    assert pending["status"] == PENDING and pending["evidence"]["receipt_available"] is False
+    assert "回收 Chroma 空間" in pending["detail"]
+
+    def _job(job_id, status, result):
+        return RAGIndexJob(
+            id=job_id, job_type="compact_chroma", status=status,
+            completed_at=NOW - timedelta(minutes=5),
+            result_json=_json.dumps(result, ensure_ascii=False),
+        )
+
+    with db.session_scope() as session:
+        session.add(_job("j1", "completed", {
+            "reclaimed_bytes": 4_100_000_000, "before_bytes": 4_240_000_000,
+            "after_bytes": 140_000_000, "removed_dirs": [{"name": "eb2894eb", "bytes": 4_000_000_000}],
+            "failed_dirs": [], "vacuum": {"ran": True, "integrity": "ok"},
+            "after": {"reclaimable_bytes": 0},
+        }))
+    passed = _item(_report(db, cfg), "A21")
+    assert passed["status"] == PASSED and passed["evidence"]["removed_dirs"] == 1
+    assert "4,100,000,000" in passed["detail"]
+
+    # 刪不掉的（檔案被開著）不是綠燈，而且要說出下一步
+    with db.session_scope() as session:
+        session.query(RAGIndexJob).delete()
+        session.add(_job("j2", "completed", {
+            "reclaimed_bytes": 0, "before_bytes": 10, "after_bytes": 10, "removed_dirs": [],
+            "failed_dirs": [{"name": "eb2894eb", "error": "PermissionError: in use"}],
+            "vacuum": {"ran": False, "error": "OperationalError: database is locked"},
+        }))
+    blocked = _item(_report(db, cfg), "A21")
+    assert blocked["status"] == PARTIAL and "釋放記憶體" in blocked["detail"]
 
 
 # ---- A7／A8 報告與收據 ----
