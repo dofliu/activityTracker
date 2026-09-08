@@ -673,6 +673,11 @@ P2.5-S1 API 安全邊界
    - 剩餘候選：瀏覽器閱讀、terminal history、未 commit 的工作狀態。
    - 門檻不變：**每項先過「能否改變決策」檢驗**（像 ADR-015 開頭那張表一樣寫出來），過不了就不納入——採集越多不等於越有用，只會增加隱私面與噪音。
 
+4. **C7 會議秘書（第一層：會後逐字稿，[ADR-022](docs/ADR-022-meeting-secretary.md) 已起草）**
+   - 目標：秘書「知道你在開會」（行事曆事件＋前景視窗是 Teams，兩個確定性訊號）並在會後把 Teams 匯出的逐字稿併入知識庫與記憶區，產出摘要與**候選**待辦——你點了才成為未結事項。
+   - 前置：`meetings.transcript_dir`（沒設就是關）、WebVTT parser（`.vtt` 目前不在 DeskRAG 支援清單）、L0 template `meeting_notes`；沒有新資料表，逐字稿走既有索引路徑。摘要預設本機 provider，選雲端要在設定與卡片上明示「與會者的話會送出去」。
+   - 刻意不做：錄音、讀 Teams 視窗、Graph API、會前提醒。**即時字幕／翻譯是第二層**，另案 ADR，五道門寫在 ADR-022 D6。
+
 另有隨時可做的低風險項：C1 更多 L2 template（一次一個審查）、C2 更多 L0 可排程 template（L1/L2 永遠不可排程）、C4 更多配色（只加一組 CSS 變數）。
 
 ### 12.3 `release_ready: true` 的收斂條件
