@@ -36,6 +36,12 @@ BASE_SCORES = {
 # 年齡加權刻意壓低：放很久確實該處理，但不該讓一批舊 issue 蓋過今天真正卡住的事。
 AGE_BONUS_MAX = 0.12
 
+# 年齡有兩個區間（ADR-007 Addendum 2026-09-08）：幾週沒動值得提醒，幾個月沒動代表世界
+# 已經往前走——那不是「現在該做的事」。實機：放了 100 天的 PR 被標成「只差一個 review、
+# 收益立即」，使用者的判斷是「這種就不用納入考量了」。超過這個天數的 PR／issue 不進提案，
+# 但如實計數，讓 inputs 說得出「另有 N 件太舊沒列」。0 = 關閉。
+DEFAULT_GITHUB_STALE_AFTER_DAYS = 60
+
 
 def _local_naive(value: datetime | None) -> datetime | None:
     if value is None or value.tzinfo is None:
@@ -111,6 +117,23 @@ def collect_pr_signals(session: Any, now: datetime) -> list[dict[str, Any]]:
         })
 
     return signals
+
+
+def split_stale_github_signals(
+    signals: list[dict[str, Any]], stale_after_days: int
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """把「太舊、不必納入考量」的 GitHub 訊號分出來：回 (保留, 排除)。
+
+    只看 ``age_days``（自 updated_at／created_at 起算的閒置天數）；``stale_after_days`` ≤ 0
+    表示不過濾。排除的訊號原樣回傳，呼叫端負責把數量與對象寫進 inputs——不悄悄消失。
+    """
+    if stale_after_days <= 0:
+        return list(signals), []
+    kept: list[dict[str, Any]] = []
+    dropped: list[dict[str, Any]] = []
+    for item in signals:
+        (dropped if float(item.get("age_days") or 0.0) > stale_after_days else kept).append(item)
+    return kept, dropped
 
 
 def collect_issue_signals(session: Any, now: datetime) -> list[dict[str, Any]]:

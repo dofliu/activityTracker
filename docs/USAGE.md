@@ -488,7 +488,7 @@ Invoke-RestMethod -Method Post -ContentType "application/json" -Body '{"confirm"
 
 1. **上次做到哪**（最上方）：最近有活動的專案、最後一個動作、未結事項數；「接續 →」直接跳到 02 該專案，「複製 Handoff」拿到接續 prompt。
 2. **早晨包摘要**（一行）：若排程有跑，顯示「早晨包：repo 需 pull N、需 push M、STATUS 過期 K、Handoff J 份」與時間；尚未建立排程時會提示。
-3. **秘書提案**：每項多一句 **「為什麼是現在」**（例如「CI 紅燈擋住合併，越晚修越容易衝突」「18 小時前還在動，脈絡還新鮮」），這就是排序依據的白話版。停滯／未收尾事項若尚無 L2 起草動作，會提示開啟 L2 後小秘書可先起草重啟計畫（仍需批准＋確認碼）。
+3. **秘書提案**：**超過 60 天沒更新的 PR／issue 不納入考量**（`proactive_secretary.github_stale_after_days`，0 = 不過濾）——幾個月沒動的東西不是「現在該做的事」；被排除的數量與對象寫在 `inputs.github_stale_excluded`，提案區也會多一行說明。每項多一句 **「為什麼是現在」**（例如「CI 紅燈擋住合併，越晚修越容易衝突」「18 小時前還在動，脈絡還新鮮」），這就是排序依據的白話版。停滯／未收尾事項若尚無 L2 起草動作，會提示開啟 L2 後小秘書可先起草重啟計畫（仍需批准＋確認碼）。
 
 **📦 建立每日排程**（需 execution token；執行器與排程任務開關須先開）：一鍵建立兩個 L0 唯讀排程——07:30 `morning_pack`（Repo 同步報告＋STATUS 過期草稿＋活躍專案 Handoff，三步各自容錯，失敗步驟記在 receipt 的 `errors`）與 21:30 `handoff_active_projects`（今天有活動的專案各產一份 Handoff 到 `reports/handoffs/`）。已存在就不重複建立。晨報（桌面／Telegram）會帶入早晨包摘要與 top 建議的「為什麼是現在」。**沒有任何自動 pull／push**；同步動作仍由你批准。
 

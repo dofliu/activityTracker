@@ -1382,6 +1382,20 @@ function renderSecretaryProposals() {
   const proposals = secretaryProposalsCache.proposals || [];
   badge.textContent = `${proposals.length} ${currentLang === "zh-TW" ? "項" : "ITEMS"}`;
   badge.className = `trust ${proposals.length ? "noisy" : "ok"}`;
+  // 太舊而沒列入的 PR／issue 要說出來，不能悄悄消失（ADR-007 Addendum 2026-09-08）
+  const staleNote = $("secretary-stale-note");
+  if (staleNote) {
+    const stale = (secretaryProposalsCache.inputs || {}).github_stale_excluded || null;
+    if (stale && stale.total > 0) {
+      staleNote.textContent = currentLang === "zh-TW"
+        ? `另有 ${stale.total} 件超過 ${stale.threshold_days} 天沒更新的 PR／issue 不列入考量（PR ${stale.prs}、issue ${stale.issues}）；要看的話調 proactive_secretary.github_stale_after_days。`
+        : `${stale.total} PR/issue item(s) idle for more than ${stale.threshold_days} days are left out (${stale.prs} PR, ${stale.issues} issue); adjust proactive_secretary.github_stale_after_days to include them.`;
+      staleNote.title = (stale.subjects || []).map(x => `${x.subject_ref} · ${Math.round(x.age_days)}d`).join("\n");
+      staleNote.hidden = false;
+    } else {
+      staleNote.hidden = true;
+    }
+  }
   if (!proposals.length) {
     box.innerHTML = `<div class="placeholder">${currentLang === "zh-TW" ? "目前沒有超過規則門檻的建議；不代表所有工作都已完成。" : "No suggestion crossed the current rule threshold; this does not prove all work is complete."}</div>`;
     return;

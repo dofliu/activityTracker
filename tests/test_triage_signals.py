@@ -265,6 +265,9 @@ def test_repo_issue_backlog_excludes_pull_requests(tmp_path):
 
 
 def test_open_issue_becomes_proposal_with_traceable_evidence(tmp_path):
+    # 這支測的是「issue 變成提案時收據可追溯」，不是年齡。原本用 120 天前的 issue；
+    # 2026-09-08 起超過 60 天沒更新的 PR／issue 不納入考量（ADR-007 Addendum），
+    # 所以改成 20 天——太舊的情境由下面的專屬測試負責。
     database = TempDatabase(tmp_path / "issue.db")
     with database.session_scope() as session:
         session.add(GitHubIssueEvent(
@@ -276,8 +279,8 @@ def test_open_issue_becomes_proposal_with_traceable_evidence(tmp_path):
             assignee="student01",
             html_url="https://github.com/dofliu/labRepo/issues/12",
             labels_json='["todo"]',
-            created_at=NOW - timedelta(days=120),
-            updated_at=NOW - timedelta(days=120),
+            created_at=NOW - timedelta(days=20),
+            updated_at=NOW - timedelta(days=20),
         ))
 
     proposals = _build(database)["proposals"]
@@ -288,3 +291,78 @@ def test_open_issue_becomes_proposal_with_traceable_evidence(tmp_path):
     assert any(ref.startswith("github_issue_events:") for ref in item["evidence_refs"])
     assert any("student01" in reason for reason in item["reasons"])
     assert item["execution_available"] is False
+
+
+# ---- 太舊的 PR／issue 不納入考量（ADR-007 Addendum 2026-09-08）----
+
+
+def _issue(session, repo, number, *, days_old=10, assignee=None):
+    session.add(GitHubIssueEvent(
+        repo_name=repo,
+        issue_number=number,
+        title=f"{repo} issue {number}",
+        state="open",
+        assignee=assignee,
+        html_url=f"https://github.com/dofliu/{repo}/issues/{number}",
+        created_at=NOW - timedelta(days=days_old),
+        updated_at=NOW - timedelta(days=days_old),
+    ))
+
+
+def test_github_items_idle_for_months_are_left_out_but_counted(tmp_path):
+    """實機：放了 101 天的 PR 被標成「只差一個 review、收益立即」。幾個月沒動不是
+    「現在該做的事」——預設 60 天以上不進提案，但 inputs 要說得出少了哪些。"""
+    db = TempDatabase(tmp_path / "t.db")
+    with db.session_scope() as session:
+        _pr(session, "z72-scada-system", 92, ci="success", days_old=101)
+        _pr(session, "z72-scada-system", 93, ci="success", days_old=100)
+        _pr(session, "fresh-app", 7, ci="success", days_old=59)
+        _issue(session, "z72-scada-system", 40, days_old=200)
+        _issue(session, "fresh-app", 3, days_old=12, assignee="dofliu")
+
+    result = _build(db)
+    subjects = {p["subject_ref"] for p in result["proposals"]}
+    assert "pr:fresh-app#7" in subjects and "issue:fresh-app#3" in subjects
+    assert not any(ref.startswith("pr:z72-scada-system") for ref in subjects)
+    assert "issue:z72-scada-system#40" not in subjects
+
+    stale = result["inputs"]["github_stale_excluded"]
+    assert stale == {
+        "threshold_days": 60,
+        "prs": 2,
+        "issues": 1,
+        "total": 3,
+        "subjects": [
+            {"subject_ref": "issue:z72-scada-system#40", "age_days": 200.0},
+            {"subject_ref": "pr:z72-scada-system#92", "age_days": 101.0},
+            {"subject_ref": "pr:z72-scada-system#93", "age_days": 100.0},
+        ],
+    }
+    # open_prs／open_issues 仍是「全部開著的」，不是過濾後的數——帳要對得上
+    assert result["inputs"]["open_prs"] == 3 and result["inputs"]["open_issues"] == 2
+
+
+def test_stale_cutoff_is_configurable_and_zero_disables_it(tmp_path):
+    db = TempDatabase(tmp_path / "t.db")
+    with db.session_scope() as session:
+        _pr(session, "old-app", 1, ci="success", days_old=101)
+        _pr(session, "old-app", 2, ci="success", days_old=45)
+
+    strict = _build(db, cfg=_config(github_stale_after_days=30))
+    assert {p["subject_ref"] for p in strict["proposals"]} == set()
+    assert strict["inputs"]["github_stale_excluded"]["total"] == 2
+
+    off = _build(db, cfg=_config(github_stale_after_days=0))
+    assert {p["subject_ref"] for p in off["proposals"]} == {"pr:old-app#1", "pr:old-app#2"}
+    assert off["inputs"]["github_stale_excluded"] == {
+        "threshold_days": 0, "prs": 0, "issues": 0, "total": 0, "subjects": [],
+    }
+
+
+def test_split_stale_keeps_the_boundary_day():
+    from core.triage_signals import split_stale_github_signals
+
+    signals = [{"subject_ref": "a", "age_days": 60.0}, {"subject_ref": "b", "age_days": 60.1}]
+    kept, dropped = split_stale_github_signals(signals, 60)
+    assert [x["subject_ref"] for x in kept] == ["a"] and [x["subject_ref"] for x in dropped] == ["b"]
+    assert split_stale_github_signals(signals, 0) == (signals, [])

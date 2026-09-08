@@ -66,3 +66,33 @@ execute/jobs endpoints、`AgentExecutionJob` model 與前端 Execute 按鈕；
 - 以 `create_subprocess_exec` 傳 argv list 取代 `create_subprocess_shell`。
 - 執行路徑要求獨立 token；`L2_MUTATE` 需與 `L0`/`L1` 不同的二次確認機制。
 - 本 ADR 的 acceptance criteria 與對應 contract tests 同步更新，不得留在 failing 狀態。
+
+## Addendum 2026-09-08：年齡有兩個區間——幾個月沒動的 PR／issue 不納入考量
+
+### Context
+
+分流訊號（`core/triage_signals.py`）原本把年齡當成單調的「越久沒動越該處理」：PR／issue 的分數有
+年齡加權（有上限），理由欄會寫「已開啟 N 天沒有更新」。實機（2026-09-08）01 桌面同時列出兩張
+HIGH 卡：`z72-scada-system #92`／`#93`，CI 綠燈、**已開啟 100～101 天沒有更新**，「為什麼是現在」
+寫著「只差一個 review／merge 動作，成本最低、收益立即」。使用者的判斷是：「這種已經超過 60 天的，
+就不用納入考量了。」
+
+他是對的。幾週沒動的東西值得提醒——脈絡還在、成本還低；幾個月沒動的東西代表世界已經往前走，
+「收益立即」是不真的宣稱。秘書桌面的問題是「今天先做什麼」，不是「所有還開著的東西」。
+
+### Decision
+
+1. `proactive_secretary.github_stale_after_days`（預設 **60**，0 = 不過濾）：自 `updated_at`
+   （沒有就 `created_at`）起閒置**超過**這個天數的 PR／issue 訊號，**不進提案**。
+2. 不悄悄消失：`inputs.github_stale_excluded` 如實寫出門檻、被排除的 PR 數、issue 數與最舊的
+   十個對象（`subject_ref` 與天數）；`inputs.open_prs`／`open_issues` 維持「全部開著的」計數，
+   帳要對得上。01 的提案區在有排除時多一行「另有 N 件超過 60 天沒更新的 PR／issue 不列入考量」。
+3. 只動 GitHub 的 PR／issue 訊號。未結事項（`stalled_open_loop`）、被冷落的專案、文件落後**不受影響**
+   ——它們各自有自己的年齡語意，若也要有上限，另案討論。
+4. 想看回來就調設定；個別的仍可用既有的 snooze／「不再提醒」。
+
+### Consequences
+
+- 提案清單變短，HIGH 卡更可能是真的「現在」。代價是一個放了 61 天、其實還想合的 PR 會從桌面消失
+  ——它還在 GitHub 上，`inputs` 也點得出名字。
+- 這條規則是使用者的判斷寫成設定，不是從活動推斷出來的（與 ADR-018 同一種精神）。
