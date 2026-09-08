@@ -58,3 +58,27 @@ DeskRAG 原本以 FastAPI `BackgroundTasks` 執行 async function，但其中包
 - 「建完索引 → 按預熱」現在會真的重載，代價是使用者按下按鈕時要重新等載入（大索引可能數十秒）；狀態卡片在這段時間顯示「預熱中」。
 - A6 的完成判準因此比原本嚴格：不只要「有載入東西」，還要**載入的量不小於索引現在的內容**。它仍然不宣稱索引夠大或檢索結果正確——只是不再把過期的收據當成就緒。
 - 這與 A6 前一輪的修法（0 chunk 不叫使用者等預熱）同一條原則：**狀態訊息指向錯誤的下一步，和假綠燈是同一類 bug**。
+
+## Addendum C（2026-09-07）：Chroma 的「刪除」不會讓磁碟變小
+
+### Context
+
+使用者的 `chroma_bytes` 是 4.24 GB，索引裡卻只有 4,839 個切片。實測（chromadb 1.5.9）確認這是預期中的殘留而不是壞掉：建一個 4,000 切片的 collection、`delete_collection` 之後再重建，**目錄大小 14,209,408 bytes 一個位元組都沒少**——
+
+- `chroma.sqlite3` 的 1,791 頁裡有 1,590 頁變成空頁（VACUUM 後 7.3 MB → 0.8 MB）；SQLite 不會自己把空頁還給檔案系統。
+- 舊的 HNSW 片段目錄整個留在原地，而且新的 collection 用的是新的 segment id——那個目錄從此不再被 `segments` 表引用，也不會有人去刪它。
+
+§5 的清空流程對此無能為力：`clear_all_rag_indexes` 呼叫的 `compact_sqlite()` VACUUM 的是 **OmniContext 自己的** SQLite，不是 `chroma.sqlite3`；`chroma_reclamation: "collection_reset"` 這個標記描述的是邏輯刪除，不是磁碟回收。每重建一次索引就多留一份殘留，於是「小索引、大目錄」會隨時間惡化。
+
+### Decision
+
+13. `rag/storage.py` 的 `chroma_report()` 為 Chroma 目錄算一份**唯讀**的空間帳：目錄總大小、`chroma.sqlite3`（含 -wal／-shm）大小與空頁位元組、活的片段目錄、**孤兒**片段目錄（名稱是 UUID 但不在 `segments` 表裡）、認不得的項目。只用 sqlite3 唯讀連線與檔案大小，**不 import chromadb**——§6 的邊界在這裡一樣成立。
+14. `compact_chroma(confirm=True)` 是唯一的回收路徑，跑在既有的 index worker（job type `compact_chroma`，因此與其他索引工作互斥、有進度與收據）：刪掉孤兒片段目錄，再 VACUUM `chroma.sqlite3`。三條 fail-closed 規則——**讀不到 `segments` 表就什麼都不刪**；只刪名稱是 UUID 且不在表裡的目錄（活片段、認不得的檔案、`chroma.sqlite3` 本身永遠不碰）；刪不掉的（檔案被開著）如實記在 `failed_dirs`。刪除前會**重讀一次** `segments`，其間變成活的就跳過。
+15. `POST /api/v1/rag/storage/compact-chroma` 需要 `confirm=true`，並在啟動工作前先請檢索 worker 讓開（Windows 上開著的檔案刪不掉）；worker 下次提問或按預熱時自動重啟。儀表板在儲存卡片顯示「Chroma 目錄 / 可回收」，殘留超過 200 MB 時直接寫出孤兒片段數與空頁大小。
+16. 驗收中心 A21 只認 worker 的回收收據（回收前後位元組、刪掉幾個孤兒、VACUUM 結果）；沒跑過就回 `pending`，**不去掃描目錄猜現在多大**。
+
+### Consequences
+
+- 「重建索引很多次」不再等於「磁碟只出不進」。容器實測：12,932,956 → 2,625,700 bytes（回收 79.7%），活的 collection 回收後仍可檢索（900 切片、查詢照常命中）。
+- 回收依賴 Chroma 的 `segments` 表這個內部結構。萬一未來版本改了 schema，讀不到就是「不知道」，而不知道時**一律不刪**——這是刻意選擇的失敗方向。
+- 回收不會讓索引變小、也不會改善檢索品質；它只把已經沒有人引用的位元組還給檔案系統。狀態卡片與收據都只講位元組，不宣稱索引正確。

@@ -19,7 +19,7 @@ from rag.jobs import (
     create_job, get_job, get_latest_job, launch_worker, request_cancel,
     request_pause, update_job,
 )
-from rag.storage import storage_report
+from rag.storage import chroma_report, storage_report
 from rag.retrieval.catalog import DEFAULT_STRATEGY, STRATEGY_CATALOG
 from rag.retrieval.context import citations_from_payload, format_context_prompt
 from rag.retrieval_client import (
@@ -250,6 +250,35 @@ def rag_storage():
 def rag_storage_verify():
     job = _start_job_or_raise("audit")
     return {"success": True, "job": job, "message": "已交由獨立 worker 驗證 Chroma、BM25 與 SQLite 一致性。"}
+
+
+@router.get("/storage/chroma")
+def rag_storage_chroma():
+    """Chroma 目錄的空間帳：活的片段、刪掉沒回收的孤兒、SQLite 空頁。只讀。"""
+    return chroma_report()
+
+
+@router.post("/storage/compact-chroma")
+def rag_compact_chroma(req: ConfirmIndexRemovalRequest):
+    if not req.confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="此操作需要 confirm=true；只會刪除不被引用的 Chroma 片段目錄並 VACUUM，不動來源檔、對話或現有索引。",
+        )
+    # 檢索 worker 會把片段檔案開著（Windows 上刪不掉），先請它讓開；
+    # 下一次提問或按預熱會自動重新啟動（ADR-009 Addendum B 之後，明示預熱一律重載）。
+    retrieval_released = None
+    try:
+        retrieval_released = retrieval_client.shutdown().get("state")
+    except Exception as exc:  # noqa: BLE001 — 放不掉就照常進行，失敗會如實記在收據裡
+        retrieval_released = f"error:{type(exc).__name__}"
+    job = _start_job_or_raise("compact_chroma")
+    return {
+        "success": True,
+        "job": job,
+        "retrieval_worker": retrieval_released,
+        "message": "已交由獨立 worker 回收 Chroma 空間；只刪不被引用的片段目錄，現有索引不受影響。",
+    }
 
 
 @router.post("/storage/rebuild-bm25")

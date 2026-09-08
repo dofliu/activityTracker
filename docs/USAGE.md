@@ -461,6 +461,27 @@ Invoke-RestMethod -Method Post "http://127.0.0.1:8765/api/v1/rag/retrieval/shutd
 
 狀態卡片只描述 worker 程序狀態與載入計數，不代表檢索結果正確或索引完整；索引一致性仍以「驗證索引與空間」的 worker 收據為準。
 
+### 回收 Chroma 空間：刪掉的索引不會讓磁碟變小（2026-09-07）
+
+如果你看到「索引只有幾千個切片，Chroma 目錄卻是好幾 GB」，那不是壞掉，是 Chroma 的刪除只做**邏輯**刪除。實測（chromadb 1.5.9）：建一個 4,000 切片的 collection、刪掉再重建之後，目錄大小一個位元組都沒少——
+
+- `chroma.sqlite3` 裡的資料列變成**空頁**留在檔案裡（實測 1,791 頁裡有 1,590 頁是空的），SQLite 不會自己還給檔案系統；
+- 舊的 HNSW 片段目錄整個留著，而重建後的 collection 用的是新的片段 id，那個舊目錄從此沒有人引用。
+
+每重建一次索引就多留一份。「02 知識庫」的儲存卡片現在直接把帳寫出來：**Chroma 目錄 X／可回收 Y**（殘留超過 200 MB 會再寫一行說明孤兒片段幾個、SQLite 空頁多少）。按 **「🧹 回收 Chroma 空間」** 就會交給獨立 worker 刪掉不被引用的片段目錄並 VACUUM `chroma.sqlite3`。
+
+- **不會動到**：現有索引（活著的片段目錄不碰）、來源檔案、對話紀錄、`chroma.sqlite3` 本身。
+- **分不出來就不刪**：讀不到 `chroma.sqlite3` 的 `segments` 表時，所有目錄都算「不知道」，這次回收會直接失敗而不是猜。
+- 回收前會先請檢索 worker 讓開（開著的檔案在 Windows 上刪不掉）；回收後按一次「🔥 預熱檢索 worker」重新載入。
+- 大目錄可能要一兩分鐘（VACUUM 要重寫整個 `chroma.sqlite3`）；期間工作進度條會顯示狀態，收據裡有回收前後的位元組數。
+- 驗收中心 A21 只認這份收據——沒跑過就是 `pending`，不會去掃描目錄猜。
+
+```powershell
+Invoke-RestMethod "http://127.0.0.1:8765/api/v1/rag/storage/chroma" | ConvertTo-Json -Depth 3
+Invoke-RestMethod -Method Post -ContentType "application/json" -Body '{"confirm":true}' `
+  "http://127.0.0.1:8765/api/v1/rag/storage/compact-chroma"
+```
+
 ### 01「今天」：今日行動清單與每日早晨包（2026-09-02）
 
 「01 · 小秘書」分頁採三欄：左欄是 **TODAY · 今日行動清單**、中欄是交辦與提問、右欄是全站側欄（「今日統計」可收合＋Focus Now）。知識庫（完整 RAG 對話、引用、索引管理）自 2026-09-02 起是獨立的「02 · 知識庫」分頁，與 01 的交辦框共用同一條對話。今日行動清單把原本散在各處的東西收在一起：

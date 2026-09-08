@@ -54,6 +54,19 @@ def main() -> int:
             from rag.storage import verify_index_consistency
             result = {"storage": verify_index_consistency()}
             finish_job(args.job_id, "completed", "已完成 RAG 索引一致性檢查", result=result)
+        elif job["job_type"] == "compact_chroma":
+            # ADR-009 Addendum C：Chroma 的 delete_collection 只做邏輯刪除，磁碟不會變小。
+            # 這裡只刪「不被 segments 表引用的片段目錄」並 VACUUM chroma.sqlite3；
+            # 不碰來源檔、不碰 SQLite 業務資料、不 import chromadb。
+            from rag.storage import compact_chroma
+            update_job(args.job_id, message="正在回收 Chroma 目錄：刪除孤兒片段並 VACUUM…")
+            result = compact_chroma(confirm=True)
+            finish_job(
+                args.job_id,
+                "completed",
+                f"已回收 {result['reclaimed_bytes']:,} bytes（孤兒片段 {len(result['removed_dirs'])} 個）",
+                result=result,
+            )
         elif job["job_type"] == "rebuild_bm25":
             from rag.lifecycle import rebuild_bm25_from_chroma
             result = rebuild_bm25_from_chroma(
