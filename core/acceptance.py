@@ -966,12 +966,45 @@ def _check_a20(ctx: _Ctx) -> dict[str, Any]:
 # ---- A21 Chroma 空間回收 --------------------------------------------------
 
 
+# rag/jobs.py 的 ACTIVE_STATUSES。驗收只查 SQLite，不 import rag 套件；
+# 兩邊一致由契約測試鎖住（tests/test_rag_storage_compaction.py）。
+_ACTIVE_JOB_STATUSES = ("queued", "running", "scanning", "indexing", "paused", "cancelling")
+
+
 def _check_a21(ctx: _Ctx) -> dict[str, Any]:
     """ADR-009 Addendum C：Chroma 的 delete_collection 只做邏輯刪除，磁碟不會變小。
     這一項只認 worker 的回收收據——沒跑過就說沒跑過，不去猜目錄現在多大。"""
+    running = (
+        ctx.session.query(RAGIndexJob.status, RAGIndexJob.requested_at)
+        .filter(
+            RAGIndexJob.job_type == "compact_chroma",
+            RAGIndexJob.status.in_(_ACTIVE_JOB_STATUSES),
+        )
+        .order_by(RAGIndexJob.requested_at.desc())
+        .first()
+    )
+    if running is not None:
+        # 還在跑不是「沒有完成」。4 GB 級的目錄光 VACUUM 就要一兩分鐘，
+        # 這時候叫使用者「再跑一次」是指錯方向——而且同時只能有一個索引工作，
+        # 真的再按也會被拒（2026-09-08 實機遇到）。
+        return {
+            "status": PENDING,
+            "detail": (
+                f"回收正在進行中（{running[0]}）。大目錄光 VACUUM 就要一兩分鐘，"
+                "等它跑完再看這一項；不用再按一次（同時只能有一個索引工作）。"
+            ),
+            "evidence": {
+                "job_status": running[0],
+                "requested_at": running[1].isoformat(timespec="seconds") if running[1] else None,
+                "receipt_available": False,
+            },
+        }
     row = (
         ctx.session.query(RAGIndexJob.status, RAGIndexJob.result_json, RAGIndexJob.completed_at)
-        .filter(RAGIndexJob.job_type == "compact_chroma")
+        .filter(
+            RAGIndexJob.job_type == "compact_chroma",
+            RAGIndexJob.status.notin_(_ACTIVE_JOB_STATUSES),
+        )
         .order_by(RAGIndexJob.completed_at.desc(), RAGIndexJob.requested_at.desc())
         .first()
     )

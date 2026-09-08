@@ -383,6 +383,38 @@ def test_a21_reports_the_reclamation_receipt_or_says_there_is_none(db, cfg):
     assert blocked["status"] == PARTIAL and "釋放記憶體" in blocked["detail"]
 
 
+def test_a21_says_the_reclamation_is_still_running_instead_of_unfinished(db, cfg):
+    """工作還在跑不是「沒有完成」。4 GB 的 VACUUM 要一兩分鐘，這時候叫使用者
+    「再跑一次」是指錯方向——而且同時只能有一個索引工作，再按也會被拒（2026-09-08 實機）。"""
+    with db.session_scope() as session:
+        session.add(RAGIndexJob(
+            id="j-run", job_type="compact_chroma", status="running",
+            requested_at=NOW - timedelta(seconds=40), completed_at=None, result_json=None,
+        ))
+    item = _item(_report(db, cfg), "A21")
+    assert item["status"] == PENDING
+    assert "進行中" in item["detail"] and "再跑一次" not in item["detail"]
+    assert item["evidence"]["job_status"] == "running"
+
+    # 進行中的工作不會蓋掉先前那份成功的收據
+    import json as _json
+
+    with db.session_scope() as session:
+        session.add(RAGIndexJob(
+            id="j-old", job_type="compact_chroma", status="completed",
+            completed_at=NOW - timedelta(hours=2),
+            result_json=_json.dumps({
+                "reclaimed_bytes": 4_100_000_000, "before_bytes": 4_240_000_000,
+                "after_bytes": 140_000_000, "removed_dirs": [{"name": "eb2894eb", "bytes": 1}],
+                "failed_dirs": [], "vacuum": {"ran": True, "integrity": "ok"},
+            }),
+        ))
+    assert _item(_report(db, cfg), "A21")["status"] == PENDING   # 進行中優先
+    with db.session_scope() as session:
+        session.query(RAGIndexJob).filter(RAGIndexJob.id == "j-run").delete()
+    assert _item(_report(db, cfg), "A21")["status"] == PASSED
+
+
 # ---- A7／A8 報告與收據 ----
 
 
