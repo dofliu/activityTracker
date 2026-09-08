@@ -13,7 +13,7 @@
 | 版本 | v1.3.0a5 已發佈為 GitHub pre-release（release workflow 自動 build → verify → release，SHA-256 receipt 交叉驗證）。`release_ready: false`，唯一**能力型**缺口是全天 coverage ledger 實測（TODO A1）。 |
 | 還缺什麼 | 別憑記憶：跑 `python main.py verify`（或看「06 系統設定 → 驗收中心」）就會列出 A1–A17 每一項現在有沒有收據，以及 ROADMAP §12.3 四個 gate 缺什麼。 |
 | Schema | migration **18/18**（append-only + checksum；**新表一律進 registry，不得靠 `create_all` 繞過**）。017 = `secretary_notes`、018 = `calendar_events`。 |
-| 測試 | **61 個 contract test 模組、603 項**（602 passed + 1 skipped）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
+| 測試 | **61 個 contract test 模組、606 項**（605 passed + 1 skipped）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
 | 導覽 | 6 分頁，**沒有右欄**（2026-09-06 依實機回饋移除；今日統計與 Focus Now 在 05 最上方、DATA TRUST 在 06 系統健康）：01 小秘書＝兩塊一屏（左：秘書桌面，問候併入、全部提案收合在底部；右：交辦與提問，記憶區收合在裡面）／02 知識庫／03 進行中工作／04 Git 同步中心／05 摘要與統計／06 系統設定（左欄 11 區塊，末項為**驗收中心**）。桌面與 494px 皆無水平溢出（Playwright 實測）。 |
 | 外觀 | 兩個獨立軸：`data-theme`（dark/light）× `data-accent`（naruto/forest/ocean），CSS 全走 `var(--accent)`；新配色只需加一組變數區塊。偏好存 localStorage（`omni-theme`／`omni-palette`／`omni-settings-pane`）。 |
 | 危險能力 | 執行器、L2、L2 寫入、自訂排程、Telegram 對話、`allow_remote_arm`、LINE、問候卡 LLM 潤飾——**全部預設關閉**；行事曆預設開但沒設路徑就等於停用。 |
@@ -65,6 +65,7 @@
 - **兩個事實放在一起就是洞見，不需要推測**：「你說 X 優先」與「上週 X 只有 1 天」各自都只是資料，並列才是秘書該說的話（ADR-020）。新增「秘書注意到 X」的功能時，先找有沒有兩個既有的事實可以並列，再考慮任何推論；期間一律用**已結束**的週／日。
 - **要秘書「做」一件重複的事，先問缺的是能力還是觸發**：使用者最常手打的指令（檢視同步狀態＋更新文件）其實兩半都已經有機制——L0 同步報告＋L2 agent CLI 調度——缺的只是一個確定性訊號（ADR-021）。新增功能前先查 `_DRAFT_PLAN_TYPES` 與既有 L0 template，能接上就不要開第二條寫入路徑。
 - **「東西在不在」不等於「東西有沒有內容」**：`index_present()` 只看檔案／目錄存在就回 true，於是空索引會讓 A6 停在「等預熱」而不是「去建索引」。任何 `*_present`／`configured` 類的判定都要問：它檢查的是存在還是內容？狀態訊息指向錯誤的下一步，和假綠燈一樣是 bug（2026-09-07）。
+- **年齡不是單調的**：分流訊號曾把「越久沒動」一路加分到底，於是放了 100 天的 PR 被說成「收益立即」。幾週沒動＝該提醒，幾個月沒動＝世界已經往前走。任何「越舊越急」的加權都要有一個「太舊就不算了」的上限，而且被排除的要在 inputs 點得出名字（ADR-007 Addendum 2026-09-08）。
 - **「進行中」要跟「失敗」分開講**：驗收項目讀非同步工作的收據時，先問「現在還在跑嗎」。把 running 講成「沒有完成，再跑一次」既不真也做不到（同時只能有一個索引工作）——這是「狀態訊息指錯下一步也是 bug」的第三次現身（2026-09-08）。
 - **「刪掉」不等於「空間還回來」**：Chroma 的 `delete_collection` 只做邏輯刪除——實測刪掉 4,000 切片再重建，目錄大小一個位元組都沒少（SQLite 空頁 ＋ 沒人引用的 HNSW 片段目錄）。任何「清空／移除」功能都要分開回答兩件事：**邏輯上不見了嗎？磁碟真的少了嗎？** 回收第三方儲存的空間必然要讀它的內部結構（這裡是 `segments` 表），所以規則寫成 fail-closed：讀不到就一律不刪（ADR-009 Addendum C，2026-09-07）。
 - **idempotent 的快取要問「底下的東西會不會變」**：`warmup_in_background()` 原本只要 worker 活著且預熱過就回舊收據，於是「建完索引 → 按預熱」永遠拿到重建之前的計數，A6 還照著那份舊收據判綠。**使用者明示要求的動作不該被 idempotence 吃掉**——自動路徑可以跳過，明示路徑一律重做（ADR-009 Addendum B 的 `force`）。同理，任何拿記憶體狀態判定的驗收項，都要跟持久化的來源計數對一次帳（2026-09-07）。

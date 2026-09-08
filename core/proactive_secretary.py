@@ -22,7 +22,9 @@ from .triage_signals import (
     collect_issue_signals,
     collect_open_loop_signals,
     collect_pr_signals,
+    DEFAULT_GITHUB_STALE_AFTER_DAYS,
     repo_issue_backlog,
+    split_stale_github_signals,
 )
 
 
@@ -251,6 +253,11 @@ def build_action_proposals(
         1,
         min(int(cfg.get("proactive_secretary.unfinished_recent_min_idle_hours", 12)), stalled_hours),
     )
+    # 超過這個天數沒更新的 PR／issue 不納入考量（0 = 不過濾）。
+    github_stale_after_days = max(
+        0,
+        min(int(cfg.get("proactive_secretary.github_stale_after_days", DEFAULT_GITHUB_STALE_AFTER_DAYS)), 3650),
+    )
 
     proposals: list[dict[str, Any]] = []
     signals: list[dict[str, Any]] = []
@@ -301,6 +308,23 @@ def build_action_proposals(
         issue_signals = collect_issue_signals(session, now)
         loop_signals = collect_open_loop_signals(session, now, stalled_hours)
 
+        # 幾個月沒動的 PR／issue 不是「現在該做的事」：不進提案，但如實計數（ADR-007 Addendum 2026-09-08）
+        counters["open_prs"] = len(pr_signals)
+        counters["open_issues"] = len(issue_signals)
+        pr_signals, stale_prs = split_stale_github_signals(pr_signals, github_stale_after_days)
+        issue_signals, stale_issues = split_stale_github_signals(issue_signals, github_stale_after_days)
+        stale = stale_prs + stale_issues
+        counters["github_stale_excluded"] = {
+            "threshold_days": github_stale_after_days,
+            "prs": len(stale_prs),
+            "issues": len(stale_issues),
+            "total": len(stale),
+            "subjects": [
+                {"subject_ref": item["subject_ref"], "age_days": item["age_days"]}
+                for item in sorted(stale, key=lambda item: -float(item.get("age_days") or 0.0))[:10]
+            ],
+        }
+
         # 剛動過就不提醒；閒置超過門檻才納入
         loop_signals = [
             item
@@ -309,8 +333,6 @@ def build_action_proposals(
             or item["age_days"] * 24 >= recent_idle_hours
         ]
 
-        counters["open_prs"] = len(pr_signals)
-        counters["open_issues"] = len(issue_signals)
         counters["open_loop_projects"] = len(loop_signals)
         counters["repo_issue_backlog"] = repo_issue_backlog(session)
 
@@ -450,6 +472,10 @@ def build_action_proposals(
             "open_prs": counters["open_prs"],
             "open_issues": counters["open_issues"],
             "open_loop_projects": counters["open_loop_projects"],
+            "github_stale_excluded": counters.get(
+                "github_stale_excluded",
+                {"threshold_days": github_stale_after_days, "prs": 0, "issues": 0, "total": 0, "subjects": []},
+            ),
             "snoozed_suppressed": counters["snoozed"],
             "memory_muted": counters.get("memory_muted", 0),
             "repo_issue_backlog": counters.get("repo_issue_backlog", {}),
