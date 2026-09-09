@@ -696,6 +696,55 @@ def get_secretary_memory_context():
     return memory_context()
 
 
+class MeetingFollowupRequest(BaseModel):
+    note_id: int
+    index: int
+    action: str = "accept"
+    project_key: Optional[str] = None
+
+
+@app.post("/api/v1/secretary/meetings/followups")
+def resolve_meeting_followup(payload: MeetingFollowupRequest):
+    """把一條會議候選待辦變成未結事項，或忽略它（ADR-022 D4）。
+
+    **只有這條路徑會把候選變成 open loop**——秘書自己永遠不會。
+    """
+    from .meeting_transcripts import accept_followup
+
+    try:
+        return accept_followup(
+            payload.note_id,
+            payload.index,
+            action=payload.action,
+            project_key=payload.project_key,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/secretary/meetings")
+def get_meeting_context():
+    """現在是不是在開會（行事曆 ＋ 前景應用程式名稱）與逐字稿資料夾現況。唯讀。"""
+    from .meeting_transcripts import list_transcripts, meeting_context, summary_provider
+
+    cfg = get_config()
+    files, meta = list_transcripts(cfg=cfg, limit=10)
+    return {
+        "context": meeting_context(cfg=cfg),
+        "provider": summary_provider(cfg),
+        "transcripts": [
+            {
+                "name": item["name"],
+                "sha1": item["sha1"],
+                "modified_at": item["modified_at"].isoformat(timespec="minutes"),
+                "bytes": item["bytes"],
+            }
+            for item in files
+        ],
+        "sources": meta,
+    }
+
+
 @app.get("/api/v1/secretary/profile")
 def get_secretary_profile():
     """ADR-018 宣告式個人檔案：從偏好筆記解析出的「本期優先」與「語氣」；唯讀。

@@ -231,6 +231,17 @@ secretary_memory:
   # 觀察永遠可在介面一鍵刪除。
   observation_ttl_days: 14
 
+# 會議秘書第一層（ADR-022）：把會後逐字稿變成可回溯的紀錄。
+# **不錄音、不讀會議軟體視窗內容、不連 Teams／Graph API**——秘書只等你把 Teams
+# 匯出的逐字稿放進 transcript_dir。沒設路徑就是停用（不會有假警報）。
+meetings:
+  transcript_dir: ""        # 例：C:/Users/you/OneDrive/Recordings；支援 .vtt/.docx/.txt/.md
+  # 摘要用的 provider。**預設 ollama＝全本機**：逐字稿裡有其他與會者的發言，
+  # 改成 gemini/anthropic/openai 等雲端 provider 就等於把他們的話送到那家供應商，
+  # 觀察卡與設定頁都會明白寫出來。prompt 與回應原文一律不落地（ADR-012 邊界）。
+  provider: ollama
+  timeout_seconds: 120
+
 proactive_secretary:
   max_per_project: 2
   unfinished_recent_min_idle_hours: 12

@@ -209,6 +209,8 @@ def build_home(
     resume = today.get("resume") or {}
     memory_meta = today.get("memory") or {}
     calendar = today.get("calendar") or {}
+    # ADR-022：桌面在會議中多一行；訊號只有其一時如實說差異（來自 build_today_view）
+    meeting = today.get("meeting") or {}
     return {
         "generated_at": now.isoformat(timespec="seconds"),
         "focus": {
@@ -224,6 +226,7 @@ def build_home(
         "memory_pick": memory_pick,
         "resume": resume,
         "calendar": calendar,
+        "meeting": meeting,
         "pack_line": today.get("pack_line"),
         "profile_line": profile_line,
         "details": {

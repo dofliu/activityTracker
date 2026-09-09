@@ -215,6 +215,28 @@ def _validate_digest_params(params: dict[str, Any]) -> dict[str, Any]:
     return {"days_back": days_back}
 
 
+def _validate_meeting_notes_params(params: dict[str, Any]) -> dict[str, Any]:
+    raw = params.get("limit", 5)
+    try:
+        limit = int(raw)
+    except (TypeError, ValueError):
+        raise ExecutionRejected("invalid_params", "limit 必須是整數") from None
+    if not 1 <= limit <= 20:
+        raise ExecutionRejected("invalid_params", "limit 只接受 1–20（一次最多整理幾份逐字稿）")
+    return {"limit": limit}
+
+
+def _run_meeting_notes(params: dict[str, Any]) -> Callable[[dict[str, Any]], dict[str, Any]]:
+    limit = int(params.get("limit", 5))
+
+    def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
+        from core.meeting_transcripts import build_meeting_notes
+
+        return build_meeting_notes(limit=limit)
+
+    return _runner
+
+
 def _run_daily_digest(params: dict[str, Any]) -> Callable[[dict[str, Any]], dict[str, Any]]:
     days_back = int(params.get("days_back", 1))
 
@@ -324,6 +346,24 @@ SCHEDULABLE_TEMPLATES: dict[str, SchedulableTemplate] = {
             build_runner=_run_active_handoffs,
             receipt_fields=("hours", "projects_considered", "handoffs_written", "errors", "output_dir"),
             timeout_seconds=300,
+        ),
+        SchedulableTemplate(
+            template_id="meeting_notes",
+            risk_level=RISK_L0,
+            label="會議紀錄：把逐字稿資料夾裡還沒整理的檔案各寫成一則記憶區觀察",
+            description=(
+                "只讀 meetings.transcript_dir 裡的檔案與行事曆（時間配對），寫出摘要與"
+                "**候選**待辦——候選要你在提案卡上點了才會成為未結事項。摘要走既有 LLM 路徑，"
+                "預設本機 ollama；選雲端 provider 時觀察卡會明寫與會者發言曾送往該供應商。"
+            ),
+            params_schema={"limit": "一次最多整理幾份逐字稿（1–20，預設 5）"},
+            validate_params=_validate_meeting_notes_params,
+            build_runner=_run_meeting_notes,
+            receipt_fields=(
+                "transcript_dir", "files_seen", "written_count", "provider",
+                "provider_is_cloud", "skipped", "errors",
+            ),
+            timeout_seconds=600,
         ),
         SchedulableTemplate(
             template_id="daily_digest",

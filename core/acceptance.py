@@ -1066,6 +1066,77 @@ def _check_a21(ctx: _Ctx) -> dict[str, Any]:
     }
 
 
+# ---- A22 會議秘書（會後逐字稿）--------------------------------------------
+
+
+def _check_a22(ctx: _Ctx) -> dict[str, Any]:
+    """ADR-022 第一層：機器能回報「資料夾設了嗎、整理過幾份、還有幾條候選待辦沒處理」；
+    「摘要有沒有編造、配對對不對」是人眼。"""
+    from core.meeting_transcripts import (
+        SOURCE_PREFIX,
+        list_transcripts,
+        meetings_enabled,
+        parse_followups,
+        provider_is_cloud,
+        summary_provider,
+    )
+
+    if not meetings_enabled(ctx.cfg):
+        return {
+            "status": NOT_CONFIGURED,
+            "detail": "還沒設 meetings.transcript_dir——設一個資料夾、把 Teams 匯出的逐字稿放進去，這一項才有東西可查。",
+            "evidence": {"transcript_dir": None},
+        }
+    provider = summary_provider(ctx.cfg)
+    files, meta = list_transcripts(cfg=ctx.cfg, now=ctx.now, limit=50)
+    notes = (
+        ctx.session.query(SecretaryNote.id, SecretaryNote.body)
+        .filter(SecretaryNote.kind == "observation", SecretaryNote.source_ref.like(f"{SOURCE_PREFIX}%"))
+        .all()
+    )
+    pending = 0
+    accepted = 0
+    for _note_id, body in notes:
+        for item in parse_followups(body or ""):
+            if item["status"] == "pending":
+                pending += 1
+            elif item["status"] == "accepted":
+                accepted += 1
+    evidence = {
+        "transcript_dir": meta.get("path"),
+        "transcripts_found": len(files),
+        "meeting_notes": len(notes),
+        "followups_pending": pending,
+        "followups_accepted": accepted,
+        "provider": provider,
+        "provider_is_cloud": provider_is_cloud(provider),
+        "degraded_sources": meta.get("degraded_sources", []),
+    }
+    if not files and not notes:
+        return {
+            "status": PENDING,
+            "detail": f"資料夾已設（{meta.get('path')}）但裡面沒有逐字稿；開了轉錄的會議結束後把檔案放進去再看。",
+            "evidence": evidence,
+        }
+    if not notes:
+        return {
+            "status": PENDING,
+            "detail": (
+                f"找到 {len(files)} 份逐字稿，但還沒整理過——到「排程任務」對 meeting_notes 按立即執行（或排一個時間）。"
+            ),
+            "evidence": evidence,
+        }
+    return {
+        "status": NEEDS_HUMAN,
+        "detail": (
+            f"已整理 {len(notes)} 場會議（{len(files)} 份逐字稿在資料夾裡）；"
+            f"候選待辦已加入 {accepted} 條、還有 {pending} 條沒處理。"
+            "摘要有沒有編造、配對到的會議對不對，要你親眼看過。"
+        ),
+        "evidence": evidence,
+    }
+
+
 # ---- 項目清單 -------------------------------------------------------------
 
 _ITEMS: tuple[dict[str, Any], ...] = (
@@ -1257,6 +1328,15 @@ _ITEMS: tuple[dict[str, Any], ...] = (
         "how": "02 知識庫 →「🧹 回收 Chroma 空間」（大目錄可能要一兩分鐘；回收後按預熱重載）",
         "criterion": "worker 收據顯示回收前後的位元組數與刪掉的孤兒片段數；現有索引仍可檢索（重新預熱後計數不變）",
         "probe": _check_a21,
+    },
+    {
+        "id": "A22",
+        "title": "會議秘書（會後逐字稿）實機收據",
+        "priority": "P2",
+        "blocks_release": False,
+        "how": "設 meetings.transcript_dir → 會後把逐字稿放進去 → 執行 meeting_notes → 01 的「會議紀錄」卡點一條「加入未結事項」",
+        "criterion": "摘要沒有編造你沒說過的事；配對到的會議標題正確（或如實寫未配對）；點過的才出現在未結事項（人眼確認）",
+        "probe": _check_a22,
     },
 )
 

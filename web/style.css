@@ -1115,3 +1115,9 @@ details.trust-panel[open] summary { border-bottom: none; }
 .home-desk .home-slot { padding: 10px 14px; }
 .home-desk .home-desk-details { padding: 6px 14px; }
 .home-greeting { padding: 8px 14px 6px; }
+
+/* ADR-022 會議候選待辦：一行一條，動作就在旁邊 */
+.proposal-followups { margin: 6px 0 2px; padding: 6px 8px; border-left: 2px solid var(--accent); background: rgba(127, 127, 127, 0.06); border-radius: 4px; }
+.proposal-followups-hint { font-size: 10px; letter-spacing: .04em; opacity: .75; margin-bottom: 4px; }
+.proposal-followup-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 3px 0; }
+.proposal-followup-text { flex: 1 1 200px; font-size: 12px; line-height: 1.4; }

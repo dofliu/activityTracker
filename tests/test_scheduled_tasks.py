@@ -118,6 +118,7 @@ def test_registry_only_contains_l0_read_only_templates():
         "repo_sync_report",
         "daily_digest",
         "weekly_review",          # ADR-020：唯讀 reduce，與 daily_digest 同一類
+        "meeting_notes",          # ADR-022：只讀逐字稿檔與行事曆，寫出的是可刪的記憶區觀察
         "status_snapshot_draft",
     }
     for template in SCHEDULABLE_TEMPLATES.values():
