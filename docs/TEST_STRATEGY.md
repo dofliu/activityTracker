@@ -125,7 +125,7 @@ python main.py extension-path
 
 ## P3 Semantic Index / `omni ask` / Context Memory Matrix
 
-- Fresh/legacy DB 必須到 schema 7/7；`semantic_documents` source identity 唯一且 embedding input mode 可追溯。
+- Fresh/legacy DB 必須升到最新 schema（目前 18/18）；`semantic_documents` source identity 唯一且 embedding input mode 可追溯。
 - AI response 只有 `final_candidate` 可進入 response evidence；partial/legacy response 不得升格。
 - Incremental rerun 必須以 content hash/model 跳過未變來源；成功 batch 原子提交，中斷後可續跑。
 - Ollama URL 預設 loopback-only；remote URL 在 `allow_remote=false` 時 fail-closed。
@@ -157,21 +157,30 @@ Claude Desktop Cowork／local-agent Windows incremental scan曾新增 148 turns�
 
 同批資料完成 incremental semantic index：來源與索引均為 4,380，`indexed=285 / unchanged=4095 / failures=0`；新增數包含掃描期間其他合法來源，不等同全部來自 Claude Desktop。
 
-## 現況與各功能的契約矩陣（2026-09-04）
+## 現況與各功能的契約矩陣（2026-09-13）
 
-本機完整 `pytest tests/` 為 **425 項（424 passed + 1 skipped）／53 個模組**；skip 的那一項是容器缺 `xdg-open` 時的 `test_open_command_is_argv_not_shell_string`，會標註原因而非失敗。以下為 P2.5 之後新增的主要契約矩陣，各自守住一條「不能退步」的邊界：
+本機完整 `pytest tests/` 為 **626 項（625 passed + 1 skipped）／62 個模組**；skip 的那一項是容器缺 `xdg-open` 時的 `test_open_command_is_argv_not_shell_string`，會標註原因而非失敗。以下為 P2.5 之後新增的主要契約矩陣，各自守住一條「不能退步」的邊界：
 
 | 模組 | 項數 | 守什麼 |
 | :--- | ---: | :--- |
 | `test_api_boundary.py` | 18 | Origin allowlist、secret redaction、hostile origin 403 |
-| `test_database_migration.py` | — | append-only registry、checksum、未知新版本 fail-closed、不得靠 `create_all` 繞過 |
-| `test_agent_executor.py` / `test_agent_dispatch_l2.py` / `test_scheduled_tasks.py` | — | ADR-008 三級閘門、argv 白名單禁 shell、env allowlist 不轉發金鑰、L1/L2 永不可排程、audit receipt |
+| `test_database_migration.py` | 7 | append-only registry、checksum、未知新版本 fail-closed、不得靠 `create_all` 繞過 |
+| `test_agent_executor.py` / `test_agent_dispatch_l2.py` / `test_scheduled_tasks.py` | 17 / 10 / 17 | ADR-008 三級閘門、argv 白名單禁 shell、env allowlist 不轉發金鑰、L1/L2 永不可排程、audit receipt |
 | `test_rag_chat_stream.py` | 10 | 金鑰走 header 不進 URL、SSE 一定送 `done`、檢索逾時降級 |
-| `test_rag_retrieval_worker.py` | 20 | 主服務不得 import 索引函式庫（乾淨直譯器）、worker 逾時即 kill 並自動重啟 |
+| `test_rag_retrieval_worker.py` | 21 | 主服務不得 import 索引函式庫（乾淨直譯器）、worker 逾時即 kill 並自動重啟 |
 | `test_secretary_memory.py` | 20 | 記憶只由使用者或 L0 收據寫入、對話注入有上限附收據、偏好不變成執行 |
 | `test_telegram_chat.py` | 29 | 與網頁同一條管線、只批 L0/L1、arm code 單次／過期／猜錯即焚／不回顯 |
 | `test_notification_channels.py` | 32 | 內容與呈現分離且一律 escape、adapter 能力宣告、扇出逐通道隔離、晨報缺料只省略該段 |
 | `test_secretary_greeting.py` | 23 | 數字只能來自資料表、鼓勵語同日同句、LLM 潤飾不得新增統計外的數字 |
 | `test_calendar_source.py` | 17 | 只取時間／標題／地點／狀態（描述與與會者不落地）、整批替換不殘留、壞檔隔離 |
+| `test_acceptance_center.py` | 36 | 唯讀便宜查詢、跑完不留任何 row、不 shell 不連網、「沒發生」與「查不到」分開講、A1 不拿當天比例判綠、A6 不拿舊收據判綠、A21 的 running 不講成失敗 |
+| `test_activity_patterns.py` | 21 | （專案 × 日）活動矩陣只算**已結束**的日子、不讀 prompt 原文、不呼叫 LLM |
+| `test_secretary_profile.py` | 27 | 優先與語氣**只**從偏好筆記解析，不從活動或 prompt 推斷；語氣改措辭不改數字 |
+| `test_secretary_home.py` | 14 | 焦點與「記得」由確定性規則從既有唯讀資料挑選；工具自身的提醒不佔焦點 |
+| `test_weekly_review.py` | 20 | 只用上一個**完整** ISO 週、活躍天數只用可回溯計數、宣告名字對不到活動時如實寫沒有 |
+| `test_docs_freshness.py` | 25 | 訊號來自文件檔事件與其後的 commit 數；**沒有文件紀錄的 repo 一律不提** |
+| `test_meeting_transcripts.py` | 19 | WebVTT parser、時間配對、事實閘只管數字、**provider 錯誤字串先攔再進閘**、候選待辦不自動成為未結事項 |
+| `test_rag_storage_compaction.py` | 9 | 沒有 confirm 不刪、讀不到 `segments` 一律不刪（fail-closed）、刪前重讀、回收前後位元組如實回報 |
+| `test_triage_signals.py` | 11 | 年齡加權有上限（預設 60 天），被排除的項目要在 inputs 點得出名字 |
 
 新增功能時的最低要求：**至少一項測試證明「說不出來的事不會被說出來」**（claim boundary），以及一項證明「上游失敗時只降級不消失」（故障隔離）。

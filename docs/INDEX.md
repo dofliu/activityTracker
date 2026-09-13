@@ -1,6 +1,9 @@
 # 📚 OmniContext 文件總覽（Documentation Index）
 
-> 最後整理：2026-09-04。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
+> 最後整理：2026-09-13。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
+>
+> **每份文件只有一個職責**——同一件事不在第二個地方再寫一次。職責分工見
+> [NEXT_SESSION.md → 工程慣例 → 文件同步](NEXT_SESSION.md#工程慣例照舊)。
 
 ## 我該從哪裡開始？
 
@@ -11,7 +14,7 @@
 | **查實機收據做到哪了** | 儀表板「06 系統設定 → 驗收中心」或 `python main.py verify` —— TODO A 段每一項的本機收據現況（[ADR-016](ADR-016-acceptance-center.md)） |
 | 快速了解專案是什麼、能做什麼 | [README.md](../README.md)（繁中）/ [README_en.md](../README_en.md)（English） |
 | 安裝、Extension 配對、日常操作、備份與故障排查 | [USAGE.md](USAGE.md) —— **使用手冊** |
-| 了解目前開發到哪 | [ROADMAP.md](../ROADMAP.md) §11 成果紀錄 + [STATUS.yaml](../STATUS.yaml) |
+| 了解目前開發到哪 | [ROADMAP.md](../ROADMAP.md) §11.2 成果紀錄（依日期一條）+ [STATUS.yaml](../STATUS.yaml) |
 | 了解下一階段方向與取捨 | [ROADMAP.md](../ROADMAP.md) §12「下一階段規劃」 |
 | 了解產品定位與「不宣稱什麼」的證據邊界 | [PRODUCT_POSITIONING.md](PRODUCT_POSITIONING.md) |
 | 修改架構前先看相關決策 | 下方 ADR 一覽 |
@@ -23,16 +26,16 @@
 | :--- | :--- |
 | [../README.md](../README.md) | 繁體中文主說明：特色、快速開始、CLI 指令、設定檔、隱私邊界 |
 | [../README_en.md](../README_en.md) | English documentation（與繁中版對應） |
-| [USAGE.md](USAGE.md) | **使用手冊**：安裝初始化、Git 同步中心、Extension 安裝配對與 live 驗證、使用時間與里程碑、常用操作（semantic index / DeskRAG / 秘書建議 / 快照）、備份與 migration、平台能力、FAQ |
+| [USAGE.md](USAGE.md) | **使用手冊**（14 節，開頭有目錄）：安裝與初始化、啟動與外觀、Extension 配對、使用時間與里程碑、小秘書桌面／提案／記憶、行事曆與會議、知識庫與檢索、通知與手機、摘要與快照、驗收中心、備份與 migration、平台能力、FAQ |
 | [../config.example.yaml](../config.example.yaml) | 設定檔範本（`main.py init` 會據此建立本機 `config.yaml`） |
 
 ## 規劃與現況
 
 | 文件 | 說明 |
 | :--- | :--- |
-| [../ROADMAP.md](../ROADMAP.md) | P0–P8 開發規劃與**成果紀錄**（已完成的事寫在這裡） |
+| [../ROADMAP.md](../ROADMAP.md) | P0–P8 開發規劃與**成果紀錄**（已完成的事寫在 §11.2，依日期排序的單一清單） |
 | [TODO.md](TODO.md) | **待辦清單**：等待中的使用者側收據、已知問題與技術債、功能候選；每項都有完成判準 |
-| [../STATUS.yaml](../STATUS.yaml) | 機器可讀的現況快照：feature 清單、evidence receipts、quality gates、known blockers |
+| [../STATUS.yaml](../STATUS.yaml) | 機器可讀的現況快照：feature 清單、evidence receipts、quality gates、**真正還擋著的** known_blockers 與 capability_boundaries（已完成的歷史在 ROADMAP §11.2，不在這裡重複） |
 | [PRODUCT_POSITIONING.md](PRODUCT_POSITIONING.md) | 產品定位：跨 AI、應用與 Repository 的個人工作脈絡層，以及能力／證據邊界 |
 
 ## 架構決策紀錄（ADR）
@@ -60,8 +63,8 @@
 | [ADR-017](ADR-017-pattern-aware-proposals.md) | 模式感知提案（秘書用它記得的東西） | （專案 × 日）活動矩陣、只算已結束的日子、沒有每日排程／被冷落的專案／主線加權、不新增可執行動作 |
 | [ADR-018](ADR-018-declared-profile.md) | 宣告式個人檔案（你自己說的，不是推測的） | 偏好筆記裡的「優先：」「語氣：」變成會改變行為的設定、優先加分壓過推出的主線、語氣只改措辭不改數字、唯讀端點沒有第二套資料 |
 | [ADR-019](ADR-019-secretary-desk-home.md) | 秘書桌面（01 分頁成為真正的首頁） | 由秘書用確定性規則挑焦點一張與記得一則、工具自身的提醒不佔焦點、完整清單降為詳情、卡片一鍵變成對話、量測「一天離開 01 幾次」 |
-| [ADR-021](ADR-021-docs-behind-code.md) | 文件落後程式（那句常打的指令變成一張卡） | 文件檔最後異動 vs 之後的 commit 數、沒有文件紀錄一律不提、接既有兩段式 L2（起草→批准→改檔不 commit）、事實由 server 準備、順手修 401 訊息 |
 | [ADR-020](ADR-020-weekly-review-said-vs-done.md) | 每週回顧（說的 vs 做的） | 已結束的 ISO 週、活躍天數只用可回溯計數、宣告優先對照實際活動的 done／drift／quiet、回顧觀察同一週一則、priority_drift 即時算且頂掉重複的被冷落、不推測原因 |
+| [ADR-021](ADR-021-docs-behind-code.md) | 文件落後程式（那句常打的指令變成一張卡） | 文件檔最後異動 vs 之後的 commit 數、沒有文件紀錄一律不提、接既有兩段式 L2（起草→批准→改檔不 commit）、事實由 server 準備、順手修 401 訊息 |
 | [ADR-022](ADR-022-meeting-secretary.md) | 會議秘書（第一層已實作：會後逐字稿，不碰即時音訊） | 「在開會」只用行事曆＋前景視窗兩個確定性訊號、逐字稿只從一個資料夾走既有索引路徑（需 WebVTT parser）、摘要預設本機 LLM 且雲端要明示、候選待辦不自動成為未結事項、即時音訊另案並寫下五道門 |
 
 ## 功能規格與驗證
@@ -90,5 +93,5 @@
 | [NEXT_SESSION.md](NEXT_SESSION.md) | 下一個開發 session 的接手指南（現況、待辦、環境備忘） |
 | [../promo/](../promo/) | 3 分鐘介紹影片的 18 個場景源檔、分鏡表與渲染腳本（可單景重渲） |
 | [assets/](assets/) | 文件用圖片（架構與 roadmap 卡片等） |
-| `../tests/` | 53 個 contract test 模組（425 項，424 passed + 1 skipped）；執行 `python -m pytest tests/ -v` |
+| `../tests/` | **62 個 contract test 模組（626 項，625 passed + 1 conditional skip）**；執行 `python -m pytest tests/` |
 | `../scripts/` | 驗證、清理、autostart 與 E2E 腳本 |

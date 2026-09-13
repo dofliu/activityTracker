@@ -1,26 +1,42 @@
 # 🌐 OmniContext — 個人全景活動追蹤與進行中工作智慧中樞
 
-[![Language](https://img.shields.io/badge/Language-English%20%7C%20%E7%B9%81%E9%AB%94%E4%B8%AD%E6%96%87-orange)](#-language--%E8%AA%9E%E8%A8%80)
+[![Language](https://img.shields.io/badge/Language-English%20%7C%20%E7%B9%81%E9%AB%94%E4%B8%AD%E6%96%87-orange)](README_en.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-green)](https://fastapi.tiangolo.com/)
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **目前狀態：Personal Alpha（v1.3.0a5 已發佈為 GitHub pre-release）。** Windows milestone WinRT Toast E2E、schema 18/18、formal package+DB rollback、P3-2～P3-5、collector runtime diagnostics、P2.6 continuous coverage ledger 與跨平台 CI 已通過；Extension 1.3.1 已於 2026-08-31 取得 ChatGPT＋Claude.ai live PASS receipt，P2.7 三平台背景任務 live 驗收亦全數 PASS。**秘書已依 [ADR-008](docs/ADR-008-gated-agent-executor.md) 完成 P5-R1～R5 全階段**（LLM 註解、L0/L1 白名單代辦、L2 調度本機 agent CLI 起草／依批准計畫改檔、Telegram inline 批准與晚間交接、L0 唯讀自訂排程任務含週/月報 rollup 與 STATUS 草稿，全部預設關閉），並有秘書晨報（P5-R4a）、兩層增量摘要與小秘書首頁 UI。P4.3 Repo Onboarding／對帳（init／連結 remote／clone／建立 GitHub repo 的單一目標確認式流程）已實作；儀表板已完成資訊架構重整（6 分頁分主次、系統設定以左欄切換 10 個區塊）與可選配色主題（火影橘／森林綠／海洋藍 × 深淺）。2026-09-02～04 另加入**小秘書記憶區**（[ADR-012](docs/ADR-012-secretary-memory.md)）、**手機上的 Telegram 對話**（[ADR-013](docs/ADR-013-telegram-secretary-chat.md)）、**LINE／Telegram 多通道推播與一次性解鎖碼**（[ADR-014](docs/ADR-014-multi-channel-push-and-arm-code.md)）、**小秘書問候卡**（首頁與晨報開頭）與**本機行事曆採集**（[ADR-015](docs/ADR-015-local-calendar-source.md)，唯讀 .ics），全部預設關閉或沒設路徑即停用。目前 53 個 contract test 模組共 425 項。剩餘缺口：全天 coverage ledger 實測與各功能的使用者實機 live 收據（release_ready 仍為 false）；完整待辦見 [docs/TODO.md](docs/TODO.md)、方向見 [ROADMAP.md](ROADMAP.md) §12「下一階段規劃」。
+**OmniContext** 是一個**本機優先（Local-First）、具有明確資料邊界**的個人上下文記憶中樞與工作進度追蹤系統。它捕獲跨平台 AI 對話（Claude Code、Codex、Antigravity、ChatGPT、Gemini 等）、程式碼提交、檔案與論文寫作異動、視窗時間分配，並整合 GitHub 倉庫與 Pull Request 狀態，最後由一位**只提案、不擅自行動的小秘書**把這些線索變成「現在該做什麼」。
 
-**文件入口：**[📚 文件總覽](docs/INDEX.md) · [完整使用說明](docs/USAGE.md) · [開發規劃](ROADMAP.md) · [目前狀態](STATUS.yaml) · [測試策略](docs/TEST_STRATEGY.md)
+它與單一 AI 的 memory／chat import 不同：**OmniContext 的 canonical context 屬於使用者與專案，不屬於任何一家 AI provider。** 完整定位與證據邊界見[產品定位](docs/PRODUCT_POSITIONING.md)。
 
-![OmniContext 架構與未來 Roadmap](docs/assets/omnicontext-architecture-roadmap-card-v1.png)
+隨時幫助你回答三個核心問題：
 
-**OmniContext** 是一個**本機優先（Local-First）、具有明確資料邊界**的個人上下文記憶中樞與工作進度追蹤系統。它能捕獲跨平台 AI 對話（Claude Code、Codex、Antigravity、ChatGPT、Gemini 等）、程式碼提交、檔案與論文寫作異動、視窗時間分配，並整合 GitHub 雲端倉庫與 Pull Request (PR) 狀態。
-
-它與單一 AI 的 memory／chat import 不同：**OmniContext 的 canonical context 屬於使用者與專案，不屬於任何一家 AI provider。** 除了多個 AI 的對話與工作狀態，也把 local Repository、branch/commit、檔案異動、IDE/terminal、foreground activity 與 Open Loops 納入同一條可追溯時間線，再產生 provider-neutral Context Handoff。完整定位與證據邊界見[產品定位](docs/PRODUCT_POSITIONING.md)。
-
-隨時幫助您回答三個核心問題：
 1. **「我現在正在進行哪些專案？」**
 2. **「我上次做到哪裡、動了哪些檔案？」**
 3. **「有哪些尚未收尾的未結事項（Open Loops）？」**
+
+---
+
+## 📊 目前狀態
+
+**Personal Alpha — v1.3.0a5（已發佈為 [GitHub pre-release](https://github.com/dofliu/activityTracker/releases)，附 SHA-256 receipt）**
+
+| 面向 | 現況 |
+| :--- | :--- |
+| 程式 | P0–P8 與 ADR-008 執行器全階段已落地；22 份 ADR 記錄每個決策的邊界 |
+| 測試 | **62 個 contract test 模組、626 項**（625 passed + 1 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job 全綠 |
+| 資料 | SQLite schema migration **18/18**（append-only + checksum，升級前自動備份） |
+| 發佈 | `release_ready: false` |
+
+**剩下的缺口幾乎都不是「還沒寫的程式」，而是只能在使用者實機取得的收據。** 本專案不把「測試通過」當成「實機可用」——唯一還在擋發佈的**能力型**缺口是全天 coverage ledger 實測。
+
+不必憑記憶：跑 `python main.py verify`（或看儀表板「06 系統設定 → 驗收中心」）就會列出每一項現在有沒有收據（[ADR-016](docs/ADR-016-acceptance-center.md)）。
+
+**文件入口：**[📚 文件總覽](docs/INDEX.md) · [使用手冊](docs/USAGE.md) · [開發規劃與成果](ROADMAP.md) · [待辦與判準](docs/TODO.md) · [機器可讀現況](STATUS.yaml)
+
+![OmniContext 架構與未來 Roadmap](docs/assets/omnicontext-architecture-roadmap-card-v1.png)
 
 ---
 
@@ -32,10 +48,10 @@
 ├──────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
 │  [ 跨平台 AI 採集 ]      [ 本機檔案 / Git ]      [ GitHub 雲端整合 ]     │
-│  • Claude Code 日誌       • Watchdog 檔案異動     • 48+ Public/Private   │
+│  • Claude Code 日誌       • Watchdog 檔案異動     • Public/Private repo  │
 │  • Codex Sessions         • 遞迴 Git Scanner      • PR 狀態 / 分支流向   │
 │  • Antigravity 對話       • 論文多檔案智能歸戶    • Actions CI 測試結果  │
-│  • Chrome 擴充套件                                                       │
+│  • Chrome 擴充套件        • 本機 .ics 行事曆（唯讀）                     │
 │          │                       │                       │               │
 │          └───────────────────────┼───────────────────────┘               │
 │                                  ▼                                       │
@@ -46,141 +62,126 @@
 │          ▼                       ▼                       ▼               │
 │  [ Web 視覺化儀表板 ]    [ DeskRAG 知識庫 ]      [ AI 摘要與主動提醒 ]   │
 │  • 01 · 🤖 小秘書        • PDF/Office/Md 解析    • 多日自訂區間日報回顧  │
-│    （問候卡+今日清單     • FastEmbed + ChromaDB  • 週期性 Checkpoint     │
-│     +交辦對話+記憶區）   • Jieba + BM25 關鍵字   • 桌面通知／Telegram／  │
+│    （桌面：問候＋焦點    • FastEmbed + ChromaDB  • 兩層增量微摘要        │
+│     ＋記得一則＋交辦）   • Jieba + BM25 關鍵字   • 桌面通知／Telegram／  │
 │  • 02 · 知識庫           • Hybrid RRF 混合檢索     LINE 多通道推播       │
-│  • 03 · 進行中工作       • 多模型 SSE 串流問答   • 多供應商 (Gemini /    │
-│  • 04 · Git 同步中心     • 常駐檢索 worker 隔離    Claude/OpenAI/Ollama) │
+│  • 03 · 進行中工作       • 多模型 SSE 串流問答   • 多供應商 (Ollama /    │
+│  • 04 · Git 同步中心     • 常駐檢索 worker 隔離    Gemini/Claude/OpenAI) │
 │  • 05 · 摘要與統計 · 檔案總管精準定位                                    │
-│  • 06 · 系統設定（左欄 10 區塊：秘書與自動化／Telegram／LINE／           │
+│  • 06 · 系統設定（左欄 11 區塊：秘書與自動化／Telegram／LINE／           │
 │         監控路徑／採集來源／摘要與 LLM／使用時間／GitHub／               │
-│         維運：即時情報流／系統健康）                                     │
+│         維運：即時情報流／系統健康／驗收中心）                           │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
+> 下面是「有什麼」。**「怎麼用」一律見 [使用手冊](docs/USAGE.md)，「為什麼這樣設計」見對應 ADR。**
+
 ### 1. 🎯 專案根目錄智能歸戶（Hierarchy Project Resolver）
-* **消除子目錄碎片化**：自動將巢狀目錄（如 `core/`、`synthesizer/`、`Draft_Paper/`、`Daily_Report/`）整合歸戶至對應的真實專案或論文根名稱（如 `activityTracker`、`AI_PapersResearch`）。
-* **工作階段多檔案聚合**：同一工作階段內動到的多個檔案，在專案卡片上整合成單一條目（如「`異動 A.md, B.py 等共 6 個檔案`」），點開手風琴即可展開所有檔案的字數變更與路徑清單。
 
-### 2. 🐙 GitHub 雲端全專案與 PR 智慧追蹤（GitHub Cloud Intel）
-* **雙軌認證**：
-  * **一鍵免密連線**：自動探測本機登入之 `gh` CLI 憑證（具備 `repo`, `read:org`, `workflow`, `gist` 完整 scope），無需手動建立 PAT。
-  * **Token 支援**：支援 Fine-Grained 與 Classic Personal Access Token。
-* **全量倉庫與 PR 狀態撈取**：
-  * 自動同步所有 Public / Private 倉庫。
-  * 提取各 PR 的標題、狀態（Open / Merged / Draft）、分支流向（`head -> base`）、CI 測試結果（`SUCCESS` / `PENDING` / `FAILURE`）與審查狀態。
-  * Web 儀表板提供直接點擊跳轉至 GitHub PR 的超連結。
+* **消除子目錄碎片化**：自動將巢狀目錄（如 `core/`、`synthesizer/`、`Draft_Paper/`）歸戶至真實的專案或論文根名稱（如 `activityTracker`、`AI_PapersResearch`）。
+* **工作階段多檔案聚合**：同一階段動到的多個檔案在專案卡上整合成單一條目，展開可看每個檔案的字數變更與路徑。
 
-### 2.1. 🔁 本機 Git 同步中心（逐項確認）
-* **本機狀態與雲端 metadata 分流**：GitHub 卡片維持讀取雲端 repo／PR；同步中心則顯示設定 roots 下各 repo 的 branch、upstream、cached ahead/behind 與 worktree 變更，兩者不再混稱為「同步」。
-* **受控雙向同步**：每個 repo 可先 `Fetch` 更新 remote-tracking refs，再依條件執行 `Pull --ff-only`、`Commit staged`、`Push`。
-* **安全預設**：沒有排程自動同步、不會 `git add`、不提供 force push；Pull/Push 都要求 clean worktree，Commit 只處理使用者已 staged 的檔案並要求輸入 message。詳見 [使用說明](docs/USAGE.md#13-本機-git-同步中心) 與 [ADR-011](docs/ADR-011-safe-local-repository-sync.md)。
-* **全覽與批次（2026-09-02，ADR-011 Addendum B）**：一張表列出**全部** repo 的 branch／↑↓／worktree／上次 fetch 時間並可篩選；「全部 Fetch」只更新遠端參照；批次 Pull／Push 先列出目前符合條件的清單讓你確認，執行時逐一重檢、永不 force，批次 Push 另有開關且預設關閉。小秘書可排程 L0 `repo_sync_report`（唯讀、不連網）每日產生同步報告與「需要 pull／push」提案，批准後才執行 L1 fast-forward pull。
-* **目前範圍**：本機資料夾尚未 `git init`、本機 Git repo 尚未設定 remote、以及 GitHub repo 尚未 clone 到電腦，會被明確保留為下一階段的 Repo Onboarding／Reconciliation；目前不會自動建立雲端 repo、初始化資料夾或 clone，以避免將使用者意圖不明的資料夾直接發布到遠端。
+### 2. 🤖 跨平台 AI 對話全景記錄（來源可追溯）
 
-### 3. 🤖 跨平台 AI 對話全景記錄（來源可追溯；P2.5 強化中）
-* **本機 CLI / IDE Agent**：
-  * **Claude Code**（`~/.claude/projects/`）：完整記錄命令、提問與對話細節。
-  * **Claude Desktop Cowork／local-agent**：自動偵測 application data 中的結構化 project JSONL；Windows extended-path 與最近 7 天首次回補已支援。
-  * **Codex**（`~/.codex/sessions/**`）：解析 Rollout JSONL 與 Assistant 訊息回覆。
-  * **Antigravity**（`.gemini/brain/**`）：即時擷取對話與執行工具。
-* **瀏覽器擴充套件（Chrome Extension MV3）**：
-  * 支援 **ChatGPT**、**Gemini**、**Claude.ai**。
-  * 以獨立 ingest token 實施 write-only capability boundary，並以穩定 turn key Upsert。
-* **明確邊界**：一般 Claude Desktop 雲端聊天目前只偵測 cache 存在，不解析 Chromium LevelDB，也不宣稱已取得對話內容。
-* **來源故障隔離**：Claude Desktop 等單一來源遇到目錄權限或解析錯誤時，只跳過該來源並繼續掃描 Codex、Claude Code 與 Antigravity，不再讓整輪 Agent 採集一起中止。
+* **本機 CLI / IDE Agent**：Claude Code（`~/.claude/projects/`）、Claude Desktop local-agent、Codex（`~/.codex/sessions/**`）、Antigravity（`.gemini/brain/**`）。
+* **瀏覽器擴充套件（Chrome MV3）**：ChatGPT、Gemini、Claude.ai；以獨立 ingest token 實施 write-only capability boundary，並以穩定 turn key upsert。
+* **明確邊界**：一般 Claude Desktop 雲端聊天只偵測 cache 存在，**不解析 Chromium LevelDB，也不宣稱已取得對話內容**。
+* **來源故障隔離**：單一來源遇到權限或解析錯誤時只跳過該來源，不讓整輪採集中止。
 
-### 4. ⚡ 自訂日期區間 AI 工作回顧（LLM Synthesis Engine）
-* **任意日期範圍報告**：支援從 Web UI 選擇起訖日期（`FROM ~ TO`）或使用 `今日`、`昨日`、`本週`、`近 7 天`、`近 30 天` 快捷標籤，一鍵產出多日全景回顧。
-* **多模型支援**：預設採用 Google Gemini (`gemini-3.7-flash`)，亦支援 Anthropic Claude、OpenAI GPT-4o 及本機 Ollama。
-* **未結事項萃取**：AI 生成摘要時自動提煉「待收尾與未結事項 (Open Loops)」，並同步至首頁右側清單供勾選結案。
+### 3. 🐙 GitHub 雲端追蹤與 🔁 本機 Git 同步中心
 
-### 5. 🌐 完整中英文多語言介面（Bilingual i18n & Theme）
-* Web 儀表板頂部提供 `🌐 English` / `🌐 繁體中文` 一鍵即時切換。
-* 支援淺色（Light）與深色（Dark）主題，所有使用者偏好自動儲存於 `localStorage`。
+* **雙軌認證**：自動探測本機 `gh` CLI 憑證，或使用 Fine-Grained／Classic PAT。
+* **雲端 metadata**：同步所有 Public／Private 倉庫與 PR 的標題、狀態、分支流向、CI 結果與審查狀態。
+* **本機同步中心（逐項確認）**：顯示各 repo 的 branch、upstream、ahead/behind 與 worktree 變更，可 `Fetch` → 條件式 `Pull --ff-only`／`Commit staged`／`Push`。
+* **安全預設**：沒有排程自動同步、不會 `git add`、不提供 force push；灰掉的按鈕會**帶著這個 repo 的實際數字**說明為什麼不能動。
+* **全覽與批次**：一張表列出全部 repo，批次 Pull／Push 先列清單讓你確認、執行時逐一重檢；批次 Push 另有開關且預設關閉。小秘書可排程 L0 `repo_sync_report` 產生每日同步報告。詳見 [ADR-011](docs/ADR-011-safe-local-repository-sync.md)。
+* **Repo Onboarding**：資料夾尚未 `git init`、repo 沒有 remote、GitHub repo 尚未 clone——三種情境各有單一目標的確認式流程，不覆寫非空目錄、不批次 create/clone、永不代為 push。
 
-### 6. 🔔 零設定主動提醒（桌面通知 + 每日入口檔案）
-* **Windows 原生桌面通知**：直接呼叫 WinRT Toast，**不需安裝任何套件、不需申請帳號**。
-  * 晨間簡報（08:30）：進行中專案 + 最優先的未收尾事項。
-  * 今日回顧（22:00）：今天推進了哪些專案。
-  * 停滯提醒：專案閒置超過 5 天自動示警。
-  * 點擊通知直接開啟儀表板；`--dry-run` 可先預覽內容。
-* **每日入口簡報**：自動產出 `OMNICONTEXT_TODAY.md` / `.html` 到你每天會打開的目錄，
-  HTML 版每 5 分鐘自動刷新，可直接設為瀏覽器首頁或書籤。
-* 提供 Windows 開機自動背景啟動安裝腳本（`scripts/install_autostart.ps1`）。
-* Telegram 通道保留為選用（預設關閉）。
+### 4. ⏱️ 使用時間、背景任務與 coverage
 
-### 7. ⏱️ 每日主要介面使用時間與里程碑（P2.6 Alpha）
-* 主頁顯示 Claude、Codex、ChatGPT、Gemini、Antigravity、VS Code 等介面的每日 **foreground active time** 與 AI turns。
-* 使用者可設定每日目標、里程碑、通知語氣、quiet hours 與 cooldown；SQLite receipt 防止重啟後重複通知。
-* 數值只代表已觀察到的前景時間，不等於生產力或實際工時。continuous coverage ledger 會記錄採集器實際被觀測運作的時間段：當日 ledger 覆蓋率達門檻（預設 95%）時顯示 `observed`，否則顯示 `partial` 與實際覆蓋率，中斷或休眠的時間永不回補。
-* 主頁 `DATA CAPTURE` 將 `FOCUS`、`WEB`、`LOG` 三種獨立訊號濃縮在同一區塊；任何一欄 `OBSERVED` 都不能替代另外兩欄。
-* `http://127.0.0.1:8765/extension-monitor` 是 Browser Extension 的進階診斷頁，負責 enabled／observed、heartbeat 與逐站狀態；token pairing 仍只能在 Extension popup 完成。
+* **每日主要介面使用時間**：Claude、Codex、ChatGPT、Gemini、Antigravity、VS Code 等的 foreground active time 與 AI turns，可設每日目標、里程碑、通知語氣、quiet hours 與 cooldown。
+* **可驗證背景 Agent／CLI 任務時間**：只有 prompt start 與明確 final completion timestamp **成對存在**才結算；平行任務以時間聯集計算，避免 double counting（[ADR-010](docs/ADR-010-verified-background-agent-task-time.md)）。
+* **continuous coverage ledger**：記錄採集器實際被觀測運作的時間段；覆蓋率達門檻才顯示 `observed`，否則顯示 `partial` 與實際比例，**中斷或休眠的時間永不回補**。
+* **邊界**：這些數值只代表已觀察到的前景時間，**不等於生產力或實際工時**；`FOCUS`／`WEB`／`LOG` 三種訊號互不替代。
 
-### 8. 🧾 可驗證背景 Agent／CLI 任務時間（Alpha）
-* 主頁另以 `BACKGROUND AGENT TASKS` 顯示 Claude Code、Claude Desktop local-agent、Codex session 的 **paired local receipt** 執行時間。
-* 只有來源內的 prompt start 與明確 final completion timestamp 成對存在才會結算；縮小視窗後仍可被納入，但 generic Terminal／PowerShell 與缺 final receipt 的工作不會估算。
-* 這個數字與前景使用時間、AI turns、里程碑完全分離；平行任務以時間聯集計算總數，避免 double counting。完整邊界見 [ADR-010](docs/ADR-010-verified-background-agent-task-time.md)。
+### 5. 🧠 記憶層：Semantic Index、`omni ask` 與 Related History
 
-### 9. 🧠 本機 Semantic Index 與 `omni ask`（P3-2 / P3-3 Alpha）
-* 以 loopback Ollama `bge-m3` 將 AI turns、Git commits、file activity metadata、Open Loops 與 Project State 建立 1024 維本機索引，資料不送至 cloud provider。
-* `content_hash + embedding_model` 增量更新；每筆保留原始 SQLite `source_ref`、project、timestamp、trust status 與 embedding input 降級模式。
-* `omni ask` 可先 retrieval-only，也可由本機 Ollama 生成含 `[S1]` 引用的答案；similarity 不是來源真實性或 coverage 證明。
+* 以 loopback Ollama `bge-m3` 將 AI turns、Git commits、檔案 metadata、Open Loops 與 Project State 建立 1024 維**本機**索引，資料不送 cloud provider（[ADR-005](docs/ADR-005-local-semantic-index-and-ask.md)）。
+* `content_hash + embedding_model` 增量更新；每筆保留 SQLite `source_ref`、project、timestamp、trust status 與 embedding input 降級模式。
+* `omni ask` 可只看 retrieval evidence，也可由本機 Ollama 生成含 `[S1]` 引用的答案。
+* **Related History 與 Work Sessions**：依 project + inactivity gap 整理為 derived work session，不新增資料表、不改寫原始事件（[ADR-006](docs/ADR-006-derived-context-sessions-and-related-history.md)）。
+* **邊界**：similarity 不是來源真實性或 coverage 的證明；session span 只是首末事件時間差，不代表實際工時或專注品質。
 
-### 10. 🧭 Related History 與 Work Sessions（P3-4 / P3-5 Alpha）
-* 主頁將已歸戶的 AI、Git 與檔案事件依 project + inactivity gap 整理為 derived work session；每段保留穩定 session ID、來源計數與 SQLite `source_ref`，不新增資料表、不改寫原始事件。
-* `omni recall` 與主頁 `RELATED HISTORY` 使用 loopback Ollama 尋找相似歷史；查詢不保存，Ollama 不可用時不 fallback 到 cloud。
-* Session 是 temporal inference，不代表實際工時、連續專注或成果品質；similarity 也不能證明工作重複、歷史答案正確或仍然適用。架構決策見 [ADR-006](docs/ADR-006-derived-context-sessions-and-related-history.md)。
+### 6. 📚 DeskRAG 本地知識庫與文件智慧問答
 
-### 11. 🧩 主動小秘書：建議 → 批准 → 代辦（P5-1／R1／R2／R3／R4a）
-* **建議收件匣（proposal-only 基座）**：把本機 Project State、actionable Open Loops 與 Extension diagnostics 整理成附 evidence refs 的下一步建議;規則引擎不寫入事件資料、不執行 command。安全契約見 [ADR-007](docs/ADR-007-proposal-only-secretary.md)，executor 契約見 [ADR-008](docs/ADR-008-gated-agent-executor.md)。
-* **P5-R1 LLM 參考註解（選用，預設關閉）**：由 LLM（預設本機 Ollama）為既有建議附一句判斷提示與今日 summary——只能註解、不能增刪或執行，LLM 不可用時自動回退純規則。
-* **P5-R2 Gated Executor（選用，預設關閉）**：逐項批准後代辦白名單動作（產生 Handoff、`git fetch`、標記 stale）——execute API 只接受 proposal_id、動作由 server 白名單 template 決定且不開 shell、需獨立 execution token、每次執行留 audit receipt，evidence 改變的提案自動失效。
-* **P5-R3 L2 Dispatcher（選用，獨立開關，預設關閉）**：三道門（token＋單鍵批准＋一次性 6 碼確認碼）＋冷卻後，調度**你本機已登入的 Claude Code／Codex CLI** 為停滯事項起草行動計畫;子行程 argv 白名單禁 shell、cwd 限該專案 repo、環境變數 allowlist 重建（**任何 API key 都不轉發**）、逾時即 kill、執行中可取消。
-* **L2 寫入模式（第三開關，預設關閉;ADR-008 Addendum）**：兩段式批准——你先讀過 agent 起草的計畫，再讓 CLI 依**那份計畫全文**實際修改檔案;dispatch 前 worktree 必須乾淨，**永不 commit／push**，改動留給你 `git diff` 驗收、`git checkout .` 一鍵還原。
-* **P5-R4a 秘書晨報**：每天 08:30 桌面通知與 `OMNICONTEXT_TODAY` 每日入口檔帶入 top 建議與 LLM 總評（唯讀，失敗不阻斷晨報）。
-* 以上開關都可在儀表板「設定 → 小秘書執行器」直接切換熱套用，不用手改 YAML。
-* 介面外觀可在頂列自由組合：深色／淺色 × 火影橘／森林綠／海洋藍三種配色（僅存於瀏覽器 localStorage，不進 config.yaml）。
+* **單一 Web 入口、獨立索引 worker**：Dashboard 與 API 維持在 `http://127.0.0.1:8765`；掃描、解析、embedding、刪除與空間維護由另一個本機 process 執行，長時間索引不佔用主服務（[ADR-009](docs/ADR-009-deskrag-worker-index-lifecycle.md)）。
+* **全方位解析器**：PDF（PyMuPDF，保留頁碼）、Word／PowerPoint／Excel、Markdown 與程式碼、WebVTT 逐字稿，另把 Project State 與 Open Loops 併成虛擬切片。
+* **混合檢索**：FastEmbed（ONNX，`BAAI/bge-small-zh-v1.5`）+ ChromaDB 向量庫，Jieba + BM25Okapi 關鍵字，支援 Hybrid RRF、Weighted Fusion、Vector Only、BM25 Only。
+* **常駐檢索 worker**：檢索在子程序執行，主服務**不載入** Chroma／BM25／embedding（有乾淨直譯器契約測試把關）；啟動後背景預熱，逾時即終止並自動重啟。
+* **多模型問答**：本機 Ollama 或雲端 Gemini／Claude／OpenAI，SSE 逐字串流與來源引文卡片，Windows 可從引文一鍵在檔案總管定位該檔。
+* **受控生命週期與真實容量**：移除資料夾索引與清空全部索引都要明確確認，且不刪來源檔或對話；容量數字來自 worker 的最近驗證收據，未驗證時顯示「待驗證」，**不以估算值冒充實測**。
+* **空間回收**：Chroma 的 `delete_collection` 只做邏輯刪除——刪掉索引不會讓磁碟變小。「🧹 回收 Chroma 空間」會分開回答兩件事：邏輯上不見了嗎、磁碟真的少了嗎；讀不到內部結構就一律不刪（fail-closed）。
 
-### 12. 📚 DeskRAG 本地知識庫與文件智慧問答系統（Single Server 整合版）
-* **單一 Web 入口、獨立索引 worker**：Dashboard 與 API 維持於 `http://127.0.0.1:8765`；檔案掃描、解析、embedding、刪除與空間維護改由另一個本機 process 執行，長時間索引不佔用主服務。
-* **本機離線與雲端模型下拉選單**：
-  * **Ollama 本機離線**：精選 4 款本地模型選單切換（`llama3.1:8b` 預設推薦、`mistral:7b`、`gemma4:e4b`、`qwen3:4b`），全離線運算免連網、隱私零外洩。
-  * **雲端 LLM**：亦支援 Google Gemini (`gemini-3.7-flash`)、Anthropic Claude (`claude-3-5-sonnet`)、OpenAI (`gpt-4o`)。
-* **智慧對話工作階段管理（Chat Sessions）**：
-  * **自動擷取提問標題**：每次新提問自動擷取首句精華作為主題標題（如 `💬 OPC UA 時間序列 預測`），不再產生無意義的「新對話」清單。
-  * **完整歷史回溯**：下拉即可隨時切換歷史對話，即時還原當次所有問答脈絡、參考切片卡片與模型來源。
-  * **獨立管理**：支援隨時點選 `➕ 建立新對話` 與一鍵刪除當前對話。
-* **全方位檔案解析器（Parser Hub）**：
-  * **PDF**：以 PyMuPDF 擷取文字並保留頁碼（Page Number）。
-  * **Office 文件**：支援 Word（`.docx` 段落與標題）、PowerPoint（`.pptx` 投影片）、Excel（`.xlsx` 工作表數據）。
-  * **文字與程式碼**：Markdown、`.py`、`.js`、`.json` 等，支援多種編碼自動探測。
-  * **日常活動虛擬切片**：將本機專案狀態（Project State）與未結事項（Open Loops）整合為標準虛擬切片，使日常開發行為亦可被語意檢索。
-* **階層滑動切分器（Sliding Window Chunker）**：提供可配置大小與重疊長度的切分機制，完整保留段落標題、頁碼、投影片與工作表中繼資料。
-* **混合檢索引掣（Hybrid Retrieval Engine）**：
-  * **語意向量**：採用 FastEmbed（ONNX 本地極速推論，512 維度 `BAAI/bge-small-zh-v1.5`）+ 本地 ChromaDB 向量庫。
-  * **關鍵字匹配**：採用 Jieba 繁簡中文分詞 + BM25Okapi 演算法與 Pickle 持久化。
-  * **融合演算法**：支援 **Hybrid RRF（倒數排名融合）**、**Weighted Fusion（線性加權融合）**、**Vector Only** 與 **BM25 Only**，檢索在**常駐 retrieval worker 子程序**執行（主服務不載入 Chroma／BM25／embedding；啟動後背景預熱、逾時即終止並自動重啟），不阻塞服務。
-* **多模型問答與 SSE 串流**：提供 SSE 逐字串流輸出與來源引文卡片。
-* **Windows 原生檔案總管喚起**：引文卡片點擊「📂 在總管開啟」即可在 Windows 檔案總管精準定位並選中該檔案。
-* **受控索引生命週期**：每次可設定檔案上限與間隔，支援暫停、恢復、取消；「移除資料夾索引」與「清空所有 RAG 索引」都必須明確確認，且不會刪除來源檔案或 RAG 對話。
-* **可回查容量與一致性**：介面顯示來源檔案、來源大小、SQLite 切片、最近 worker 驗證的向量／BM25 數量與索引空間。驗證、BM25 重建、SQLite `VACUUM` 均在 worker 執行；未驗證時顯示 `待驗證`，不以估算值冒充實測。
+### 7. 🧩 主動小秘書：建議 → 批准 → 代辦
 
-### 13. ⚡ 兩層增量摘要與小秘書首頁
-* **兩層增量（map-reduce）日報**：每次週期 checkpoint 後用本機 Ollama 把該時段壓成 ≤100 字微摘要（零 API 成本），23:30 日報只讀「微摘要時間軸＋缺漏時段原文回退」——雲端 token 用量約降一個數量級，Ollama 不可用時該時段自動回退原文，日報永遠可產生。
-* **小秘書首頁（01 分頁）**：交辦對話框（整合 RAG，與知識庫分頁共用同一條對話）、今日關鍵數字列與建議收件匣同屏;每日摘要 prompt 另有逐事件截斷與總量上限（`synthesizer.max_prompt_chars`），`python main.py llm-test` 可診斷各 provider 連線。
-* **介紹影片**：`promo/` 內含 3 分鐘介紹影片的 18 個場景源檔與分鏡表，可單景改字重渲（見 `promo/README.md`）。
-* **小秘書記憶區（2026-09-02，[ADR-012](docs/ADR-012-secretary-memory.md)）**：秘書有了固定的「大腦」——在對話框打「記下來：…」「偏好：不要提醒 repo_needs_push」「決定 @專案：…」直接寫進本機筆記；早晨包會留下可一鍵刪除的觀察；每次提問自動帶入今日狀態、前三個提案與筆記（有字數上限、附收據、可檢視），提案卡會讀偏好與同專案的決定；Handoff／同步報告／STATUS 草稿／時段摘要可一鍵併入知識庫供檢索。
-* **手機上的小秘書（2026-09-03，[ADR-013](docs/ADR-013-telegram-secretary-chat.md)，預設關閉）**：不在電腦前也能用——在 Telegram 綁定的對話裡直接打字就是提問（走與儀表板交辦框同一條管線，回覆附引用檔名與「參考記憶區 N 筆」），「記下來：…／偏好：…」直接寫進記憶區不送 LLM，`/today` `/notes` `/status` `/proposals` 為指令；批准仍只有白名單 L0/L1 且通道要先解鎖，`/disarm` 隨時可上鎖。**邊界**：這是唯一會把提問與回答送出本機的通道（內容經 Telegram，引用只送檔名），因此預設關閉；不想外送就只用通知與批准。
-* **通知可以選 LINE 或 Telegram（2026-09-03，[ADR-014](docs/ADR-014-multi-channel-push-and-arm-code.md)，皆預設關閉）**：晨報／晚報／日報／停滯提醒可以推 Telegram、LINE 或兩者，同一份內容自動用各平台的格式呈現。**能力邊界**：LINE Messaging API 沒有輪詢介面，接收訊息需要公開 webhook（會打破「只在 127.0.0.1」的邊界），所以 **LINE 只做推播**，提問、記筆記與按鈕批准仍走 Telegram。同時把 `/arm` 從 execution token 改成儀表板簽發的 6 位數短效碼（單次、5 分鐘失效、猜錯即焚）——手機從此不必持有長期 secret。
-* **小秘書會主動說話（2026-09-04）**：01 分頁最上方的「🤗 小秘書的話」卡，說明今天或近 2 小時做了什麼（commit、PR、AI 對話、論文與程式檔案、推進的專案、收掉的事項）再接一句貼心的鼓勵。每個數字都可回溯到資料表，沒被採集到的工作不代表沒做——郵件與行事曆不在採集範圍，卡上寫明；鼓勵語由規則挑選、同一天不跳動，LLM 潤飾預設關閉且不得多出統計裡沒有的數字。同一段話也是 Telegram／LINE 晨報的第一段（早上還沒活動就改說昨天）。
-* **行事曆也看得到了（2026-09-04，[ADR-015](docs/ADR-015-local-calendar-source.md)）**：把 Outlook／Google／Apple 匯出或同步的 `.ics` 放在本機資料夾、在「系統設定 → 採集來源」加入路徑，晨報就多一段「📅 今日行程」、首頁多一行「下一場 14:00 專案會議（35 分後）」、問候卡如實寫「開了 N 場會」。**唯讀、不連雲端**：只取時間／標題／地點／狀態，描述、與會者、連結一律不落地；沒設路徑就是停用。
+* **Proposal-only 基座**：把 Project State、actionable Open Loops 與診斷訊號整理成**附 evidence refs** 的下一步建議；規則引擎不寫事件資料、不執行 command（[ADR-007](docs/ADR-007-proposal-only-secretary.md)）。
+* **LLM 參考註解（選用，預設關閉）**：LLM 只能為既有建議加一句判斷提示，**不能增刪或執行**；不可用時自動回退純規則。
+* **分級執行器 L0／L1／L2（選用，三個獨立開關，全部預設關閉）**（[ADR-008](docs/ADR-008-gated-agent-executor.md)）：
+  * **L0／L1**：逐項批准後代辦白名單動作（產生 Handoff、`git fetch`、fast-forward pull、標記 stale）。execute API 只接受 `proposal_id`，動作由 server 白名單 template 決定、不開 shell，需獨立 execution token，每次留 audit receipt。
+  * **L2 調度本機 agent CLI**：三道門（token ＋ 單鍵批准 ＋ 一次性 6 碼確認碼）＋冷卻後，調度**你本機已登入的** Claude Code／Codex CLI 起草行動計畫。子行程 argv 白名單禁 shell、cwd 限該專案、環境變數 allowlist 重建（**任何 API key 都不轉發**）、逾時即 kill、執行中可取消。
+  * **L2 寫入模式**：兩段式批准——你先讀過 agent 起草的計畫，再讓 CLI 依**那份計畫全文**改檔；dispatch 前 worktree 必須乾淨，**永不 commit／push**，改動留給你 `git diff` 驗收。
+* **可排程的 L0 任務**：晨間包、每日工作誌、同步報告、週／月報 rollup、每週回顧、會議紀錄等**唯讀** template 可自訂排程；**L1／L2 永遠不可排程**（模組載入即強制，有 allowlist 測試把關）。
+* **文件落後偵測**：比對文件檔最後異動與其後的 commit 數，把「文件落後了」變成一張可執行的卡（[ADR-021](docs/ADR-021-docs-behind-code.md)）；沒有文件紀錄的 repo 一律不提。
+
+### 8. 💬 小秘書的個人化：它記得、也照你說的做
+
+* **記憶區（大腦）**（[ADR-012](docs/ADR-012-secretary-memory.md)）：對話框打「記下來：…」「偏好：不要提醒 repo_needs_push」「決定 @專案：…」直接寫進本機筆記；每次提問自動帶入今日狀態、前三個提案與筆記（有字數上限、附收據、可檢視），秘書觀察可一鍵刪除。
+* **每日工作誌**：L0 template `daily_digest` 每天把活動 reduce 成一則工作誌與幾則專案觀察——**採集到 ≠ 秘書知道**，要秘書記得就得有東西進 `secretary_notes`。
+* **模式感知提案**（[ADR-017](docs/ADR-017-pattern-aware-proposals.md)）：用（專案 × 日）活動矩陣看出「你有 N 天在工作但還沒有每日排程」「X 被冷落了」，並為主線專案加權。**只算已結束的日子。**
+* **宣告式個人檔案**（[ADR-018](docs/ADR-018-declared-profile.md)）：「偏好：優先：<專案>」「偏好：語氣：簡潔」——**你自己說的，不是推測的**；宣告的權重壓過推出來的，語氣只改措辭、不改數字。
+* **秘書桌面（01 是首頁）**（[ADR-019](docs/ADR-019-secretary-desk-home.md)）：由確定性規則挑「焦點一張」與「記得一則」，工具自身的提醒（例如 Extension heartbeat）不佔焦點；完整清單降為詳情。
+* **每週回顧：說的 vs 做的**（[ADR-020](docs/ADR-020-weekly-review-said-vs-done.md)）：把「你說 X 優先」與「上週 X 只有 1 天在動」兩個事實並列——**兩個事實放在一起就是洞見，不需要推測原因**。
+* **問候卡**：01 最上方「🤗 小秘書的話」說明今天做了什麼再接一句鼓勵。每個數字都能回溯到資料表；沒被採集到的（例如郵件）卡上如實寫明。LLM 潤飾預設關閉，且**不得多出統計裡沒有的數字**，違反就退回規則版。
+
+### 9. 📅 行事曆與會議秘書
+
+* **本機行事曆（唯讀 .ics）**（[ADR-015](docs/ADR-015-local-calendar-source.md)）：把 Outlook／Google／Apple 匯出或同步的 `.ics` 放進本機資料夾即可；晨報多一段「📅 今日行程」、首頁多一行「下一場 14:00 …」。**只取時間／標題／地點／狀態**，描述、與會者、連結一律不落地；**不連任何雲端 API**；沒設路徑就是停用。
+* **會議秘書（第一層：會後逐字稿）**（[ADR-022](docs/ADR-022-meeting-secretary.md)）：把 Teams 等匯出的逐字稿放進一個資料夾，`meeting_notes` 會產出摘要與**候選**待辦，並依時間配對到當天的行事曆事件。
+  * 「知道你在開會」只用**兩個確定性訊號**：行事曆上正在進行的事件 ＋ 前景視窗是會議軟體（只取應用程式名稱）。
+  * **摘要預設走本機 provider（`ollama`）**；改用雲端就等於把與會者的話送到那家供應商，設定頁與卡片都會明白寫出來。prompt 與回應原文一律不落地。
+  * **候選待辦要你點了才成為未結事項**——沒點的不進入任何計數。
+  * **刻意不做**：錄音、讀會議軟體視窗內容、呼叫 Teams／Graph API、自動下載逐字稿。**即時字幕／翻譯是第二層**，需另寫 ADR 並通過 ADR-022 D6 的五道門。
+
+### 10. 🔔 通知：桌面、Telegram、LINE 與每日入口檔
+
+* **Windows 原生桌面通知**：直接呼叫 WinRT Toast，**不需安裝套件、不需申請帳號**——晨間簡報、今日回顧、停滯提醒；`--dry-run` 可先預覽。
+* **每日入口簡報**：自動產出 `OMNICONTEXT_TODAY.md` / `.html`，HTML 版每 5 分鐘自動刷新，可設為瀏覽器首頁。
+* **多通道推播**（[ADR-014](docs/ADR-014-multi-channel-push-and-arm-code.md)，皆預設關閉）：同一份內容自動用各平台格式呈現。**能力邊界**：LINE Messaging API 沒有輪詢介面，接收訊息需要公開 webhook（會打破「只在 127.0.0.1」的邊界），所以 **LINE 只做推播**。
+* **手機上的小秘書（Telegram，預設關閉）**（[ADR-013](docs/ADR-013-telegram-secretary-chat.md)）：在綁定的對話裡打字就是提問，走與儀表板同一條管線；`/today` `/notes` `/status` `/proposals` 為指令，inline 可批准 L0／L1。**邊界**：這是唯一會把提問與回答送出本機的通道，因此預設關閉。
+* **一次性解鎖碼**：`/arm` 用儀表板簽發的 6 位數短效碼（單次、5 分鐘失效、猜錯即焚），手機不必持有長期 secret；`/disarm` 永遠可用。
+
+### 11. ⚡ 摘要引擎：自訂區間與兩層增量
+
+* **任意日期範圍報告**：Web UI 選起訖日期或用 `今日`／`昨日`／`本週`／`近 7 天`／`近 30 天` 快捷標籤。
+* **兩層增量（map-reduce）日報**：每次週期 checkpoint 後用本機 Ollama 把該時段壓成 ≤100 字微摘要（零 API 成本），日報只讀「微摘要時間軸＋缺漏時段原文回退」——雲端 token 用量約降一個數量級，Ollama 不可用時自動回退原文，**日報永遠可產生**。
+* **多供應商**：預設本機 Ollama；亦支援 Google Gemini、Anthropic Claude、OpenAI。`python main.py llm-test` 可診斷各 provider 連線。
+* **未結事項萃取**：摘要時自動提煉 Open Loops 並同步至清單供勾選結案。
+
+### 12. ✅ 驗收中心：還有哪些收據沒拿到
+
+* 把 [docs/TODO.md](docs/TODO.md) A 段每一項的完成判準變成**可重跑的唯讀查詢**（[ADR-016](docs/ADR-016-acceptance-center.md)）：`python main.py verify` 或「06 系統設定 → 驗收中心」。
+* **只讀不做**：不替你執行任何驗收動作、不跑 git、不連網。
+* 狀態字彙嚴格區分「**沒發生**」與「**查不到**」；人工署名永不覆蓋機器判定；記憶體內才有的數字（例如檢索 worker 狀態）標為 `runtime_only`，而不是謊報「還沒做」。
+
+### 13. 🌐 介面：雙語 × 明暗 × 配色
+
+* 頂列一鍵切換 `🌐 English` / `🌐 繁體中文`。
+* 外觀是兩個獨立軸：`data-theme`（深／淺）× `data-accent`（火影橘／森林綠／海洋藍），可組成 6 種外觀。
+* 偏好只存瀏覽器 `localStorage`，**不寫入 `config.yaml`、不送往後端**。
 
 ---
 
 ## 🚀 快速開始
-
-### 1. 安裝環境與依賴
 
 需求環境：**Python 3.10+**
 
@@ -194,7 +195,12 @@ python -m pip install -e ".[dev]"
 
 # 建立本機設定、目錄與 browser ingest token
 python main.py init --watch "/your/project/root"
+
+# 啟動 Web 儀表板與背景採集
+python main.py
 ```
+
+啟動後開啟 **[http://127.0.0.1:8765](http://127.0.0.1:8765)**。
 
 若使用已建置的 Alpha wheel：
 
@@ -204,151 +210,74 @@ omnicontext init --watch "/your/project/root"
 omnicontext assets-status
 ```
 
-Alpha wheel 由 [GitHub Releases](https://github.com/dofliu/activityTracker/releases) 提供下載（pre-release；附 SHA-256 receipt）。Installed wheel 預設將 config、database 與 reports 放在使用者可寫的 `~/OmniContext`，不寫入 `site-packages`；可用 `OMNICONTEXT_HOME` 或 `OMNICONTEXT_CONFIG` 覆寫。
+Installed wheel 預設把 config、database 與 reports 放在使用者可寫的 `~/OmniContext`，不寫入 `site-packages`；可用 `OMNICONTEXT_HOME` 或 `OMNICONTEXT_CONFIG` 覆寫。
 
-### 2. 設定 LLM API 金鑰
+### LLM 金鑰（選用）
 
-發布範本預設使用本機 `Ollama` 且關閉排程摘要。若主動選用 `Google Gemini`、Anthropic 或 OpenAI，請把金鑰保存在作業系統環境變數；`config.yaml` 只保存 `api_key_env` 變數名稱，不保存明文金鑰。Dashboard「設定 → 摘要與 LLM」（較少變動的設定預設收合，點標題展開）會顯示是否已偵測及來源，但不會把金鑰送到瀏覽器。
+預設全部走本機 Ollama。若要用雲端 provider，把金鑰放在**作業系統環境變數**——`config.yaml` 只保存 `api_key_env` 變數名稱，不保存明文金鑰：
 
-```bash
-# Windows PowerShell：持久保存於目前使用者環境
+```powershell
 [Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "your-gemini-api-key", "User")
-
-# 或若使用 Anthropic / OpenAI
-[Environment]::SetEnvironmentVariable("ANTHROPIC_API_KEY", "your-anthropic-api-key", "User")
-[Environment]::SetEnvironmentVariable("OPENAI_API_KEY", "your-openai-api-key", "User")
 ```
 
-Windows 上即使 OmniContext 的父程序較早啟動，後端也會回讀 User／Machine environment；設定後可在配置頁按「重新檢查」。
+Windows 上即使 OmniContext 的父程序較早啟動，後端也會回讀 User／Machine environment；設定後可在「設定 → 摘要與 LLM」按「重新檢查」。
 
-### 3. 啟動 Web 儀表板與後台監控
-
-```bash
-python main.py
-```
-
-啟動後於瀏覽器開啟：**[http://127.0.0.1:8765](http://127.0.0.1:8765)**
-
-完整的 Extension 配對、里程碑設定、備份與故障排查流程見 **[docs/USAGE.md](docs/USAGE.md)**。
+> **Extension 配對、里程碑設定、備份與故障排查的完整流程，見 [docs/USAGE.md](docs/USAGE.md)。**
 
 ---
 
-## 💻 CLI 指令完全指南
+## 💻 CLI 指令
 
-OmniContext 支援完整的終端命令列操作：
+Installed wheel 可將 `python main.py` 改為 `omnicontext` 或較短的 `omni`。
 
-| 指令 | 說明 | 範例 |
-| :--- | :--- | :--- |
-| `python main.py` | 啟動 Web 儀表板與背景採集服務 | `python main.py` |
-| `python main.py init` | 建立／更新跨平台設定與 extension token | `python main.py init --watch D:/Projects` |
-| `python main.py resume` | 產出專案接續 Context Handoff（支援 `--copy` 一鍵複製貼入 AI） | `python main.py resume activityTracker -c` |
-| `python main.py now` | 一秒查詢當前進行中專案、最近 5 筆活動與未結事項 | `python main.py now` |
-| `python main.py summary` | 生成 AI 摘要日報（支援自訂區間與強制更新） | `python main.py summary --start 2026-08-20 --end 2026-08-23` |
-| `python main.py github status` | 查看當前 GitHub 連線帳號、倉庫數與 API 額度 | `python main.py github status` |
-| `python main.py github sync` | 手動觸發同步 GitHub 所有 Public/Private 倉庫與 PRs | `python main.py github sync` |
-| `python main.py checkpoint` | 手動打包最近時段活動為 Markdown 快照 Log | `python main.py checkpoint --hours 2` |
-| `python main.py brief` | 產出每日簡報檔案至每日入口目錄 | `python main.py brief --notify` |
-| `python main.py notify` | 手動觸發提醒（預設桌面通知） | `python main.py notify briefing --dry-run` |
-| `python main.py status` | 查看資料庫累積數據指標與採集器運行狀態 | `python main.py status` |
-| `python main.py open-loop` | 人工複核 Open Loop lifecycle | `python main.py open-loop 12 resolved --note "done"` |
-| `python main.py backup` | 使用 SQLite Online Backup API 建立並驗證備份 | `python main.py backup` |
-| `python main.py restore-drill` | 在隔離暫存 DB 驗證最新／指定備份，不覆蓋 live DB | `python main.py restore-drill` |
-| `python main.py migration-status` | 唯讀查看目前／最新 schema version、pending 與相容性 | `python main.py migration-status` |
-| `python main.py assets-status` | 檢查 packaged config/Web/Extension assets | `python main.py assets-status` |
-| `python main.py extension-path` | 顯示 Chrome/Edge Load unpacked 目錄 | `python main.py extension-path` |
-| `python main.py index` | 建立／增量更新本機 semantic index | `python main.py index --json` |
-| `python main.py ask` | 查詢自己的跨 AI／Repository 歷史並列出來源 | `python main.py ask "上次如何處理 rollback?" --project activityTracker` |
-| `python main.py sessions` | 將近期 evidence 整理為 derived work sessions | `python main.py sessions --project activityTracker --hours 72` |
-| `python main.py recall` | 查詢相似歷史工作，不保存 query | `python main.py recall "formal rollback rehearsal" --project activityTracker` |
-| `python main.py maintain` | 執行資料庫健康維護（Checkpoint、修剪、線上備份、輪替） | `python main.py maintain --retention-days 90` |
-| `python main.py heal` | 巡檢背景採集器並自動修復異常線程 (Self-Healing) | `python main.py heal` |
-| `python main.py wal-checkpoint` | 手動截斷並同步 SQLite WAL 檔案至主庫 | `python main.py wal-checkpoint --mode TRUNCATE` |
-| `python main.py verify` | 驗收中心：查 `docs/TODO.md` A 段每一項的本機收據（唯讀，不做任何動作） | `python main.py verify --item A1 --json` |
-
-Installed wheel 可將表中的 `python main.py` 改為 `omnicontext` 或較短的 `omni`。
+| 指令 | 說明 |
+| :--- | :--- |
+| `python main.py` / `run` / `web` | 啟動 Web 儀表板與背景採集服務 |
+| `init` | 建立／更新跨平台設定與 extension token（`--show-token` 顯示金鑰） |
+| `now` | 一秒查詢當前進行中專案、最近活動與未結事項 |
+| `resume` | 產出專案接續 Context Handoff（`--copy` 一鍵複製貼入 AI） |
+| `summary` | 生成 AI 摘要日報（支援自訂區間與強制更新） |
+| `checkpoint` | 手動打包最近時段活動為 Markdown 快照 |
+| `brief` | 產出每日簡報檔案至每日入口目錄 |
+| `notify` | 手動觸發提醒（`--dry-run` 預覽、`--channel` 指定通道） |
+| `status` | 查看資料庫累積指標與採集器運行狀態 |
+| `github status` / `github sync` | 查看或同步 GitHub 倉庫與 PR |
+| `index` / `ask` | 建立本機 semantic index／查詢跨 AI 歷史並列出來源 |
+| `sessions` / `recall` | 整理 derived work sessions／查詢相似歷史（query 不保存） |
+| `open-loop` / `open-loop-reconcile` | 人工複核 Open Loop lifecycle／回填 fingerprint 收斂重複項 |
+| `verify` | **驗收中心**：查 TODO A 段每一項的本機收據（唯讀，不做任何動作） |
+| `llm-test` | 診斷各 LLM provider 連線與設定 |
+| `backup` / `restore-drill` | 建立並驗證備份／在隔離暫存 DB 驗證，不覆蓋 live DB |
+| `migration-status` | 唯讀查看目前／最新 schema version 與相容性 |
+| `maintain` / `heal` / `wal-checkpoint` | 資料庫生命週期維護／採集器自我修復／WAL 截斷 |
+| `assets-status` / `extension-path` | 檢查 packaged assets／顯示 Extension Load unpacked 目錄 |
+| `clear-demo` | 清除示範假資料與歷史噪音 |
 
 ---
 
-## ⚙️ 設定檔說明 (`config.yaml`)
+## ⚙️ 設定
 
-系統設定檔支援 Web 介面即時儲存與熱更新：
+`main.py init` 會依 **[config.example.yaml](config.example.yaml)** 產生本機 `config.yaml`；該範本是**設定項目的唯一權威來源**，每個區塊都有行內註解說明邊界，這裡不重複列出。多數設定可在儀表板「06 系統設定」即時儲存與熱更新。
 
-```yaml
-server:
-  port: 8765
-  host: "127.0.0.1"
+第一次安裝通常只需要動這幾項：
 
-security:
-  allowed_origins:
-    - "http://127.0.0.1:8765"
-    - "http://localhost:8765"
-  allow_remote_clients: false
-  browser_extension_ingest_token_env: "OMNICONTEXT_INGEST_TOKEN"
+| 設定 | 作用 |
+| :--- | :--- |
+| `project_resolution.search_roots` | 你的專案根目錄（決定歸戶結果，**建議明確設定**） |
+| `watchers.file_watcher.watch_directories` / `extensions` | 要監控的資料夾與副檔名 |
+| `watchers.git_watcher.repositories` | 要遞迴掃描的 Git 根目錄 |
+| `synthesizer.provider` | 摘要供應商（預設 `ollama` 全本機） |
+| `integrations.github.token` | 留空時自動使用本機 `gh auth token` |
 
-data_lifecycle:
-  backups_dir: "~/OmniContext/backups"
-  backup_retention_days: 30
-  auto_backup_on_start: false
-
-project_resolution:
-  # 建議填入自己的專案根目錄；可使用 ~ 與環境變數。
-  search_roots:
-    - "~/Projects"
-  # 可選；留空時會由安裝位置自動定位 OmniContext 自身。
-  self_project_path: ""
-
-watchers:
-  file_watcher:
-    enabled: true
-    watch_directories:
-      - "~/Projects"
-      - "~/Documents/Research"
-    extensions: [".tex", ".docx", ".md", ".pdf", ".py"]
-  
-  git_watcher:
-    enabled: true
-    repositories:
-      - "~/Projects"
-  
-  agent_log_watcher:
-    enabled: true
-    claude_code: true
-    codex: true
-    antigravity: true
-
-  browser:
-    gemini: true
-    chatgpt: true
-    claude_web: true
-
-synthesizer:
-  provider: "gemini"
-  gemini:
-    model: "gemini-3.7-flash"
-  schedule:
-    enabled: true
-    time: "23:30"
-  periodic_checkpoint:
-    enabled: true
-    interval_hours: 2
-
-integrations:
-  github:
-    enabled: true
-    token: ""  # 空白時自動使用本機 gh auth token
-```
+**危險能力全部預設關閉**：秘書執行器、L2、L2 寫入、自訂排程、Telegram 對話、`allow_remote_arm`、LINE、問候卡 LLM 潤飾；行事曆與會議秘書預設開但沒設路徑就等於停用。
 
 ---
 
-## 🧩 安裝 Chrome 瀏覽器擴充套件
+## 🧩 Chrome 瀏覽器擴充套件
 
-1. 開啟 Chrome 或 Edge 瀏覽器，進入 `chrome://extensions/`。
-2. 開啟右上角 **「開發人員模式」 (Developer mode)**。
-3. 點選 **「載入未封裝項目」 (Load unpacked)**。
-4. 執行 `python main.py extension-path`（wheel 安裝則為 `omnicontext extension-path`），將輸出的資料夾選為 Load unpacked。
-5. 執行 `python main.py init --show-token`，將 token 貼到擴充套件 popup 後儲存。
-6. 只有帶有效 token 的支援網站事件，才能寫入本機 `/api/v1/events/ai`。
-7. popup 顯示「配對成功」後，可由 `http://127.0.0.1:8765/extension-monitor` 查看各網站是否已有 observed event。
+`python main.py extension-path` 顯示 Load unpacked 目錄，`python main.py init --show-token` 取得 ingest token 貼進 popup。只有帶有效 token 的支援網站事件才能寫入本機 `/api/v1/events/ai`。
+
+配對完成後可從 `http://127.0.0.1:8765/extension-monitor` 查看逐站 observed 狀態。**完整步驟與 live 驗證流程見 [docs/USAGE.md §3](docs/USAGE.md)。**
 
 ---
 
@@ -356,148 +285,113 @@ integrations:
 
 ```text
 activityTracker/
-├── config.yaml                     # 系統設定檔（支援 Web UI 熱更新；由 config.example.yaml 產生）
-├── main.py                         # 主入口與 CLI 命令列分發
-├── pyproject.toml                  # 跨平台安裝、CLI entry point 與 pytest 設定
-├── MANIFEST.in                     # sdist assets 與 privacy exclusions
-├── requirements.txt                # 專案相依套件清單
-├── README.md / README_en.md        # 繁體中文 / English 說明文件
-├── ROADMAP.md / STATUS.yaml        # 開發規劃紀錄與機器可讀現況快照
+├── main.py                     # 主入口與 CLI 分發
+├── config.example.yaml         # 設定範本（init 依此產生本機 config.yaml）
+├── pyproject.toml              # 跨平台安裝、CLI entry point 與 pytest 設定
+├── README.md / README_en.md    # 繁中／English 說明
+├── ROADMAP.md / STATUS.yaml    # 開發規劃與成果／機器可讀現況快照
 │
-├── docs/                           # 📚 文件目錄（入口見 docs/INDEX.md）
-│   ├── INDEX.md                    # 文件總覽與導讀地圖
-│   ├── USAGE.md                    # 使用手冊：安裝、配對、日常操作、備份與故障排查
-│   ├── PRODUCT_POSITIONING.md      # 產品定位與證據邊界
-│   ├── TEST_STRATEGY.md / RELEASE_CHECKLIST.md  # 測試策略與發佈檢查
-│   ├── ADR-001 ~ ADR-015           # 架構決策紀錄
-│   └── archive/                    # 已歸檔的一次性規劃書與完成報告
+├── docs/                       # 📚 文件（入口見 docs/INDEX.md）
+│   ├── USAGE.md                # 使用手冊
+│   ├── TODO.md                 # 待辦與完成判準
+│   ├── NEXT_SESSION.md         # 開發接手指南
+│   ├── ADR-001 ~ ADR-022       # 架構決策紀錄（為什麼這樣設計、邊界在哪）
+│   └── archive/                # 已歸檔的一次性規劃書與完成報告
 │
-├── core/                           # 核心服務模組
-│   ├── server.py                   # FastAPI REST API 與靜態伺服器
-│   ├── manager.py                  # 採集器統籌與 supervise_and_heal 自我修復守護
-│   ├── database.py / migrations.py # SQLite 連線與 append-only schema migration
-│   ├── models.py                   # SQLAlchemy 資料庫模型 (Events, Projects, PRs, RAG)
-│   ├── security.py / secret_resolver.py  # Origin 邊界、secret redaction 與金鑰解析
-│   ├── data_lifecycle.py           # 線上備份、WAL checkpoint、歷史修剪與 integrity receipt
-│   ├── project_engine.py / project_paths.py  # 專案智能歸戶與根目錄定位
-│   ├── semantic_index.py           # 本機 embeddings、provenance retrieval 與 omni ask
-│   ├── context_memory.py           # Related History 與 derived work-session grouping
-│   ├── handoff_engine.py           # Provider-neutral Context Handoff 產生器
-│   ├── proactive_secretary.py      # Proposal-only 主動秘書（ADR-007）
-│   ├── repo_sync.py                # 受控本機 Git 同步中心（ADR-011）
-│   ├── background_tasks.py         # 可驗證背景 Agent 任務時間（ADR-010）
-│   ├── usage_analytics.py / capture_coverage.py  # 使用時間統計與 coverage 訊號
-│   ├── extension_monitor.py / extension_verification.py  # Extension 診斷與 live 驗證
-│   ├── triage_signals.py           # 跨專案 triage 訊號（GitHub PR/Issue）
-│   ├── platform_services.py        # Windows/macOS/Linux argv 型 OS 整合
-│   └── runtime_paths.py / fs_utils.py / time_utils.py  # 執行路徑、檔案總管與時區工具
+├── core/                       # 核心服務
+│   ├── server.py               # FastAPI REST API 與靜態伺服器
+│   ├── manager.py              # 採集器統籌與 supervise_and_heal 自我修復
+│   ├── database.py / migrations.py / models.py   # SQLite 與 append-only migration
+│   ├── security.py / secret_resolver.py          # Origin 邊界與金鑰解析
+│   ├── data_lifecycle.py       # 線上備份、WAL checkpoint、修剪與 integrity receipt
+│   ├── project_engine.py / project_paths.py      # 專案歸戶與根目錄定位
+│   ├── semantic_index.py / context_memory.py     # 本機 embeddings 與 Related History
+│   ├── handoff_engine.py       # Provider-neutral Context Handoff
+│   ├── proactive_secretary.py / secretary_advisor.py   # 提案引擎與 LLM 註解層
+│   ├── agent_executor.py / agent_dispatch.py / scheduled_tasks.py  # L0/L1/L2 與排程
+│   ├── secretary_memory.py / secretary_profile.py      # 記憶區與宣告式個人檔案
+│   ├── secretary_home.py / secretary_greeting.py / secretary_packs.py  # 桌面／問候／每日包
+│   ├── activity_digest.py / activity_patterns.py / weekly_review.py    # 工作誌／模式／週回顧
+│   ├── meeting_transcripts.py  # 會議秘書（WebVTT、配對、事實閘、候選待辦）
+│   ├── docs_freshness.py       # 文件落後程式偵測
+│   ├── ics_parser.py / calendar_agenda.py        # 本機 .ics 行事曆（唯讀）
+│   ├── repo_sync.py / repo_onboarding.py / repo_sync_report.py  # Git 同步中心
+│   ├── acceptance.py           # 驗收中心（TODO A 段的可執行副本）
+│   ├── usage_analytics.py / capture_coverage.py / coverage_ledger.py
+│   ├── background_tasks.py / triage_signals.py / status_draft.py
+│   └── platform_services.py / runtime_paths.py / fs_utils.py / time_utils.py
 │
-├── rag/                            # 📚 DeskRAG 本地知識庫子系統
-│   ├── router.py                   # /api/v1/rag/* REST API 與 SSE 串流問答
-│   ├── scanner.py / index_worker.py / jobs.py / lifecycle.py  # 受控索引 worker 生命週期
-│   ├── parsers/                    # PDF / Office / 文字 / 圖片解析中樞（Parser Hub）
-│   ├── chunker.py                  # 階層滑動窗口切分器
-│   ├── embeddings.py / vector_store.py  # FastEmbed (ONNX) + ChromaDB 向量庫
-│   ├── retriever.py / retrieval/   # Jieba+BM25 與 Hybrid RRF / Weighted Fusion 檢索
-│   ├── activity_indexer.py         # 專案狀態與 Open Loops 虛擬切片
-│   └── llm_gateway.py              # Ollama / Gemini / Claude / OpenAI 多模型網關
+├── rag/                        # 📚 DeskRAG 子系統
+│   ├── router.py               # /api/v1/rag/* REST API 與 SSE 串流問答
+│   ├── scanner.py / index_worker.py / jobs.py / lifecycle.py   # 受控索引 worker
+│   ├── retrieval_worker.py / retrieval_client.py               # 常駐檢索 worker
+│   ├── parsers/ chunker.py embeddings.py vector_store.py retriever.py
+│   ├── storage.py              # 容量報告與 Chroma 空間回收
+│   ├── activity_indexer.py     # 專案狀態與 Open Loops 虛擬切片
+│   └── llm_gateway.py          # Ollama / Gemini / Claude / OpenAI 多模型網關
 │
-├── integrations/                   # 外部雲端整合
-│   └── github_client.py            # GitHub API Client (Public/Private Repos, PRs, CI)
+├── watchers/                   # 多源採集器
+│   ├── file_watcher.py git_watcher.py window_watcher.py
+│   ├── agent_log_watcher.py    # Claude Code/Desktop、Codex、Antigravity
+│   ├── calendar_watcher.py     # 本機 .ics
+│   └── browser_extension/      # Chrome MV3 擴充套件
 │
-├── watchers/                       # 多源活動數據採集器
-│   ├── file_watcher.py             # Watchdog 檔案異動監控與字數統計
-│   ├── git_watcher.py              # Git 遞迴多倉庫掃描與 Commit 追蹤（損壞倉庫局部隔離）
-│   ├── window_watcher.py           # 視窗焦點切換與時間分配統計
-│   ├── agent_log_watcher.py        # Claude Code/Desktop、Codex、Antigravity 日誌解析
-│   └── browser_extension/          # Chrome MV3 擴充套件 (ChatGPT/Gemini/Claude)
+├── synthesizer/                # 摘要與排程引擎
+│   ├── aggregator.py prompt_templates.py llm_client.py scheduler.py
+│   └── micro_summarizer.py / rollup.py    # 兩層增量微摘要與週/月報
 │
-├── synthesizer/                    # AI 摘要與排程回顧引擎
-│   ├── aggregator.py               # 多日區間資料聚合與報告管線
-│   ├── prompt_templates.py         # 結構化 Prompt 樣板
-│   ├── llm_client.py               # 多供應商 LLM 客戶端 (Gemini/Claude/OpenAI/Ollama)
-│   └── scheduler.py                # 每日定時總結與週期快照定時器
+├── notifiers/                  # 通知推播
+│   ├── messages.py / channels.py          # 內容與呈現分離、adapter 能力宣告
+│   ├── desktop_notifier.py                # Windows WinRT Toast（零依賴）
+│   ├── telegram_notifier.py / telegram_chat.py / telegram_approvals.py / telegram_setup.py
+│   └── line_setup.py / secretary_push.py
+├── integrations/github_client.py          # GitHub API Client
+├── exporters/daily_brief.py               # OMNICONTEXT_TODAY.md/.html
 │
-├── notifiers/                      # 通知推播模組
-│   ├── desktop_notifier.py         # Windows WinRT Toast 桌面通知（零依賴）
-│   └── telegram_notifier.py        # Telegram Bot 每日摘要與停滯專案警示（選用）
-├── exporters/
-│   └── daily_brief.py              # OMNICONTEXT_TODAY.md/.html 每日入口簡報
+├── web/                        # 儀表板前端（6 分頁 + extension-monitor）
+│   └── index.html / app.js / style.css
 │
-├── web/                            # Web 儀表板前端（01~07 分頁 + extension-monitor）
-│   ├── index.html / app.js / style.css  # 主結構、i18n 控制器與暗橘主題
-│   └── extension-monitor.html      # Browser Extension 進階診斷頁
-│
-├── scripts/                        # 自動化、驗證與維護腳本（autostart、E2E、資料清理）
-├── tests/                          # 31 個 contract test 模組（security/data/RAG/sync/lifecycle）
-│
-├── logs/checkpoints/               # 週期性活動快照儲存目錄
-└── reports/                        # 每日/區間 Markdown 報告儲存目錄
+├── scripts/                    # 驗證、清理、autostart 與 E2E 腳本
+├── tests/                      # 62 個 contract test 模組（626 項）
+├── logs/checkpoints/           # 週期性活動快照
+└── reports/                    # 每日／區間 Markdown 報告
 ```
 
 ---
 
-## 🗺️ 開發路線與現況
+## 🗺️ 這個專案的差異化定位
 
-### 目前累積的資料資產
+市面同類工具（ActivityWatch、RescueTime、Timing）追蹤的是**時間**；Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 
-```
-2,418 筆 AI event rows · 2,053 筆非空回應 · 1,890 筆 final candidates · 66 筆 partial（2026-08-24 16:35 快照）
-時間跨度 2025-05-19 ~ 2026-08-24（15 個月）
-72 個專案狀態 · 57 個 GitHub repos · 266 筆 PR
-```
+**目前沒有主流工具在讀本機 AI agent 的 transcript。** `~/.claude/projects/`、`~/.codex/sessions/`、`.gemini/antigravity/brain/` 這些檔案就在硬碟上，不需錄螢幕、不需額外權限，而裡面記錄的是真正的思考過程——問了什麼、AI 怎麼答、最後決定怎麼做。
 
-### 這個專案的差異化定位
-
-市面同類工具（ActivityWatch、RescueTime、Timing）追蹤的是**時間**；
-Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
-
-**目前沒有主流工具在讀本機 AI agent 的 transcript。** `~/.claude/projects/`、
-`~/.codex/sessions/`、`.gemini/antigravity/brain/` 這些檔案就在硬碟上，
-不需錄螢幕、不需額外權限，而裡面記錄的是真正的思考過程——
-問了什麼、AI 怎麼答、最後決定怎麼做。
-
-### 下一階段：從「日誌」到「記憶」
-
-現階段 236 萬字元**只有一種存取方式：時間排序**。因此下一階段的重點
-不是繼續擴大收集，而是讓既有資料可被檢索與再利用：
-
-| 階段 | 內容 | 說明 |
-| :--- | :--- | :--- |
-| **P2.5** | 可信度與安全 hardening | API security boundary、ingestion provenance/finalization、Open Loop lifecycle、pytest 與跨平台基線 |
-| **P3** | 記憶層 | ✅ P3-1 Context Handoff、P3-2 本機語意檢索、P3-3 `omni ask`、P3-4 Related History、P3-5 derived Session 敘事層均完成 Alpha |
-| **P4** | 收集層補完 | 瀏覽器閱讀內容、行事曆與會議、終端機指令歷史、未 commit 的工作狀態 |
-| **P5** | 主動秘書 AI 與自主執行 | 主動情境推論與前瞻提案、三級安全守門員（L0/L1/L2）、Agent Dispatcher 調度自主執行、Telegram/Web 一鍵批准、晨間前瞻與晚間交接、`STATUS.yaml` 自動維護 |
-| **P6** | 開源整備 | `1.3.0a3` candidate、formal rollback，以及 Windows／Ubuntu／macOS × Python 3.10／3.12 GitHub Actions matrix 已通過；仍待 Extension live receipts 與發佈授權 |
+從「日誌」到「記憶」是這個專案的主線：現階段的重點不是繼續擴大收集，而是讓既有資料**可被檢索、可被秘書使用**。
 
 > 收集越多不等於越有用：檔案事件曾從 3,575 筆噪音 → 4,327 筆 → 收斂至 789 筆。
-> 新增採集來源必須先通過「能否改變決策」的檢驗。
+> **新增採集來源必須先通過「能否改變決策」的檢驗。**
 
-完整規劃與驗收標準見 **[ROADMAP.md](ROADMAP.md)**。
+完整階段規劃、實測數據對比與成果紀錄見 **[ROADMAP.md](ROADMAP.md)**；下一階段方向與取捨見 §12。
 
 ### 目前的使用前提
 
-本專案現階段為**個人優先（personal-first）**設計，尚未針對他人環境整備：
+本專案現階段為**個人優先（personal-first）**設計：
 
-* 專案根目錄已改為 `project_resolution.search_roots` 設定；未設定時才沿用 file/Git watcher 的 roots，因此首次安裝仍應明確設定自己的目錄。
-* 視窗採集、桌面通知與開機排程僅支援 **Windows**。
-* `pyproject.toml`、schema migration 7/7、formal rollback，以及 Windows／Ubuntu／macOS 的 wheel/sdist build、install、API/assets smoke 已完成。
-* `main.py init --watch <path>` 已取代手動複製設定；複雜來源仍需於 `config.yaml` 調整。
-
-剩餘項目將於 **P6 開源整備** 階段持續處理。
+* 視窗採集、桌面通知與開機排程僅支援 **Windows**；其餘功能跨平台（CI 涵蓋 Windows／Ubuntu／macOS）。
+* `project_resolution.search_roots` 未設定時才沿用 file/Git watcher 的 roots，首次安裝仍應明確設定自己的目錄。
+* PyPI 發佈不在目前範圍，只發 GitHub pre-release（wheel/sdist + SHA-256 receipt）。
 
 ---
 
 ## 🔒 隱私與安全聲明
 
 * **事件本機儲存**：活動事件保存在本機 SQLite（`omni_context.db`），不含第三方 analytics telemetry。
-* **LLM 資料邊界**：選擇 Gemini、Anthropic 或 OpenAI 產生摘要時，組裝後的工作脈絡會傳送至該 provider；選擇 Ollama 才是完整本機推論。
-* **Local API**：採 deny-by-default Origin boundary、loopback-only 預設、敏感設定遮蔽與 browser-extension ingestion capability，避免一般網頁跨來源讀取本機工作紀錄。
+* **LLM 資料邊界**：選擇 Gemini／Anthropic／OpenAI 產生摘要時，組裝後的工作脈絡會傳送至該 provider；**選擇 Ollama 才是完整本機推論**。會議逐字稿摘要的 provider 另有獨立設定，預設 `ollama`。
+* **Local API**：deny-by-default Origin boundary、loopback-only 預設、敏感設定遮蔽與 browser-extension ingestion capability（[ADR-001](docs/ADR-001-p2-5-trust-boundary.md)）。
 * **資料可信度**：canonical AI event 必須具備 `turn_key`、source provenance 與 `response_status`；partial／legacy 回應不作為摘要或 handoff 結論。
-* **備份生命週期**：`python main.py backup` 使用 SQLite Online Backup API 並輸出 integrity／SHA-256；`python main.py restore-drill` 於隔離暫存 DB 驗證 schema 與 row counts並保存 JSON receipt，不覆蓋 live DB。Formal package+DB rollback rehearsal 已通過；自動 retention pruning 尚未完成。
-* **Schema migration**：append-only registry 保存 version/name/checksum；既有 DB upgrade 前自動產生 verified backup。Checksum mismatch 或未知較新版本會 fail-closed，不允許舊版 runtime 繼續開啟。
-* **Artifact 邊界**：wheel/sdist content receipt 會檢查必要 assets，並拒絕夾帶 `config.yaml`、SQLite database 或 local secrets。
-* **Git 提交防護**：資料庫檔案、API 金鑰與個人 Markdown 報告已預設加入 `.gitignore`，降低誤提交私密資料的風險。
+* **備份生命週期**：`backup` 使用 SQLite Online Backup API 並輸出 integrity／SHA-256；`restore-drill` 於隔離暫存 DB 驗證 schema 與 row counts，**不覆蓋 live DB**。
+* **Schema migration**：append-only registry 保存 version/name/checksum，升級前自動產生 verified backup；checksum mismatch 或未知較新版本 **fail-closed**（[ADR-003](docs/ADR-003-versioned-sqlite-migrations.md)）。
+* **Artifact 邊界**：wheel/sdist content receipt 會拒絕夾帶 `config.yaml`、SQLite database 或 local secrets。
+* **Git 提交防護**：資料庫檔案、API 金鑰與個人 Markdown 報告已預設加入 `.gitignore`。
 
 ---
 
