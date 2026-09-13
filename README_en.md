@@ -1,168 +1,159 @@
 # 🌐 OmniContext — Personal Context Intelligence & Workstream Hub
 
-[![Language](https://img.shields.io/badge/Language-English%20%7C%20%E7%B9%81%E9%AB%94%E4%B8%AD%E6%96%87-orange)](#-language)
+[![Language](https://img.shields.io/badge/Language-English%20%7C%20%E7%B9%81%E9%AB%94%E4%B8%AD%E6%96%87-orange)](README.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-green)](https://fastapi.tiangolo.com/)
 
 > **[English Documentation](README_en.md) | [繁體中文說明文件](README.md)**
 
-> **Current status: Personal Alpha (v1.3.0a5 published as a GitHub pre-release).** Windows milestone WinRT Toast E2E, schema 18/18, formal package+database rollback, P3-2 through P3-5 Context Memory Alpha, collector runtime diagnostics, the P2.6 continuous coverage ledger, and the cross-platform CI matrix have passed; Extension 1.3.1 obtained a live PASS receipt for ChatGPT and Claude.ai on 2026-08-31 and the P2.7 background-task live acceptance passed for all three platforms. **The secretary has completed all [ADR-008](docs/ADR-008-gated-agent-executor.md) stages P5-R1 through R5** (LLM notes, L0/L1 whitelist actions, L2 dispatch of your local agent CLI to draft plans / apply an approved plan, Telegram inline approvals with an evening handoff push, and L0 read-only custom scheduled tasks with weekly/monthly rollups and a STATUS draft — all off by default), plus the morning briefing (P5-R4a), two-tier incremental summaries, and the assistant-home UI. P4.3 repo onboarding/reconciliation (confirmed single-target init / attach-remote / clone / create-GitHub-repo flows) has landed, and the dashboard went through an information-architecture pass (6 tabs split into primary/secondary, System Settings consolidated into a 10-section left nav) plus optional color palettes (Naruto Orange / Forest Green / Ocean Blue x dark/light). Between 2026-09-02 and 09-04 it also gained the **secretary memory area** ([ADR-012](docs/ADR-012-secretary-memory.md)), **Telegram chat from your phone** ([ADR-013](docs/ADR-013-telegram-secretary-chat.md)), **multi-channel push for LINE/Telegram with a one-time arm code** ([ADR-014](docs/ADR-014-multi-channel-push-and-arm-code.md)), the **secretary greeting card** (home tab and the top of the morning briefing), and a **local calendar source** ([ADR-015](docs/ADR-015-local-calendar-source.md), read-only .ics) — each off by default, or inert until you configure a path. 53 contract-test modules, 425 tests. Remaining gap: a real full-day coverage-ledger receipt plus the user's live on-machine acceptance receipts (release_ready stays false); the full backlog lives in [docs/TODO.md](docs/TODO.md) and the direction in [ROADMAP section 12](ROADMAP.md).
+**OmniContext** is a **local-first personal context memory hub** with explicit data boundaries. It captures cross-platform AI conversations (Claude Code, Codex, Antigravity, ChatGPT, Gemini), code commits, file and paper-writing activity, and window time allocation, integrates GitHub repositories and pull request state — and then has a **secretary that only proposes and never acts on its own** turn those signals into "what should I do next".
 
-**Documentation:** [📚 Documentation index](docs/INDEX.md) · [Traditional Chinese usage guide](docs/USAGE.md) · [Roadmap](ROADMAP.md) · [Current status](STATUS.yaml) · [Test strategy](docs/TEST_STRATEGY.md)
+Unlike a single vendor's memory/chat-import feature: **OmniContext's canonical context belongs to you and your projects, not to any AI provider.** Full positioning and evidence boundaries: [Product Positioning](docs/PRODUCT_POSITIONING.md).
 
-![OmniContext architecture and future roadmap](docs/assets/omnicontext-architecture-roadmap-card-v1.png)
+It answers three questions at any moment:
 
-**OmniContext** is a **local-first, privacy-focused** personal context intelligence and activity tracking hub. It automatically captures your cross-platform AI interactions (Claude Code, Codex, Antigravity, ChatGPT, Gemini, etc.), code commits, paper and file modifications, window time allocation, and deeply integrates with your GitHub repositories and Pull Request (PR) statuses.
+1. **"Which projects am I actively working on?"**
+2. **"Where did I leave off, and which files did I touch?"**
+3. **"What open loops are still unresolved?"**
 
-Unlike provider-specific memory or chat import, **OmniContext keeps canonical context with the user and project rather than with one AI provider.** It combines multi-AI activity with local repositories, branches/commits, file changes, IDE/terminal and foreground activity, and Open Loops, then produces a provider-neutral Context Handoff. See [Product Positioning](docs/PRODUCT_POSITIONING.md) for the current capability and evidence boundaries.
+---
 
-It is purpose-built to answer three fundamental questions at any moment:
-1. **"What projects and workstreams am I actively working on?"**
-2. **"Where did I leave off in my last work session, and what files did I touch?"**
-3. **"What open loops and unresolved tasks require my attention?"**
+## 📊 Current Status
+
+**Personal Alpha — v1.3.0a5** (published as a [GitHub pre-release](https://github.com/dofliu/activityTracker/releases) with a SHA-256 receipt)
+
+| Area | State |
+| :--- | :--- |
+| Code | P0–P8 and all ADR-008 executor stages landed; 22 ADRs record the boundary behind each decision |
+| Tests | **62 contract test modules, 626 tests** (625 passed + 1 skipped); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs |
+| Data | SQLite schema migration **18/18** (append-only + checksum, verified backup before upgrade) |
+| Release | `release_ready: false` |
+
+**What is left is almost never "code not yet written" — it is receipts that can only be obtained on the user's own machine.** This project does not treat "tests pass" as "works in production". The one remaining *capability* gap blocking release is a full-day coverage ledger measurement.
+
+Don't rely on memory: `python main.py verify` (or dashboard "06 Settings → Acceptance Center") reports which receipts exist right now ([ADR-016](docs/ADR-016-acceptance-center.md)).
+
+**Documentation:** [📚 Index](docs/INDEX.md) · [User Guide](docs/USAGE.md) · [Roadmap & Results](ROADMAP.md) · [Backlog](docs/TODO.md) · [Machine-readable status](STATUS.yaml)
+
+![OmniContext Architecture & Roadmap](docs/assets/omnicontext-architecture-roadmap-card-v1.png)
 
 ---
 
 ## 🌟 Key Features
 
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                      OmniContext Architecture Overview                   │
-├──────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  [ Cross-Platform AI ]    [ Local Files / Git ]   [ GitHub Cloud Intel ] │
-│  • Claude Code Logs       • Watchdog File Events  • 48+ Public & Private │
-│  • Codex Sessions         • Recursive Git Scanner • PR States & Branches │
-│  • Antigravity Brain      • Canonical Project     • Actions CI & Reviews │
-│  • Chrome Extension (MV3)   Resolver                                     │
-│          │                       │                       │               │
-│          └───────────────────────┼───────────────────────┘               │
-│                                  ▼                                       │
-│                      [ Local SQLite Database ]                           │
-│              (omni_context.db · local; cloud LLM is opt-in)              │
-│                                  │                                       │
-│          ┌───────────────────────┼───────────────────────┐               │
-│          ▼                       ▼                       ▼               │
-│  [ Web Dashboard UI ]    [ DeskRAG Subsystem ]     [ AI Synthesis ]      │
-│  • 01 · 🤖 Assistant     • PDF/Docx/Pptx/Xlsx/Md   • Multi-Day Reviews   │
-│    (greeting + today     • FastEmbed + ChromaDB    • Periodic Snapshots  │
-│     list+chat+memory)    • Jieba + BM25 Keyword    • Telegram/LINE Push  │
-│  • 02 · Knowledge base   • Hybrid RRF Retrieval    • Multi-LLM (Gemini/  │
-│  • 03 · Workstreams      • Multi-LLM SSE Chat        Claude/OpenAI/Ollama│
-│  • 04 · Git Sync Center · 05 · Summaries & Stats · Explorer Reveal       │
-│  • 06 · System Settings (10-section left nav) · 🌐 Bilingual (EN/ZH)     │
-└──────────────────────────────────────────────────────────────────────────┘
-```
+> This section is **what exists**. **How to use it** lives in the [User Guide](docs/USAGE.md); **why it is designed this way** lives in the corresponding ADR.
 
 ### 1. 🎯 Canonical Hierarchy Project Resolver
-* **Zero Subfolder Fragmentation**: Automatically aggregates edits in deeply nested subfolders (e.g., `core/`, `synthesizer/`, `Draft_Paper/`, `Daily_Report/`) into their true parent project or paper root (e.g. `activityTracker`, `AI_PapersResearch`).
-* **Session-Level Multi-File Batching**: Multiple files modified during the same session are grouped into a clean single line (e.g. `Modified file1.md, file2.py (6 files total)`). Clicking any item expands the full file list with diffs and word counts.
 
-### 2. 🐙 GitHub Cloud & PR Intelligence
-* **Dual Authentication**:
-  * **1-Click Zero-Config Auth**: Automatically detects local `gh` CLI credentials (with `repo`, `read:org`, `workflow`, `gist` scopes) with no manual token creation required.
-  * **Personal Access Token (PAT)**: Supports Fine-Grained and Classic PATs.
-* **Full Repository & PR Tracking**:
-  * Synchronizes all Public and Private repositories.
-  * Captures PR titles, states (Open / Merged / Draft), branch flows (`head -> base`), GitHub Actions CI test results (`SUCCESS` / `PENDING` / `FAILURE`), and review approval statuses.
-  * Web dashboard includes direct clickable links to GitHub PR pages.
+* **No more subdirectory fragmentation**: nested directories (`core/`, `synthesizer/`, `Draft_Paper/`) are resolved to their real project or paper root (`activityTracker`, `AI_PapersResearch`).
+* **Multi-file session aggregation**: files touched in the same working session collapse into a single card entry, expandable to per-file word-count deltas and paths.
 
-### 2.1 🔁 Local Git Sync Center (per-repository confirmation)
-* **Separate from GitHub Cloud Sync**: GitHub integration reads cloud repository/PR metadata; the Local Git Sync Center reports configured local repository branches, cached ahead/behind refs, and worktree state.
-* **Controlled two-way workflow**: Refresh each repository with `Fetch`, then use `Pull --ff-only`, `Commit staged`, or `Push` only when its preflight is safe.
-* **Safe defaults**: No scheduled sync, no automatic `git add`, and no force push. Pull/Push require a clean non-diverged worktree; Commit requires an explicit message and includes only pre-staged files. See [Usage Guide](docs/USAGE.md#13-本機-git-同步中心) and [ADR-011](docs/ADR-011-safe-local-repository-sync.md).
-* **Current scope**: A plain local folder, a local Git repository without a remote, and a GitHub repository not yet cloned are intentionally left for the planned Repo Onboarding / Reconciliation flow. The current release never initializes a folder, creates a cloud repository, or clones automatically.
+### 2. 🤖 Cross-Platform AI Conversation Capture
 
-### 3. 🤖 Cross-Platform AI Conversation Capture (Full Prompts & Responses)
-* **Local CLI / IDE Agents**:
-  * **Claude Code** (`~/.claude/projects/`): Logs bash executions, tool calls, and user prompts.
-  * **Claude Desktop Cowork/local-agent**: Auto-detects structured project JSONL under application data, with Windows extended-path support and a seven-day initial backfill.
-  * **Codex** (`~/.codex/sessions/**`): Parses rollout JSONL records and complete assistant message turns.
-  * **Antigravity** (`.gemini/brain/**`): Captures real-time sessions and tool outputs.
-* **Browser Extension (Chrome MV3)**:
-  * Supports **ChatGPT**, **Google Gemini**, and **Claude.ai**.
-  * Uses a dedicated ingest token, stable turn key, and write-only capability boundary.
-* **Boundary**: normal Claude Desktop cloud-chat Chromium LevelDB cache is detected but not parsed and is never claimed as captured transcript content.
-* **Source fault isolation**: a permission or parser failure in one source such as Claude Desktop skips only that source; Codex, Claude Code, and Antigravity scans continue in the same cycle.
+* **Local CLI / IDE agents**: Claude Code (`~/.claude/projects/`), Claude Desktop local-agent, Codex (`~/.codex/sessions/**`), Antigravity (`.gemini/brain/**`).
+* **Chrome MV3 extension**: ChatGPT, Gemini, Claude.ai — write-only capability boundary enforced with a dedicated ingest token, upserted on a stable turn key.
+* **Explicit boundary**: ordinary Claude Desktop cloud chat is only detected as *cache present*. The Chromium LevelDB is **not** parsed and no claim is made that the conversation was captured.
+* **Per-source fault isolation**: a permission or parse error in one source skips that source only; the rest of the collection round continues.
 
-### 4. ⚡ Custom Date-Range AI Synthesis Engine
-* **Flexible Date Ranges**: Choose any start and end dates (`FROM ~ TO`) or use quick chips (`Today`, `Yesterday`, `This Week`, `Last 7 Days`, `Last 30 Days`) to synthesize executive multi-day review reports.
-* **Multi-Model Support**: The release template defaults to local Ollama with scheduled synthesis disabled; Gemini, Anthropic, and OpenAI remain explicitly selectable.
-* **Open Loops Extraction**: Automatically analyzes daily activities and extracts actionable tasks into an interactive checklist.
+### 3. 🐙 GitHub Cloud Intel & 🔁 Local Git Sync Center
 
-### 5. 🌐 Full Bilingual (EN / 繁中) i18n & Theme Switcher
-* Topbar button provides seamless 1-click switching between `English` and `繁體中文`.
-* Full Dark / Light theme support with preferences persisted in `localStorage`.
+* **Dual auth**: auto-detect the local `gh` CLI credential, or use a fine-grained / classic PAT.
+* **Cloud metadata**: all public/private repositories and PR titles, state, branch flow, CI results and review status.
+* **Local sync center (per-repository confirmation)**: branch, upstream, ahead/behind and worktree changes per repo, with `Fetch` → conditional `Pull --ff-only` / `Commit staged` / `Push`.
+* **Safe defaults**: no scheduled auto-sync, never runs `git add`, no force push. A disabled button explains why **with that repository's actual numbers**, not a generic sentence.
+* **Overview & batch**: one table for every repository; batch Pull/Push lists the qualifying set for confirmation and re-checks each repo at execution time. Batch push has its own switch, off by default. The secretary can schedule the L0 `repo_sync_report`. See [ADR-011](docs/ADR-011-safe-local-repository-sync.md).
+* **Repo onboarding**: folder not yet `git init`-ed, repo without a remote, GitHub repo not yet cloned — each has a single-target confirmation flow. Never overwrites a non-empty directory, never batch-creates or batch-clones, never pushes on your behalf.
 
-### 6. 🔔 Local Desktop Notifications & Background Autostart
-* Windows-native morning briefings, evening reviews, and project stagnation alerts; Telegram remains optional and disabled by default.
-* Includes a PowerShell background autostart installer (`scripts/install_autostart.ps1`).
+### 4. ⏱️ Interface Usage Time, Background Tasks & Coverage
 
-### 7. ⏱️ Daily Interface Usage & Milestones (P2.6 Alpha)
-* The dashboard shows observed foreground time and AI turns for Claude, Codex, ChatGPT, Gemini, Antigravity, VS Code, and other configured interfaces.
-* Daily goals, milestones, notification tone, quiet hours, and cooldown are configurable; SQLite receipts prevent duplicate notifications after restart.
-* Foreground time is not productivity or actual work time. A continuous coverage ledger records when the window collector was actually observed running: coverage shows `observed` only when the day's ledger coverage meets the configured threshold (default 95%), otherwise `partial` with the measured ratio; interruptions and sleep are never back-filled.
-* The dashboard `DATA CAPTURE` panel condenses three independent signals—`FOCUS`, `WEB`, and `LOG`—without treating one observed channel as proof of another.
-* `http://127.0.0.1:8765/extension-monitor` is the advanced Browser Extension diagnostic page for enabled/observed, heartbeat, and per-site state; token pairing remains inside the Extension popup.
+* **Daily interface usage**: foreground active time and AI turns for Claude, Codex, ChatGPT, Gemini, Antigravity, VS Code and more, with configurable daily goals, milestones, tone, quiet hours and cooldown.
+* **Verified background agent / CLI task time**: settled **only** when a prompt start and an explicit final completion timestamp exist as a pair; parallel tasks are counted as a time union to avoid double counting ([ADR-010](docs/ADR-010-verified-background-agent-task-time.md)).
+* **Continuous coverage ledger**: records the intervals collectors were actually observed running. Above threshold it reads `observed`; otherwise `partial` with the real ratio. **Gaps are never backfilled.**
+* **Boundary**: these numbers represent observed foreground time only — **not productivity, not billable hours**. The `FOCUS` / `WEB` / `LOG` signals never substitute for one another.
 
-### 8. 🧾 Verified Background Agent / CLI Task Time (Alpha)
-* `BACKGROUND AGENT TASKS` separately shows paired local-receipt execution time from Claude Code, Claude Desktop local-agent, and Codex sessions.
-* A task is counted only when its local source contains both a prompt-start and an explicit final-completion timestamp. It can therefore appear after its window is minimized; generic Terminal/PowerShell work and tasks without a final receipt are never estimated.
-* This metric remains separate from foreground time, AI turns, and milestones. Parallel tasks use an interval union for the total to avoid double counting. See [ADR-010](docs/ADR-010-verified-background-agent-task-time.md) for its evidence boundary.
+### 5. 🧠 Memory Layer: Semantic Index, `omni ask`, Related History
 
-### 9. 🧠 Local Semantic Index and `omni ask` (P3-2 / P3-3 Alpha)
-* Loopback Ollama `bge-m3` indexes AI turns, Git commits, file-activity metadata, Open Loops, and Project State without sending the index to a cloud provider.
-* Incremental updates use content hashes and retain SQLite source references, project, time, trust status, and embedding-input degradation provenance.
-* `omni ask` supports retrieval-only mode or a local Ollama answer with `[S1]` citations. Similarity is not source validation or proof of coverage.
+* A 1024-dimension **local** index over AI turns, git commits, file metadata, open loops and project state, built with loopback Ollama `bge-m3`. Nothing is sent to a cloud provider ([ADR-005](docs/ADR-005-local-semantic-index-and-ask.md)).
+* Incremental on `content_hash + embedding_model`; every row keeps its SQLite `source_ref`, project, timestamp, trust status and embedding-input degradation mode.
+* `omni ask` runs retrieval-only, or has local Ollama generate an answer carrying `[S1]` citations.
+* **Related History and work sessions**: derived by project + inactivity gap, adding no tables and rewriting no source events ([ADR-006](docs/ADR-006-derived-context-sessions-and-related-history.md)).
+* **Boundary**: similarity is not proof of source truth or coverage; a session span is the first-to-last event delta, not real working time or focus quality.
 
-### 10. 🔗 Related History and Derived Work Sessions (P3-4 / P3-5 Alpha)
-* `Recent Work Sessions` derives project-scoped clusters from AI turns, Git commits, and file events using a configurable inactivity gap. It is a read-only view and adds no new session table.
-* `Related History` searches the local semantic index from the dashboard or CLI, returns traceable source references and trust status, and does not persist the query.
-* Session grouping is not actual work time, focus, or productivity. Similarity is not proof that work is duplicated, correct, or reusable.
+### 6. 📚 DeskRAG Local Knowledge Base & Document Chat
 
-### 11. 🧩 Proposal-only Secretary (P5-1 Alpha + P5-R1 LLM notes)
-* The first Alpha derives traceable next-step suggestions from local Project State, actionable Open Loops, and non-sensitive Extension diagnostics.
-* The rule engine never persists proposals, modifies files, executes commands, or exposes an approval action. See [ADR-007](docs/ADR-007-proposal-only-secretary.md) for the safety contract and [ADR-008](docs/ADR-008-gated-agent-executor.md) for the executor-restart contract.
-* **P5-R1 LLM advisory notes (optional, off by default)**: when enabled, an LLM (local Ollama by default; cloud is an explicit opt-in) adds one advisory note per existing suggestion plus a daily summary — annotate-only, it can never add, remove, or execute anything, and any LLM failure falls back to the pure rule output.
-* **P5-R2 Gated Executor (optional, off by default)**: with per-item user approval the secretary can carry out whitelisted actions (generate a Handoff, `git fetch`, mark a stale open loop) — the execute API accepts only a proposal_id, actions come from server-side templates with no shell involved, a dedicated execution token is required, every run leaves an audit receipt, and proposals whose evidence changed expire automatically.
-* **P5-R3 L2 dispatcher (optional, separate switch, off by default)**: behind three gates (token + per-item approval + one-time 6-digit confirm code) and a per-template cooldown, the secretary dispatches **your locally signed-in Claude Code / Codex CLI** to draft a restart plan for a stalled item; subprocesses run as argv lists with no shell, cwd is restricted to that project's repo, the environment is rebuilt from a location-only allowlist (no API key is ever forwarded), timeouts kill the process, and running jobs are cancellable.
-* **L2 write mode (third switch, off by default; ADR-008 addendum)**: two-phase approval — you read the drafted plan first, then the CLI edits files following that exact plan; the worktree must be clean, the agent **never commits or pushes**, and changes stay in the worktree for `git diff` review (`git checkout .` reverts everything).
-* **P5-R4a morning briefing**: the 08:30 desktop toast and the `OMNICONTEXT_TODAY` daily entry file now carry the top secretary suggestions with the optional LLM summary (read-only; failures never block the briefing). All switches live in the dashboard settings tab — no YAML editing required.
-* **Two-tier incremental summaries**: each periodic checkpoint compresses its window into a ≤100-char micro-summary via local Ollama (zero API cost); the nightly report reads the micro-summary timeline and falls back to raw excerpts only for uncovered windows — cloud token usage drops by roughly an order of magnitude.
-* The localhost smoke produced two suggestions with three evidence references, blocked a hostile Origin with 403, and passed desktop plus 494px responsive rendering. This receipt does not authorize an executor.
-* **Secretary memory (2026-09-02, [ADR-012](docs/ADR-012-secretary-memory.md))**: the secretary now has a fixed "brain" — type "remember: …", "/pref mute repo_needs_push" or "/decision @project …" in the chat box to write a local note without calling the LLM; the morning pack leaves deletable observations; every question is answered with today's status, the top three proposals and your notes injected (capped, receipted, inspectable), proposal cards honour preferences and show the latest decision for that project; handoffs, sync reports, STATUS drafts and period summaries can be folded into the knowledge base in one click.
-* **The secretary on your phone (2026-09-03, [ADR-013](docs/ADR-013-telegram-secretary-chat.md), off by default)**: the dashboard stays loopback-only, so the phone channel is Telegram — type in the bound chat to ask (same pipeline as the dashboard chat box; replies carry citation filenames and a "memory: N notes" line), "remember: …" / "/pref …" write straight to memory without calling the LLM, and `/today` `/notes` `/status` `/proposals` are commands. Approvals stay limited to whitelisted L0/L1 actions on an unlocked channel, and `/disarm` locks it from anywhere. **Boundary**: this is the only channel that sends your questions and the answers off the machine (content passes through Telegram; citations send filenames only), so it ships off by default.
-* **Pick LINE or Telegram for notifications (2026-09-03, [ADR-014](docs/ADR-014-multi-channel-push-and-arm-code.md), both off by default)**: morning/evening briefings, the daily report and stagnation alerts can go to Telegram, LINE, or both — one message, rendered per platform. **Capability boundary**: the LINE Messaging API has no polling endpoint, so receiving messages would need a public webhook (breaking the 127.0.0.1-only boundary); **LINE is push-only**, while asking, note-taking and button approvals stay on Telegram. `/arm` also moved from the execution token to a dashboard-issued 6-digit code (single use, 5-minute expiry, burned on a wrong guess), so the phone never holds a long-lived secret.
-* **The secretary speaks first (2026-09-04)**: a greeting card at the top of tab 01 tells you what you did today or in the last 2 hours (commits, PRs, AI turns, writing vs. code files, projects moved forward, loops closed) and adds a word of encouragement. Every number traces back to a table; work the collectors did not see is not claimed — email and calendar are out of scope and the card says so. Encouragement is rule-picked and stable for the day; optional LLM polishing is off by default and may not introduce numbers absent from the stats. The same greeting opens the Telegram/LINE morning briefing (falling back to yesterday when the day has not started).
-* **Your calendar, read locally (2026-09-04, [ADR-015](docs/ADR-015-local-calendar-source.md))**: drop an exported or synced `.ics` (Outlook, Google, Apple) into a local folder and add the path under Settings → Sources. The morning briefing gains a “📅 Today's schedule” section, the home tab shows “next: 14:00 project meeting (in 35 min)”, and the greeting card honestly counts meetings. **Read-only, no cloud**: only time, title, location and status are kept; descriptions, attendees and links are never stored. No paths configured means the source is simply off.
+* **One web entry point, isolated index worker**: the dashboard and API stay on `http://127.0.0.1:8765`, while scanning, parsing, embedding, deletion and space maintenance run in a separate local process ([ADR-009](docs/ADR-009-deskrag-worker-index-lifecycle.md)).
+* **Parser hub**: PDF (PyMuPDF, page numbers preserved), Word / PowerPoint / Excel, Markdown and code, WebVTT transcripts, plus virtual chunks synthesized from project state and open loops.
+* **Hybrid retrieval**: FastEmbed (ONNX, `BAAI/bge-small-zh-v1.5`) + ChromaDB vectors, Jieba + BM25Okapi keywords, fused via Hybrid RRF, weighted fusion, vector-only or BM25-only.
+* **Resident retrieval worker**: retrieval runs in a subprocess; the main service **never imports** Chroma / BM25 / embedding libraries (guarded by a clean-interpreter contract test). It warms up in the background and restarts automatically on timeout.
+* **Multi-model chat**: local Ollama or cloud Gemini / Claude / OpenAI, SSE token streaming with citation cards; on Windows a citation opens File Explorer with the file selected.
+* **Controlled lifecycle, honest capacity**: removing a folder index or clearing all indexes requires explicit confirmation and never deletes source files or chat history. Capacity figures come from the worker's latest verification receipt — unverified values display as pending rather than **passing an estimate off as a measurement**.
+* **Space reclamation**: Chroma's `delete_collection` is a logical delete only — dropping an index does not shrink the directory. "Compact Chroma" answers two questions separately: is it logically gone, and did the disk actually shrink? If the internal structure cannot be read, nothing is deleted (fail-closed).
 
-### 12. 📚 DeskRAG Local Knowledge Base & Document Chat (Single-Server Embedded)
-* **Single Server Integration**: Seamlessly integrated into the single OmniContext daemon (`http://127.0.0.1:8765`), eliminating dual-server operational overhead while executing indexing and storage maintenance in background workers.
-* **Curated Local & Cloud Model Dropdowns**:
-  * **Ollama Local Offline**: Dedicated dropdown selection across 4 curated offline models (`llama3.1:8b` default, `mistral:7b`, `gemma4:e4b`, `qwen3:4b`) for 100% private, offline inference.
-  * **Cloud LLMs**: Optional integration with Google Gemini (`gemini-3.7-flash`), Anthropic Claude (`claude-3-5-sonnet`), and OpenAI (`gpt-4o`).
-* **Intelligent Chat Session Lifecycle**:
-  * **Auto-Titling**: First prompt sentence is automatically extracted as the session title (e.g. `💬 OPC UA Time Series Forecasting`), replacing generic titles.
-  * **Seamless Session Switching & History**: Instant recall of past QA histories, cited chunk cards, and metadata.
-  * **Session Management**: One-click new chat creation (`➕ Create New Chat`) and session deletion.
-* **Universal Parser Hub & Activity Indexing**:
-  * **Documents**: High-precision text extraction with page/slide/sheet metadata for PDF (PyMuPDF), Word (`.docx`), PowerPoint (`.pptx`), Excel (`.xlsx`), and source code/markdown text files.
-  * **Project Activity Slices**: Maps local Project States and Open Loops into virtual chunks for unified semantic retrieval across work history and static documents.
-* **Sliding Window Hierarchical Chunker**: Preserves paragraph headers, page numbers, slide titles, and sheet names.
-* **Hybrid Retrieval Engine**: Combines FastEmbed (ONNX, 512-dim `BAAI/bge-small-zh-v1.5`) + ChromaDB vector embeddings with Jieba + BM25Okapi keyword matching using Reciprocal Rank Fusion (RRF), Weighted Fusion, Vector Only, and BM25 Only. Retrieval runs in a **resident worker subprocess** (the main service never loads Chroma/BM25/embedding models; warmed up in the background after start, killed and restarted on timeout).
-* **Multi-LLM SSE Streaming Chat**: Interactive chat with token-level SSE streams and citation source cards (with page/slide/sheet badges).
-* **Native Windows Explorer Reveal**: One-click opening and highlighting of cited source documents in Windows File Explorer.
+### 7. 🧩 Proactive Secretary: Propose → Approve → Act
+
+* **Proposal-only core**: project state, actionable open loops and diagnostics become next-step proposals **with evidence refs**. The rule engine writes no event data and executes no commands ([ADR-007](docs/ADR-007-proposal-only-secretary.md)).
+* **LLM advisory notes (optional, off by default)**: the LLM may only annotate existing proposals — it **cannot add, remove or execute** anything, and falls back to pure rules when unavailable.
+* **Tiered executor L0 / L1 / L2 (three independent switches, all off by default)** ([ADR-008](docs/ADR-008-gated-agent-executor.md)):
+  * **L0 / L1**: per-item approval for allowlisted actions (generate a handoff, `git fetch`, fast-forward pull, mark stale). The execute API accepts only a `proposal_id`; the action is chosen by a server-side allowlisted template, no shell is opened, a separate execution token is required, and every run leaves an audit receipt.
+  * **L2 local agent CLI dispatch**: behind three gates (token + single-click approval + a one-time 6-digit confirm code) plus a cooldown, it dispatches **your own already-signed-in** Claude Code / Codex CLI to draft an action plan. Subprocess argv is allowlisted with no shell, cwd is confined to that project, the environment is rebuilt from an allowlist (**no API key is ever forwarded**), timeouts kill the process, and runs are cancellable.
+  * **L2 write mode**: two-stage approval — you read the drafted plan first, then let the CLI modify files according to **that exact plan text**. The worktree must be clean before dispatch, it **never commits or pushes**, and changes are left for your `git diff` review.
+* **Schedulable L0 tasks**: morning pack, daily digest, sync report, weekly/monthly rollups, weekly review, meeting notes and other **read-only** templates can be scheduled. **L1/L2 can never be scheduled** — enforced at module load and covered by an allowlist test.
+* **Docs-behind-code detection**: compares a doc file's last modification against commits since, turning "the docs are stale" into an actionable card ([ADR-021](docs/ADR-021-docs-behind-code.md)). Repositories with no doc baseline are never mentioned.
+
+### 8. 💬 Personalization: It Remembers, and It Does What You Declared
+
+* **Memory ("the brain")** ([ADR-012](docs/ADR-012-secretary-memory.md)): typing "remember: …", "preference: don't remind me about repo_needs_push" or "decision @project: …" writes local notes. Every question injects today's state, the top three proposals and your notes (bounded in size, with a receipt, inspectable), and secretary observations can be deleted with one click.
+* **Daily digest**: the L0 `daily_digest` template reduces each day's activity into a work log plus per-project observations — **collected ≠ known**. For the secretary to remember something, it has to land in `secretary_notes`.
+* **Pattern-aware proposals** ([ADR-017](docs/ADR-017-pattern-aware-proposals.md)): a (project × day) activity matrix surfaces "you worked N days this week but have no daily schedule" and "X has been neglected", and weights your main line of work. **Only completed days are counted.**
+* **Declared profile** ([ADR-018](docs/ADR-018-declared-profile.md)): "preference: priority: <project>" and "preference: tone: concise" — **what you said, not what was inferred**. Declared weight outranks inferred weight; tone changes wording only, never numbers.
+* **Secretary desk (01 is the home page)** ([ADR-019](docs/ADR-019-secretary-desk-home.md)): deterministic rules pick one focus card and one "remember" item. The tool's own reminders (e.g. extension heartbeat) never take the focus slot; the full list is demoted to detail.
+* **Weekly review — said vs. done** ([ADR-020](docs/ADR-020-weekly-review-said-vs-done.md)): places "you said X is the priority" next to "X moved on 1 day last week". **Two facts side by side are the insight — no speculation about why.**
+* **Greeting card**: the top of tab 01 says what you did today and adds one line of encouragement. Every number traces back to a table; anything not collected (e.g. email) is stated as such on the card. LLM polish is off by default and **may not introduce a number absent from the statistics** — violations fall back to the rule-based version.
+
+### 9. 📅 Calendar & Meeting Secretary
+
+* **Local calendar (read-only .ics)** ([ADR-015](docs/ADR-015-local-calendar-source.md)): drop an Outlook / Google / Apple export or sync folder in place. The morning briefing gains a "today's agenda" section and the home page a "next up at 14:00 …" line. **Only start/end time, title, location and status are read** — descriptions, attendees and links never land on disk. **No cloud API is contacted.** No path configured means disabled.
+* **Meeting secretary (layer 1: post-meeting transcripts)** ([ADR-022](docs/ADR-022-meeting-secretary.md)): put transcripts exported from Teams (or similar) in one folder and `meeting_notes` produces a summary plus **candidate** follow-ups, time-matched to that day's calendar event.
+  * "You're in a meeting" uses **two deterministic signals only**: an in-progress calendar event, and the foreground window being a meeting app (application name only).
+  * **Summaries default to a local provider (`ollama`)**. Choosing a cloud provider means sending other participants' words to that vendor — the settings page and the card both say so plainly. Prompt and response text is never persisted.
+  * **A candidate follow-up becomes an open loop only when you click it** — unclicked ones appear in no count.
+  * **Deliberately not done**: recording audio, reading meeting-app window contents, calling Teams/Graph APIs, auto-downloading transcripts. **Live captioning / translation is layer 2** and requires its own ADR plus the five gates in ADR-022 D6.
+
+### 10. 🔔 Notifications: Desktop, Telegram, LINE & Daily Entry File
+
+* **Native Windows desktop notifications**: WinRT Toast called directly — **no package to install, no account to register**. Morning briefing, evening recap, stalled-project alerts; `--dry-run` previews the content.
+* **Daily entry brief**: `OMNICONTEXT_TODAY.md` / `.html` written to a folder you open every day; the HTML version refreshes every 5 minutes and works as a browser home page.
+* **Multi-channel push** ([ADR-014](docs/ADR-014-multi-channel-push-and-arm-code.md), all off by default): one payload, rendered per platform. **Capability boundary**: the LINE Messaging API has no polling interface, and receiving messages would need a public webhook (breaking the "127.0.0.1 only" boundary), so **LINE is push-only**.
+* **Secretary on your phone (Telegram, off by default)** ([ADR-013](docs/ADR-013-telegram-secretary-chat.md)): typing in the bound chat asks a question through the same pipeline as the dashboard; `/today` `/notes` `/status` `/proposals` are commands, and L0/L1 can be approved inline. **Boundary**: this is the only channel that sends questions and answers off your machine, which is why it ships disabled.
+* **One-time unlock code**: `/arm` uses a dashboard-issued 6-digit short-lived code (single use, 5-minute expiry, burned on a wrong guess) so the phone never holds a long-lived secret. `/disarm` always works.
+
+### 11. ⚡ Synthesis Engine: Custom Ranges & Two-Tier Incremental Summaries
+
+* **Arbitrary date ranges** from the web UI, or the `Today` / `Yesterday` / `This week` / `Last 7 days` / `Last 30 days` shortcuts.
+* **Two-tier (map-reduce) daily report**: after each periodic checkpoint, local Ollama compresses that window into a ≤100-character micro-summary (zero API cost); the daily report reads the micro-summary timeline plus raw fallback for gaps — roughly an order of magnitude less cloud token usage, with automatic fallback to raw excerpts when Ollama is unavailable, so **the report always gets produced**.
+* **Multiple providers**: local Ollama by default; Google Gemini, Anthropic Claude and OpenAI also supported. `python main.py llm-test` diagnoses provider connectivity.
+* **Open-loop extraction**: summaries distill unresolved items into the open-loop list for check-off.
+
+### 12. ✅ Acceptance Center: Which Receipts Are Still Missing
+
+* Turns every completion criterion in [docs/TODO.md](docs/TODO.md) section A into a **re-runnable read-only query** ([ADR-016](docs/ADR-016-acceptance-center.md)): `python main.py verify`, or "06 Settings → Acceptance Center".
+* **Read-only**: it performs no acceptance action for you, runs no git, contacts no network.
+* Its vocabulary strictly separates "**did not happen**" from "**cannot be observed**"; a human sign-off never overrides a machine verdict; values that exist only in memory (e.g. retrieval worker state) are marked `runtime_only` rather than falsely reported as "not done".
+
+### 13. 🌐 Interface: Bilingual × Light/Dark × Accent
+
+* One-click `🌐 English` / `🌐 繁體中文` in the top bar.
+* Appearance is two independent axes: `data-theme` (dark/light) × `data-accent` (Naruto orange / forest green / ocean blue) — six combinations.
+* Preferences live in browser `localStorage` only — **never written to `config.yaml`, never sent to the backend**.
 
 ---
 
 ## 🚀 Getting Started
 
-### 1. Prerequisites & Installation
+Requires **Python 3.10+**.
 
-Requires **Python 3.10+**
-
-```bash
+```console
 # Clone the repository
 git clone https://github.com/dofliu/activityTracker.git
 cd activityTracker
@@ -170,154 +161,91 @@ cd activityTracker
 # Source checkout / development mode
 python -m pip install -e ".[dev]"
 
-# Create local config, directories, and a browser ingest token
+# Create local config, directories and a browser ingest token
 python main.py init --watch "/your/project/root"
+
+# Launch the dashboard and background collectors
+python main.py
 ```
 
-For a locally built Alpha wheel:
+Then open **[http://127.0.0.1:8765](http://127.0.0.1:8765)**.
 
-```bash
+Using a prebuilt alpha wheel:
+
+```console
 python -m pip install omnicontext-1.3.0a5-py3-none-any.whl
 omnicontext init --watch "/your/project/root"
 omnicontext assets-status
 ```
 
-The wheel is not publicly released. Installed wheels keep config, database, and reports under the writable `~/OmniContext` by default rather than `site-packages`; `OMNICONTEXT_HOME` and `OMNICONTEXT_CONFIG` can override this.
+An installed wheel keeps config, database and reports under the user-writable `~/OmniContext` rather than `site-packages`; override with `OMNICONTEXT_HOME` or `OMNICONTEXT_CONFIG`.
 
-### 2. Configure LLM API Keys
+### LLM API Keys (optional)
 
-The release template uses local Ollama. If you explicitly select Gemini, Anthropic, or OpenAI, set the relevant environment variable and provider in `config.yaml`:
+Everything defaults to local Ollama. To use a cloud provider, store the key in an **OS environment variable** — `config.yaml` only records the `api_key_env` variable *name*, never the key itself:
 
-```bash
-# Windows PowerShell
-$env:GEMINI_API_KEY="your-gemini-api-key"
-
-# Or if using Anthropic / OpenAI
-$env:ANTHROPIC_API_KEY="your-anthropic-api-key"
-$env:OPENAI_API_KEY="your-openai-api-key"
+```powershell
+[Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "your-gemini-api-key", "User")
 ```
 
-### 3. Launch Dashboard & Collectors
+On Windows the backend re-reads the User/Machine environment even when the OmniContext parent process started earlier; press "Re-check" under Settings → Summary & LLM.
 
-```bash
-python main.py
-```
-
-Open your browser and navigate to: **[http://127.0.0.1:8765](http://127.0.0.1:8765)**
-
-For Extension pairing, milestone configuration, backups, and troubleshooting, see **[docs/USAGE.md](docs/USAGE.md)**.
+> **Extension pairing, milestone configuration, backup and troubleshooting: see [docs/USAGE.md](docs/USAGE.md).**
 
 ---
 
-## 💻 CLI Command Reference
+## 💻 CLI Reference
 
-| Command | Description | Example |
-| :--- | :--- | :--- |
-| `python main.py` | Start Web dashboard and background collectors | `python main.py` |
-| `python main.py init` | Create/update portable config and browser ingest token | `python main.py init --watch D:/Projects` |
-| `python main.py now` | Instant 1-second view of active projects, last 5 events, and open loops | `python main.py now` |
-| `python main.py summary` | Synthesize AI daily or range review | `python main.py summary --start 2026-08-20 --end 2026-08-23` |
-| `python main.py github status` | Inspect GitHub connection status, repo count, and rate limits | `python main.py github status` |
-| `python main.py github sync` | Trigger immediate synchronization of GitHub repos and PRs | `python main.py github sync` |
-| `python main.py checkpoint` | Manually generate a Markdown activity checkpoint log | `python main.py checkpoint --hours 2` |
-| `python main.py notify` | Trigger Telegram report or briefing push | `python main.py notify summary` |
-| `python main.py status` | View database metrics and collector states | `python main.py status` |
-| `python main.py backup` | Create and verify an SQLite online backup | `python main.py backup` |
-| `python main.py restore-drill` | Restore a backup into an isolated temporary DB without replacing the live DB | `python main.py restore-drill` |
-| `python main.py migration-status` | Read current/latest schema versions, pending steps, and compatibility | `python main.py migration-status` |
-| `python main.py assets-status` | Verify packaged config/Web/Extension assets | `python main.py assets-status` |
-| `python main.py extension-path` | Print the Chrome/Edge Load unpacked directory | `python main.py extension-path` |
-| `python main.py index` | Build or incrementally update the local semantic index | `python main.py index --json` |
-| `python main.py ask` | Ask cross-AI/repository history with traceable sources | `python main.py ask "How did rollback work?" --project activityTracker` |
-| `python main.py sessions` | Derive recent project work sessions from existing observations | `python main.py sessions --project activityTracker --hours 24` |
-| `python main.py recall` | Find related local history without storing the query | `python main.py recall "rollback rehearsal" --project activityTracker` |
-| `python main.py maintain` | Run SQLite health maintenance (Checkpoint, prune, backup, rotate) | `python main.py maintain --retention-days 90` |
-| `python main.py heal` | Supervise and auto-restart degraded or dead collector workers | `python main.py heal` |
-| `python main.py wal-checkpoint` | Manually checkpoint and truncate the SQLite WAL log | `python main.py wal-checkpoint --mode TRUNCATE` |
-| `python main.py verify` | Acceptance center: check the local receipts for every item in `docs/TODO.md` section A (read-only; runs nothing) | `python main.py verify --item A1 --json` |
+With an installed wheel, replace `python main.py` with `omnicontext` or the shorter `omni`.
 
-With an installed wheel, replace `python main.py` with `omnicontext` or `omni`.
+| Command | Description |
+| :--- | :--- |
+| `python main.py` / `run` / `web` | Start the web dashboard and background collectors |
+| `init` | Create/update cross-platform config and the extension token (`--show-token`) |
+| `now` | One-second view of active projects, recent activity and open loops |
+| `resume` | Produce a project Context Handoff (`--copy` to clipboard) |
+| `summary` | Generate an AI daily report (custom ranges, force refresh) |
+| `checkpoint` | Snapshot the recent window into a Markdown log |
+| `brief` | Write the daily brief to the daily entry directory |
+| `notify` | Trigger a notification (`--dry-run`, `--channel`) |
+| `status` | Database metrics and collector runtime state |
+| `github status` / `github sync` | Inspect or sync GitHub repositories and PRs |
+| `index` / `ask` | Build the local semantic index / query your history with sources |
+| `sessions` / `recall` | Derived work sessions / similar history (query is never stored) |
+| `open-loop` / `open-loop-reconcile` | Review open-loop lifecycle / backfill fingerprints and merge duplicates |
+| `verify` | **Acceptance center**: check local receipts for TODO section A (read-only) |
+| `llm-test` | Diagnose LLM provider connectivity and configuration |
+| `backup` / `restore-drill` | Create and verify a backup / validate it in an isolated DB (live DB untouched) |
+| `migration-status` | Read-only schema version and compatibility check |
+| `maintain` / `heal` / `wal-checkpoint` | Lifecycle maintenance / collector self-healing / WAL truncation |
+| `assets-status` / `extension-path` | Verify packaged assets / print the extension "Load unpacked" directory |
+| `clear-demo` | Remove demo data and historical noise |
 
 ---
 
-## ⚙️ Configuration (`config.yaml`)
+## ⚙️ Configuration
 
-```yaml
-server:
-  port: 8765
-  host: "127.0.0.1"
+`main.py init` generates a local `config.yaml` from **[config.example.yaml](config.example.yaml)**, which is the **single authoritative list of settings** — every block carries inline comments describing its boundary, so they are not duplicated here. Most settings are editable with hot reload under dashboard "06 Settings".
 
-security:
-  allowed_origins:
-    - "http://127.0.0.1:8765"
-    - "http://localhost:8765"
-  allow_remote_clients: false
-  browser_extension_ingest_token_env: "OMNICONTEXT_INGEST_TOKEN"
+A first install usually only needs these:
 
-data_lifecycle:
-  backups_dir: "~/OmniContext/backups"
-  backup_retention_days: 30
-  auto_backup_on_start: false
+| Setting | Purpose |
+| :--- | :--- |
+| `project_resolution.search_roots` | Your project roots (drives resolution — **set this explicitly**) |
+| `watchers.file_watcher.watch_directories` / `extensions` | Folders and file extensions to monitor |
+| `watchers.git_watcher.repositories` | Git roots to scan recursively |
+| `synthesizer.provider` | Summary provider (defaults to `ollama`, fully local) |
+| `integrations.github.token` | Leave empty to use the local `gh auth token` |
 
-project_resolution:
-  # Add your project roots; ~ and environment variables are supported.
-  search_roots:
-    - "~/Projects"
-  # Optional; blank derives the OmniContext project path from its installation.
-  self_project_path: ""
-
-watchers:
-  file_watcher:
-    enabled: true
-    watch_directories:
-      - "~/Projects"
-      - "~/Documents/Research"
-    extensions: [".tex", ".docx", ".md", ".pdf", ".py"]
-  
-  git_watcher:
-    enabled: true
-    repositories:
-      - "~/Projects"
-  
-  agent_log_watcher:
-    enabled: true
-    claude_code: true
-    codex: true
-    antigravity: true
-
-  browser:
-    gemini: true
-    chatgpt: true
-    claude_web: true
-
-synthesizer:
-  provider: "ollama"
-  gemini:
-    model: "gemini-3.7-flash"
-  schedule:
-    enabled: false
-    time: "23:30"
-  periodic_checkpoint:
-    enabled: true
-    interval_hours: 2
-
-integrations:
-  github:
-    enabled: true
-    token: ""  # When blank, automatically uses local gh auth token
-```
+**Every dangerous capability is off by default**: the secretary executor, L2, L2 write mode, custom scheduling, Telegram chat, `allow_remote_arm`, LINE and greeting-card LLM polish. Calendar and meeting secretary are enabled but inert until a path is configured.
 
 ---
 
-## 🧩 Installing the Chrome Extension
+## 🧩 Chrome Extension
 
-1. Open Chrome or Edge and navigate to `chrome://extensions/`.
-2. Toggle on **Developer mode** in the top right.
-3. Click **Load unpacked**.
-4. Run `python main.py extension-path` (or `omnicontext extension-path` for a wheel) and select the printed directory.
-5. Run `python main.py init --show-token`, then paste the token into the extension popup and save it.
-6. Only supported-site events carrying a valid token can write to the local ingestion endpoint.
-7. After the popup reports a verified pairing, open `http://127.0.0.1:8765/extension-monitor` to inspect observed browser events.
+`python main.py extension-path` prints the "Load unpacked" directory; `python main.py init --show-token` yields the ingest token to paste into the popup. Only events from supported sites carrying a valid token may write to the local `/api/v1/events/ai`.
+
+After pairing, `http://127.0.0.1:8765/extension-monitor` shows per-site observed state. **Full steps and the live verification flow: [docs/USAGE.md §3](docs/USAGE.md).**
 
 ---
 
@@ -325,106 +253,116 @@ integrations:
 
 ```text
 activityTracker/
-├── config.yaml                     # System configuration with hot reload (created from config.example.yaml)
-├── main.py                         # Main entry point and CLI dispatcher
-├── pyproject.toml                  # Packaging, CLI entry point, and pytest config
-├── MANIFEST.in                     # sdist assets and privacy exclusions
-├── requirements.txt                # Python package dependencies
-├── README.md / README_en.md        # Traditional Chinese / English documentation
-├── ROADMAP.md / STATUS.yaml        # Development record and machine-readable status snapshot
+├── main.py                     # Entry point and CLI dispatch
+├── config.example.yaml         # Config template (init generates config.yaml from it)
+├── pyproject.toml              # Packaging, CLI entry points, pytest settings
+├── README.md / README_en.md    # Traditional Chinese / English documentation
+├── ROADMAP.md / STATUS.yaml    # Plan and results / machine-readable status snapshot
 │
-├── docs/                           # 📚 Documentation (start at docs/INDEX.md)
-│   ├── INDEX.md                    # Documentation index and reading map
-│   ├── USAGE.md                    # User guide: setup, pairing, daily operation, backups, troubleshooting
-│   ├── PRODUCT_POSITIONING.md      # Product positioning and evidence boundaries
-│   ├── TEST_STRATEGY.md / RELEASE_CHECKLIST.md
-│   ├── ADR-001 ~ ADR-011           # Architecture decision records
-│   └── archive/                    # Archived one-off plans and completion reports
+├── docs/                       # 📚 Documentation (start at docs/INDEX.md)
+│   ├── USAGE.md                # User guide
+│   ├── TODO.md                 # Backlog with completion criteria
+│   ├── NEXT_SESSION.md         # Developer handoff guide
+│   ├── ADR-001 ~ ADR-022       # Architecture decision records
+│   └── archive/                # Archived one-off plans and completion reports
 │
-├── core/                           # Core service modules
-│   ├── server.py                   # FastAPI REST API & static file server
-│   ├── manager.py                  # Collector orchestration and supervise_and_heal self-healing
-│   ├── database.py / migrations.py # SQLite sessions and append-only schema migration
-│   ├── models.py                   # SQLAlchemy models (Events, Projects, PRs, RAG)
-│   ├── security.py / secret_resolver.py  # Origin boundary, secret redaction, key resolution
-│   ├── data_lifecycle.py           # Online backup, WAL checkpoint, history pruning, receipts
-│   ├── project_engine.py / project_paths.py  # Canonical project resolver and root resolution
-│   ├── semantic_index.py           # Local embeddings, provenance retrieval, and omni ask
-│   ├── context_memory.py           # Derived work sessions and related-history retrieval
-│   ├── handoff_engine.py           # Provider-neutral Context Handoff generator
-│   ├── proactive_secretary.py      # Proposal-only secretary (ADR-007)
-│   ├── repo_sync.py                # Safe local Git sync center (ADR-011)
-│   ├── background_tasks.py         # Verified background agent task time (ADR-010)
-│   ├── usage_analytics.py / capture_coverage.py  # Usage statistics and coverage signals
-│   ├── extension_monitor.py / extension_verification.py  # Extension diagnostics and live verification
-│   ├── triage_signals.py           # Cross-project triage signals (GitHub PRs/issues)
-│   ├── platform_services.py        # Cross-platform argv-based OS integration
-│   └── runtime_paths.py / fs_utils.py / time_utils.py  # Runtime paths, explorer, timezone helpers
+├── core/                       # Core services
+│   ├── server.py               # FastAPI REST API and static server
+│   ├── manager.py              # Collector supervision and supervise_and_heal
+│   ├── database.py / migrations.py / models.py   # SQLite and append-only migrations
+│   ├── security.py / secret_resolver.py          # Origin boundary and secret resolution
+│   ├── data_lifecycle.py       # Online backup, WAL checkpoint, pruning, integrity receipts
+│   ├── project_engine.py / project_paths.py      # Project resolution and root detection
+│   ├── semantic_index.py / context_memory.py     # Local embeddings and related history
+│   ├── handoff_engine.py       # Provider-neutral context handoff
+│   ├── proactive_secretary.py / secretary_advisor.py   # Proposal engine and LLM advisory
+│   ├── agent_executor.py / agent_dispatch.py / scheduled_tasks.py  # L0/L1/L2 and scheduling
+│   ├── secretary_memory.py / secretary_profile.py      # Memory and declared profile
+│   ├── secretary_home.py / secretary_greeting.py / secretary_packs.py  # Desk / greeting / packs
+│   ├── activity_digest.py / activity_patterns.py / weekly_review.py    # Digest / patterns / review
+│   ├── meeting_transcripts.py  # Meeting secretary (WebVTT, pairing, fact gate, follow-ups)
+│   ├── docs_freshness.py       # Docs-behind-code detection
+│   ├── ics_parser.py / calendar_agenda.py        # Local read-only .ics calendar
+│   ├── repo_sync.py / repo_onboarding.py / repo_sync_report.py  # Git sync center
+│   ├── acceptance.py           # Acceptance center (executable copy of TODO section A)
+│   ├── usage_analytics.py / capture_coverage.py / coverage_ledger.py
+│   ├── background_tasks.py / triage_signals.py / status_draft.py
+│   └── platform_services.py / runtime_paths.py / fs_utils.py / time_utils.py
 │
-├── rag/                            # 📚 DeskRAG local knowledge-base subsystem
-│   ├── router.py                   # /api/v1/rag/* REST API and SSE streaming chat
-│   ├── scanner.py / index_worker.py / jobs.py / lifecycle.py  # Controlled index worker lifecycle
-│   ├── parsers/                    # PDF / Office / text / image Parser Hub
-│   ├── chunker.py                  # Sliding-window hierarchical chunker
-│   ├── embeddings.py / vector_store.py  # FastEmbed (ONNX) + ChromaDB vector store
-│   ├── retriever.py / retrieval/   # Jieba+BM25 and Hybrid RRF / Weighted Fusion retrievers
-│   ├── activity_indexer.py         # Project State and Open Loop virtual chunks
-│   └── llm_gateway.py              # Ollama / Gemini / Claude / OpenAI gateway
+├── rag/                        # 📚 DeskRAG subsystem
+│   ├── router.py               # /api/v1/rag/* REST API and SSE streaming chat
+│   ├── scanner.py / index_worker.py / jobs.py / lifecycle.py   # Controlled index worker
+│   ├── retrieval_worker.py / retrieval_client.py               # Resident retrieval worker
+│   ├── parsers/ chunker.py embeddings.py vector_store.py retriever.py
+│   ├── storage.py              # Capacity reporting and Chroma space reclamation
+│   ├── activity_indexer.py     # Project state and open-loop virtual chunks
+│   └── llm_gateway.py          # Ollama / Gemini / Claude / OpenAI gateway
 │
-├── integrations/                   # External integrations
-│   └── github_client.py            # GitHub API client (Repos, PRs, CI, Reviews)
+├── watchers/                   # Collectors
+│   ├── file_watcher.py git_watcher.py window_watcher.py
+│   ├── agent_log_watcher.py    # Claude Code/Desktop, Codex, Antigravity
+│   ├── calendar_watcher.py     # Local .ics
+│   └── browser_extension/      # Chrome MV3 extension
 │
-├── watchers/                       # Data collection watchers
-│   ├── file_watcher.py             # Watchdog file activity tracker with word counts
-│   ├── git_watcher.py              # Recursive Git scanner with per-repo fault isolation
-│   ├── window_watcher.py           # Active window focus & time tracker
-│   ├── agent_log_watcher.py        # Claude Code/Desktop, Codex, Antigravity log parser
-│   └── browser_extension/          # Chrome MV3 extension (ChatGPT/Gemini/Claude)
+├── synthesizer/                # Synthesis and scheduling
+│   ├── aggregator.py prompt_templates.py llm_client.py scheduler.py
+│   └── micro_summarizer.py / rollup.py    # Two-tier micro-summaries, weekly/monthly rollups
 │
-├── synthesizer/                    # AI synthesis & scheduling engine
-│   ├── aggregator.py               # Multi-day range event aggregation pipeline
-│   ├── prompt_templates.py         # Structured prompt templates
-│   ├── llm_client.py               # Multi-provider LLM client (Gemini/Claude/GPT/Ollama)
-│   └── scheduler.py                # Daily synthesis & periodic checkpoint timer
+├── notifiers/                  # Notification channels
+│   ├── messages.py / channels.py          # Content/presentation split, adapter capabilities
+│   ├── desktop_notifier.py                # Windows WinRT Toast (zero dependency)
+│   ├── telegram_notifier.py / telegram_chat.py / telegram_approvals.py / telegram_setup.py
+│   └── line_setup.py / secretary_push.py
+├── integrations/github_client.py          # GitHub API client
+├── exporters/daily_brief.py               # OMNICONTEXT_TODAY.md/.html
 │
-├── notifiers/                      # Notification modules
-│   ├── desktop_notifier.py         # Windows WinRT Toast desktop notifications (zero-dependency)
-│   └── telegram_notifier.py        # Telegram bot for briefings & stagnation alerts (optional)
-├── exporters/
-│   └── daily_brief.py              # OMNICONTEXT_TODAY.md/.html daily entry brief
+├── web/                        # Dashboard frontend (6 tabs + extension-monitor)
+│   └── index.html / app.js / style.css
 │
-├── web/                            # Web UI Dashboard (tabs 01–07 + extension-monitor)
-│   ├── index.html / app.js / style.css  # Layout, i18n controller, dark-orange theme
-│   └── extension-monitor.html      # Browser Extension advanced diagnostics page
-│
-├── scripts/                        # Automation, verification, and maintenance scripts
-├── tests/                          # 31 contract test modules (security/data/RAG/sync/lifecycle)
-│
-├── logs/checkpoints/               # Periodic activity checkpoint logs
-└── reports/                        # Daily & range Markdown reports
+├── scripts/                    # Verification, cleanup, autostart and E2E scripts
+├── tests/                      # 62 contract test modules (626 tests)
+├── logs/checkpoints/           # Periodic activity snapshots
+└── reports/                    # Daily / range Markdown reports
 ```
 
 ---
 
-## 🗺️ Roadmap & Status
+## 🗺️ What Makes This Different
 
-Development is tracked in [ROADMAP.md](ROADMAP.md) (Traditional Chinese, phases P0–P8) with a machine-readable snapshot in [STATUS.yaml](STATUS.yaml). As of 2026-08-30: the P0–P2 daily-usable core, P3 memory layer (Alpha), P4.2 safe local Git sync, P5-1 proposal-only secretary (Alpha), P7 DeskRAG knowledge base, and P8 self-healing/maintenance hub are complete. The next milestone is P4.3 Repo Onboarding/Reconciliation, and the project is **not yet release-ready** — see `known_blockers` in STATUS.yaml for what remains (Extension live PASS receipt, coverage ledger, publish/tag).
+Comparable tools (ActivityWatch, RescueTime, Timing) track **time**; Rewind and Screenpipe record the screen and OCR it, at a high privacy and resource cost.
+
+**No mainstream tool currently reads local AI agent transcripts.** `~/.claude/projects/`, `~/.codex/sessions/` and `.gemini/antigravity/brain/` are already on disk — no screen recording, no extra permissions — and what they contain is the actual reasoning: what was asked, how the AI answered, what was decided.
+
+Going from *log* to *memory* is the through-line of this project: the point now is not to collect more, but to make what exists **retrievable and usable by the secretary**.
+
+> More collection is not more useful: file events went from 3,575 noisy rows → 4,327 → down to 789.
+> **Every new collection source must first pass the "can this change a decision?" test.**
+
+Full phase plan, measured comparisons and the results log: **[ROADMAP.md](ROADMAP.md)**; next-stage direction and trade-offs in §12.
+
+### Current Operating Assumptions
+
+This is a **personal-first** project at this stage:
+
+* Window capture, desktop notifications and startup scheduling are **Windows-only**; everything else is cross-platform (CI covers Windows / Ubuntu / macOS).
+* `project_resolution.search_roots` falls back to the file/Git watcher roots when unset, so a first install should still set it explicitly.
+* PyPI publishing is out of scope; releases are GitHub pre-releases only (wheel/sdist + SHA-256 receipt).
 
 ---
 
 ## 🔒 Privacy & Security
 
-* **Local event storage**: Events are stored in local SQLite (`omni_context.db`) without third-party analytics telemetry.
-* **LLM boundary**: Selecting Gemini, Anthropic, or OpenAI sends the assembled work context to that provider. Ollama keeps synthesis local.
-* **Local API boundary**: Loopback-only access, an exact Origin allowlist, secret redaction, and a browser-extension ingest token are enabled by default.
-* **Trust contract**: Canonical AI events carry a stable turn key, source provenance, and response status; partial/legacy responses are not treated as conclusions.
-* **Backup lifecycle**: `python main.py backup` uses SQLite's Online Backup API and emits integrity/SHA-256 evidence. `python main.py restore-drill` verifies schema and row counts in an isolated temporary DB and saves a JSON receipt without replacing the live DB. Windows wheel upgrade smoke has passed; automatic pruning and a formal production rollback rehearsal remain incomplete.
-* **Schema migration**: An append-only registry records version/name/checksum. Existing databases receive a verified backup before upgrade; checksum mismatches and unknown newer versions fail closed.
-* **Artifact boundary**: Wheel/sdist content receipts verify required assets and reject `config.yaml`, SQLite databases, and local secrets.
-* **Git protection**: Database files, API keys, and personal Markdown reports are ignored by default to reduce accidental commits.
+* **Events stay local**: activity events live in a local SQLite database (`omni_context.db`) with no third-party analytics telemetry.
+* **LLM data boundary**: choosing Gemini / Anthropic / OpenAI for synthesis sends the assembled work context to that provider; **only Ollama is fully local inference**. The meeting-transcript summary provider is configured separately and defaults to `ollama`.
+* **Local API**: deny-by-default origin boundary, loopback-only default, sensitive-setting redaction and a browser-extension ingestion capability ([ADR-001](docs/ADR-001-p2-5-trust-boundary.md)).
+* **Data trust**: a canonical AI event must carry `turn_key`, source provenance and `response_status`; partial/legacy responses never become a summary or handoff conclusion.
+* **Backup lifecycle**: `backup` uses the SQLite Online Backup API and emits integrity / SHA-256; `restore-drill` validates schema and row counts in an isolated temporary DB and **never overwrites the live DB**.
+* **Schema migration**: an append-only registry records version/name/checksum and takes a verified backup before upgrading; checksum mismatch or an unknown newer version **fails closed** ([ADR-003](docs/ADR-003-versioned-sqlite-migrations.md)).
+* **Artifact boundary**: the wheel/sdist content receipt rejects any bundled `config.yaml`, SQLite database or local secret.
+* **Commit protection**: database files, API keys and personal Markdown reports are in `.gitignore` by default.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+Released under the [MIT License](LICENSE).
