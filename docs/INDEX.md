@@ -95,5 +95,5 @@
 | [NEXT_SESSION.md](NEXT_SESSION.md) | 下一個開發 session 的接手指南（現況、待辦、環境備忘） |
 | [../promo/](../promo/) | 3 分鐘介紹影片的 18 個場景源檔、分鏡表與渲染腳本（可單景重渲） |
 | [assets/](assets/) | 文件用圖片（架構與 roadmap 卡片等） |
-| `../tests/` | **62 個 contract test 模組（629 項，628 passed + 1 conditional skip）**；執行 `python -m pytest tests/` |
+| `../tests/` | **63 個 contract test 模組（639 項，638 passed + 1 conditional skip；不裝 `[rag]` extra 時 626 passed + 12 skipped）**；執行 `python -m pytest tests/` |
 | `../scripts/` | 驗證、清理、autostart 與 E2E 腳本 |

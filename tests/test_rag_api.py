@@ -38,6 +38,8 @@ def test_rag_folders_and_files_lifecycle(tmp_path, monkeypatch):
 
     # API test 不啟動真實 child process，避免測試環境觸碰本機 embedding/Chroma。
     monkeypatch.setattr("rag.router.launch_worker", lambda job_id: get_job(job_id))
+    # 這裡測的是 job 生命週期，不是依賴有沒有裝：沒裝 [rag] extra 時仍要能跑
+    monkeypatch.setattr("rag.availability.missing_index_packages", lambda: [])
     folder_id = None
     job_ids = []
     try:

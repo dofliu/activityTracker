@@ -34,7 +34,7 @@ It answers three questions at any moment:
 
 Don't rely on memory: `python main.py verify` (or dashboard "06 Settings → Acceptance Center") reports which receipts exist right now ([ADR-016](docs/ADR-016-acceptance-center.md)).
 
-**2026-09-16 project review**: the feature set is large enough; what comes next is **subtraction** — remove dead code and unused dependencies, make RAG an optional install, merge the two LLM clients and the two vector-memory stacks, then extract the one capability nothing else offers (reading local AI-agent transcripts) into a standalone package. Feature candidates (remote access, two-way LINE, more collectors) are paused. **The first R0 pass (dead code, unused deps, vendored marked, one source of truth for status numbers) landed the same day.** Full assessment (in Traditional Chinese): [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md); three-phase plan: [ROADMAP §13](ROADMAP.md#13-架構整頓與推廣方向2026-09-16-檢視).
+**2026-09-16 project review**: the feature set is large enough; what comes next is **subtraction** — remove dead code and unused dependencies, make RAG an optional install, merge the two LLM clients and the two vector-memory stacks, then extract the one capability nothing else offers (reading local AI-agent transcripts) into a standalone package. Feature candidates (remote access, two-way LINE, more collectors) are paused. **R0 landed the same day: dead code and unused deps removed, marked vendored, one source of truth for status numbers, and the knowledge-base dependencies moved to an optional `[rag]` extra (core install 721 MB → 176 MB).** Full assessment (in Traditional Chinese): [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md); three-phase plan: [ROADMAP §13](ROADMAP.md#13-架構整頓與推廣方向2026-09-16-檢視).
 
 **Documentation:** [📚 Index](docs/INDEX.md) · [User Guide](docs/USAGE.md) · [Roadmap & Results](ROADMAP.md) · [Backlog](docs/TODO.md) · [Machine-readable status](STATUS.yaml) · [Project review 2026-09-16](docs/REVIEW-2026-09-16-project-assessment.md)
 
@@ -82,7 +82,7 @@ Don't rely on memory: `python main.py verify` (or dashboard "06 Settings → Acc
 * **Related History and work sessions**: derived by project + inactivity gap, adding no tables and rewriting no source events ([ADR-006](docs/ADR-006-derived-context-sessions-and-related-history.md)).
 * **Boundary**: similarity is not proof of source truth or coverage; a session span is the first-to-last event delta, not real working time or focus quality.
 
-### 6. 📚 DeskRAG Local Knowledge Base & Document Chat
+### 6. 📚 DeskRAG Local Knowledge Base & Document Chat (optional: `pip install "omnicontext[rag]"`)
 
 * **One web entry point, isolated index worker**: the dashboard and API stay on `http://127.0.0.1:8765`, while scanning, parsing, embedding, deletion and space maintenance run in a separate local process ([ADR-009](docs/ADR-009-deskrag-worker-index-lifecycle.md)).
 * **Parser hub**: PDF (PyMuPDF, page numbers preserved), Word / PowerPoint / Excel, Markdown and code, WebVTT transcripts, plus virtual chunks synthesized from project state and open loops.
@@ -160,8 +160,11 @@ Requires **Python 3.10+**.
 git clone https://github.com/dofliu/activityTracker.git
 cd activityTracker
 
-# Source checkout / development mode
+# Source checkout / development mode (includes the knowledge-base extra and test tools)
 python -m pip install -e ".[dev]"
+# Core only (collectors, secretary, Git sync, notifications; no knowledge-base indexing): ~170 MB
+#   python -m pip install -e .
+# Add the knowledge base later with: python -m pip install -e ".[rag]"
 
 # Create local config, directories and a browser ingest token
 python main.py init --watch "/your/project/root"
@@ -175,10 +178,13 @@ Then open **[http://127.0.0.1:8765](http://127.0.0.1:8765)**.
 Using a prebuilt alpha wheel:
 
 ```console
-python -m pip install omnicontext-1.3.0a5-py3-none-any.whl
+python -m pip install omnicontext-1.3.0a5-py3-none-any.whl            # core
+python -m pip install "omnicontext-1.3.0a5-py3-none-any.whl[rag]"     # core + knowledge base (DeskRAG)
 omnicontext init --watch "/your/project/root"
 omnicontext assets-status
 ```
+
+**The knowledge base (DeskRAG) is an optional install**: the `[rag]` extra pulls in ChromaDB / FastEmbed / BM25 / jieba and the PDF / Office parsers (~550 MB). Without it everything else works; the "02 Knowledge Base" tab states which packages are missing and the install command, and chat still answers, just without document context.
 
 An installed wheel keeps config, database and reports under the user-writable `~/OmniContext` rather than `site-packages`; override with `OMNICONTEXT_HOME` or `OMNICONTEXT_CONFIG`.
 

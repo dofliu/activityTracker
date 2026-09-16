@@ -17,6 +17,7 @@ def test_text_parser(tmp_path):
 
 
 def test_docx_parser(tmp_path):
+    pytest.importorskip("docx")
     import docx
     f = tmp_path / "test.docx"
     d = docx.Document()
@@ -32,6 +33,7 @@ def test_docx_parser(tmp_path):
 
 
 def test_excel_parser(tmp_path):
+    pytest.importorskip("openpyxl")
     import openpyxl
     f = tmp_path / "data.xlsx"
     wb = openpyxl.Workbook()
@@ -50,6 +52,7 @@ def test_excel_parser(tmp_path):
 
 
 def test_pptx_parser(tmp_path):
+    pytest.importorskip("pptx")
     from pptx import Presentation
     f = tmp_path / "presentation.pptx"
     prs = Presentation()

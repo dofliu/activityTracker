@@ -4,7 +4,7 @@
 > P2.6 coverage ledger、P3 context memory、P4.2/4.3 Git 同步與對帳、P5 分級執行器與排程、P6 發佈整備、P7 DeskRAG、P8 自我修復均已實作；
 > 秘書側另有記憶區（ADR-012）／Telegram 對話（ADR-013）／多通道推播（ADR-014）／本機行事曆（ADR-015）／驗收中心（ADR-016）／模式感知提案（ADR-017）／
 > 宣告式個人檔案（ADR-018）／秘書桌面（ADR-019）／每週回顧（ADR-020）／文件落後偵測（ADR-021）／會議秘書第一層（ADR-022）。**危險能力一律預設關閉。**
-> 62 個 contract test 模組、629 項測試（628 passed + 1 skipped）；schema migration 18/18。
+> 63 個 contract test 模組、639 項測試（638 passed + 1 skipped；不裝 `[rag]` extra 時 626 passed + 12 skipped）；schema migration 18/18。
 > **仍不具 release-ready 資格**：全天 coverage ledger 實測與各功能的使用者實機收據未齊（見 §12 與 [docs/TODO.md](docs/TODO.md)）。
 > 本文件記錄 OmniContext 從 0 到 1 的缺陷修復歷程、已完成之架構改造與未來的維運與延伸規劃。
 
@@ -649,6 +649,7 @@ P2.5-S1 API 安全邊界
 - ✅ 2026-09-08：**會議秘書第一層**（[ADR-022](docs/ADR-022-meeting-secretary.md)，起草與實作同日）。使用者在線上會議問秘書「你可以看到嗎」，秘書答不能——對的；接著問「知道我在開會就可以做即時紀錄、翻譯、筆記嗎」。把它拆成兩層：**第一層是會後**——你把 Teams 匯出的逐字稿放進 `meetings.transcript_dir`（沒設就是關），L0 template `meeting_notes` 產出一則可刪的記憶區觀察（配對到的會議標題／發言與講者數／摘要／**候選**待辦），01 提案卡上每條候選旁邊是「加入未結事項」「忽略」——**點了才進 open_loops**，秘書自己永遠不寫。「在開會」只用兩個確定性訊號（行事曆進行中 ＋ 前景是 Teams／Zoom），只有其一時如實說差異。新增 WebVTT parser（`<v NAME>` 與 `NAME:` 兩種講者標記、字幕「同一句長出來」的重複要收斂）、`.vtt` 進 RAG 支援清單。摘要預設 **ollama（全本機）**；雲端 provider 在觀察正文明寫「與會者的發言曾送往該供應商」。**即時音訊（第二層）沒做**，五道門寫在 ADR-022 D6。容器實機（真實 Teams 格式）找到並修掉一個 bug：`LLMClient` 連不上供應商時是**回傳錯誤字串**而不是丟例外，那串錯誤被當成摘要送進事實閘，於是對使用者說「摘要編造了數字 11434」——真正原因是 ollama 沒開；已在事實閘之前判斷並改成「provider 未回覆摘要…（可跑 `python main.py llm-test` 診斷）」。驗收 A22（機器只查資料夾／整理過幾份／候選待辦計數，摘要品質留人眼）。20 項契約測試；全套 626 項（625 passed + 1 conditional skip）。
 - ✅ 2026-09-13：**文件整理**——README／README_en 依實際程式重寫（補上 2026-09-04 之後的驗收中心、模式感知提案、宣告式個人檔案、秘書桌面、每週回顧、文件落後偵測與會議秘書共七項功能，修正 53 模組／425 項等過期數字為 62 模組／626 項、schema 7/7 為 18/18、ADR-015 為 ADR-022、設定左欄 10 區塊為 11 區塊），設定與 Extension 安裝步驟改為指向 `config.example.yaml` 與 USAGE 不再各寫一份；USAGE 的「常用操作」由 32 節流水帳重組為六節（小秘書／行事曆與會議／知識庫檢索／通知與手機／摘要快照／驗收中心）並加目錄，標題移除日期、刪掉一段描述 ADR-019 之前版面的過期重複；本節（原 §11）的成果紀錄原本掛在兩個不同的父項下導致日期跳動，現合併為單一依日期排序的清單。
 - ✅ 2026-09-16：**R0 減法第一輪（TODO B5–B9）**——依同日專案檢視（[docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md) §4.2）逐項處理已核實的死碼與依賴債，**不改行為**：(B5) 刪 `core/server.py` 被遮蔽的第一個 `SystemMaintenanceRequest`；(B6) 自 `pyproject.toml`／`requirements.txt` 移除零 import 的 `pandas`／`pillow`／`sse-starlette`／`python-dotenv`，`rapidocr-onnxruntime` 改為 `[ocr]` 選用依賴（未裝時圖片解析維持檔名 stub）；(B7) 刪 `notifiers/telegram_notifier.py`（零 importer）、`synthesizer/scheduler.py` 永遠跑不到的 `_std_scheduler_loop` 備援（約 170 行，APScheduler 是硬依賴）、`scripts/inspect_logs／inspect_codex／inspect_assistants／check_real_recent／windows_milestone_e2e／migrate_timezone／purge_legacy_data／cleanup_noise.py` 與 CLI `clear-demo`；(B8) `marked` v15.0.12 改隨 wheel 本機提供（`web/vendor/`）、移除 Google Fonts 連結改全本機字型堆疊，`verify_release_artifacts` 與 `assets-status` 納入 vendor 檔，新增「index.html 不得外連」契約測試；(B9) `manager.get_status()` 的 `metrics` 成為狀態數字唯一定義（補 `project_states`／`open_loops_open_count`，非空回應排除占位字串），`main.py status` 只呈現不再自算。**收據**：`pytest` 628 passed ＋ 1 skipped（新增 3 項契約測試）；`python main.py verify` 輸出與基底 commit 逐行相同；`python -m build` ＋ `verify_release_artifacts.py` 通過且 wheel 不再含上述腳本；乾淨 venv `pip install -e ".[dev]"` 797 MB → 721 MB（pillow／python-dotenv 仍由 fastembed／chromadb 間接帶入，只是不再由本專案宣告）。R0 剩 D1（RAG 依賴改選用）。
+- ✅ 2026-09-16（第二輪）：**R0 完成——知識庫依賴改為選用 extra（TODO D1）**。`chromadb`／`fastembed`／`rank-bm25`／`jieba`／`pymupdf`／`python-docx`／`python-pptx`／`openpyxl` 自核心依賴移到 `[project.optional-dependencies] rag`；`dev` 改為自我參照 `omnicontext[rag]` ＋ `omnicontext[test]`（pip 可解析，已實測）。新增 `rag/availability.py`（只用 `importlib.find_spec`，不 import 套件）作為單一定義，每條會用到這些套件的路徑都**在動手前**說清楚缺什麼：建 job → `create_job` 拒絕、API 回 503 且 `detail.error = rag_extra_not_installed` 附 `missing` 與 `install_hint`；檢索 worker → 不啟動子程序、狀態 `unavailable`（只針對預設指令，測試注入的替身不受影響）；對話 → 照常回答只是不帶文件脈絡；啟動預熱 → 略過並記 `rag_extra_not_installed`；驗收中心 A6 → `not_configured` 並給安裝指令；儀表板 02 分頁把會失敗的按鈕灰掉並顯示安裝指令。**收據**：有 extra 時 `pytest` 638 passed ＋ 1 skipped（新增 11 項）；**沒有** extra 的乾淨 venv `pip install -e ".[test]"` 只有 **176 MB**（B6 後 721 MB → 176 MB，`[rag]` 佔約 550 MB），`import core.server` 成功、`pytest` 626 passed ＋ 12 skipped（需要套件的測試以 `importorskip` 標明）；`verify` 輸出與基底相同；wheel METADATA 的 `Provides-Extra: rag／ocr／test／dev` 正確；CI 新增 `test-core-without-rag-extra` job（ubuntu／3.12，不裝 `[rag]` 跑全套）。踩坑：依賴檢查一開始放在 router 與 startup 外圍，結果沒裝套件的環境裡連注入假 worker 的測試都被擋——**檢查要放在真的會失敗的那一層（client 啟動子程序處）**，外圍只讀它回報的狀態。
 
 ---
 
@@ -712,7 +713,7 @@ P2.5-S1 API 安全邊界
 
 ### 13.1 檢視結論
 
-- 程式面 P0–P8 ＋ 22 份 ADR 全部落地、629 項測試容器全綠；**功能已經夠多，缺的是減法。**
+- 程式面 P0–P8 ＋ 22 份 ADR 全部落地、639 項測試容器全綠；**功能已經夠多，缺的是減法。**
 - 專案唯一沒有替代品的能力是**讀本機 AI agent transcript 並還原成有 provenance 的工作脈絡**；
   其餘（RAG、Git 同步、Telegram／LINE、會議秘書）市面都有更成熟的替代品。
 - 現在的形狀不適合對外：安裝 800 MB 起、449 行設定、視窗採集與桌面通知綁 Windows、
@@ -721,11 +722,11 @@ P2.5-S1 API 安全邊界
 
 ### 13.2 三個階段（每階段結束都要能 `pytest` 全綠、`verify` 結果不變）
 
-**R0 減法（1 個 session，零設計決策）**——B5–B9 已於 2026-09-16 完成（§11.2），剩 D1
+**R0 減法（1 個 session，零設計決策）**——✅ 全部於 2026-09-16 完成（§11.2 兩條）
 - 刪已核實的死碼與未用依賴（TODO B5–B9）：重複的 `SystemMaintenanceRequest`、`telegram_notifier.py`、`_std_scheduler_loop`、四個 `scripts/inspect_*`／`check_real_recent.py`、`pandas`／`pillow`／`sse-starlette`／`python-dotenv`、`clear-demo`。
 - `rapidocr` 二選一：宣告成選用依賴，或移除 `image_parser.py`。
 - `marked` 與字型改為隨 wheel 本機提供，恢復 local-first 宣稱。
-- RAG 依賴鏈改成 `omnicontext[rag]` 選用依賴（TODO D1）；量預設安裝體積前後對照當收據。
+- RAG 依賴鏈改成 `omnicontext[rag]` 選用依賴（TODO D1）；量預設安裝體積前後對照當收據。→ 實測 721 MB → 176 MB。
 
 **R1 合併（2–3 個 session，小設計決策）**
 - 一個 LLM client（同步 `generate` ＋ 串流 `stream`），`synthesizer/llm_client.py` 與 `rag/llm_gateway.py` 收成一個模組（D2）。

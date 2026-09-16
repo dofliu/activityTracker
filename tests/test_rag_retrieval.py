@@ -1,5 +1,9 @@
 import pytest
-from rag.retrieval.registry import retriever_registry
+
+pytest.importorskip("rank_bm25")  # 沒裝 [rag] extra：這裡測的是真的 BM25／registry
+pytest.importorskip("chromadb")
+
+from rag.retrieval.registry import retriever_registry  # noqa: E402
 from rag.retriever import BM25Service
 from rag.retrieval.base import CitationSource
 

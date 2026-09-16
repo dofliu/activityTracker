@@ -50,16 +50,23 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-若不需要開發測試套件，可改用：
+`[dev]` 會一併安裝知識庫（DeskRAG）依賴與測試工具。依需求可以拆開：
 
 ```powershell
-python -m pip install -r requirements.txt
+python -m pip install -e .            # 只要核心：採集、秘書、Git 同步、通知（約 170 MB）
+python -m pip install -e ".[rag]"     # 補上知識庫：ChromaDB／FastEmbed／BM25／jieba／PDF／Office 解析（約 +550 MB）
+python -m pip install -e ".[test]"    # 只補測試工具
 ```
+
+沒裝 `[rag]` 時：服務照常啟動；「02 · 知識庫」的檢索 worker 卡片會直接寫出缺哪些套件與安裝指令，掃描／預熱等按鈕灰掉；
+對話（01 交辦框、Telegram）仍可用，只是不帶文件脈絡；`python main.py verify` 的 A6 顯示「未設定」而不是失敗。
+`requirements.txt` 只列核心依賴。
 
 本機建置出的 Alpha wheel 可安裝為：
 
 ```powershell
-python -m pip install .\dist\omnicontext-1.3.0a3-py3-none-any.whl
+python -m pip install .\dist\omnicontext-1.3.0a5-py3-none-any.whl          # 核心
+python -m pip install ".\dist\omnicontext-1.3.0a5-py3-none-any.whl[rag]"   # 核心＋知識庫
 omnicontext assets-status
 ```
 
@@ -672,6 +679,8 @@ Dashboard「進行中工作」會同步顯示 `RECENT WORK SESSIONS` 與 `RELATE
 若本機 Ollama 或 semantic index 不可用，Related History 會明確顯示 unavailable，不改送 cloud。Session 的 span 只是首末事件時間差，不代表實際工時、專注度或任務連續性。
 
 ### 管理 DeskRAG 知識庫與索引
+
+> **前置**：知識庫依賴是選用 extra（`pip install -e ".[rag]"`，見 §1.1）。沒裝時本節的掃描、索引、預熱都會回「缺 X，請執行 …」而不是失敗。
 
 在 Dashboard「02 · 知識庫」分頁中，掃描按鈕會建立一個獨立本機 worker；主頁、採集器與 Health API 不會在同一個 process 內等待文件解析或 embedding。
 

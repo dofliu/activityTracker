@@ -15,8 +15,6 @@ from core.data_lifecycle import (
     get_latest_maintenance_receipt,
     verify_sqlite_database,
 )
-from rag.scanner import FileScanner
-from rag.parsers.parser_hub import parser_hub
 
 
 import gc
@@ -150,6 +148,10 @@ def test_run_database_maintenance(temp_wal_db):
 
 
 def test_rag_temporary_file_filtering():
+    pytest.importorskip("chromadb")  # rag.scanner 在模組層載入向量庫；沒裝 [rag] extra 就跳過
+    from rag.scanner import FileScanner
+    from rag.parsers.parser_hub import parser_hub
+
     scanner = FileScanner()
 
     # 暫存與鎖定檔名應被忽略

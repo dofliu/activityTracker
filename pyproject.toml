@@ -28,6 +28,13 @@ dependencies = [
   "tzdata>=2024.1; sys_platform == 'win32'",
   "apscheduler>=3.10.4",
   "pywin32>=306; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+# 知識庫（DeskRAG）：索引、檢索與文件解析。主服務程序不 import 這些套件（ADR-009），
+# 沒裝時儀表板與 API 會明說缺什麼（rag/availability.py），其餘功能照常。
+# 安裝：pip install "omnicontext[rag]"（或 -e ".[rag]"）
+rag = [
   "chromadb>=0.4.24",
   "fastembed>=0.2.7",
   "rank-bm25>=0.2.2",
@@ -37,14 +44,18 @@ dependencies = [
   "python-pptx>=0.6.23",
   "openpyxl>=3.1.2",
 ]
-
-[project.optional-dependencies]
 # 圖片 OCR（rag/parsers/image_parser.py）。未安裝時圖片只留檔名 stub，不影響其他解析器。
 ocr = ["rapidocr-onnxruntime>=1.3.0"]
-dev = [
+# 只跑測試（不含 rag）：CI 用它證明核心在沒有知識庫依賴時也全綠。
+test = [
   "pytest>=8.0",
   "httpx>=0.27",
   "tomli>=2.0; python_version < '3.11'",
+]
+# 開發：核心 + 知識庫 + 測試工具。
+dev = [
+  "omnicontext[rag]",
+  "omnicontext[test]",
 ]
 
 [project.scripts]

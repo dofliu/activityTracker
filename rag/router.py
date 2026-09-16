@@ -15,6 +15,8 @@ from core.models import RAGIndexedFolder, RAGIndexedFile, RAGChatSession, RAGCha
 from core.platform_services import open_local_path
 from core.time_utils import get_local_now
 from rag.config import rag_settings
+from rag import availability
+from rag.availability import RagExtraNotInstalled
 from rag.jobs import (
     create_job, get_job, get_latest_job, launch_worker, request_cancel,
     request_pause, update_job,
@@ -52,10 +54,22 @@ class ConfirmIndexRemovalRequest(BaseModel):
     confirm: bool = False
 
 
+def _extra_missing_detail(exc: RagExtraNotInstalled) -> Dict[str, Any]:
+    """503 的 detail 是機器可讀的：前端靠 error 欄位判斷，不靠比對中文句子。"""
+    return {
+        "error": "rag_extra_not_installed",
+        "missing": exc.missing,
+        "install_hint": availability.INSTALL_HINT,
+        "message": str(exc),
+    }
+
+
 def _start_job_or_raise(job_type: str, folder_id: Optional[int] = None, max_files: Optional[int] = None, throttle_ms: Optional[int] = None):
     try:
         job = create_job(job_type, folder_id=folder_id, max_files=max_files, throttle_ms=throttle_ms)
         return launch_worker(job["id"])
+    except RagExtraNotInstalled as exc:
+        raise HTTPException(status_code=503, detail=_extra_missing_detail(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except Exception as exc:
@@ -405,7 +419,12 @@ def retrieval_worker_warmup():
     if retrieval_mode() != "worker":
         raise HTTPException(status_code=409, detail="目前為 in_process 檢索模式，沒有可預熱的 worker")
     # 使用者明示按下預熱：一律重載，否則建完索引後只會拿到舊計數（ADR-009 Addendum B）
-    return retrieval_client.warmup_in_background(reason="dashboard", force=True)
+    receipt = retrieval_client.warmup_in_background(reason="dashboard", force=True)
+    if isinstance(receipt, dict) and receipt.get("state") == "unavailable":
+        # 沒裝 [rag] extra：client 不會啟動子程序；回機器可讀的 503 讓前端說要裝什麼（TODO D1）
+        missing = list(receipt.get("extra_missing") or availability.missing_index_packages())
+        raise HTTPException(status_code=503, detail=_extra_missing_detail(RagExtraNotInstalled(missing)))
+    return receipt
 
 
 @router.post("/retrieval/shutdown")
@@ -422,6 +441,10 @@ def _retrieve_citations(query: str, req: "ChatRequest"):
     讓上層沿用同一段降級邏輯。
     """
     if retrieval_mode() == "worker":
+        if retrieval_client.status().get("state") == "unavailable":
+            # 沒裝 [rag] extra：對話照常，只是不帶文件脈絡；狀態端點會說明缺什麼（TODO D1）。
+            logger.info("RAG retrieval skipped: rag extra not installed (%s)", availability.INSTALL_HINT)
+            return []
         try:
             payload = retrieval_client.retrieve(
                 query=query,
@@ -435,6 +458,9 @@ def _retrieve_citations(query: str, req: "ChatRequest"):
             raise asyncio.TimeoutError(str(exc)) from exc
         return citations_from_payload(payload)
 
+    if availability.missing_index_packages():
+        logger.info("RAG retrieval skipped (in_process): rag extra not installed (%s)", availability.INSTALL_HINT)
+        return []
     from rag.retrieval.registry import retriever_registry
     return retriever_registry.retrieve(
         query=query,

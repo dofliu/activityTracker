@@ -372,6 +372,18 @@ def _check_a6(ctx: _Ctx) -> dict[str, Any]:
     from rag.retrieval_client import retrieval_client
 
     status = retrieval_client.status()
+    if status.get("extra_installed") is False:
+        return {
+            "status": NOT_CONFIGURED,
+            "detail": (
+                "知識庫的選用依賴未安裝（缺 "
+                + ", ".join(status.get("extra_missing") or [])
+                + "）；要用檢索 worker 請先 "
+                + str(status.get("install_hint") or 'pip install "omnicontext[rag]"')
+                + "。"
+            ),
+            "evidence": {"extra_missing": status.get("extra_missing"), "basis": "importlib.find_spec"},
+        }
     warmup = status.get("warmup") or {}
     evidence = {
         "mode": status.get("mode"),
