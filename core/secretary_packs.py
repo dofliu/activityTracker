@@ -336,7 +336,7 @@ def build_today_view(
 ) -> dict[str, Any]:
     """儀表板「01 今天」用：上次做到哪＋早晨包摘要＋預設排程狀態。提案另由 /proposals 提供。"""
     from core.agent_executor import executor_enabled, l2_enabled
-    from core.scheduled_tasks import scheduled_tasks_enabled
+    from core.scheduled_tasks import legacy_opt_out, scheduled_tasks_enabled
 
     cfg = cfg or get_config()
     now = now or get_local_now()
@@ -407,6 +407,9 @@ def build_today_view(
         "schedules": {
             "executor_enabled": executor_enabled(cfg),
             "scheduled_tasks_enabled": scheduled_tasks_enabled(cfg),
+            # 設定檔還留著已淘汰的 scheduled_tasks.enabled: false 時，UI 要講得出
+            # 「為什麼開了執行器還是沒排程」（TODO D6）。
+            "scheduled_tasks_legacy_opt_out": legacy_opt_out(cfg),
             "l2_enabled": l2_enabled(cfg),
             **presets,
         },

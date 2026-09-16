@@ -18,11 +18,13 @@ from sqlalchemy import desc
 from core.config import get_config
 from core.database import get_db
 from core.models import (
+    ActivityMicroSummary,
     AIPromptEvent,
     FileActivityEvent,
     GitActivityEvent,
     OpenLoop,
     ProjectState,
+    SecretaryNote,
     SemanticDocument,
 )
 from core.time_utils import get_local_now
@@ -175,6 +177,17 @@ def _embed_resilient(
         }]
 
 
+ACTIVITY_SOURCE_TYPES: tuple[str, ...] = (
+    "ai_turn",
+    "git_commit",
+    "file_activity",
+    "open_loop",
+    "project_state",
+    "secretary_note",
+    "micro_summary",
+)
+
+
 def collect_source_documents(
     *,
     database: Any | None = None,
@@ -182,7 +195,13 @@ def collect_source_documents(
     max_document_chars: int = 6000,
     limit: int | None = None,
 ) -> list[SourceDocument]:
-    """只索引既有本機 evidence rows，不掃描未授權檔案內容。"""
+    """只索引既有本機 evidence rows，不掃描未授權檔案內容。
+
+    ADR-023（TODO D7）起這裡是**活動記憶唯一的定義**：`secretary_note` 與
+    `micro_summary` 原本只有 `rag/activity_indexer` 看得到，現在一併收進核心索引，
+    於是 `omni ask`、`/api/v1/context/related` 與知識庫對話引用的是同一組證據。
+    文件（使用者資料夾、秘書寫出的報告檔）仍屬 DeskRAG，不在這裡。
+    """
     database = database or get_db()
     project_text = str(project or "").strip().lower()
     documents: list[SourceDocument] = []
@@ -276,6 +295,50 @@ def collect_source_documents(
                 "project_state", str(row.id), f"project_states:{row.id}",
                 row.last_activity_at, row.project_key, row.display_name,
                 content[:max_document_chars], "project_state_observed",
+            ))
+
+        # ADR-023：秘書記憶區的筆記／偏好／決定／觀察。只存短文字，不含 prompt 原文。
+        note_rows = session.query(SecretaryNote).order_by(desc(SecretaryNote.created_at)).all()
+        for row in note_rows:
+            if not matches(row.project_key, row.title):
+                continue
+            body = _bounded(row.body, max_document_chars)
+            if not body:
+                continue
+            kind = str(row.kind or "user_note")
+            content = (
+                f"Secretary memory ({kind})\nProject: {row.project_key or 'general'}\n"
+                f"Title: {row.title or 'none'}\nBody:\n{body}\n"
+                f"Source: {row.source}{(' · ' + row.source_ref) if row.source_ref else ''}"
+            )
+            documents.append(SourceDocument(
+                "secretary_note", str(row.id), f"secretary_notes:{row.id}",
+                row.created_at, row.project_key,
+                str(row.title or body)[:120],
+                content[:max_document_chars],
+                # 觀察是秘書自己從 L0 收據推出來的，和使用者親口說的不同級
+                "user_stated" if kind != "observation" else "derived_observation",
+            ))
+
+        # ADR-023：checkpoint 時段微摘要（已壓縮，本來就不含 prompt／response 原文）。
+        micro_rows = (
+            session.query(ActivityMicroSummary)
+            .order_by(desc(ActivityMicroSummary.period_start))
+            .all()
+        )
+        for row in micro_rows:
+            if project_text:
+                continue  # 微摘要不分專案；有專案過濾時不納入（與 RAG 版同一條規則）
+            start = row.period_start.isoformat() if row.period_start else ""
+            end = row.period_end.isoformat() if row.period_end else ""
+            content = (
+                f"Work session summary\nWindow: {start[:16]} → {end[:16]}\n"
+                f"Events: {row.event_count}\nSummary:\n{_bounded(row.summary_text, max_document_chars)}"
+            )
+            documents.append(SourceDocument(
+                "micro_summary", str(row.id), f"activity_micro_summaries:{row.id}",
+                row.period_start, None, f"Work session {start[:16]}",
+                content[:max_document_chars], "local_llm_summary",
             ))
 
     documents.sort(key=lambda item: item.updated_at or datetime.min, reverse=True)

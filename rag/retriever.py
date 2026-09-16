@@ -100,6 +100,14 @@ class BM25Service:
     def clear(self):
         self.build_index([])
 
+    def count_by_source_domain(self, source_domain: str) -> int:
+        """該領域目前有幾個切片（ADR-023 清除舊活動切片時要寫進收據）。"""
+        self._ensure_loaded()
+        return sum(
+            1 for c in self.corpus_chunks
+            if c.get("metadata", {}).get("source_domain") == source_domain
+        )
+
     def delete_by_source_domain(self, source_domain: str):
         self._ensure_loaded()
         self.corpus_chunks = [c for c in self.corpus_chunks if c.get("metadata", {}).get("source_domain") != source_domain]
@@ -134,9 +142,12 @@ class BM25Service:
             meta = item.get("metadata", {})
 
             # Filter by scope (all / documents / activity)
+            # ADR-023 起 RAG 只收文件：使用者資料夾（document）與秘書寫出的報告檔
+            # （report）都算 documents；活動記憶在 core/semantic_index，不在這裡，
+            # 所以 scope="activity" 在 RAG 這一側本來就不該有東西。
             if scope and scope != "all":
                 item_domain = meta.get("source_domain", "document")
-                if scope == "documents" and item_domain != "document":
+                if scope == "documents" and item_domain not in {"document", "report"}:
                     continue
                 if scope == "activity" and item_domain != "activity":
                     continue

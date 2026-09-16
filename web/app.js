@@ -271,7 +271,6 @@ const I18N = {
     executor_l2_write_label: "允許 L2 依已批准計畫修改檔案（不 commit）",
     executor_cli_label: "AGENT CLI",
     executor_boundary: "L2 會用您本機已登入的 CLI 消耗訂閱／API 額度；子行程禁 shell、僅限白名單動作與該專案 repo 目錄，不會拿到任何 API key。執行前仍需 execution token（python main.py init --show-token）＋單鍵批准＋回填一次性確認碼。",
-    sched_tasks_enabled_label: "啟用自訂排程任務（僅 L0 唯讀動作）",
     sched_tasks_title: "自訂排程任務（P5-R5）",
     sched_tasks_loading: "載入中…",
     sched_template_label: "TEMPLATE",
@@ -309,7 +308,6 @@ const I18N = {
     btn_line_connect: "✅ 測試並儲存啟用",
     btn_line_disconnect: "解除",
     line_boundary: "LINE 只做推播（晨報／晚報／日報／停滯提醒）：LINE Messaging API 沒有輪詢介面，要接收你的訊息必須由 LINE 平台 webhook 連到一個公開網址，那會打破本專案「只在 127.0.0.1」的邊界——所以提問、記筆記與批准仍走 Telegram。另請注意 LINE 官方帳號免費方案有每月推播則數上限。token 與 userId 只存本機，瀏覽器永遠拿不回明文。",
-    tg_remote_arm_label: "允許用 /arm <token> 從手機解鎖批准（訊息會被自動刪除；不開則只能在這裡解鎖）",
     tg_chat_boundary: "小秘書對話：手機上直接打字即可提問（會帶今日狀態、建議與記憶區筆記），「記下來：…」直接寫進記憶區不送 LLM，/today /notes /status /proposals 為指令。這是本專案唯一會把「你的提問與秘書的回答」送出本機的通道——內容會經過 Telegram 伺服器（引用只送檔名，不送文件內容）；若對話 provider 選雲端供應商，內容另會送往該供應商。預設關閉。",
     btn_tg_arm: "🔓 解鎖遠端批准（需 execution token）",
     btn_tg_disarm: "🔒 上鎖",
@@ -618,7 +616,6 @@ const I18N = {
     executor_l2_write_label: "Allow L2 to edit files per an approved plan (never commits)",
     executor_cli_label: "AGENT CLI",
     executor_boundary: "L2 spends your locally signed-in CLI quota; subprocesses are shell-free, restricted to whitelist actions and the project's repo directory, and never receive any API key. Runs still require the execution token (python main.py init --show-token), one-click approval, and a one-time confirm code.",
-    sched_tasks_enabled_label: "Enable custom scheduled tasks (L0 read-only actions only)",
     sched_tasks_title: "Custom Scheduled Tasks (P5-R5)",
     sched_tasks_loading: "Loading…",
     sched_template_label: "TEMPLATE",
@@ -656,7 +653,6 @@ const I18N = {
     btn_line_connect: "✅ Test and save",
     btn_line_disconnect: "Disconnect",
     line_boundary: "LINE is push-only (morning/evening briefings, daily report, stagnation alerts). The LINE Messaging API has no polling endpoint: receiving your messages would require LINE to reach a public webhook, which would break this project's 127.0.0.1-only boundary — so asking, note-taking and approvals stay on Telegram. Note also that the free LINE official account plan caps monthly push messages. Token and userId stay on this machine; the browser never gets the plaintext back.",
-    tg_remote_arm_label: "Allow /arm <token> to unlock approvals from the phone (the message is deleted automatically; otherwise unlock here only)",
     tg_chat_boundary: "Secretary chat: type in the bound chat to ask (today's status, proposals and your notes are included); “remember: …” writes straight to memory without calling the LLM; /today /notes /status /proposals are commands. This is the only channel that sends your questions and the secretary's answers off this machine — content passes through Telegram's servers (citations send filenames only, never document content), and a cloud chat provider also receives the content. Off by default.",
     btn_tg_arm: "🔓 Unlock remote approvals (execution token)",
     btn_tg_disarm: "🔒 Lock",
@@ -1969,9 +1965,15 @@ async function loadTodayView() {
         : "No daily schedules yet. Click “📦 Create daily schedules” for a 07:30 morning pack.";
       pack.hidden = false;
     } else if (!sched.executor_enabled || !sched.scheduled_tasks_enabled) {
+      // 排程跟著執行器開關（D6）；只有設定檔還留著已淘汰的 scheduled_tasks.enabled: false 時才另有說法。
+      const legacy = sched.scheduled_tasks_legacy_opt_out === true;
       pack.textContent = zh
-        ? "小秘書排程未啟用（設定 → 小秘書執行器 → 執行器與排程任務開關）；啟用後可一鍵建立每日早晨包。"
-        : "Scheduled tasks are off (Settings → Executor); enable them to create the daily morning pack.";
+        ? (legacy
+          ? "設定檔仍留著已淘汰的 executor.scheduled_tasks.enabled: false，排程因此關著；刪掉那一行就會跟著執行器開關。"
+          : "小秘書排程未啟用（設定 → 小秘書執行器 → 啟用執行器）；啟用後可一鍵建立每日早晨包。")
+        : (legacy
+          ? "Your config still sets the retired executor.scheduled_tasks.enabled: false, so schedules stay off; delete that line to follow the executor switch."
+          : "Scheduled tasks are off (Settings → Executor); enable the executor to create the daily morning pack.");
       pack.hidden = false;
     } else {
       pack.hidden = true;
@@ -3174,9 +3176,7 @@ async function loadConfig() {
     $("toggle-executor-l2").checked = !!(executor.l2 && executor.l2.enabled === true);
     $("toggle-executor-l2-write").checked = !!(executor.l2 && executor.l2.allow_write === true);
     $("select-agent-cli").value = (executor.agent_cli && executor.agent_cli.binary) === "codex" ? "codex" : "claude";
-    $("toggle-scheduled-tasks").checked = !!(executor.scheduled_tasks && executor.scheduled_tasks.enabled === true);
     $("toggle-tg-approvals").checked = !!(executor.telegram_approvals && executor.telegram_approvals.enabled === true);
-    $("toggle-tg-remote-arm").checked = !!(executor.telegram_approvals && executor.telegram_approvals.allow_remote_arm === true);
     const tgChat = ((currentConfig.notifiers || {}).telegram || {}).chat || {};
     $("toggle-tg-chat").checked = tgChat.enabled === true;
     loadScheduledTasks();
@@ -3310,11 +3310,8 @@ async function saveSettings() {
     executorCfg.agent_cli.binary = cliChoice;
     executorCfg.agent_cli.args = cliChoice === "codex" ? ["exec", "{prompt}"] : ["-p", "{prompt}"];
   }
-  executorCfg.scheduled_tasks = executorCfg.scheduled_tasks || {};
-  executorCfg.scheduled_tasks.enabled = $("toggle-scheduled-tasks").checked;
   executorCfg.telegram_approvals = executorCfg.telegram_approvals || {};
   executorCfg.telegram_approvals.enabled = $("toggle-tg-approvals").checked;
-  executorCfg.telegram_approvals.allow_remote_arm = $("toggle-tg-remote-arm").checked;
   cfg.notifiers = cfg.notifiers || {};
   cfg.notifiers.telegram = cfg.notifiers.telegram || {};
   cfg.notifiers.telegram.chat = cfg.notifiers.telegram.chat || {};

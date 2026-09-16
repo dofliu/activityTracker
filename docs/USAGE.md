@@ -824,7 +824,7 @@ token 與 userId 只存本機、瀏覽器永遠拿不回明文；token 只走 `A
 - **直接打字＝提問**：走與儀表板交辦框**同一條管線**（記憶區脈絡＋知識庫檢索＋所選 LLM）。回覆會附「📎 引用：檔名」與「🧠 參考記憶區 N 筆」。第一則先回「🤔 查一下…」，答案在模型回完後送出；同一時間只回答一題，太長的答案會分段而不是截斷。
 - **記下來：… ／ 偏好：… ／ 決定：…**（或 `/note` `/pref` `/decision` `remember:`）直接寫進記憶區（ADR-012），**不送 LLM**；可帶 `@專案`。偏好寫「不要提醒 repo_needs_push」之後，提案清單立刻不再出現該類建議。
 - **指令**：`/today`（上次做到哪＋早晨包＋前三個建議含「為什麼是現在」）、`/proposals`（附批准按鈕）、`/notes`、`/status`、`/help`。
-- **批准**：仍只有 server 白名單的 L0/L1，且通道要先解鎖。預設只能在儀表板按「🔓 解鎖遠端批准」；若另外勾選「允許用 /arm 從手機解鎖」，可在手機送 `/arm <6 位數碼>`（碼在儀表板產生，見下一節；手機不必持有 execution token）。`/disarm`（上鎖）不受開關限制、隨時可用，手機掉了就傳它。
+- **批准**：仍只有 server 白名單的 L0/L1，且通道要先解鎖。可在儀表板按「🔓 解鎖遠端批准」，或在手機送 `/arm <6 位數碼>`（碼在儀表板產生，見下一節；手機不必持有 execution token）。`/disarm`（上鎖）不受開關限制、隨時可用，手機掉了就傳它。
 
 ```yaml
 notifiers:
@@ -835,10 +835,6 @@ notifiers:
       model: ''
       enable_rag: true
       max_question_chars: 1000
-proactive_secretary:
-  executor:
-    telegram_approvals:
-      allow_remote_arm: false   # 開啟才能用 /arm；/disarm 不受限
 ```
 
 > **隱私邊界（請先讀）**：這是本專案唯一會把「你的提問與秘書的回答」送出本機的通道——內容會經過 Telegram 伺服器。引用只送**檔名**，不送被檢索到的文件內容切片；若對話 provider 選雲端供應商，內容另會送往該供應商（與網頁相同）。全本機請把 provider 留成 `ollama`。不想外送任何內容就別開這個開關——通知、`/proposals` 與 inline 批准不受影響。
@@ -863,7 +859,7 @@ proactive_secretary:
 2. 5 分鐘內在手機傳 `/arm 123456`。碼**只能用一次**，猜錯一次就作廢，`/disarm` 與服務重啟都會銷毀它。
 3. 解鎖成功後的授權窗仍是 24 小時；能批准的仍只有白名單 L0/L1，L2 一律回儀表板走確認碼。
 
-需要先勾「允許用 /arm 從手機解鎖批准」（`allow_remote_arm`，預設關閉）。`/disarm`（上鎖）不受任何開關限制、隨時可用。
+需要先啟用 Telegram inline 批准（`telegram_approvals.enabled`，預設關閉）——2026-09-16（ADR-008 Addendum D）起 `/arm` 跟著那個開關，不再有獨立的 `allow_remote_arm`：碼本來就只有儀表板簽得出來（需 execution token、5 分鐘失效、用過即銷毀）。既有設定檔若明確寫著 `allow_remote_arm: false` 仍然有效（照樣拒絕），刪掉那一行才會跟著通道開關。`/disarm`（上鎖）不受任何開關限制、隨時可用。
 
 ## 9. 摘要、快照與未結事項
 

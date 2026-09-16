@@ -26,7 +26,7 @@
 | 面向 | 現況 |
 | :--- | :--- |
 | 程式 | P0–P8 與 ADR-008 執行器全階段已落地；22 份 ADR 記錄每個決策的邊界 |
-| 測試 | **66 個 contract test 模組、673 項**（672 passed + 1 skipped；不裝 `[rag]` extra 時 660 passed + 11 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
+| 測試 | **68 個 contract test 模組、695 項**（694 passed + 1 skipped；不裝 `[rag]` extra 時 681 passed + 12 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
 | 資料 | SQLite schema migration **18/18**（append-only + checksum，升級前自動備份） |
 | 發佈 | `release_ready: false` |
 
@@ -34,7 +34,7 @@
 
 不必憑記憶：跑 `python main.py verify`（或看儀表板「06 系統設定 → 驗收中心」）就會列出每一項現在有沒有收據（[ADR-016](docs/ADR-016-acceptance-center.md)）。
 
-**2026-09-16 專案檢視**：功能已經夠多，接下來是**減法**——刪死碼與未用依賴、RAG 改為選用安裝、合併兩套 LLM client 與兩套向量記憶，再把「讀本機 AI agent transcript」這個唯一無替代品的核心抽成獨立套件對外。功能候選（遠端存取、LINE 雙向、更多採集來源）暫停。**R0 已於同日完成：死碼與未用依賴移除、marked 本機化、CLI／API 同一組數字，以及知識庫依賴改為 `[rag]` 選用安裝（核心安裝 721 MB → 176 MB）；R1 已完成 D2（兩套 LLM client 合為 `core/llm_client.py`）、D3（活動來源收進 `core/activity_sources.py`）與 D4（`server.py` 1,995 → 134 行，依領域切成 9 個 router）。** 評估全文見 [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md)，三階段計畫見 [ROADMAP §13](ROADMAP.md#13-架構整頓與推廣方向2026-09-16-檢視)。
+**2026-09-16 專案檢視**：功能已經夠多，接下來是**減法**——刪死碼與未用依賴、RAG 改為選用安裝、合併兩套 LLM client 與兩套向量記憶，再把「讀本機 AI agent transcript」這個唯一無替代品的核心抽成獨立套件對外。功能候選（遠端存取、LINE 雙向、更多採集來源）暫停。**R0 已於同日完成：死碼與未用依賴移除、marked 本機化、CLI／API 同一組數字，以及知識庫依賴改為 `[rag]` 選用安裝（核心安裝 721 MB → 176 MB）；R1 已完成 D2（兩套 LLM client 合為 `core/llm_client.py`）、D3（活動來源收進 `core/activity_sources.py`）、D4（`server.py` 1,995 → 134 行，依領域切成 9 個 router）、D5（桌面通知併入 `ChannelAdapter`）與 D6（六層旗標收三層）；R2 已完成 D7（一份活動記憶，ADR-023）。** 評估全文見 [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md)，三階段計畫見 [ROADMAP §13](ROADMAP.md#13-架構整頓與推廣方向2026-09-16-檢視)。
 
 **文件入口：**[📚 文件總覽](docs/INDEX.md) · [使用手冊](docs/USAGE.md) · [開發規劃與成果](ROADMAP.md) · [待辦與判準](docs/TODO.md) · [機器可讀現況](STATUS.yaml) · [專案檢視 2026-09-16](docs/REVIEW-2026-09-16-project-assessment.md)
 
@@ -276,7 +276,7 @@ Installed wheel 可將 `python main.py` 改為 `omnicontext` 或較短的 `omni`
 | `synthesizer.provider` | 摘要供應商（預設 `ollama` 全本機） |
 | `integrations.github.token` | 留空時自動使用本機 `gh auth token` |
 
-**危險能力全部預設關閉**：秘書執行器、L2、L2 寫入、自訂排程、Telegram 對話、`allow_remote_arm`、LINE、問候卡 LLM 潤飾；行事曆與會議秘書預設開但沒設路徑就等於停用。
+**危險能力全部預設關閉**：秘書執行器（含只排 L0 的自訂排程）、L2、L2 寫入、Telegram 對話、Telegram inline 批准（含 `/arm`）、LINE、問候卡 LLM 潤飾；行事曆與會議秘書預設開但沒設路徑就等於停用。
 
 ---
 
@@ -339,7 +339,7 @@ activityTracker/
 │   ├── retrieval_worker.py / retrieval_client.py               # 常駐檢索 worker
 │   ├── parsers/ chunker.py embeddings.py vector_store.py retriever.py
 │   ├── storage.py              # 容量報告與 Chroma 空間回收
-│   ├── activity_indexer.py     # 專案狀態與 Open Loops 虛擬切片
+│   ├── report_indexer.py       # 秘書寫出的報告檔切片（活動記憶在 core/semantic_index）
 │
 ├── watchers/                   # 多源採集器
 │   ├── file_watcher.py git_watcher.py window_watcher.py
@@ -363,7 +363,7 @@ activityTracker/
 │   └── index.html / app.js / style.css
 │
 ├── scripts/                    # 驗證、清理、autostart 與 E2E 腳本
-├── tests/                      # 66 個 contract test 模組（673 項）
+├── tests/                      # 68 個 contract test 模組（695 項）
 ├── logs/checkpoints/           # 週期性活動快照
 └── reports/                    # 每日／區間 Markdown 報告
 ```

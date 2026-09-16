@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from core.models import Base, SecretaryNote
+from core.models import ActivityMicroSummary, Base, SecretaryNote
 from core.secretary_memory import (
     MAX_BODY_CHARS,
     MemoryRejected,
@@ -299,16 +299,31 @@ def test_today_view_reports_memory_counts(tmp_path):
 # ---- RAG 併入 ----
 
 
-def test_activity_indexer_includes_notes_micro_summaries_and_whitelisted_reports(tmp_path, monkeypatch):
-    pytest.importorskip("rank_bm25")
-    from core.models import ActivityMicroSummary
-    from rag import activity_indexer as ai
+def test_notes_and_micro_summaries_go_into_the_core_semantic_index():
+    """筆記與微摘要是**活動記憶**，ADR-023 起由核心索引保管（不再進 RAG）。"""
+    from core.semantic_index import collect_source_documents
 
     db = TempDatabase()
     add_note(kind="preference", body="回答用繁體中文", database=db, now=NOW)
     record_observation(title="obs", body="2 個 repo 需要 pull", source_ref="x", database=db, now=NOW)
     with db.session_scope() as session:
-        session.add(ActivityMicroSummary(period_start=NOW - timedelta(hours=1), period_end=NOW, provider="ollama", summary_text="修了 CI", event_count=3))
+        session.add(ActivityMicroSummary(period_start=NOW - timedelta(hours=1), period_end=NOW,
+                                         provider="ollama", summary_text="修了 CI", event_count=3))
+
+    documents = collect_source_documents(database=db)
+    notes = [d for d in documents if d.source_type == "secretary_note"]
+    micro = [d for d in documents if d.source_type == "micro_summary"]
+    assert len(notes) == 2
+    assert {d.trust_status for d in notes} == {"user_stated", "derived_observation"}
+    assert len(micro) == 1 and "修了 CI" in micro[0].content
+    assert micro[0].source_ref.startswith("activity_micro_summaries:")
+
+
+def test_report_indexer_reads_only_whitelisted_secretary_reports(tmp_path, monkeypatch):
+    """報告檔是**文件**，留在 RAG；白名單、截斷與專案鍵解析都不變（ADR-023）。"""
+    pytest.importorskip("rank_bm25")
+    from rag import report_indexer as ri
+
     (tmp_path / "handoffs").mkdir()
     (tmp_path / "handoffs" / "Handoff_alpha_20260902_2130.md").write_text("# Handoff alpha\n下一步：merge", encoding="utf-8")
     (tmp_path / "repo_sync").mkdir()
@@ -317,17 +332,13 @@ def test_activity_indexer_includes_notes_micro_summaries_and_whitelisted_reports
     (tmp_path / "Weekly_Rollup_2026-W35.md").write_text("# 週報\n", encoding="utf-8")
     (tmp_path / "random_user_file.md").write_text("不該被讀", encoding="utf-8")
     (tmp_path / "handoffs" / "big.md").write_text("x" * 7000, encoding="utf-8")
-    monkeypatch.setattr(ai, "get_config", lambda: DictConfig({"exporters": {"reports_dir": str(tmp_path)}}))
-    monkeypatch.setattr(ai, "resolve_runtime_path", lambda value: Path(value))
+    monkeypatch.setattr(ri, "get_config", lambda: DictConfig({"exporters": {"reports_dir": str(tmp_path)}}))
+    monkeypatch.setattr(ri, "resolve_runtime_path", lambda value: Path(value))
 
-    chunks = ai.ActivityIndexer().build_activity_chunks(database=db)
+    chunks = ri.ReportIndexer().build_report_chunks()
     by_type = {}
     for c in chunks:
         by_type.setdefault(c.metadata["source_type"], []).append(c)
-    assert len(by_type["secretary_note"]) == 2
-    kinds = {c.metadata["note_kind"]: c.metadata["trust_status"] for c in by_type["secretary_note"]}
-    assert kinds == {"preference": "user_stated", "observation": "derived_observation"}
-    assert len(by_type["micro_summary"]) == 1 and "修了 CI" in by_type["micro_summary"][0].content
     handoffs = by_type["report_handoff"]
     assert {c.metadata["project_key"] for c in handoffs} == {"alpha", "general"}
     big = next(c for c in handoffs if c.metadata["project_key"] == "general")
@@ -335,7 +346,9 @@ def test_activity_indexer_includes_notes_micro_summaries_and_whitelisted_reports
     assert len(by_type["report_repo_sync"]) == 1
     assert len(by_type["report_daily_entry"]) == 1 and len(by_type["report_rollup"]) == 1
     assert not any("random_user_file" in c.file_path for c in chunks)
-    assert all(c.metadata["source_domain"] == "activity" for c in chunks)
+    # 報告是文件側；RAG 裡不該再出現 activity 領域的切片
+    assert all(c.metadata["source_domain"] == "report" for c in chunks)
+    assert not any("secretary_note" in c.metadata["source_type"] for c in chunks)
 
 
 def test_activity_sync_is_a_registered_worker_job(monkeypatch):
@@ -361,5 +374,6 @@ def test_activity_sync_is_a_registered_worker_job(monkeypatch):
 
 
 def test_index_worker_source_dispatches_activity_sync():
+    """端點與 job 型別不變；做的事改成同步報告＋清掉舊活動切片（ADR-023）。"""
     source = Path("rag/index_worker.py").read_text(encoding="utf-8")
-    assert 'job["job_type"] == "activity_sync"' in source and "activity_indexer.sync_all()" in source
+    assert 'job["job_type"] == "activity_sync"' in source and "report_indexer.sync_all()" in source

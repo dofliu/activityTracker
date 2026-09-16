@@ -75,17 +75,18 @@ def main() -> int:
             )
             finish_job(args.job_id, "completed", f"已從 Chroma 重建 {result['rebuilt_chunks']} 個 BM25 切片", result=result)
         elif job["job_type"] == "activity_sync":
-            # ADR-012：把秘書記憶區（筆記／每日摘要／Handoff／同步報告／STATUS 草稿）
-            # 併入 RAG activity 領域；在 worker 程序做，主服務不載入索引套件。
-            from rag.activity_indexer import activity_indexer
-            update_job(args.job_id, message="正在把秘書記憶區與工作紀錄併入知識庫…")
-            result = activity_indexer.sync_all()
-            finish_job(
-                args.job_id,
-                "completed",
-                f"已將 {result.get('total_activity_indexed', 0)} 筆工作紀錄／記憶切片併入知識庫",
-                result=result,
-            )
+            # ADR-023（TODO D7）：知識庫只收文件。這個 job 把秘書寫出的報告檔
+            # （Handoff／同步報告／STATUS 草稿／每日入口）同步進來，並清掉舊版
+            # 寫進 RAG 的活動切片——活動記憶改由 core/semantic_index 保管，
+            # 每筆只 embedding 一次。在 worker 程序做，主服務不載入索引套件。
+            from rag.report_indexer import report_indexer
+            update_job(args.job_id, message="正在同步秘書報告檔，並清掉重複的活動切片…")
+            result = report_indexer.sync_all()
+            removed = result.get("legacy_activity_chunks_removed", 0)
+            message = f"已同步 {result.get('total_reports_indexed', 0)} 份秘書報告"
+            if removed:
+                message += f"，並清掉 {removed} 筆重複的舊活動切片"
+            finish_job(args.job_id, "completed", message, result=result)
         else:
             raise ValueError(f"Unsupported RAG job type: {job['job_type']}")
         return 0

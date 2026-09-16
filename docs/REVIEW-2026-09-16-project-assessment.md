@@ -94,7 +94,7 @@
    改成 `pip install omnicontext[rag]` 是純打包工作。
    → **同日已完成（D1）**：核心安裝 176 MB，`[rag]` 另 550 MB，沒裝時每條路徑都說得出缺什麼（ROADMAP §11.2）。
 2. **平台**：`watchers/window_watcher.py`、`notifiers/desktop_notifier.py`、autostart 腳本綁 Windows；`core/manager.py:182` 在其他平台仍無條件啟動視窗採集器、靜默無效。
-3. **設定門檻**：449 行設定裡有約 25 個是秘書引擎的評分權重（`proactive_secretary.*_boost`、`*_min_days`），那是程式常數不是使用者設定。
+3. **設定門檻**：449 行設定裡有約 25 個是秘書引擎的評分權重（`proactive_secretary.*_boost`、`*_min_days`），那是程式常數不是使用者設定。→ **同日已完成（D6）**：22 個權重、視窗標題忽略清單與介面辨識規則移出範例檔（數值不變，由測試鎖住）；設定行 327 → 252，檔案 449 → 344 行（其餘為隱私／安全邊界註解，刻意留著）。
 4. **首次啟動沒有資料**：沒有示範資料、沒有「偵測到你有 Claude Code 記錄，要不要匯入」的引導。
 5. **local-first 宣稱有一個破口**：`web/index.html:12` 從 jsdelivr 載入 `marked`、第 8–10 行載入 Google Fonts——離線就壞、且對外發請求。
    → **同日已完成（B8）**。
@@ -135,7 +135,7 @@
 1. **兩套 LLM client**：`synthesizer/llm_client.py:88`（同步，Ollama 走 `/api/generate`）與 `rag/llm_gateway.py:24`（非同步串流，Ollama 走 `/api/chat`），讀同一組設定鍵，
    預設模型已經漂移（`gemini-3.7-flash` vs `gemini-2.5-flash`）；`core/semantic_index.py:451` 還有第三條 Ollama 呼叫；`rag/embeddings.py:71` 第四次實作 OpenAI 金鑰解析。
    → **同日已完成（D2）**：合為 `core/llm_client.py`，四處都改走它（ROADMAP §11.2）。
-2. **兩套向量記憶**：`core/semantic_index.py`（Ollama bge-m3、向量存 SQLite BLOB、純 Python cosine）與 `rag/activity_indexer.py:54`（FastEmbed＋Chroma＋BM25）
+2. **兩套向量記憶**：`core/semantic_index.py`（Ollama bge-m3、向量存 SQLite BLOB、純 Python cosine）與 `rag/activity_indexer.py:54`（FastEmbed＋Chroma＋BM25）→ **同日已完成（D7）**：依 ADR-023 分工——活動記憶收進核心索引（多了秘書筆記與微摘要）、文件留給 RAG；`activity_indexer.py` 縮成只剩報告檔的 `report_indexer.py`，對話的活動段改查同一份核心索引。
    對**同樣五種實體**（ProjectState／OpenLoop／AI turn／Git／File）各做一次 embedding、各有查詢路徑與 UI（`omni ask` vs `/api/v1/rag/chat`）。這是 repo 裡最大的一塊重複。
 3. **四份「每專案每日活躍」聚合**：`weekly_review.py:83`、`activity_patterns.py:243-306`、`activity_digest.py:77`、`secretary_greeting.py:97`，各自從同一組事件表算一遍。
    → **同日已完成（D3）**，但**這條當時的描述只對一半**：其中兩組早就互相委派了。真正的重複是「哪些表算活動、專案名在哪個欄位、一天從哪到哪」各寫三遍，已收進 `core/activity_sources.py`（ROADMAP §11.2）。
@@ -154,7 +154,7 @@
    `rag/router.py`（655 行、31 條）也把資料夾 CRUD、job、儲存、檔案瀏覽、檢索、對話 session 混在一起。
 2. **`web/app.js` 6,055 行單檔**：約 30 個模組層 `let` 當狀態、105 處 `innerHTML`、9 處繞過共用 fetch helper 的裸 `fetch()`、126 個 `catch` 只有 13 個記 log、17 處字串內嵌 `onclick=`。
 3. **`watchers/agent_log_watcher.py` 1,066 行**解析四種**無穩定性保證的私有格式**（Codex 還有 json／jsonl 兩套 parser）；測試用合成 fixture，鎖的是今天的形狀，**格式一變就是靜默零事件**。
-4. **六層巢狀預設關閉旗標**（`executor` → `l2` → `l2.allow_write` → `scheduled_tasks` → `telegram_approvals` → `allow_remote_arm`）守著約 2,800 行預設安裝永不執行的程式。
+4. **六層巢狀預設關閉旗標**（`executor` → `l2` → `l2.allow_write` → `scheduled_tasks` → `telegram_approvals` → `allow_remote_arm`）守著約 2,800 行預設安裝永不執行的程式。→ **同日已完成（D6）**：收成三層真正的分級，另兩層併入它們的上層開關（ADR-008 Addendum D）；既有設定檔明確寫成 false 的照樣有效。
 5. **`core/acceptance.py` 1,564 行**：22 個手寫 `_check_aN` ＋ 200 行 `_ITEMS`——把 TODO A 段做成可執行是好主意，但 3% 的程式碼在做自我證明，應改為少數幾個通用探針上的宣告式表格。
 6. **API 錯誤契約不一致**：48 處 `HTTPException` 與多處回 HTTP 200 的 `{"status": "skipped"/"error"}` 並存；87 個 `except Exception` 大多靜默吞掉。
 7. **CLI 與 API 詞彙分家**：`main.py cmd_status` 自己多算 `ai_nonempty_count`／`checkpoint_errors`，儀表板拿不到。
