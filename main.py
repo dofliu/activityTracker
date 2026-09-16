@@ -53,7 +53,6 @@ from core.project_engine import (
     transition_open_loop,
 )
 from synthesizer.aggregator import generate_daily_summary_pipeline, generate_periodic_checkpoint
-from scripts.cleanup_noise import cleanup_noise_and_demo_data
 from notifiers.desktop_notifier import DesktopNotifier
 from exporters.daily_brief import export_daily_brief
 
@@ -244,10 +243,13 @@ def cmd_checkpoint(hours: int = 2):
 
 
 def cmd_status():
-    """查看本地 SQLite 資料庫累積事件統計與專案狀態"""
+    """查看本地 SQLite 資料庫累積事件統計與專案狀態。
+
+    數字一律來自 ``/api/v1/control/status``（服務沒開時退回同一支 ``get_status()``）；
+    CLI 只呈現、不自己再算一份，儀表板與 CLI 才會講同一組數字（TODO B9）。
+    """
     import json
     import urllib.request
-    from sqlalchemy import func
 
     cfg = get_config()
     status_source = "local fallback"
@@ -264,30 +266,12 @@ def cmd_status():
     except Exception:
         status = get_manager().get_status()
 
-    db = get_db()
-
-    with db.session_scope() as session:
-        project_counts = dict(
-            session.query(ProjectState.status, func.count(ProjectState.id))
-            .group_by(ProjectState.status)
-            .all()
-        )
-        open_loops_count = session.query(OpenLoop).filter(OpenLoop.status == "open").count()
-        ai_nonempty_count = session.query(AIPromptEvent).filter(
-            AIPromptEvent.response_text.isnot(None),
-            func.length(func.trim(AIPromptEvent.response_text)) > 0,
-            ~AIPromptEvent.response_text.like("[%Session]"),
-            ~AIPromptEvent.response_text.like("[%Agent Session]")
-        ).count()
-        ai_final_candidate_count = session.query(AIPromptEvent).filter(
-            AIPromptEvent.response_status == "final_candidate",
-            AIPromptEvent.response_text.isnot(None),
-            func.length(func.trim(AIPromptEvent.response_text)) > 0,
-        ).count()
-        checkpoint_errors = session.query(IngestionCheckpoint).filter(
-            IngestionCheckpoint.last_error.isnot(None),
-            func.length(func.trim(IngestionCheckpoint.last_error)) > 0,
-        ).count()
+    metrics = status.get("metrics", {})
+    project_counts = metrics.get("project_states", {})
+    open_loops_count = metrics.get("open_loops_open_count", 0)
+    ai_nonempty_count = metrics.get("ai_nonempty_responses_count", 0)
+    ai_final_candidate_count = metrics.get("ai_final_candidates_count", 0)
+    checkpoint_errors = metrics.get("ingestion_checkpoint_errors_count", 0)
 
     print("\n" + "="*50)
     print("📊 OmniContext 系統統計數據")
@@ -936,9 +920,6 @@ def main():
     brief_parser.add_argument("--dir", help="覆寫輸出目錄")
     brief_parser.add_argument("--notify", action="store_true", help="產出後同時發送桌面通知")
 
-    # clear-demo 指令
-    subparsers.add_parser("clear-demo", help="清除示範假資料與歷史噪音")
-
     # status 指令
     subparsers.add_parser("status", help="查看當前數據庫統計與監控狀態")
 
@@ -1047,8 +1028,6 @@ def main():
             cmd_notify_desktop(args.type, getattr(args, "dry_run", False))
     elif args.command == "brief":
         cmd_brief(getattr(args, "dir", None), getattr(args, "notify", False))
-    elif args.command == "clear-demo":
-        cleanup_noise_and_demo_data()
     elif args.command == "status":
         cmd_status()
     elif args.command == "index":

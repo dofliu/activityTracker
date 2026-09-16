@@ -136,7 +136,7 @@ html[data-theme="light"][data-accent="ocean"] {
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: "Noto Sans TC", system-ui, -apple-system, "Microsoft JhengHei", sans-serif;
+  font-family: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", system-ui, -apple-system, sans-serif; /* 全部本機字型；不再載入 Google Fonts */
   background: var(--bg);
   color: var(--tx);
   line-height: 1.5;
@@ -149,7 +149,7 @@ input, select, button { font-family: inherit; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: var(--bd); }
 
-.mono, .mono-label, .mono-mini { font-family: "JetBrains Mono", monospace; }
+.mono, .mono-label, .mono-mini { font-family: "JetBrains Mono", "Cascadia Mono", Consolas, "SF Mono", monospace; }
 .mono-label { font-size: 11px; letter-spacing: 2px; font-weight: 700; }
 .mono-mini { font-size: 10.5px; letter-spacing: 1.4px; font-weight: 700; }
 .muted { color: var(--mu); }

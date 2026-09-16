@@ -30,7 +30,7 @@
 ### D1 唯讀輪詢本機 `.ics`
 
 - `watchers/calendar_watcher.py`：`CalendarWatcherService` 與其他採集器同形（`start`／`stop`／`check_health_and_heal`／`get_diagnostics`），每 `scan_interval_seconds`（預設 900）掃一次 `watchers.calendar_watcher.paths` 裡的 `.ics` 檔與資料夾（資料夾只收第一層 `.ics`）。**只讀檔案，永不寫回、永不連網。**
-- 解析器 `core/ics_parser.py` 只用標準函式庫 ＋ `python-dateutil`（已是 pandas 的相依）：RFC 5545 折行、`DTSTART`／`DTEND`／`DURATION`、`VALUE=DATE` 全天、`TZID`（`zoneinfo`；查不到時區時退回本地時間並在診斷記一筆）、`RRULE`＋`EXDATE`、`RECURRENCE-ID` 覆寫、`STATUS:CANCELLED`。重複事件**只展開視野內**（今天 −7 天 ～ ＋`horizon_days`，預設 30）。
+- 解析器 `core/ics_parser.py` 只用標準函式庫 ＋ `python-dateutil`（直接宣告的依賴）：RFC 5545 折行、`DTSTART`／`DTEND`／`DURATION`、`VALUE=DATE` 全天、`TZID`（`zoneinfo`；查不到時區時退回本地時間並在診斷記一筆）、`RRULE`＋`EXDATE`、`RECURRENCE-ID` 覆寫、`STATUS:CANCELLED`。重複事件**只展開視野內**（今天 −7 天 ～ ＋`horizon_days`，預設 30）。
 - 每個檔案各自 try/except：壞檔進 `degraded_sources`，不影響其他檔（與 git_watcher 的 repo 隔離同一模式）。
 
 ### D2 只存決策需要的欄位

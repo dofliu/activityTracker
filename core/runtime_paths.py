@@ -89,6 +89,7 @@ def runtime_asset_status() -> dict:
         "config_template": template.is_file(),
         "web_index": (web_dir / "index.html").is_file(),
         "extension_monitor": (web_dir / "extension-monitor.html").is_file(),
+        "web_vendor_marked": (web_dir / "vendor" / "marked.min.js").is_file(),
         "extension_manifest": (extension_dir / "manifest.json").is_file(),
         "extension_popup": (extension_dir / "popup.html").is_file(),
     }

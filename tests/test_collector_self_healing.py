@@ -138,6 +138,11 @@ def test_manager_supervise_and_heal(tmp_path):
     assert "git_watcher" in res.get("healed_services", [])
 
     status = manager.get_status()
+    # TODO B9：CLI `status` 只呈現這裡的數字，所以專案狀態與 open loops 也要在 metrics 裡
+    metrics = status["metrics"]
+    assert set(metrics["project_states"]) == {"active", "idle", "stale"}
+    assert isinstance(metrics["open_loops_open_count"], int)
+    assert "ai_nonempty_responses_count" in metrics and "ingestion_checkpoint_errors_count" in metrics
     assert status["self_healing"]["healing_events_count"] >= 1
     assert "file_watcher" in status["collector_diagnostics"]
     assert "git_watcher" in status["collector_diagnostics"]

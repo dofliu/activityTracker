@@ -114,6 +114,8 @@
 
 ### 4.2 已核實的缺陷與死碼（可以直接刪）
 
+> **同日已處理**（R0 第一輪，收據見 [ROADMAP §11.2](../ROADMAP.md) 2026-09-16 條目）：下表九項全部完成；`clear-demo` 連同 `scripts/cleanup_noise.py` 一起移除，字型改為全本機字型堆疊而非把 Noto Sans TC 打進 wheel。
+
 | # | 位置 | 問題 |
 | :-- | :--- | :--- |
 | 1 | `core/server.py:332` vs `:860` | `SystemMaintenanceRequest` 定義兩次；第一個（含 `do_backup`／`checkpoint_mode`）沒有任何使用者，純死碼，且讓讀者以為 API 支援那兩個欄位 |
@@ -181,6 +183,6 @@
 
 ## 7. 這份檢視沒有做的事
 
-- 沒有改任何程式碼；§4.2 的缺陷已登記為 TODO B5–B9，整頓項目為 TODO D 段。
+- 檢視本身沒有改程式碼；§4.2 的九項在同日 R0 第一輪處理完（ROADMAP §11.2），整頓項目仍在 TODO D 段。
 - 沒有在 Windows 實機驗證任何功能；A 段收據狀態以 `python main.py verify` 為準。
 - 沒有評估 LLM 產出的品質（摘要、提案註解）；那需要使用者的實機資料。
