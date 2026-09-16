@@ -1,11 +1,8 @@
 from fastapi.testclient import TestClient
 
-from core.server import (
-    app,
-    browser_conversation_key,
-    browser_response_status,
-    get_system_config,
-)
+from core.api.settings import get_system_config
+from core.ingest import browser_conversation_key, browser_response_status
+from core.server import app
 from core.secret_resolver import SecretResolution
 
 
@@ -31,7 +28,7 @@ def test_empty_config_keeps_public_secret_field_contract(monkeypatch):
     class EmptyConfig:
         data = {}
 
-    monkeypatch.setattr("core.server.get_config", lambda: EmptyConfig())
+    monkeypatch.setattr("core.api.settings.get_config", lambda: EmptyConfig())
     payload = get_system_config()
 
     assert payload["integrations"]["github"]["token"] == ""
@@ -40,7 +37,7 @@ def test_empty_config_keeps_public_secret_field_contract(monkeypatch):
 
 def test_llm_status_exposes_source_but_never_secret(monkeypatch):
     monkeypatch.setattr(
-        "core.server.resolve_secret_env",
+        "core.api.integrations.resolve_secret_env",
         lambda name, aliases=(): SecretResolution(
             value="test-secret-never-returned",
             source="windows_user",
@@ -94,7 +91,7 @@ def test_extension_write_with_wrong_token_explains_403(monkeypatch):
 def test_extension_status_pairing_probe_requires_token(monkeypatch):
     monkeypatch.setenv("OMNICONTEXT_INGEST_TOKEN", "pairing-test-token")
     monkeypatch.setattr(
-        "core.server.build_extension_status",
+        "core.api.system.build_extension_status",
         lambda provided_token: {
             "extension": {
                 "pairing_verified": provided_token == "pairing-test-token",
@@ -121,7 +118,7 @@ def test_extension_status_pairing_probe_requires_token(monkeypatch):
 def test_extension_heartbeat_requires_token_even_without_origin(monkeypatch):
     monkeypatch.setenv("OMNICONTEXT_INGEST_TOKEN", "heartbeat-test-token")
     monkeypatch.setattr(
-        "core.server.record_extension_heartbeat",
+        "core.api.system.record_extension_heartbeat",
         lambda payload: {
             "status": "accepted",
             "server_received_at": "2026-08-25T10:00:00",
@@ -176,7 +173,7 @@ def test_extension_verification_api_is_local_only_and_forbids_extra_fields(monke
                 "persisted": False,
             }
 
-    monkeypatch.setattr("core.server.extension_verification_registry", FakeRegistry())
+    monkeypatch.setattr("core.api.system.extension_verification_registry", FakeRegistry())
     started = client.post(
         "/api/v1/extension/verification",
         json={"platforms": ["claude"], "timeout_seconds": 300},
@@ -207,9 +204,9 @@ def test_usage_api_exposes_claim_and_coverage_contract(monkeypatch):
         def get_status(self):
             return {"collector_runtime": {}, "collector_health": {}}
 
-    monkeypatch.setattr("core.server.get_manager", lambda: FakeManager())
+    monkeypatch.setattr("core.api.activity.get_manager", lambda: FakeManager())
     monkeypatch.setattr(
-        "core.server.get_usage_summary",
+        "core.api.activity.get_usage_summary",
         lambda *_args, **_kwargs: {
             "metric_label": "foreground_active_time",
             "claim_boundary": "not productivity",
@@ -228,7 +225,7 @@ def test_usage_api_exposes_claim_and_coverage_contract(monkeypatch):
 
 def test_background_task_api_keeps_duration_separate_and_content_private(monkeypatch):
     monkeypatch.setattr(
-        "core.server.get_background_task_summary",
+        "core.api.activity.get_background_task_summary",
         lambda *_args, **_kwargs: {
             "metric_label": "verified_background_agent_execution_time",
             "claim_boundary": "not foreground or productivity",
@@ -249,7 +246,7 @@ def test_background_task_api_keeps_duration_separate_and_content_private(monkeyp
 
 def test_capture_status_api_exposes_separate_channels_without_sensitive_content(monkeypatch):
     monkeypatch.setattr(
-        "core.server.build_capture_coverage",
+        "core.api.system.build_capture_coverage",
         lambda: {
             "platforms": [
                 {
@@ -276,7 +273,7 @@ def test_capture_status_api_exposes_separate_channels_without_sensitive_content(
 
 def test_context_sessions_api_keeps_temporal_inference_boundary(monkeypatch):
     monkeypatch.setattr(
-        "core.server.build_recent_work_sessions",
+        "core.api.activity.build_recent_work_sessions",
         lambda **_kwargs: {
             "status": "observed",
             "sessions": [{"session_id": "abc", "inference_status": "temporal_grouping"}],
@@ -294,7 +291,7 @@ def test_context_sessions_api_keeps_temporal_inference_boundary(monkeypatch):
 
 def test_related_context_api_is_local_advisory_and_rejects_extra_fields(monkeypatch):
     monkeypatch.setattr(
-        "core.server.find_related_work",
+        "core.api.activity.find_related_work",
         lambda question, **_kwargs: {
             "status": "related_history_found",
             "question": question,
@@ -321,7 +318,7 @@ def test_related_context_api_is_local_advisory_and_rejects_extra_fields(monkeypa
 
 def test_secretary_proposals_api_is_read_only_and_origin_protected(monkeypatch):
     monkeypatch.setattr(
-        "core.server.build_action_proposals",
+        "core.api.secretary.build_action_proposals",
         lambda **_kwargs: {
             "status": "proposal_only",
             "mode": "proposal_only",
@@ -395,7 +392,7 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     assert "select-agent-cli" in dashboard.text
     assert "DATA CAPTURE" in dashboard.text
     assert "extension-capture-badge" not in dashboard.text
-    from core.server import asset_version  # 資產版本改為內容雜湊，不再寫死
+    from core.api.pages import asset_version  # 資產版本改為內容雜湊，不再寫死
     assert f"style.css?v={asset_version()}" in dashboard.text
     assert f"app.js?v={asset_version()}" in dashboard.text
     assert "focus-carousel" in dashboard.text

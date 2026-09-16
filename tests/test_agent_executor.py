@@ -473,10 +473,10 @@ def test_execute_endpoint_requires_token_and_ignores_request_body():
 def test_401_distinguishes_an_unconfigured_service_from_a_wrong_token(monkeypatch):
     """ADR-021 D6：設定在啟動時只讀一次，所以「服務沒載入 token」是使用者最常踩到的情況；
     它與「token 打錯」對排查是兩件事，訊息必須分得出來（安全性不變，兩者都是 401）。"""
-    import core.server as server
+    import core.api.deps as deps  # D4 之後 execution token 的閘門在這裡（兩個 router 共用）
 
     client = TestClient(app)
-    monkeypatch.setattr(server, "get_config", lambda: DictConfig({"security": {}}))
+    monkeypatch.setattr(deps, "get_config", lambda: DictConfig({"security": {}}))
     unconfigured = client.post(
         "/api/v1/secretary/proposals/whatever/execute",
         json={},
@@ -487,7 +487,7 @@ def test_401_distinguishes_an_unconfigured_service_from_a_wrong_token(monkeypatc
     assert "重啟服務" in detail and "OMNICONTEXT_EXECUTION_TOKEN" in detail
 
     monkeypatch.setattr(
-        server, "get_config", lambda: DictConfig({"security": {"execution_token": "the-real-one"}})
+        deps, "get_config", lambda: DictConfig({"security": {"execution_token": "the-real-one"}})
     )
     mismatch = client.post(
         "/api/v1/secretary/proposals/whatever/execute",

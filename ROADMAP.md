@@ -4,7 +4,7 @@
 > P2.6 coverage ledger、P3 context memory、P4.2/4.3 Git 同步與對帳、P5 分級執行器與排程、P6 發佈整備、P7 DeskRAG、P8 自我修復均已實作；
 > 秘書側另有記憶區（ADR-012）／Telegram 對話（ADR-013）／多通道推播（ADR-014）／本機行事曆（ADR-015）／驗收中心（ADR-016）／模式感知提案（ADR-017）／
 > 宣告式個人檔案（ADR-018）／秘書桌面（ADR-019）／每週回顧（ADR-020）／文件落後偵測（ADR-021）／會議秘書第一層（ADR-022）。**危險能力一律預設關閉。**
-> 65 個 contract test 模組、660 項測試（659 passed + 1 skipped；不裝 `[rag]` extra 時 647 passed + 12 skipped）；schema migration 18/18。
+> 66 個 contract test 模組、663 項測試（662 passed + 1 skipped；不裝 `[rag]` extra 時 650 passed + 12 skipped）；schema migration 18/18。
 > **仍不具 release-ready 資格**：全天 coverage ledger 實測與各功能的使用者實機收據未齊（見 §12 與 [docs/TODO.md](docs/TODO.md)）。
 > 本文件記錄 OmniContext 從 0 到 1 的缺陷修復歷程、已完成之架構改造與未來的維運與延伸規劃。
 
@@ -652,6 +652,7 @@ P2.5-S1 API 安全邊界
 - ✅ 2026-09-16（第二輪）：**R0 完成——知識庫依賴改為選用 extra（TODO D1）**。`chromadb`／`fastembed`／`rank-bm25`／`jieba`／`pymupdf`／`python-docx`／`python-pptx`／`openpyxl` 自核心依賴移到 `[project.optional-dependencies] rag`；`dev` 改為自我參照 `omnicontext[rag]` ＋ `omnicontext[test]`（pip 可解析，已實測）。新增 `rag/availability.py`（只用 `importlib.find_spec`，不 import 套件）作為單一定義，每條會用到這些套件的路徑都**在動手前**說清楚缺什麼：建 job → `create_job` 拒絕、API 回 503 且 `detail.error = rag_extra_not_installed` 附 `missing` 與 `install_hint`；檢索 worker → 不啟動子程序、狀態 `unavailable`（只針對預設指令，測試注入的替身不受影響）；對話 → 照常回答只是不帶文件脈絡；啟動預熱 → 略過並記 `rag_extra_not_installed`；驗收中心 A6 → `not_configured` 並給安裝指令；儀表板 02 分頁把會失敗的按鈕灰掉並顯示安裝指令。**收據**：有 extra 時 `pytest` 638 passed ＋ 1 skipped（新增 11 項）；**沒有** extra 的乾淨 venv `pip install -e ".[test]"` 只有 **176 MB**（B6 後 721 MB → 176 MB，`[rag]` 佔約 550 MB），`import core.server` 成功、`pytest` 626 passed ＋ 12 skipped（需要套件的測試以 `importorskip` 標明）；`verify` 輸出與基底相同；wheel METADATA 的 `Provides-Extra: rag／ocr／test／dev` 正確；CI 新增 `test-core-without-rag-extra` job（ubuntu／3.12，不裝 `[rag]` 跑全套）。踩坑：依賴檢查一開始放在 router 與 startup 外圍，結果沒裝套件的環境裡連注入假 worker 的測試都被擋——**檢查要放在真的會失敗的那一層（client 啟動子程序處）**，外圍只讀它回報的狀態。
 - ✅ 2026-09-16（第三輪）：**R1 D2——一個 LLM client**。刪 `synthesizer/llm_client.py`（233 行，同步、Ollama 走 `/api/generate`、gemini 預設 2.5-flash）與 `rag/llm_gateway.py`（215 行，串流、Ollama 走 `/api/chat`、gemini 預設 3.7-flash），新增 `core/llm_client.py`（466 行）作為唯一實作：provider 別名（gpt／claude／google）、`DEFAULT_MODELS`、`KEY_ENVS` 各只定義一次；`LLMClient.generate()`（同步，失敗**回傳** `[本機備援模式]` markdown）與 `LLMClient.stream_chat()`（非同步，失敗 **yield** `[OpenAI API 錯誤]` 等字串）共用同一組預設與金鑰解析；Ollama 兩條路徑都走 `/api/chat`、system prompt 以 system role 傳（不再拼 `<system>` 標籤）。第三條 Ollama 呼叫（`core/semantic_index._generate_local_answer`，`omni ask`）改走 `LLMClient.ollama_chat()`（保留 loopback-only 與低溫度）；第四份金鑰解析（`rag/embeddings.py` 寫死 `OPENAI_API_KEY`）改走 `resolve_provider_api_key()`（開始尊重 `synthesizer.openai.api_key_env`）；`core/secretary_advisor.py` 私有的 `_DEFAULT_MODELS` 表刪除。知識庫對話的 provider／model 預設（`rag.active_provider`／`rag.active_model`）搬到呼叫端 `rag/router._chat_target()`，`core/secretary_ask` 共用——LLM client 不認識 rag 的設定鍵。**行為不變的部分**：所有失敗抬頭字面不動（`core/meeting_transcripts.looks_like_llm_error` 與 `core/acceptance._LLM_ERROR_MARKERS` 靠它們辨識供應商錯誤，有契約測試）；`python main.py llm-test` 輸出結構不變。**收據**：`pytest` 647 passed ＋ 1 skipped（新增 `tests/test_llm_client_single_source.py` 9 項；其中一項掃全 repo 禁止在 `core/llm_client.py` 以外寫死模型名——第一次跑就抓到 `semantic_index.py` 漏掉的一處）；不裝 `[rag]` 635 passed ＋ 12 skipped；`verify` 輸出與基底相同；wheel 只含 `core/llm_client.py`。
 - ✅ 2026-09-16（第四輪）：**R1 D3——活動來源定義只有一份**。動工前先核對，發現檢視當時「四份各自實作」的說法**只對一半**：`core/weekly_review.active_days_by_project` 早就委派給 `activity_patterns.activity_matrix`，`core/activity_digest.collect_day_stats` 也早就委派給 `secretary_greeting.collect_activity_stats`。真正剩下的重複是**三件事各寫三遍**——哪三張表算活動、專案名在哪個欄位、一天從哪到哪。新增 `core/activity_sources.py`（175 行）收成單一定義：`EVENT_SOURCES`（表 × 專案欄位 × 時間欄位）、`normalize_project`（空白＝沒歸戶，不猜）、`day_bounds`／`window_bounds`（一律半開區間）、`project_activity_matrix`（專案 × 日）與 `project_event_counts`（專案 × 筆數）。四個使用端全部改吃它：`activity_patterns.activity_matrix` 變成視窗換算的薄包裝、`weekly_review` 直接用新函式、`activity_digest.per_project_counts` 改用共用計數（自己那三段 group-by 刪除）、`secretary_greeting` 的三張事件表查詢改由 `source_for()` 決定要查哪張表與哪個時間欄位。**刻意不合併**問候卡的 PR／專案狀態／未結事項／前景時間查詢——那些不是活動來源，硬併只會讓新模組變成第二個 god object。**收據**：`pytest` 659 passed ＋ 1 skipped（新增 `tests/test_activity_sources_single_source.py` 12 項，核心是一支「同一天四處數字必須對得上」的對帳測試，另一支掃原始碼禁止四個使用端再自己查三張事件表的專案欄位）；不裝 `[rag]` 647 passed ＋ 12 skipped；`verify` 輸出與基底相同；四個使用端淨減 77 行。
+- ✅ 2026-09-16（第五輪）：**R1 D4——`core/server.py` 依領域切成 9 個 router**。動刀前先做安全網：`tests/test_api_route_snapshot.py` 從執行中的 app 抓下**全部 133 條路由**（98 條主服務 ＋ 31 條 DeskRAG）的（路徑、方法、handler 名稱）快照並鎖住——少一條、多一條、改名都會失敗。搬家用 AST 逐個頂層定義切出來，每個模組的 import 由「這個模組實際用到哪些名稱」自動推導，再用 pyflakes 確認零未定義、零未使用。結果：`core/server.py` **1,995 行 → 134 行**，只做四件事（建 app ＋ 安全邊界 middleware、掛 `/static`、掛 9 個 router ＋ RAG、為既有呼叫端保留 `asset_version`／`render_index_html`／`WEB_DIR` 的名稱）。新增 `core/api/{pages,system,events,activity,secretary,projects,repos,integrations,settings}.py`（每個 66～334 行）＋ `core/api/deps.py`（execution token 閘門，秘書與排程兩個 router 共用，只有一份）；33 個 Pydantic model 集中到 `core/schemas.py`；AI 事件的 `turn_key` 與 `response_status` 判定移到 `core/ingest.py`（那是 ADR-001 的 provenance 規則，不是 web 層的事）。**行為不變**：路由表、middleware 順序、403／401 的 detail 字面全部原封不動。測試只改 patch 目標的 import 路徑（14 個 `core.server.X` → 對應的 `core.api.X`，斷言一字未改）。**收據**：`pytest` 662 passed ＋ 1 skipped（新增路由快照 3 項）；不裝 `[rag]` 650 passed ＋ 12 skipped；`verify` 輸出與基底相同；`python -m build` ＋ `verify_release_artifacts.py` 通過且 wheel 含 `core/api/` 全部模組。
 
 ---
 
@@ -715,7 +716,7 @@ P2.5-S1 API 安全邊界
 
 ### 13.1 檢視結論
 
-- 程式面 P0–P8 ＋ 22 份 ADR 全部落地、660 項測試容器全綠；**功能已經夠多，缺的是減法。**
+- 程式面 P0–P8 ＋ 22 份 ADR 全部落地、663 項測試容器全綠；**功能已經夠多，缺的是減法。**
 - 專案唯一沒有替代品的能力是**讀本機 AI agent transcript 並還原成有 provenance 的工作脈絡**；
   其餘（RAG、Git 同步、Telegram／LINE、會議秘書）市面都有更成熟的替代品。
 - 現在的形狀不適合對外：安裝 800 MB 起、449 行設定、視窗採集與桌面通知綁 Windows、
@@ -733,7 +734,7 @@ P2.5-S1 API 安全邊界
 **R1 合併（2–3 個 session，小設計決策）**
 - ✅ 一個 LLM client（同步 `generate` ＋ 串流 `stream_chat`），`synthesizer/llm_client.py` 與 `rag/llm_gateway.py` 收成 `core/llm_client.py`（D2，2026-09-16 完成，§11.2）。
 - ✅ 一個 `core/activity_sources`（`EVENT_SOURCES` ＋ `project_activity_matrix` ＋ `project_event_counts`），四處改吃它（D3，2026-09-16 完成，§11.2）。
-- `core/server.py` 依領域切成 `APIRouter`，Pydantic model 集中；AI ingest 邏輯搬出路由（D4）。
+- ✅ `core/server.py` 依領域切成 9 個 `APIRouter`（1,995 → 134 行），Pydantic model 集中到 `core/schemas.py`，AI ingest 邏輯搬到 `core/ingest.py`（D4，2026-09-16 完成，§11.2）。
 - `desktop_notifier` 進 `ChannelAdapter`（D5）。
 - 六層旗標收成三個（D6）。
 

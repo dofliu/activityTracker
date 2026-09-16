@@ -150,6 +150,7 @@
 ### 4.4 結構問題（大工程，要排期）
 
 1. **`core/server.py` 2,003 行、98 條路由、零 `APIRouter` 切分**；34 個 Pydantic model 散落各處；AI 事件 ingest 的去重／turn key／狀態分級邏輯內嵌在路由（`:1370-1445`）。
+   → **同日已完成（D4）**：切成 9 個領域 router，server.py 剩 134 行；model 進 `core/schemas.py`、ingest 規則進 `core/ingest.py`；133 條路由由快照測試鎖住（ROADMAP §11.2）。
    `rag/router.py`（655 行、31 條）也把資料夾 CRUD、job、儲存、檔案瀏覽、檢索、對話 session 混在一起。
 2. **`web/app.js` 6,055 行單檔**：約 30 個模組層 `let` 當狀態、105 處 `innerHTML`、9 處繞過共用 fetch helper 的裸 `fetch()`、126 個 `catch` 只有 13 個記 log、17 處字串內嵌 `onclick=`。
 3. **`watchers/agent_log_watcher.py` 1,066 行**解析四種**無穩定性保證的私有格式**（Codex 還有 json／jsonl 兩套 parser）；測試用合成 fixture，鎖的是今天的形狀，**格式一變就是靜默零事件**。

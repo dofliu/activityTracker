@@ -59,7 +59,7 @@ def test_system_health_reads_materialized_project_count_without_refresh(client, 
         raise AssertionError("health endpoint must not refresh project states")
 
     monkeypatch.setattr("core.project_engine.refresh_project_states", _unexpected_refresh)
-    monkeypatch.setattr("core.server.get_project_state_count", lambda: 7)
+    monkeypatch.setattr("core.api.system.get_project_state_count", lambda: 7)
 
     response = client.get("/api/v1/system/health")
 
