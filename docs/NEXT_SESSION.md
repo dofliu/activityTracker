@@ -1,6 +1,7 @@
 # 下一個 Session 接手指南
 
-> 最後更新：2026-09-13（最近一輪：**文件整理**——README／README_en 重寫、USAGE 重組、ROADMAP §11 成果紀錄合併排序）。
+> 最後更新：2026-09-16（最近一輪：**專案檢視**——[REVIEW-2026-09-16](REVIEW-2026-09-16-project-assessment.md) 價值評估與架構體檢、ROADMAP §13 整頓三階段、TODO 新增 B5–B9 與 D 段；**沒有改程式**）。
+> 上一輪文件整理是 2026-09-13。
 > 上一輪程式變更是 2026-09-08 的**會議秘書第一層**（[ADR-022](ADR-022-meeting-secretary.md)）。
 > **完整的功能歷程不在這裡**：一路做了什麼一律看 [ROADMAP.md](../ROADMAP.md) §11.2（依日期排序的單一清單）。
 >
@@ -19,6 +20,7 @@
 | 導覽 | 6 分頁，**沒有右欄**（2026-09-06 依實機回饋移除；今日統計與 Focus Now 在 05 最上方、DATA TRUST 在 06 系統健康）：01 小秘書＝兩塊一屏（左：秘書桌面，問候併入、全部提案收合在底部；右：交辦與提問，記憶區收合在裡面）／02 知識庫／03 進行中工作／04 Git 同步中心／05 摘要與統計／06 系統設定（左欄 11 區塊，末項為**驗收中心**）。桌面與 494px 皆無水平溢出（Playwright 實測）。 |
 | 外觀 | 兩個獨立軸：`data-theme`（dark/light）× `data-accent`（naruto/forest/ocean），CSS 全走 `var(--accent)`；新配色只需加一組變數區塊。偏好存 localStorage（`omni-theme`／`omni-palette`／`omni-settings-pane`）。 |
 | 危險能力 | 執行器、L2、L2 寫入、自訂排程、Telegram 對話、`allow_remote_arm`、LINE、問候卡 LLM 潤飾——**全部預設關閉**；行事曆預設開但沒設路徑就等於停用。 |
+| **方向（2026-09-16 起）** | **減法優先**：功能候選 C5／C6／C3 暫停；接下來依 ROADMAP §13.2 的 R0（刪死碼、RAG 改選用依賴）→ R1（合併 LLM client／活躍聚合、切 router）→ R2（向量記憶二選一、秘書四層化、前端模組化）進行。乾淨容器實測：venv 797 MB、`pytest` 625 passed ＋ 1 skipped（52 s）。 |
 
 ## 功能地圖（要改哪裡就看這張表）
 
@@ -83,10 +85,12 @@
 
 - **待辦一律看 [TODO.md](TODO.md)**：A 段是等待使用者側 live 收據（👤 需在 Windows 實機操作，不是程式工作，A1 是唯一還擋 `release_ready` 的能力缺口）、B 段是已知問題與技術債、C 段是功能候選。
   **A 段的現況直接跑 `python main.py verify` 查**（[ADR-016](ADR-016-acceptance-center.md)）；改 A 段的判準時要同步改 `core/acceptance.py` 的 `_ITEMS`。
-- **方向與取捨看 [ROADMAP.md](../ROADMAP.md) §12「下一階段規劃」**：三條候選路線（C5 私有網路遠端存取、C6 LINE 雙向、C3 其餘採集來源）各自的前置與代價都寫在那裡。
+- **方向與取捨看 [ROADMAP.md](../ROADMAP.md) §13「架構整頓與推廣方向」**（2026-09-16）：§12 的三條功能候選路線（C5／C6／C3）**暫停**，先做減法與合併；每個 D 項的完成判準在 TODO D 段。**R0 是零設計決策的一個 session**——接手時從 TODO B5–B9 與 D1 開始最安全。
+- **想先了解「為什麼要整頓」**：讀 [REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) §4（每項附檔案：行號，已逐項核對原始碼）。
 - **個性化三步（2026-09-05 檢視後的方向）**：(1) 模式感知提案 [ADR-017](ADR-017-pattern-aware-proposals.md) ✅、(2) 宣告式個人檔案 [ADR-018](ADR-018-declared-profile.md) ✅、(3) 秘書桌面 [ADR-019](ADR-019-secretary-desk-home.md) ✅（01 分頁成為真正的首頁）。三步都已落地；刻意不走的路：用 LLM 推斷個性或優先、再多採集來源、C5 遠端存取。
 - **會議秘書**（[ADR-022](ADR-022-meeting-secretary.md)）：第一層（會後逐字稿→觀察＋候選待辦）**已於 2026-09-08 實作**，實機收據待取得（TODO A22）。**第二層（即時字幕／翻譯＝錄下其他人的聲音）刻意沒做**——要做得先過 ADR-022 D6 的五道門並另寫 ADR。
 - 新增待辦請寫進 TODO.md、成果寫進 ROADMAP §11，**不要在本頁另開清單**——這頁保持一分鐘讀完。
+- **整頓的鐵律**：每個 D 項結束 `pytest` 全綠、`python main.py verify` 結果不變（整頓不改行為）；R2 的項目先寫 ADR。
 
 ## 工程慣例（照舊）
 

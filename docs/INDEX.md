@@ -1,6 +1,6 @@
 # 📚 OmniContext 文件總覽（Documentation Index）
 
-> 最後整理：2026-09-13。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
+> 最後整理：2026-09-16。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
 >
 > **每份文件只有一個職責**——同一件事不在第二個地方再寫一次。職責分工見
 > [NEXT_SESSION.md → 工程慣例 → 文件同步](NEXT_SESSION.md#工程慣例照舊)。
@@ -15,7 +15,8 @@
 | 快速了解專案是什麼、能做什麼 | [README.md](../README.md)（繁中）/ [README_en.md](../README_en.md)（English） |
 | 安裝、Extension 配對、日常操作、備份與故障排查 | [USAGE.md](USAGE.md) —— **使用手冊** |
 | 了解目前開發到哪 | [ROADMAP.md](../ROADMAP.md) §11.2 成果紀錄（依日期一條）+ [STATUS.yaml](../STATUS.yaml) |
-| 了解下一階段方向與取捨 | [ROADMAP.md](../ROADMAP.md) §12「下一階段規劃」 |
+| 了解下一階段方向與取捨 | [ROADMAP.md](../ROADMAP.md) §13「架構整頓與推廣方向」（§12 的功能候選已暫停） |
+| **想知道這個專案值不值得推廣、架構哪裡該刪該併** | [REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) —— 現況數字、用處／學術／教學價值評估、架構體檢（附檔案：行號） |
 | 了解產品定位與「不宣稱什麼」的證據邊界 | [PRODUCT_POSITIONING.md](PRODUCT_POSITIONING.md) |
 | 修改架構前先看相關決策 | 下方 ADR 一覽 |
 | 發佈前檢查 | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) |
@@ -33,8 +34,8 @@
 
 | 文件 | 說明 |
 | :--- | :--- |
-| [../ROADMAP.md](../ROADMAP.md) | P0–P8 開發規劃與**成果紀錄**（已完成的事寫在 §11.2，依日期排序的單一清單） |
-| [TODO.md](TODO.md) | **待辦清單**：等待中的使用者側收據、已知問題與技術債、功能候選；每項都有完成判準 |
+| [../ROADMAP.md](../ROADMAP.md) | P0–P8 開發規劃與**成果紀錄**（已完成的事寫在 §11.2，依日期排序的單一清單）；§13 為 2026-09-16 起的架構整頓三階段與推廣路線 |
+| [TODO.md](TODO.md) | **待辦清單**：等待中的使用者側收據（A）、已知問題與技術債（B）、功能候選（C，暫停）、架構整頓（D）；每項都有完成判準 |
 | [../STATUS.yaml](../STATUS.yaml) | 機器可讀的現況快照：feature 清單、evidence receipts、quality gates、**真正還擋著的** known_blockers 與 capability_boundaries（已完成的歷史在 ROADMAP §11.2，不在這裡重複） |
 | [PRODUCT_POSITIONING.md](PRODUCT_POSITIONING.md) | 產品定位：跨 AI、應用與 Repository 的個人工作脈絡層，以及能力／證據邊界 |
 
@@ -76,6 +77,7 @@
 | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) | 發佈前檢查清單 |
 | [RELEASE_NOTES-v1.3.0a5.md](RELEASE_NOTES-v1.3.0a5.md) | v1.3.0a5 release notes（每個版本一份 `RELEASE_NOTES-v*.md`，release workflow 會自動取用） |
 | [VERIFICATION-2026-08-25-next-stage.md](VERIFICATION-2026-08-25-next-stage.md) | 2026-08-25 下一階段驗證紀錄 |
+| [REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) | 2026-09-16 專案檢視快照：現況、推廣／學術／教學價值、架構體檢與該刪該併的判斷 |
 
 ## 歸檔工作文件（docs/archive/）
 
