@@ -138,6 +138,7 @@
 2. **兩套向量記憶**：`core/semantic_index.py`（Ollama bge-m3、向量存 SQLite BLOB、純 Python cosine）與 `rag/activity_indexer.py:54`（FastEmbed＋Chroma＋BM25）
    對**同樣五種實體**（ProjectState／OpenLoop／AI turn／Git／File）各做一次 embedding、各有查詢路徑與 UI（`omni ask` vs `/api/v1/rag/chat`）。這是 repo 裡最大的一塊重複。
 3. **四份「每專案每日活躍」聚合**：`weekly_review.py:83`、`activity_patterns.py:243-306`、`activity_digest.py:77`、`secretary_greeting.py:97`，各自從同一組事件表算一遍。
+   → **同日已完成（D3）**，但**這條當時的描述只對一半**：其中兩組早就互相委派了。真正的重複是「哪些表算活動、專案名在哪個欄位、一天從哪到哪」各寫三遍，已收進 `core/activity_sources.py`（ROADMAP §11.2）。
 4. **秘書叢集 11 個模組、4,109 行、沒有共同型別**：全部是回傳 `dict[str, Any]` 的自由函式（`build_*`／`collect_*_signals`），
    五個訊號收集器與 `build_action_proposals`（`proactive_secretary.py:242`）之間的契約是未定型的 dict。`secretary_ask`（202 行）、`secretary_profile`（150 行）、`secretary_home`（242 行）不值得各自一個模組。
 5. **桌面通知在抽象之外**：`notifiers/desktop_notifier.py`（282 行）自己再扇出一次晨報／交接／停滯／里程碑，沒走 `ChannelAdapter`。
