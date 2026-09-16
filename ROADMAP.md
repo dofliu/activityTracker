@@ -701,3 +701,56 @@ P2.5-S1 API 安全邊界
 2. A2–A22 中屬於**預設開啟路徑**的收據齊備（雲端 provider 複測、大索引檢索、問候卡與行事曆呈現）；預設關閉的危險能力（L2、Telegram 批准、LINE）可標為 optional-verified；
 3. `docs/RELEASE_CHECKLIST.md` 走完一輪，且跨平台 CI 在該 commit 上有自己的 run receipt（不沿用舊 run）；
 4. STATUS.yaml 的 `known_blockers` 不再有 🔴 項目，且每個 quality gate 都是 `passed_*`（`implemented_*` 不算）。
+
+---
+
+## 13. 架構整頓與推廣方向（2026-09-16 檢視）
+
+> 依據：[docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md)（現況、價值評估、架構體檢，每項附檔案：行號）。
+> 這一節只寫「為什麼這樣排、先做什麼」；**待辦條目與完成判準一律在 [docs/TODO.md](docs/TODO.md) B5–B9 與 D 段**。
+
+### 13.1 檢視結論
+
+- 程式面 P0–P8 ＋ 22 份 ADR 全部落地、626 項測試容器全綠；**功能已經夠多，缺的是減法。**
+- 專案唯一沒有替代品的能力是**讀本機 AI agent transcript 並還原成有 provenance 的工作脈絡**；
+  其餘（RAG、Git 同步、Telegram／LINE、會議秘書）市面都有更成熟的替代品。
+- 現在的形狀不適合對外：安裝 800 MB 起、449 行設定、視窗採集與桌面通知綁 Windows、
+  兩套 LLM client、兩套向量記憶、四份活躍聚合、2,003 行的 `server.py` 與 6,055 行的 `app.js`。
+- 因此 §12.2 的功能候選 **C5／C6／C3 全部暫停**，優先順序改為下面三個階段。
+
+### 13.2 三個階段（每階段結束都要能 `pytest` 全綠、`verify` 結果不變）
+
+**R0 減法（1 個 session，零設計決策）**
+- 刪已核實的死碼與未用依賴（TODO B5–B9）：重複的 `SystemMaintenanceRequest`、`telegram_notifier.py`、`_std_scheduler_loop`、四個 `scripts/inspect_*`／`check_real_recent.py`、`pandas`／`pillow`／`sse-starlette`／`python-dotenv`、`clear-demo`。
+- `rapidocr` 二選一：宣告成選用依賴，或移除 `image_parser.py`。
+- `marked` 與字型改為隨 wheel 本機提供，恢復 local-first 宣稱。
+- RAG 依賴鏈改成 `omnicontext[rag]` 選用依賴（TODO D1）；量預設安裝體積前後對照當收據。
+
+**R1 合併（2–3 個 session，小設計決策）**
+- 一個 LLM client（同步 `generate` ＋ 串流 `stream`），`synthesizer/llm_client.py` 與 `rag/llm_gateway.py` 收成一個模組（D2）。
+- 一個 `project_activity_matrix()`，每週回顧／模式提案／工作誌／問候卡四處改吃它（D3）。
+- `core/server.py` 依領域切成 `APIRouter`，Pydantic model 集中；AI ingest 邏輯搬出路由（D4）。
+- `desktop_notifier` 進 `ChannelAdapter`（D5）。
+- 六層旗標收成三個（D6）。
+
+**R2 重構（要先寫 ADR）**
+- 兩套向量記憶二選一（D7）：建議「活動記憶＝`semantic_index`（核心）；文件＝RAG（選用）」，需一份 ADR-023 說明取捨與遷移。
+- 秘書叢集 11 模組 → 訊號／聚合／呈現／記憶四層，引入 `Signal`／`Proposal` dataclass（D8）。
+- `agent_log_watcher` 拆成每平台一個 parser 模組 ＋ 「某平台連續 N 天零事件」健康警示（D9）。
+- `web/app.js` 拆 ES module、`I18N` 移到 JSON 語系檔、所有 fetch 走共用 helper（D10）。
+- 模組層可變全域狀態改注入，刪三個 `_reset_*_for_tests`（D11）。
+- `acceptance.py` 改宣告式表格（D12）。
+
+### 13.3 推廣路線（R0 之後才啟動）
+
+1. **獨立套件 `agent-transcripts`**：四種 transcript 格式 → 統一 turn 模型 ＋ provenance ＋ drift 偵測。是唯一別人會單獨想要的東西，也是學術貢獻的載體。
+2. **`omni demo` 示範資料集**：匿名化假 transcript ＋ Git ＋ 檔案事件，五分鐘看到首頁與 Handoff；教學與展示都靠它。
+3. **`omni init` 自動偵測** `~/.claude`／`~/.codex`／Antigravity 路徑並詢問匯入，取代手填 449 行設定。
+4. **教學**：以 ADR、`NEXT_SESSION.md` 踩坑清單與 REVIEW §4 當案例教材，不要求學生安裝整套。
+5. **學術**：先寫 experience report；等 `agent-transcripts` 有第二位使用者再談實證。
+
+### 13.4 不做的事
+
+- R0 完成前不加任何採集來源、通道或 L2 template。
+- 不為了「更像人」引入 LLM 推斷個性或優先（ADR-018 的立場不變）。
+- 不動 ADR-001 的 loopback 邊界（C5／C6 連帶暫停）。

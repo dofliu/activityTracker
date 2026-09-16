@@ -34,7 +34,9 @@ It answers three questions at any moment:
 
 Don't rely on memory: `python main.py verify` (or dashboard "06 Settings → Acceptance Center") reports which receipts exist right now ([ADR-016](docs/ADR-016-acceptance-center.md)).
 
-**Documentation:** [📚 Index](docs/INDEX.md) · [User Guide](docs/USAGE.md) · [Roadmap & Results](ROADMAP.md) · [Backlog](docs/TODO.md) · [Machine-readable status](STATUS.yaml)
+**2026-09-16 project review**: the feature set is large enough; what comes next is **subtraction** — remove dead code and unused dependencies, make RAG an optional install, merge the two LLM clients and the two vector-memory stacks, then extract the one capability nothing else offers (reading local AI-agent transcripts) into a standalone package. Feature candidates (remote access, two-way LINE, more collectors) are paused. Full assessment (in Traditional Chinese): [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md); three-phase plan: [ROADMAP §13](ROADMAP.md#13-架構整頓與推廣方向2026-09-16-檢視).
+
+**Documentation:** [📚 Index](docs/INDEX.md) · [User Guide](docs/USAGE.md) · [Roadmap & Results](ROADMAP.md) · [Backlog](docs/TODO.md) · [Machine-readable status](STATUS.yaml) · [Project review 2026-09-16](docs/REVIEW-2026-09-16-project-assessment.md)
 
 ![OmniContext Architecture & Roadmap](docs/assets/omnicontext-architecture-roadmap-card-v1.png)
 

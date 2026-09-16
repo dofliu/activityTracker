@@ -34,7 +34,9 @@
 
 不必憑記憶：跑 `python main.py verify`（或看儀表板「06 系統設定 → 驗收中心」）就會列出每一項現在有沒有收據（[ADR-016](docs/ADR-016-acceptance-center.md)）。
 
-**文件入口：**[📚 文件總覽](docs/INDEX.md) · [使用手冊](docs/USAGE.md) · [開發規劃與成果](ROADMAP.md) · [待辦與判準](docs/TODO.md) · [機器可讀現況](STATUS.yaml)
+**2026-09-16 專案檢視**：功能已經夠多，接下來是**減法**——刪死碼與未用依賴、RAG 改為選用安裝、合併兩套 LLM client 與兩套向量記憶，再把「讀本機 AI agent transcript」這個唯一無替代品的核心抽成獨立套件對外。功能候選（遠端存取、LINE 雙向、更多採集來源）暫停。評估全文見 [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md)，三階段計畫見 [ROADMAP §13](ROADMAP.md#13-架構整頓與推廣方向2026-09-16-檢視)。
+
+**文件入口：**[📚 文件總覽](docs/INDEX.md) · [使用手冊](docs/USAGE.md) · [開發規劃與成果](ROADMAP.md) · [待辦與判準](docs/TODO.md) · [機器可讀現況](STATUS.yaml) · [專案檢視 2026-09-16](docs/REVIEW-2026-09-16-project-assessment.md)
 
 ![OmniContext 架構與未來 Roadmap](docs/assets/omnicontext-architecture-roadmap-card-v1.png)
 
@@ -366,6 +368,8 @@ activityTracker/
 **目前沒有主流工具在讀本機 AI agent 的 transcript。** `~/.claude/projects/`、`~/.codex/sessions/`、`.gemini/antigravity/brain/` 這些檔案就在硬碟上，不需錄螢幕、不需額外權限，而裡面記錄的是真正的思考過程——問了什麼、AI 怎麼答、最後決定怎麼做。
 
 從「日誌」到「記憶」是這個專案的主線：現階段的重點不是繼續擴大收集，而是讓既有資料**可被檢索、可被秘書使用**。
+
+2026-09-16 的檢視把這句話再往前推一步：**現階段的重點也不是繼續加功能，而是做減法**——把 transcript 解析抽成別人能單獨安裝的套件、讓預設安裝不帶 RAG 依賴鏈、合併重複的子系統。詳見 [專案檢視](docs/REVIEW-2026-09-16-project-assessment.md) §3／§6。
 
 > 收集越多不等於越有用：檔案事件曾從 3,575 筆噪音 → 4,327 筆 → 收斂至 789 筆。
 > **新增採集來源必須先通過「能否改變決策」的檢驗。**

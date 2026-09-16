@@ -1,6 +1,6 @@
 # OmniContext 產品定位：跨 AI、應用與 Repository 的個人工作脈絡層
 
-**定位日期：**2026-08-25
+**定位日期：**2026-08-25（2026-09-16 補「下一階段」更新）
 
 ## 一句話定位
 
@@ -51,7 +51,7 @@ AI provider 正逐步強化各自產品內的 continuity：
 - 已完整匯入每個 provider 的所有歷史 conversations。
 - Browser ingestion 已涵蓋所有支援網站或所有 UI 版本。
 - Foreground time 等於工作時間、生產力或注意力。
-- P3 semantic memory、`omni ask`、跨裝置同步或 autonomous executor 已完成。
+- 跨裝置同步或 autonomous executor 已完成（P3 semantic memory 與 `omni ask` 已於 2026-08-25 以 Alpha 落地，見 ADR-005；閘門式執行器 ADR-008 是有批准的例外，不是 autonomous）。
 
 ## 產品護城河方向
 
@@ -63,4 +63,8 @@ AI provider 正逐步強化各自產品內的 continuity：
 
 ## 下一階段
 
-近期先完成 verified Browser bridge、真實 Browser event、真實 milestone Toast 與 release matrix。這些 evidence gates 關閉後，再建置 P3-2 local semantic index 與 P3-3 `omni ask`，將跨來源資料轉成可查詢、可引用的個人工作記憶。
+> 本節 2026-08-25 的原文（先關 Browser bridge／milestone Toast／release matrix 的 evidence gates，再建 P3-2／P3-3）**均已完成**，成果見 [ROADMAP §11.2](../ROADMAP.md)。
+
+**2026-09-16 更新**：定位本身不變，但檢視後確認——上表五個護城河方向裡，真正沒有替代品的是第 1／2 項的**來源**：本機 AI agent transcript。
+下一階段不是加功能，而是把這個核心從大系統裡抽出來、讓預設安裝不帶 RAG 依賴鏈（[ROADMAP §13](../ROADMAP.md)）。
+價值評估（用處／學術／教學）與障礙排序見 [REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) §3。
