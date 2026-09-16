@@ -1,8 +1,14 @@
-"""把一份推播內容送到所有啟用的通道（ADR-014）。
+"""把一份推播內容送到所有指定的通道（ADR-014）——**扇出只有這一份**。
 
 組裝一次（`notifiers.messages`）、渲染多次（`notifiers.channels`）。每個通道
 各自 try/except，一個失敗不影響另一個；回傳的 receipt 逐通道記錄結果，供
 排程 log 與 API 回查。
+
+2026-09-16（TODO D5）之前，Windows 桌面通知走的是另一條路：`desktop_notifier`
+自己組內容、自己送、自己吞例外，於是「一個通道失敗不影響其他通道」「receipt 逐
+通道誠實」這兩個契約對桌面完全不適用，內容也和這裡的版本各自漂移。現在桌面是
+第三個 `ChannelAdapter`，四個入口（晨報／晚間交接／每日日報／停滯提醒）＋里程碑
+一律經過 :func:`push_message`——要送哪些通道由呼叫端給，怎麼送由 adapter 決定。
 """
 
 from __future__ import annotations
@@ -12,13 +18,14 @@ from datetime import datetime
 from typing import Any, Callable, Sequence
 
 from core.config import get_config
-from notifiers.channels import ChannelAdapter, enabled_push_channels
+from notifiers.channels import ChannelAdapter, desktop_channels, enabled_push_channels
 from notifiers.messages import (
     Message,
     build_daily_summary,
     build_evening_handoff,
     build_morning_briefing,
     build_stagnation_alert,
+    build_usage_milestone,
 )
 
 logger = logging.getLogger("OmniContext.SecretaryPush")
@@ -95,10 +102,44 @@ def push_stagnation_alert(
     *,
     cfg: Any | None = None,
     channels: Sequence[ChannelAdapter] | None = None,
+    min_idle_days: int | None = None,
 ) -> dict[str, Any]:
-    return _push("stagnation_alert", lambda: build_stagnation_alert(), cfg, channels)
+    """停滯提醒；``min_idle_days`` 為 None 時用 :func:`build_stagnation_alert` 的門檻。"""
+    builder = (
+        (lambda: build_stagnation_alert(min_idle_days=int(min_idle_days)))
+        if min_idle_days is not None
+        else (lambda: build_stagnation_alert())
+    )
+    return _push("stagnation_alert", builder, cfg, channels)
+
+
+def push_usage_milestone(
+    summary: Any,
+    milestone_minutes: int,
+    message: str,
+    *,
+    cfg: Any | None = None,
+    channels: Sequence[ChannelAdapter] | None = None,
+) -> dict[str, Any]:
+    """每日介面使用里程碑。
+
+    預設只送桌面：里程碑收據（`MilestoneNotificationReceipt.channel`）記的就是
+    ``desktop``，預設多送一個通道會讓收據說不出話來。要送別的通道就明講 ``channels``。
+    """
+    if channels is None:
+        channels = desktop_channels(cfg)
+    return _push(
+        "usage_milestone",
+        lambda: build_usage_milestone(summary, milestone_minutes, message),
+        cfg,
+        channels,
+    )
 
 
 def push_enabled(cfg: Any | None = None) -> bool:
-    """有任何通道設定完成即為 True（排程據此決定是否組裝內容）。"""
+    """有任何**遠端**通道設定完成即為 True（排程據此決定是否組裝內容）。
+
+    桌面通道不算在內：它的排程另有開關與時間（`notifiers.desktop.*`），
+    見 `notifiers.channels` 的模組 docstring。
+    """
     return bool(enabled_push_channels(cfg or get_config()))

@@ -505,7 +505,7 @@ def evaluate_daily_milestones(
     database: Any | None = None,
     cfg: Any | None = None,
     manager_status: Mapping[str, Any] | None = None,
-    notifier: Any | None = None,
+    channels: Any | None = None,
     now: datetime | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
@@ -586,15 +586,16 @@ def evaluate_daily_milestones(
             "summary": summary,
         }
 
-    if notifier is None:
-        from notifiers.desktop_notifier import DesktopNotifier
+    # 送達一律走單一扇出（TODO D5）：預設只有桌面通道，與下面記的 channel 一致。
+    from notifiers.secretary_push import push_usage_milestone
 
-        notifier = DesktopNotifier()
-    if not notifier.send_usage_milestone(summary, selected, message):
+    push_receipt = push_usage_milestone(summary, selected, message, cfg=cfg, channels=channels)
+    if not push_receipt.get("sent"):
         return {
             "status": "notification_failed",
             "milestone_minutes": selected,
             "message": message,
+            "push_receipt": push_receipt,
             "summary": summary,
         }
 

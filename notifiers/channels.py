@@ -1,20 +1,26 @@
-"""推播通道 adapter（ADR-014）：同一份訊息可送 Telegram、LINE 或兩者。
+"""推播通道 adapter（ADR-014）：同一份訊息可送 Telegram、LINE、Windows 桌面或全部。
 
 每個 adapter 只負責「把 :class:`notifiers.messages.Message` 變成該平台的
 請求」，並回傳非敏感 receipt。能力差異用旗標明示，呼叫端不必知道平台細節：
 
-=================  ========  ====  ==========================================
-能力                Telegram  LINE  說明
-=================  ========  ====  ==========================================
-推播                ✅        ✅    outbound HTTPS
-接收訊息            ✅        ❌    LINE 只有 webhook，需公開入口（見 ADR-014）
-按鈕批准            ✅        ❌    需先能接收；LINE 的 postback 同樣要 webhook
-刪除使用者訊息      ✅        ❌    LINE 沒有這個 API
-富文字              HTML      純文字
-=================  ========  ====  ==========================================
+=================  ========  ====  =======  ===================================
+能力                Telegram  LINE  Desktop  說明
+=================  ========  ====  =======  ===================================
+推播                ✅        ✅    ✅       前兩者 outbound HTTPS；桌面只在本機
+接收訊息            ✅        ❌    ❌       LINE 只有 webhook，需公開入口（ADR-014）
+按鈕批准            ✅        ❌    ❌       需先能接收；LINE 的 postback 同樣要 webhook
+刪除使用者訊息      ✅        ❌    ❌       LINE 沒有這個 API
+富文字              HTML      純文字 純文字   桌面 toast 只有標題＋幾行字
+需要帳號／金鑰      ✅        ✅    ❌       桌面通知零設定，但只在 Windows
+=================  ========  ====  =======  ===================================
 
 契約：任一通道失敗都不影響其他通道（各自 try/except，receipt 如實記錄）；
-receipt 永不含 token、收件 id 或訊息全文。
+receipt 永不含 token、收件 id 或訊息全文。扇出本身只寫在
+`notifiers/secretary_push.py` 一處——**這裡只有「怎麼送一則」，沒有「送給誰」**。
+
+桌面通道刻意不進 :func:`enabled_push_channels`：它有自己的排程時間（`notifiers.
+desktop.*_time`），和遠端通道併在同一個預設清單會讓同一天跳兩次 toast。要送桌面
+就明講 :func:`desktop_channels`。
 """
 
 from __future__ import annotations
@@ -23,7 +29,7 @@ import logging
 from typing import Any, Optional
 
 from core.config import get_config
-from notifiers.messages import Message, render_plain, render_telegram_html
+from notifiers.messages import Message, render_plain, render_telegram_html, render_toast
 
 logger = logging.getLogger("OmniContext.Channels")
 
@@ -147,6 +153,51 @@ class LineChannel(ChannelAdapter):
         return {"channel": self.name, "sent": True, "parts_sent": sent}
 
 
+class DesktopChannel(ChannelAdapter):
+    """Windows 桌面通知（WinRT toast，失敗降級 MessageBox）。
+
+    toast 只看得到標題＋前幾行，所以 :func:`notifiers.messages.render_toast` 會如實
+    截斷並留下記號。receipt 只記 transport 與狀態，不含通知內文。
+    """
+
+    name = "desktop"
+    supports_receive = False
+    supports_buttons = False
+    supports_delete = False
+    rich_text = "plain"
+
+    def __init__(self, *, notifier: Any | None = None, launch_url: str | None = None, dry_run: bool = False):
+        self._notifier = notifier
+        self._launch_url = launch_url
+        self._dry_run = dry_run
+
+    def render(self, message: Message) -> str:
+        return render_toast(message)
+
+    def send_text(self, text: str) -> dict[str, Any]:
+        title, _, body = text.partition("\n")
+        lines = body.splitlines()
+        if self._dry_run:
+            from notifiers.desktop_notifier import preview_toast
+
+            preview_toast(title, lines)
+            return {"channel": self.name, "sent": True, "dry_run": True}
+
+        notifier = self._notifier
+        if notifier is None:
+            from notifiers.desktop_notifier import DesktopNotifier
+
+            notifier = DesktopNotifier()
+        sent = bool(notifier.send(title, lines, launch_url=self._launch_url))
+        delivery = getattr(notifier, "last_delivery_receipt", None) or {}
+        receipt: dict[str, Any] = {"channel": self.name, "sent": sent}
+        if delivery.get("transport"):
+            receipt["transport"] = delivery["transport"]
+        if not sent:
+            receipt["error"] = str(delivery.get("status") or "send_failed")
+        return receipt
+
+
 # ---------------------------------------------------------------- 解析設定
 
 
@@ -177,13 +228,49 @@ def line_channel(cfg: Any | None = None, *, transport: Any | None = None) -> Lin
     return LineChannel(token, str(to_id), transport=transport)
 
 
+def desktop_channel(
+    cfg: Any | None = None,
+    *,
+    notifier: Any | None = None,
+    dry_run: bool = False,
+) -> DesktopChannel | None:
+    """桌面通道；關閉或非 Windows 時回 None（``dry_run`` 只是印預覽，不受此限）。"""
+    cfg = cfg or get_config()
+    if not dry_run:
+        from notifiers.desktop_notifier import DesktopNotifier
+
+        notifier = notifier or DesktopNotifier(cfg)
+        if not notifier.is_enabled():  # 開關與平台判斷只有 DesktopNotifier 一份
+            return None
+    return DesktopChannel(
+        notifier=notifier,
+        launch_url=cfg.get("notifiers.desktop.launch_url", "http://127.0.0.1:8765"),
+        dry_run=dry_run,
+    )
+
+
+def desktop_channels(
+    cfg: Any | None = None,
+    *,
+    notifier: Any | None = None,
+    dry_run: bool = False,
+) -> list[ChannelAdapter]:
+    """只送桌面的通道清單（排程的 desktop job 與 ``omni notify --channel desktop`` 用）。"""
+    channel = desktop_channel(cfg, notifier=notifier, dry_run=dry_run)
+    return [channel] if channel else []
+
+
 def enabled_push_channels(
     cfg: Any | None = None,
     *,
     telegram_transport: Any | None = None,
     line_transport: Any | None = None,
 ) -> list[ChannelAdapter]:
-    """目前可推播的通道；兩個都沒設定就回空清單（呼叫端據此跳過推播）。"""
+    """目前可推播的**遠端**通道（Telegram／LINE）；都沒設定就回空清單。
+
+    桌面通知不在這裡——它零設定、有自己的排程時間，見模組 docstring 與
+    :func:`desktop_channels`。
+    """
     cfg = cfg or get_config()
     channels: list[ChannelAdapter] = []
     telegram = telegram_channel(cfg, transport=telegram_transport)

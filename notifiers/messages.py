@@ -6,7 +6,8 @@ LINE（純文字、不支援 HTML／Markdown）或未來其他通道，必須先
 
 - :class:`Message` 只描述結構（標題、分節、footer），不含任何標記語法；
 - :func:`render_plain` 給 LINE 與 CLI 預覽，:func:`render_telegram_html` 給
-  Telegram（``<b>`` 粗體）。新增通道只要再寫一個 renderer。
+  Telegram（``<b>`` 粗體），:func:`render_toast` 給 Windows 桌面通知（標題一行、
+  內文數行，長度受系統限制）。新增通道只要再寫一個 renderer。
 
 契約：組裝函式只讀既有的唯讀來源（專案狀態、Open Loops、每日摘要、早晨包
 收據、秘書建議），任何子步驟失敗都省略該段而不是讓整則推播消失。
@@ -18,7 +19,7 @@ import html
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from core.time_utils import get_local_now
 
@@ -66,16 +67,62 @@ def render_telegram_html(message: Message) -> str:
     return "\n".join(parts)
 
 
+TOAST_LINES_PER_SECTION = 2
+TOAST_MAX_BODY_CHARS = 600
+TOAST_CLIPPED_MARK = "…（完整內容見儀表板）"
+
+
+def render_toast(
+    message: Message,
+    *,
+    lines_per_section: int = TOAST_LINES_PER_SECTION,
+    max_chars: int = TOAST_MAX_BODY_CHARS,
+) -> str:
+    """Windows toast：**第一行是標題**，其餘是內文摘要。
+
+    toast 是彈出式的一小塊，放不下整份晨報，但它也是使用者唯一會被動看到的地方。
+    所以這裡做的是**摘要而不是截頭**：每個分節都保留（標題＋前幾行），讓「今日重點
+    專案／未結事項／待判斷建議」每一段都露臉，而不是前兩段吃掉整則通知。被省略的
+    部分一律留下記號——寧可少講，也不要讓使用者以為看到的就是全部。
+    """
+    body: list[str] = []
+    dropped = False
+    for section in message.sections:
+        picked = [line for line in section.lines if line.strip()]
+        if len(picked) > lines_per_section:
+            dropped = True
+        if section.heading:
+            body.append(section.heading)
+        body.extend(picked[:lines_per_section])
+
+    text = "\n".join(body)
+    if len(text) > max_chars:
+        text = text[:max_chars].rstrip()
+        dropped = True
+    if dropped:
+        text = f"{text}\n{TOAST_CLIPPED_MARK}" if text else TOAST_CLIPPED_MARK
+    return f"{message.title}\n{text}" if text else message.title
+
+
 def _projects_and_loops(
     projects: Sequence[dict[str, Any]] | None,
     open_loops: Sequence[dict[str, Any]] | None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """推播要用的專案與未結事項；未歸戶的收容桶不是專案，一律濾掉。
+
+    桌面通知本來自己濾（`_real_projects`），Telegram／LINE 這條路沒濾——同一天
+    兩個通道會講出不同的專案數。D5 把兩條路合成一條後，歸類規則只認
+    `core.project_engine.is_bucket_project` 這一份。
+    """
+    from core.project_engine import is_bucket_project
+
     if projects is None or open_loops is None:
         from core.project_engine import get_active_projects_list, get_open_loops_list
 
         projects = projects if projects is not None else get_active_projects_list()
         open_loops = open_loops if open_loops is not None else get_open_loops_list()
-    return list(projects), list(open_loops)
+    real = [p for p in projects if not is_bucket_project(p.get("project_key"))]
+    return real, list(open_loops)
 
 
 def _loop_lines(open_loops: Sequence[dict[str, Any]], limit: int = 6) -> tuple[str, ...]:
@@ -305,4 +352,25 @@ def build_stagnation_alert(
             ),
         ),),
         footer="閒置不等於停擺；這只是提醒您確認是否還要推進。",
+    )
+
+
+def build_usage_milestone(
+    summary: Mapping[str, Any],
+    milestone_minutes: int,
+    message: str,
+    *,
+    now: datetime | None = None,
+) -> Message:
+    """每日介面使用里程碑；``message`` 已由 `core.usage_analytics` 的可信度契約產生。
+
+    這裡只負責**呈現**：加上日期標題，coverage 為 partial 時明說顯示值是下限。
+    """
+    date_text = str(summary.get("date") or (now or get_local_now()).strftime("%Y-%m-%d"))
+    lines = [message]
+    if summary.get("coverage_status") == "partial":
+        lines.append("資料 coverage 為 partial；顯示值是已觀察到的下限。")
+    return Message(
+        title=f"🏁 OmniContext 每日里程碑（{date_text[5:]}）",
+        sections=(Section(lines=tuple(lines)),),
     )

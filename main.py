@@ -53,7 +53,6 @@ from core.project_engine import (
     transition_open_loop,
 )
 from synthesizer.aggregator import generate_daily_summary_pipeline, generate_periodic_checkpoint
-from notifiers.desktop_notifier import DesktopNotifier
 from exporters.daily_brief import export_daily_brief
 
 logging.basicConfig(
@@ -634,20 +633,41 @@ def cmd_notify_telegram(action: str, date_str: Optional[str] = None, dry_run: bo
 
 
 def cmd_notify_desktop(action: str, dry_run: bool = False):
-    """發送 Windows 桌面通知"""
-    notifier = DesktopNotifier()
+    """發送 Windows 桌面通知（內容與扇出都與其他通道共用，見 TODO D5）"""
+    from core.config import get_config
+    from notifiers.channels import desktop_channels
+    from notifiers.secretary_push import (
+        push_evening_handoff,
+        push_morning_briefing,
+        push_stagnation_alert,
+    )
+
+    cfg = get_config()
+    channels = desktop_channels(cfg, dry_run=dry_run)
+    if not channels:
+        print("❌ 桌面通知未啟用或非 Windows 平台（可用 --dry-run 預覽內容）")
+        return
+
     if action in ("briefing", "summary"):
-        ok = notifier.send_morning_briefing(dry_run=dry_run)
+        receipt = push_morning_briefing(cfg=cfg, channels=channels)
     elif action == "evening":
-        ok = notifier.send_evening_summary(dry_run=dry_run)
+        receipt = push_evening_handoff(cfg=cfg, channels=channels)
     elif action == "stagnation":
-        ok = notifier.send_stagnation_alert(dry_run=dry_run)
+        receipt = push_stagnation_alert(
+            cfg=cfg,
+            channels=channels,
+            min_idle_days=int(cfg.get("notifiers.desktop.stagnation_days", 5) or 5),
+        )
     else:
         print(f"未知的通知類型: {action}")
         return
 
-    if not dry_run:
-        print("✅ 桌面通知已送出" if ok else "❌ 桌面通知發送失敗，請查看日誌")
+    if receipt.get("skipped"):
+        print(f"⚠️ 未發送：{receipt['skipped']}")
+    elif dry_run:
+        return
+    else:
+        print("✅ 桌面通知已送出" if receipt.get("sent") else "❌ 桌面通知發送失敗，請查看日誌")
 
 
 def cmd_brief(output_dir: Optional[str] = None, notify: bool = False):
@@ -665,7 +685,12 @@ def cmd_brief(output_dir: Optional[str] = None, notify: bool = False):
     print("=" * 60 + "\n")
 
     if notify:
-        DesktopNotifier().send_morning_briefing()
+        from core.config import get_config
+        from notifiers.channels import desktop_channels
+        from notifiers.secretary_push import push_morning_briefing
+
+        cfg = get_config()
+        push_morning_briefing(cfg=cfg, channels=desktop_channels(cfg))
 
 
 def cmd_github(action: str):

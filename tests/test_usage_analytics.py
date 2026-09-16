@@ -46,13 +46,17 @@ class TempDatabase:
             session.close()
 
 
-class FakeNotifier:
+class FakeChannel:
+    """里程碑送達走的是通道 adapter（TODO D5），這裡替掉桌面通道以免測試碰到 Windows。"""
+
+    name = "desktop"
+
     def __init__(self):
         self.messages = []
 
-    def send_usage_milestone(self, summary, milestone_minutes, message):
-        self.messages.append((summary["date"], milestone_minutes, message))
-        return True
+    def send(self, message):
+        self.messages.append(message)
+        return {"channel": self.name, "sent": True}
 
 
 def _usage_config():
@@ -171,12 +175,12 @@ def test_milestone_receipt_is_idempotent_and_coalesces_lower_thresholds(tmp_path
     assert summary["coverage_status"] == "partial"
     assert summary["goal"]["foreground_minutes"] == 75.0
 
-    notifier = FakeNotifier()
+    notifier = FakeChannel()
     first = evaluate_daily_milestones(
-        database=database, cfg=cfg, notifier=notifier, now=now
+        database=database, cfg=cfg, channels=[notifier], now=now
     )
     second = evaluate_daily_milestones(
-        database=database, cfg=cfg, notifier=notifier, now=now
+        database=database, cfg=cfg, channels=[notifier], now=now
     )
 
     assert first["status"] == "notified"
@@ -208,11 +212,11 @@ def test_new_milestone_waits_for_configured_cooldown(tmp_path, monkeypatch):
         )
 
     monkeypatch.setattr("core.usage_analytics.sys.platform", "win32")
-    notifier = FakeNotifier()
+    notifier = FakeChannel()
     first = evaluate_daily_milestones(
         database=database,
         cfg=cfg,
-        notifier=notifier,
+        channels=[notifier],
         now=datetime(2026, 8, 24, 12, 0),
     )
     assert first["milestone_minutes"] == 60
@@ -232,13 +236,13 @@ def test_new_milestone_waits_for_configured_cooldown(tmp_path, monkeypatch):
     cooldown = evaluate_daily_milestones(
         database=database,
         cfg=cfg,
-        notifier=notifier,
+        channels=[notifier],
         now=datetime(2026, 8, 24, 12, 30),
     )
     after_cooldown = evaluate_daily_milestones(
         database=database,
         cfg=cfg,
-        notifier=notifier,
+        channels=[notifier],
         now=datetime(2026, 8, 24, 13, 1),
     )
 

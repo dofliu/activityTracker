@@ -2,7 +2,8 @@
 
 - 訊息內容與呈現分離：同一份 Message 渲染成純文字（LINE）或 HTML（Telegram）。
 - 組裝在任一子步驟失敗時只省略該段，不讓整則推播消失；沒有內容就不推。
-- adapter 能力如實宣告：LINE 不能接收、不能按鈕、不能刪訊息、不支援富文字。
+- adapter 能力如實宣告：LINE 不能接收、不能按鈕、不能刪訊息、不支援富文字；
+  桌面通知（TODO D5）同樣是一個 adapter，只是走本機 toast 而不是 HTTPS。
 - 扇出：一個通道失敗不影響另一個，receipt 逐通道誠實。
 - LINE 設定：憑證來源優先序、失敗分類、驗證通過才寫 config；token 只走
   Authorization header，絕不進 URL、log 或任何 receipt。
@@ -15,9 +16,12 @@ import pytest
 
 from notifiers import line_setup
 from notifiers.channels import (
+    DesktopChannel,
     LineChannel,
     TelegramChannel,
     channels_status,
+    desktop_channel,
+    desktop_channels,
     enabled_push_channels,
     line_channel,
     telegram_channel,
@@ -25,14 +29,17 @@ from notifiers.channels import (
 from notifiers.messages import (
     Message,
     Section,
+    TOAST_CLIPPED_MARK,
     build_daily_summary,
     build_evening_handoff,
     build_morning_briefing,
     build_stagnation_alert,
+    build_usage_milestone,
     render_plain,
     render_telegram_html,
+    render_toast,
 )
-from notifiers.secretary_push import push_message, push_morning_briefing
+from notifiers.secretary_push import push_message, push_morning_briefing, push_usage_milestone
 
 LINE_TOKEN = "line-channel-access-token-for-tests"
 LINE_TO = "U0123456789abcdef0123456789abcdef"
@@ -392,6 +399,130 @@ def test_push_reports_build_errors_without_sending(monkeypatch):
     channel = LineChannel(LINE_TOKEN, LINE_TO, transport=LineTransport())
     receipt = push_morning_briefing(cfg=_cfg(line=True), channels=[channel])
     assert receipt["skipped"] == "build_error:ValueError" and receipt["sent"] == 0
+
+
+# ---- 桌面通道（TODO D5）----
+
+
+class FakeToast:
+    """DesktopNotifier 的替身：記下被要求送出的標題與行，模擬成功或失敗。"""
+
+    def __init__(self, ok=True, *, enabled=True, status="submitted"):
+        self.ok = ok
+        self._enabled = enabled
+        self.calls = []
+        self.last_delivery_receipt = None
+
+    def is_enabled(self):
+        return self._enabled
+
+    def send(self, title, lines, launch_url=None):
+        self.calls.append((title, tuple(lines), launch_url))
+        self.last_delivery_receipt = (
+            {"status": "submitted", "transport": "winrt_toast"}
+            if self.ok
+            else {"status": "unsupported", "transport": None}
+        )
+        return self.ok
+
+
+def _desktop_cfg(enabled=True):
+    return DictConfig({"notifiers": {"desktop": {
+        "enabled": enabled, "launch_url": "http://127.0.0.1:8765", "stagnation_days": 5,
+    }}})
+
+
+def test_toast_render_keeps_every_section_but_only_its_first_lines():
+    """toast 放不下整份晨報：每一段都要露臉（摘要），而不是前一兩段吃掉整則。"""
+    text = render_toast(SAMPLE)
+    assert text.splitlines()[0] == "標題"  # 第一行是標題，adapter 靠這個切開
+    assert "分節：" in text and "尾段" in text  # 後面的分節不會被前面吃掉
+    long_message = Message(
+        title="標題",
+        sections=(Section(heading="分節：", lines=("• 一", "• 二", "• 三")),),
+    )
+    clipped = render_toast(long_message)
+    assert "• 一" in clipped and "• 二" in clipped
+    assert "• 三" not in clipped and TOAST_CLIPPED_MARK in clipped  # 省略了就說出來
+    assert TOAST_CLIPPED_MARK not in render_toast(Message(title="只有標題"))
+
+
+def test_desktop_capabilities_are_declared_honestly():
+    capabilities = DesktopChannel().capabilities()
+    assert capabilities == {
+        "channel": "desktop", "receive": False, "buttons": False,
+        "delete_message": False, "rich_text": "plain",
+    }
+
+
+def test_desktop_adapter_sends_title_and_lines_and_keeps_the_receipt_clean():
+    toast = FakeToast()
+    receipt = DesktopChannel(notifier=toast, launch_url="http://127.0.0.1:8765").send(SAMPLE)
+    assert receipt == {"channel": "desktop", "sent": True, "transport": "winrt_toast"}
+    title, lines, launch_url = toast.calls[0]
+    assert title == "標題" and "分節：" in lines and launch_url == "http://127.0.0.1:8765"
+    # receipt 不含通知內文（與 Telegram／LINE 同一條 secret 邊界）
+    assert "分節" not in str(receipt) and "標題" not in str(receipt)
+
+
+def test_desktop_failure_is_reported_not_raised_and_does_not_block_other_channels():
+    failing = DesktopChannel(notifier=FakeToast(ok=False))
+    line = LineChannel(LINE_TOKEN, LINE_TO, transport=LineTransport())
+    receipt = push_message(SAMPLE, kind="test", cfg=_cfg(line=True), channels=[failing, line])
+    assert receipt["sent"] == 1 and receipt["attempted"] == 2
+    assert {r["channel"]: r.get("sent") for r in receipt["results"]} == {"desktop": False, "line": True}
+    assert receipt["results"][0]["error"] == "unsupported"
+
+
+def test_desktop_channel_follows_the_switch_and_the_platform():
+    assert [c.name for c in desktop_channels(_desktop_cfg(), notifier=FakeToast())] == ["desktop"]
+    # 關閉或非 Windows（DesktopNotifier.is_enabled 說了算）→ 沒有通道，push 會如實 skip
+    assert desktop_channel(_desktop_cfg(), notifier=FakeToast(enabled=False)) is None
+    assert desktop_channels(_desktop_cfg(enabled=False), notifier=FakeToast(enabled=False)) == []
+    # dry-run 只是印預覽，不受平台限制
+    assert desktop_channel(_desktop_cfg(enabled=False), dry_run=True) is not None
+
+
+def test_desktop_is_not_in_the_default_remote_channel_set():
+    """桌面有自己的排程時間；混進預設清單會讓同一天跳兩次 toast。"""
+    assert [c.name for c in enabled_push_channels(_cfg(telegram=True, line=True))] == ["telegram", "line"]
+
+
+def test_desktop_dry_run_previews_without_sending(capsys):
+    channel = desktop_channel(_desktop_cfg(enabled=False), dry_run=True)
+    receipt = channel.send(SAMPLE)
+    assert receipt == {"channel": "desktop", "sent": True, "dry_run": True}
+    output = capsys.readouterr().out
+    assert "🔔 桌面通知預覽" in output and "標題" in output and "分節：" in output
+
+
+def test_usage_milestone_goes_through_the_same_fan_out():
+    """里程碑（原本 desktop_notifier 自己組自己送）也走同一條路。"""
+    summary = {"date": "2026-09-16", "coverage_status": "partial"}
+    message = build_usage_milestone(summary, 60, "今天 Claude + Codex 已記錄至少 60 分鐘")
+    assert message.title == "🏁 OmniContext 每日里程碑（09-16）"
+    lines = message.sections[0].lines
+    assert lines[0].endswith("60 分鐘")
+    assert "下限" in lines[1]  # coverage 為 partial 時要說清楚顯示值只是下限
+
+    toast = FakeToast()
+    receipt = push_usage_milestone(summary, 60, "今天已達標", cfg=_desktop_cfg(),
+                                   channels=[DesktopChannel(notifier=toast)])
+    assert receipt["kind"] == "usage_milestone" and receipt["sent"] == 1
+    assert toast.calls[0][0] == "🏁 OmniContext 每日里程碑（09-16）"
+
+
+def test_briefing_never_reports_the_unattributed_bucket_as_a_project():
+    """未歸戶收容桶不是專案；桌面與遠端通道共用同一份判定（TODO D5）。"""
+    message = build_morning_briefing(
+        projects=[_projects(project_key="general", display_name="General / Notes"),
+                  _projects(project_key="alpha", display_name="Alpha")],
+        open_loops=[],
+        include_greeting=False,
+        include_secretary=False,
+    )
+    text = render_plain(message)
+    assert "Alpha" in text and "General / Notes" not in text
 
 
 # ---- 狀態與 secret 邊界 ----
