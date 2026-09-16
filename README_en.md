@@ -26,7 +26,7 @@ It answers three questions at any moment:
 | Area | State |
 | :--- | :--- |
 | Code | P0–P8 and all ADR-008 executor stages landed; 22 ADRs record the boundary behind each decision |
-| Tests | **67 contract test modules, 684 tests** (683 passed + 1 skipped; 671 passed + 11 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
+| Tests | **68 contract test modules, 695 tests** (694 passed + 1 skipped; 681 passed + 12 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
 | Data | SQLite schema migration **18/18** (append-only + checksum, verified backup before upgrade) |
 | Release | `release_ready: false` |
 
@@ -304,7 +304,7 @@ activityTracker/
 │   ├── retrieval_worker.py / retrieval_client.py               # Resident retrieval worker
 │   ├── parsers/ chunker.py embeddings.py vector_store.py retriever.py
 │   ├── storage.py              # Capacity reporting and Chroma space reclamation
-│   ├── activity_indexer.py     # Project state and open-loop virtual chunks
+│   ├── report_indexer.py       # Secretary-written report chunks (activity memory lives in core/semantic_index)
 │
 ├── watchers/                   # Collectors
 │   ├── file_watcher.py git_watcher.py window_watcher.py
@@ -328,7 +328,7 @@ activityTracker/
 │   └── index.html / app.js / style.css
 │
 ├── scripts/                    # Verification, cleanup, autostart and E2E scripts
-├── tests/                      # 67 contract test modules (684 tests)
+├── tests/                      # 68 contract test modules (695 tests)
 ├── logs/checkpoints/           # Periodic activity snapshots
 └── reports/                    # Daily / range Markdown reports
 ```

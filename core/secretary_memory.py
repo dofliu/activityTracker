@@ -5,8 +5,9 @@
 1. **筆記表** ``secretary_notes``：使用者交代的 ``user_note``（記下來）、``preference``
    （偏好）、``decision``（決定），以及秘書自己從 L0 收據推出的 ``observation``
    （標記來源、可一鍵刪除、同一來源同一天只寫一次）。
-2. **既有產物**（每日摘要、Handoff、同步報告、STATUS 草稿、早晨包收據）在
-   ``rag/activity_indexer.py`` 併入 RAG 的 activity 領域，提問時可被檢索到。
+2. **既有產物**：筆記與時段微摘要由 ``core/semantic_index`` 索引（ADR-023：活動記憶
+   只有這一份，每筆只 embedding 一次）；秘書寫出的報告檔（Handoff、同步報告、STATUS
+   草稿、每日入口）是文件，由 ``rag/report_indexer.py`` 併入知識庫。兩者提問時都引用得到。
 3. **固定脈絡** ``memory_context()``：每次對話注入 system prompt 的一段短文
    （今日狀態、top 提案、最近筆記），以及提案引擎讀偏好（「不要提醒 X」）。
 

@@ -23,6 +23,7 @@ from rag.jobs import (
     request_pause, update_job,
 )
 from rag.storage import chroma_report, storage_report
+from rag.retrieval.base import CitationSource
 from rag.retrieval.catalog import DEFAULT_STRATEGY, STRATEGY_CATALOG
 from rag.retrieval.context import citations_from_payload, format_context_prompt
 from rag.retrieval_client import (
@@ -319,10 +320,18 @@ def rag_rebuild_bm25():
 
 @router.post("/memory/sync")
 def rag_memory_sync():
-    """ADR-012：把秘書記憶區與工作紀錄（筆記、每日摘要、Handoff、同步報告、STATUS 草稿）
-    併入 RAG activity 領域。跑在獨立 worker，主服務不載入索引套件。"""
+    """把秘書寫出的報告檔（Handoff、同步報告、STATUS 草稿、每日入口）同步進知識庫。
+
+    ADR-023（TODO D7）起，筆記／微摘要／事件這些**活動記憶**不再進 RAG——它們在
+    `core/semantic_index` 只 embedding 一次，對話要引用時查的是同一份。這個 job 因此
+    只做文件側的事，外加清掉舊版寫進 RAG 的重複活動切片。跑在獨立 worker。
+    """
     job = _start_job_or_raise("activity_sync")
-    return {"success": True, "job": job, "message": "已交由獨立 worker 把秘書記憶區與工作紀錄併入知識庫。"}
+    return {
+        "success": True,
+        "job": job,
+        "message": "已交由獨立 worker 同步秘書報告檔，並清掉舊版重複的活動切片。",
+    }
 
 
 @router.get("/progress")
@@ -449,13 +458,61 @@ def retrieval_worker_shutdown():
     return retrieval_client.shutdown()
 
 
-def _retrieve_citations(query: str, req: "ChatRequest"):
-    """依設定把檢索送進常駐 worker（預設）或在本程序執行。
+ACTIVITY_CITATION_TOP_K = 3
 
-    兩條路徑都回傳 CitationSource 清單；worker 路徑的逾時由 client 自己
-    處理（逾時即 kill 並在下次重啟），這裡把它轉成 asyncio.TimeoutError
-    讓上層沿用同一段降級邏輯。
+
+def _activity_citations(query: str, start_index: int, top_k: int = ACTIVITY_CITATION_TOP_K):
+    """活動脈絡來自**核心** semantic index（ADR-023，TODO D7）。
+
+    以前這些切片和文件一起躺在 Chroma 裡（`rag/activity_indexer` 再 embedding 一次），
+    於是 `omni ask` 與這裡引用的是兩份會漂移的活動記憶。現在兩邊查同一份；沒有索引、
+    Ollama 沒開或索引是空的，就只少了活動段——文件段照常，並如實留下一行 log。
     """
+    from core.semantic_index import semantic_search
+
+    try:
+        result = semantic_search(query, top_k=top_k)
+    except Exception as exc:  # noqa: BLE001 — 活動段拿不到不該讓整段對話失敗
+        logger.info("Activity context unavailable (%s); answering with documents only.", type(exc).__name__)
+        return []
+
+    citations = []
+    for offset, item in enumerate(result.get("sources") or []):
+        source_ref = str(item.get("source_ref") or "")
+        citations.append(CitationSource(
+            index=start_index + offset,
+            chunk_id=f"activity:{source_ref}",
+            file_path=source_ref,
+            filename=f"[{item.get('project_key') or 'general'}] 🧠 {item.get('title') or source_ref}",
+            file_type=f".{item.get('source_type') or 'activity'}",
+            title=item.get("title"),
+            content=str(item.get("excerpt") or ""),
+            score=float(item.get("score") or 0.0),
+            retrieval_type="semantic_index",
+            source_domain="activity",
+            source_type=item.get("source_type"),
+            project_key=item.get("project_key"),
+            source_ref=source_ref,
+            timestamp=item.get("source_updated_at"),
+            trust_status=item.get("trust_status"),
+        ))
+    return citations
+
+
+def _retrieve_citations(query: str, req: "ChatRequest"):
+    """依設定把檢索送進常駐 worker（預設）或在本程序執行，再補上活動脈絡。
+
+    文件段兩條路徑都回傳 CitationSource 清單；worker 路徑的逾時由 client 自己
+    處理（逾時即 kill 並在下次重啟），這裡把它轉成 asyncio.TimeoutError
+    讓上層沿用同一段降級邏輯。活動段一律來自核心 semantic index（ADR-023）。
+    """
+    documents = _retrieve_documents(query, req)
+    activity = _activity_citations(query, start_index=len(documents) + 1)
+    return list(documents) + activity
+
+
+def _retrieve_documents(query: str, req: "ChatRequest"):
+    """文件段：使用者資料夾與秘書寫出的報告檔（DeskRAG，需要 `[rag]` extra）。"""
     if retrieval_mode() == "worker":
         if retrieval_client.status().get("state") == "unavailable":
             # 沒裝 [rag] extra：對話照常，只是不帶文件脈絡；狀態端點會說明缺什麼（TODO D1）。

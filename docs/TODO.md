@@ -89,11 +89,10 @@
 
 > 來源：[REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) §4–5。
 > 每一項結束時 `pytest` 必須全綠、`python main.py verify` 結果不得變化（整頓不改行為）。R2 的項目要先有 ADR。
-> **R0 已於 2026-09-16 完成**（B5–B9 ＋ D1）、**R1 全部於同日完成**（D2 一個 LLM client、D3 一份活動來源定義、D4 `server.py` 切成 9 個 router、D5 桌面通知併入 `ChannelAdapter`、D6 旗標六層收三層），收據見 ROADMAP §11.2；接下來是 R2（D7–D12，每項都要先寫 ADR）。
+> **R0 已於 2026-09-16 完成**（B5–B9 ＋ D1）、**R1 全部於同日完成**（D2 一個 LLM client、D3 一份活動來源定義、D4 `server.py` 切成 9 個 router、D5 桌面通知併入 `ChannelAdapter`、D6 旗標六層收三層），收據見 ROADMAP §11.2；R2 已完成 D7（一份活動記憶，ADR-023）；剩 D8–D12，每項都要先寫 ADR。
 
 | # | 項目 | 內容 | 完成判準（收據） | 階段 |
 | :-- | :--- | :--- | :--- | :--- |
-| D7 | **兩套向量記憶二選一** | 先寫 ADR-023：建議活動記憶＝`core/semantic_index.py`（核心）、文件＝RAG（選用）；刪 `rag/activity_indexer.py` 對五種實體的重複 embedding；RAG 對話要引用活動時透過檢索 worker 查 `semantic_index` | 同一筆活動只 embedding 一次；`omni ask` 與 `/api/v1/rag/chat` 引用同一份活動索引；ADR-023 Accepted | R2 |
 | D8 | **秘書叢集四層化** | 11 模組 → `secretary/signals.py`／`aggregate.py`／`present.py`／`memory.py`；引入 `Signal`／`Proposal` dataclass 取代 `dict[str, Any]`；打破 `proactive_secretary ↔ secretary_memory ↔ secretary_home ↔ agent_executor` 的環 | `core/` 內函式層延遲 import 由 110 處降到 < 20；既有 `test_secretary_*`／`test_proactive_secretary.py`／`test_weekly_review.py` 全綠（測試可改 import 路徑，不得改斷言） | R2 |
 | D9 | **transcript parser 分拆 ＋ 漂移警示** | `watchers/agent_log_watcher.py` 拆成 `watchers/transcripts/{claude_code,claude_desktop,codex,antigravity}.py` ＋ 共同介面；新增「某平台過去 N 天零事件但檔案有更新」的 collector diagnostics 警示 | 每個 parser 模組 < 300 行；`test_transcript_contracts.py` 全綠；系統健康頁能顯示該警示（contract test） | R2 |
 | D10 | **前端模組化** | `web/app.js` 拆 ES module（依分頁）；`I18N` 移到 `web/i18n/{zh-TW,en}.json` 並加「兩份 key 集合相同」測試；9 處裸 `fetch()` 改走共用 helper；移除字串內嵌 `onclick=` | 無單檔 > 1,500 行；Playwright 六分頁載入無 console error、494px 無水平溢出（沿用既有腳本） | R2 |
