@@ -134,9 +134,11 @@
 
 1. **兩套 LLM client**：`synthesizer/llm_client.py:88`（同步，Ollama 走 `/api/generate`）與 `rag/llm_gateway.py:24`（非同步串流，Ollama 走 `/api/chat`），讀同一組設定鍵，
    預設模型已經漂移（`gemini-3.7-flash` vs `gemini-2.5-flash`）；`core/semantic_index.py:451` 還有第三條 Ollama 呼叫；`rag/embeddings.py:71` 第四次實作 OpenAI 金鑰解析。
+   → **同日已完成（D2）**：合為 `core/llm_client.py`，四處都改走它（ROADMAP §11.2）。
 2. **兩套向量記憶**：`core/semantic_index.py`（Ollama bge-m3、向量存 SQLite BLOB、純 Python cosine）與 `rag/activity_indexer.py:54`（FastEmbed＋Chroma＋BM25）
    對**同樣五種實體**（ProjectState／OpenLoop／AI turn／Git／File）各做一次 embedding、各有查詢路徑與 UI（`omni ask` vs `/api/v1/rag/chat`）。這是 repo 裡最大的一塊重複。
 3. **四份「每專案每日活躍」聚合**：`weekly_review.py:83`、`activity_patterns.py:243-306`、`activity_digest.py:77`、`secretary_greeting.py:97`，各自從同一組事件表算一遍。
+   → **同日已完成（D3）**，但**這條當時的描述只對一半**：其中兩組早就互相委派了。真正的重複是「哪些表算活動、專案名在哪個欄位、一天從哪到哪」各寫三遍，已收進 `core/activity_sources.py`（ROADMAP §11.2）。
 4. **秘書叢集 11 個模組、4,109 行、沒有共同型別**：全部是回傳 `dict[str, Any]` 的自由函式（`build_*`／`collect_*_signals`），
    五個訊號收集器與 `build_action_proposals`（`proactive_secretary.py:242`）之間的契約是未定型的 dict。`secretary_ask`（202 行）、`secretary_profile`（150 行）、`secretary_home`（242 行）不值得各自一個模組。
 5. **桌面通知在抽象之外**：`notifiers/desktop_notifier.py`（282 行）自己再扇出一次晨報／交接／停滯／里程碑，沒走 `ChannelAdapter`。
@@ -148,6 +150,7 @@
 ### 4.4 結構問題（大工程，要排期）
 
 1. **`core/server.py` 2,003 行、98 條路由、零 `APIRouter` 切分**；34 個 Pydantic model 散落各處；AI 事件 ingest 的去重／turn key／狀態分級邏輯內嵌在路由（`:1370-1445`）。
+   → **同日已完成（D4）**：切成 9 個領域 router，server.py 剩 134 行；model 進 `core/schemas.py`、ingest 規則進 `core/ingest.py`；133 條路由由快照測試鎖住（ROADMAP §11.2）。
    `rag/router.py`（655 行、31 條）也把資料夾 CRUD、job、儲存、檔案瀏覽、檢索、對話 session 混在一起。
 2. **`web/app.js` 6,055 行單檔**：約 30 個模組層 `let` 當狀態、105 處 `innerHTML`、9 處繞過共用 fetch helper 的裸 `fetch()`、126 個 `catch` 只有 13 個記 log、17 處字串內嵌 `onclick=`。
 3. **`watchers/agent_log_watcher.py` 1,066 行**解析四種**無穩定性保證的私有格式**（Codex 還有 json／jsonl 兩套 parser）；測試用合成 fixture，鎖的是今天的形狀，**格式一變就是靜默零事件**。

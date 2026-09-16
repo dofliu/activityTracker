@@ -1073,7 +1073,7 @@ def main():
             getattr(args, "receipt_dir", None),
         )
     elif args.command == "llm-test":
-        from synthesizer.llm_client import diagnose_provider
+        from core.llm_client import diagnose_provider
 
         print(
             json.dumps(

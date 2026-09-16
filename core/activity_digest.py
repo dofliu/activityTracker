@@ -24,19 +24,13 @@ uavMonitor 上做了什麼」，它答不出來。
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, time as dtime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func
-
+from core.activity_sources import EVENT_KINDS, day_bounds, project_event_counts
 from core.config import get_config
 from core.database import get_db
-from core.models import (
-    ActivityMicroSummary,
-    AIPromptEvent,
-    FileActivityEvent,
-    GitActivityEvent,
-)
+from core.models import ActivityMicroSummary
 from core.time_utils import get_local_now
 
 logger = logging.getLogger("OmniContext.ActivityDigest")
@@ -69,11 +63,6 @@ def target_day(now: datetime, days_back: int) -> date:
     return (now - timedelta(days=days_back)).date()
 
 
-def day_bounds(day: date) -> tuple[datetime, datetime]:
-    start = datetime.combine(day, dtime.min)
-    return start, start + timedelta(days=1)
-
-
 def collect_day_stats(
     day: date,
     *,
@@ -100,42 +89,14 @@ def per_project_counts(
     database: Any | None = None,
     limit: int = DEFAULT_MAX_PROJECTS,
 ) -> list[dict[str, Any]]:
-    """當天各專案的 commit／AI 對話／檔案異動筆數（依總量排序）。"""
-    database = database or get_db()
-    since, until = day_bounds(day)
-    buckets: dict[str, dict[str, int]] = {}
+    """當天各專案的 commit／AI 對話／檔案異動筆數（依總量排序）。
 
-    def bump(name: str | None, field: str, count: int) -> None:
-        key = (name or "").strip()
-        if not key:
-            return  # 沒歸戶的活動不猜專案
-        buckets.setdefault(key, {"commits": 0, "ai_turns": 0, "files": 0})[field] += count
-
-    with database.session_scope() as session:
-        for name, count in (
-            session.query(GitActivityEvent.repo_name, func.count(GitActivityEvent.id))
-            .filter(GitActivityEvent.timestamp >= since, GitActivityEvent.timestamp < until)
-            .group_by(GitActivityEvent.repo_name)
-            .all()
-        ):
-            bump(name, "commits", int(count))
-        for name, count in (
-            session.query(AIPromptEvent.project_tag, func.count(AIPromptEvent.id))
-            .filter(AIPromptEvent.timestamp >= since, AIPromptEvent.timestamp < until)
-            .group_by(AIPromptEvent.project_tag)
-            .all()
-        ):
-            bump(name, "ai_turns", int(count))
-        for name, count in (
-            session.query(FileActivityEvent.project_name, func.count(FileActivityEvent.id))
-            .filter(FileActivityEvent.timestamp >= since, FileActivityEvent.timestamp < until)
-            .group_by(FileActivityEvent.project_name)
-            .all()
-        ):
-            bump(name, "files", int(count))
-
+    查詢與歸戶規則來自 :mod:`core.activity_sources`——與每週回顧、模式提案用的是
+    同一組來源，同一天的數字不會各算各的（D3）。
+    """
+    buckets = project_event_counts(start_day=day, end_day=day, database=database)
     rows = [
-        {"project": name, **counts, "total": sum(counts.values())}
+        {"project": name, **{kind: counts.get(kind, 0) for kind in EVENT_KINDS}, "total": sum(counts.values())}
         for name, counts in buckets.items()
     ]
     rows.sort(key=lambda item: (-item["total"], item["project"].casefold()))

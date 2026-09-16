@@ -418,7 +418,7 @@ def _collect(req):
 
 def test_chat_uses_worker_citations_in_prompt(monkeypatch, make_client):
     import rag.router as router_module
-    from rag import llm_gateway as gateway_module
+    from core import llm_client as gateway_module
 
     monkeypatch.setattr(router_module, "retrieval_mode", lambda: "worker")
     monkeypatch.setattr(router_module, "retrieval_client", make_client("ok"))
@@ -428,7 +428,7 @@ def test_chat_uses_worker_citations_in_prompt(monkeypatch, make_client):
         captured["system_prompt"] = kwargs.get("system_prompt")
         yield "回答"
 
-    monkeypatch.setattr(gateway_module.llm_gateway, "stream_chat", ok_stream)
+    monkeypatch.setattr(gateway_module.llm_client, "stream_chat", ok_stream)
     payload = _collect(_Req())
     assert payload.splitlines()[-2].startswith("event: done") or "event: done" in payload
     assert "命中 測試問題" in payload  # citations 事件帶回 worker 的結果
@@ -438,7 +438,7 @@ def test_chat_uses_worker_citations_in_prompt(monkeypatch, make_client):
 
 def test_chat_degrades_when_worker_times_out(monkeypatch, make_client):
     import rag.router as router_module
-    from rag import llm_gateway as gateway_module
+    from core import llm_client as gateway_module
 
     monkeypatch.setattr(router_module, "retrieval_mode", lambda: "worker")
     monkeypatch.setattr(router_module, "RETRIEVAL_TIMEOUT_SECONDS", 1)
@@ -450,7 +450,7 @@ def test_chat_degrades_when_worker_times_out(monkeypatch, make_client):
         captured["system_prompt"] = kwargs.get("system_prompt")
         yield "仍然回答"
 
-    monkeypatch.setattr(gateway_module.llm_gateway, "stream_chat", ok_stream)
+    monkeypatch.setattr(gateway_module.llm_client, "stream_chat", ok_stream)
     payload = _collect(_Req())
     assert "event: done" in payload and "仍然回答" in payload
     assert "參考知識庫文件切片" not in (captured.get("system_prompt") or "")
@@ -459,7 +459,7 @@ def test_chat_degrades_when_worker_times_out(monkeypatch, make_client):
 
 def test_chat_survives_worker_crash(monkeypatch, make_client):
     import rag.router as router_module
-    from rag import llm_gateway as gateway_module
+    from core import llm_client as gateway_module
 
     monkeypatch.setattr(router_module, "retrieval_mode", lambda: "worker")
     monkeypatch.setattr(router_module, "retrieval_client", make_client("crash"))
@@ -467,6 +467,6 @@ def test_chat_survives_worker_crash(monkeypatch, make_client):
     async def ok_stream(**kwargs):
         yield "照常回答"
 
-    monkeypatch.setattr(gateway_module.llm_gateway, "stream_chat", ok_stream)
+    monkeypatch.setattr(gateway_module.llm_client, "stream_chat", ok_stream)
     payload = _collect(_Req())
     assert "event: done" in payload and "照常回答" in payload

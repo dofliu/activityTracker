@@ -12,7 +12,7 @@ from core.runtime_paths import resolve_runtime_path
 from core.time_utils import get_local_now
 from core.project_engine import get_active_projects_list, get_open_loops_list, refresh_project_states, extract_and_save_open_loops_from_summary
 from .prompt_templates import RANGE_PROJECT_SYNTHESIS_SYSTEM, RANGE_PROJECT_SYNTHESIS_USER
-from .llm_client import LLMClient
+from core.llm_client import LLMClient
 
 logger = logging.getLogger("OmniContext.Aggregator")
 

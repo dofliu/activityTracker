@@ -105,15 +105,14 @@ def collect_activity_stats(
     """在視窗內數一遍本機資料庫；每個數字都可回溯到一張表。"""
     from sqlalchemy import func
 
-    from core.models import (
-        ActivityMicroSummary,
-        AIPromptEvent,
-        FileActivityEvent,
-        GitActivityEvent,
-        GitHubPREvent,
-        OpenLoop,
-        ProjectState,
-    )
+    from core.activity_sources import source_for, within_window
+    from core.models import ActivityMicroSummary, GitHubPREvent, OpenLoop, ProjectState
+
+    # 三張事件表「查哪張、看哪個時間欄位」由 core.activity_sources 單一定義（D3）：
+    # 新增一種活動來源時，這裡與每週回顧／模式提案／工作誌一起變，不會各走各的。
+    commit_source = source_for("commits")
+    ai_source = source_for("ai_turns")
+    file_source = source_for("files")
 
     cfg = cfg or get_config()
     database = database or get_db()
@@ -122,7 +121,7 @@ def collect_activity_stats(
     until = window_end(window, now)
 
     def within(col):
-        return (col >= since) if until is None else ((col >= since) & (col < until))
+        return within_window(col, since, until)
 
     def inside(value: datetime | None) -> bool:
         value = _naive(value)
@@ -139,12 +138,12 @@ def collect_activity_stats(
     first_seen: list[datetime] = []
 
     with database.session_scope() as session:
-        commits = session.query(GitActivityEvent).filter(within(GitActivityEvent.timestamp)).all()
+        commits = session.query(commit_source.model).filter(within(commit_source.timestamp_column)).all()
         stats["commits"] = len(commits)
         stats["commit_repos"] = sorted({c.repo_name for c in commits if c.repo_name})
         stats["insertions"] = int(sum(int(c.insertions or 0) for c in commits))
         first_seen.extend(_naive(c.timestamp) for c in commits if c.timestamp)
-        stats["sources"]["commits"] = "git_activity_events"
+        stats["sources"]["commits"] = commit_source.table
 
         prs = session.query(GitHubPREvent).filter(
             within(GitHubPREvent.created_at) | within(GitHubPREvent.merged_at) | within(GitHubPREvent.updated_at)
@@ -155,21 +154,23 @@ def collect_activity_stats(
         stats["pr_repos"] = sorted({p.repo_name for p in prs if p.repo_name})
         stats["sources"]["prs"] = "github_pr_events"
 
-        ai_rows = session.query(AIPromptEvent.platform, AIPromptEvent.timestamp).filter(within(AIPromptEvent.timestamp)).all()
+        ai_rows = session.query(ai_source.model.platform, ai_source.timestamp_column).filter(
+            within(ai_source.timestamp_column)
+        ).all()
         stats["ai_turns"] = len(ai_rows)
         stats["ai_platforms"] = sorted({str(p or "").strip() for p, _ in ai_rows if p})
         first_seen.extend(_naive(ts) for _, ts in ai_rows if ts)
-        stats["sources"]["ai_turns"] = "ai_prompt_events"
+        stats["sources"]["ai_turns"] = ai_source.table
 
-        files = session.query(FileActivityEvent.file_type, FileActivityEvent.timestamp).filter(
-            within(FileActivityEvent.timestamp)
+        files = session.query(file_source.model.file_type, file_source.timestamp_column).filter(
+            within(file_source.timestamp_column)
         ).all()
         types = [str(t or "").lower() for t, _ in files]
         stats["files_changed"] = len(files)
         stats["files_writing"] = sum(1 for t in types if t in WRITING_TYPES)
         stats["files_code"] = sum(1 for t in types if t in CODE_TYPES)
         first_seen.extend(_naive(ts) for _, ts in files if ts)
-        stats["sources"]["files"] = "file_activity_events"
+        stats["sources"]["files"] = file_source.table
 
         projects = (
             session.query(ProjectState)

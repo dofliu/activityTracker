@@ -128,7 +128,7 @@ def test_untracked_files_do_not_block_push(synced_repo: Path):
 
 def test_api_uses_repo_id_and_rejects_arbitrary_path_field(synced_repo: Path, monkeypatch):
     service, status = _one_status(synced_repo)
-    monkeypatch.setattr("core.server.LocalRepositorySync", lambda: service)
+    monkeypatch.setattr("core.api.repos.LocalRepositorySync", lambda: service)
     client = TestClient(app)
 
     listed = client.get("/api/v1/repos/sync-status")

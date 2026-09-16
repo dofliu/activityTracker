@@ -210,7 +210,7 @@ def test_batch_push_is_off_by_default_and_pushes_only_ahead_repos_when_enabled(t
 
 def test_batch_api_schema_is_strict_and_push_returns_409_when_disabled(fleet, monkeypatch):
     service = LocalRepositorySync(_Config(fleet["root"]))
-    monkeypatch.setattr("core.server.LocalRepositorySync", lambda: service)
+    monkeypatch.setattr("core.api.repos.LocalRepositorySync", lambda: service)
     client = TestClient(app)
 
     listed = client.get("/api/v1/repos/sync-status?scope=all")

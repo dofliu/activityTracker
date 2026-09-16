@@ -26,7 +26,7 @@ It answers three questions at any moment:
 | Area | State |
 | :--- | :--- |
 | Code | P0–P8 and all ADR-008 executor stages landed; 22 ADRs record the boundary behind each decision |
-| Tests | **62 contract test modules, 629 tests** (628 passed + 1 skipped); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs |
+| Tests | **66 contract test modules, 663 tests** (662 passed + 1 skipped; 650 passed + 12 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
 | Data | SQLite schema migration **18/18** (append-only + checksum, verified backup before upgrade) |
 | Release | `release_ready: false` |
 
@@ -34,7 +34,7 @@ It answers three questions at any moment:
 
 Don't rely on memory: `python main.py verify` (or dashboard "06 Settings → Acceptance Center") reports which receipts exist right now ([ADR-016](docs/ADR-016-acceptance-center.md)).
 
-**2026-09-16 project review**: the feature set is large enough; what comes next is **subtraction** — remove dead code and unused dependencies, make RAG an optional install, merge the two LLM clients and the two vector-memory stacks, then extract the one capability nothing else offers (reading local AI-agent transcripts) into a standalone package. Feature candidates (remote access, two-way LINE, more collectors) are paused. **R0 landed the same day: dead code and unused deps removed, marked vendored, one source of truth for status numbers, and the knowledge-base dependencies moved to an optional `[rag]` extra (core install 721 MB → 176 MB).** Full assessment (in Traditional Chinese): [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md); three-phase plan: [ROADMAP §13](ROADMAP.md#13-架構整頓與推廣方向2026-09-16-檢視).
+**2026-09-16 project review**: the feature set is large enough; what comes next is **subtraction** — remove dead code and unused dependencies, make RAG an optional install, merge the two LLM clients and the two vector-memory stacks, then extract the one capability nothing else offers (reading local AI-agent transcripts) into a standalone package. Feature candidates (remote access, two-way LINE, more collectors) are paused. **R0 landed the same day: dead code and unused deps removed, marked vendored, one source of truth for status numbers, and the knowledge-base dependencies moved to an optional `[rag]` extra (core install 721 MB → 176 MB); R1 has landed D2 (one `core/llm_client.py`), D3 (activity sources in `core/activity_sources.py`) and D4 (`server.py` went from 1,995 to 134 lines, split into 9 domain routers).** Full assessment (in Traditional Chinese): [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md); three-phase plan: [ROADMAP §13](ROADMAP.md#13-架構整頓與推廣方向2026-09-16-檢視).
 
 **Documentation:** [📚 Index](docs/INDEX.md) · [User Guide](docs/USAGE.md) · [Roadmap & Results](ROADMAP.md) · [Backlog](docs/TODO.md) · [Machine-readable status](STATUS.yaml) · [Project review 2026-09-16](docs/REVIEW-2026-09-16-project-assessment.md)
 
@@ -275,6 +275,8 @@ activityTracker/
 │
 ├── core/                       # Core services
 │   ├── server.py               # FastAPI REST API and static server
+│   ├── llm_client.py           # the one LLM client: Ollama / Gemini / Claude / OpenAI, sync + streaming
+│   ├── activity_sources.py     # the one definition of activity: which tables, project attribution, day bounds
 │   ├── manager.py              # Collector supervision and supervise_and_heal
 │   ├── database.py / migrations.py / models.py   # SQLite and append-only migrations
 │   ├── security.py / secret_resolver.py          # Origin boundary and secret resolution
@@ -303,7 +305,6 @@ activityTracker/
 │   ├── parsers/ chunker.py embeddings.py vector_store.py retriever.py
 │   ├── storage.py              # Capacity reporting and Chroma space reclamation
 │   ├── activity_indexer.py     # Project state and open-loop virtual chunks
-│   └── llm_gateway.py          # Ollama / Gemini / Claude / OpenAI gateway
 │
 ├── watchers/                   # Collectors
 │   ├── file_watcher.py git_watcher.py window_watcher.py
@@ -312,7 +313,7 @@ activityTracker/
 │   └── browser_extension/      # Chrome MV3 extension
 │
 ├── synthesizer/                # Synthesis and scheduling
-│   ├── aggregator.py prompt_templates.py llm_client.py scheduler.py
+│   ├── aggregator.py prompt_templates.py scheduler.py
 │   └── micro_summarizer.py / rollup.py    # Two-tier micro-summaries, weekly/monthly rollups
 │
 ├── notifiers/                  # Notification channels
@@ -327,7 +328,7 @@ activityTracker/
 │   └── index.html / app.js / style.css
 │
 ├── scripts/                    # Verification, cleanup, autostart and E2E scripts
-├── tests/                      # 62 contract test modules (629 tests)
+├── tests/                      # 66 contract test modules (663 tests)
 ├── logs/checkpoints/           # Periodic activity snapshots
 └── reports/                    # Daily / range Markdown reports
 ```

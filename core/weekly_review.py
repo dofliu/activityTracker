@@ -21,7 +21,7 @@ import logging
 from datetime import date, datetime, time as dtime, timedelta
 from typing import Any
 
-from core.activity_patterns import activity_matrix
+from core.activity_sources import ANY_PROJECT, project_activity_matrix
 from core.config import get_config
 from core.database import get_db
 from core.models import SecretaryNote
@@ -82,9 +82,9 @@ def review_period(now: datetime, weeks_back: int = 1) -> tuple[date, date, str]:
 
 def active_days_by_project(start: date, end: date, *, database: Any | None = None) -> tuple[dict[str, int], int]:
     """(各專案活躍天數, 整週有活動的天數)。沒歸戶的活動只算進整週天數，不猜專案。"""
-    matrix = activity_matrix(end_day=end, days=(end - start).days + 1, database=database or get_db())
-    total = len(matrix.get("*", set()))
-    per_project = {key: len(days) for key, days in matrix.items() if key != "*" and days}
+    matrix = project_activity_matrix(start_day=start, end_day=end, database=database or get_db())
+    total = len(matrix.get(ANY_PROJECT, set()))
+    per_project = {key: len(days) for key, days in matrix.items() if key != ANY_PROJECT and days}
     return per_project, total
 
 

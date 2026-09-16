@@ -129,7 +129,7 @@ def _llm_reduce(
     """回傳 LLM 彙整結果；不可用或回傳備援報告時回 None（呼叫端回退）。"""
     if llm_generate is None:
         try:
-            from .llm_client import LLMClient
+            from core.llm_client import LLMClient
 
             llm_generate = LLMClient().generate
         except Exception:  # noqa: BLE001 — LLM 不可用即回退 deterministic

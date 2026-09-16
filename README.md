@@ -26,7 +26,7 @@
 | 面向 | 現況 |
 | :--- | :--- |
 | 程式 | P0–P8 與 ADR-008 執行器全階段已落地；22 份 ADR 記錄每個決策的邊界 |
-| 測試 | **62 個 contract test 模組、629 項**（628 passed + 1 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job 全綠 |
+| 測試 | **66 個 contract test 模組、663 項**（662 passed + 1 skipped；不裝 `[rag]` extra 時 650 passed + 12 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
 | 資料 | SQLite schema migration **18/18**（append-only + checksum，升級前自動備份） |
 | 發佈 | `release_ready: false` |
 
@@ -34,7 +34,7 @@
 
 不必憑記憶：跑 `python main.py verify`（或看儀表板「06 系統設定 → 驗收中心」）就會列出每一項現在有沒有收據（[ADR-016](docs/ADR-016-acceptance-center.md)）。
 
-**2026-09-16 專案檢視**：功能已經夠多，接下來是**減法**——刪死碼與未用依賴、RAG 改為選用安裝、合併兩套 LLM client 與兩套向量記憶，再把「讀本機 AI agent transcript」這個唯一無替代品的核心抽成獨立套件對外。功能候選（遠端存取、LINE 雙向、更多採集來源）暫停。**R0 已於同日完成：死碼與未用依賴移除、marked 本機化、CLI／API 同一組數字，以及知識庫依賴改為 `[rag]` 選用安裝（核心安裝 721 MB → 176 MB）。** 評估全文見 [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md)，三階段計畫見 [ROADMAP §13](ROADMAP.md#13-架構整頓與推廣方向2026-09-16-檢視)。
+**2026-09-16 專案檢視**：功能已經夠多，接下來是**減法**——刪死碼與未用依賴、RAG 改為選用安裝、合併兩套 LLM client 與兩套向量記憶，再把「讀本機 AI agent transcript」這個唯一無替代品的核心抽成獨立套件對外。功能候選（遠端存取、LINE 雙向、更多採集來源）暫停。**R0 已於同日完成：死碼與未用依賴移除、marked 本機化、CLI／API 同一組數字，以及知識庫依賴改為 `[rag]` 選用安裝（核心安裝 721 MB → 176 MB）；R1 已完成 D2（兩套 LLM client 合為 `core/llm_client.py`）、D3（活動來源收進 `core/activity_sources.py`）與 D4（`server.py` 1,995 → 134 行，依領域切成 9 個 router）。** 評估全文見 [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md)，三階段計畫見 [ROADMAP §13](ROADMAP.md#13-架構整頓與推廣方向2026-09-16-檢視)。
 
 **文件入口：**[📚 文件總覽](docs/INDEX.md) · [使用手冊](docs/USAGE.md) · [開發規劃與成果](ROADMAP.md) · [待辦與判準](docs/TODO.md) · [機器可讀現況](STATUS.yaml) · [專案檢視 2026-09-16](docs/REVIEW-2026-09-16-project-assessment.md)
 
@@ -306,7 +306,12 @@ activityTracker/
 │   └── archive/                # 已歸檔的一次性規劃書與完成報告
 │
 ├── core/                       # 核心服務
-│   ├── server.py               # FastAPI REST API 與靜態伺服器
+│   ├── server.py               # FastAPI app 組裝：安全邊界、靜態資源、router 掛載
+│   ├── api/                    # 依領域切分的 9 個 APIRouter（路由表由快照測試鎖住）
+│   ├── schemas.py              # API 請求結構（33 個 Pydantic model）
+│   ├── ingest.py               # AI 事件的 turn_key 與 response_status 判定
+│   ├── llm_client.py           # 唯一的 LLM client：Ollama / Gemini / Claude / OpenAI，同步與串流
+│   ├── activity_sources.py     # 唯一的活動來源定義：哪些表算活動、專案歸戶、日界
 │   ├── manager.py              # 採集器統籌與 supervise_and_heal 自我修復
 │   ├── database.py / migrations.py / models.py   # SQLite 與 append-only migration
 │   ├── security.py / secret_resolver.py          # Origin 邊界與金鑰解析
@@ -335,7 +340,6 @@ activityTracker/
 │   ├── parsers/ chunker.py embeddings.py vector_store.py retriever.py
 │   ├── storage.py              # 容量報告與 Chroma 空間回收
 │   ├── activity_indexer.py     # 專案狀態與 Open Loops 虛擬切片
-│   └── llm_gateway.py          # Ollama / Gemini / Claude / OpenAI 多模型網關
 │
 ├── watchers/                   # 多源採集器
 │   ├── file_watcher.py git_watcher.py window_watcher.py
@@ -344,7 +348,7 @@ activityTracker/
 │   └── browser_extension/      # Chrome MV3 擴充套件
 │
 ├── synthesizer/                # 摘要與排程引擎
-│   ├── aggregator.py prompt_templates.py llm_client.py scheduler.py
+│   ├── aggregator.py prompt_templates.py scheduler.py
 │   └── micro_summarizer.py / rollup.py    # 兩層增量微摘要與週/月報
 │
 ├── notifiers/                  # 通知推播
@@ -359,7 +363,7 @@ activityTracker/
 │   └── index.html / app.js / style.css
 │
 ├── scripts/                    # 驗證、清理、autostart 與 E2E 腳本
-├── tests/                      # 62 個 contract test 模組（629 項）
+├── tests/                      # 66 個 contract test 模組（663 項）
 ├── logs/checkpoints/           # 週期性活動快照
 └── reports/                    # 每日／區間 Markdown 報告
 ```

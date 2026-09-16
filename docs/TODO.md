@@ -1,6 +1,6 @@
 # 待辦事項與已知問題（Backlog）
 
-> 最後更新：2026-09-16（R0 減法 B5–B9 與 D1 已完成並移到 ROADMAP §11.2）。這頁是**唯一的待辦清單入口**；現況數據以
+> 最後更新：2026-09-16（R0 B5–B9／D1 與 R1 D2／D3／D4 已完成並移到 ROADMAP §11.2）。這頁是**唯一的待辦清單入口**；現況數據以
 > [STATUS.yaml](../STATUS.yaml) 為準，接手路徑見 [NEXT_SESSION.md](NEXT_SESSION.md)。
 >
 > 每一項都標明**完成判準（收據）**——沒有收據就不算完成，這是本專案的一貫原則。
@@ -89,13 +89,10 @@
 
 > 來源：[REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) §4–5。
 > 每一項結束時 `pytest` 必須全綠、`python main.py verify` 結果不得變化（整頓不改行為）。R2 的項目要先有 ADR。
-> **R0 已於 2026-09-16 完成**（B5–B9 ＋ D1，收據見 ROADMAP §11.2）；下一階段從 R1 的 D2 開始。
+> **R0 已於 2026-09-16 完成**（B5–B9 ＋ D1）、**R1 的 D2／D3／D4 同日完成**（一個 LLM client、一份活動來源定義、`server.py` 切成 9 個 router），收據見 ROADMAP §11.2；接下來是 D5（桌面通知進 ChannelAdapter）。
 
 | # | 項目 | 內容 | 完成判準（收據） | 階段 |
 | :-- | :--- | :--- | :--- | :--- |
-| D2 | **一個 LLM client** | `synthesizer/llm_client.py` 與 `rag/llm_gateway.py` 合為一個模組（同步 `generate` ＋ 非同步 `stream`）；`core/semantic_index.py:451` 與 `rag/embeddings.py:71` 的獨立呼叫改走它 | 四個 provider 各只有一處實作；預設模型名只定義一次；`test_summary_prompt_limits.py`／`test_rag_chat_stream.py`／`test_secretary_advisor.py` 全綠 | R1 |
-| D3 | **一份活躍聚合** | 新增單一 `project_activity_matrix(start, end)`，`weekly_review.py:83`、`activity_patterns.py:243`、`activity_digest.py:77`、`secretary_greeting.py:97` 全改吃它 | 四個模組不再各自查事件表；新增一支 contract test 斷言同一天四處數字相同 | R1 |
-| D4 | **`server.py` 切 router** | 依領域拆成約 8 個 `APIRouter`（health／ingest／usage／secretary／scheduled／acceptance／config／integrations／system）；34 個 Pydantic model 集中到 `core/schemas.py`；AI ingest 的去重／turn key／狀態分級（`:1370-1445`）搬到 `core/ingest.py` | `core/server.py` < 300 行且只做組裝；路由總數與路徑不變（用 `app.routes` 快照測試鎖住）；`test_api_boundary.py` 全綠 | R1 |
 | D5 | **桌面通知進 ChannelAdapter** | `notifiers/desktop_notifier.py` 成為第三個 `ChannelAdapter`，扇出只在 `secretary_push.py` 一處 | `desktop_notifier.py` 不再自己組晨報／交接／停滯／里程碑內容；`test_notification_channels.py` 多一組 desktop adapter 斷言 | R1 |
 | D6 | **旗標六層收三層** | 只留 `executor.enabled`／`l2.enabled`／`l2.allow_write`；`scheduled_tasks.enabled` 併入 executor、`allow_remote_arm` 併入 `telegram_approvals`；秘書引擎約 25 個評分權重（`*_boost`／`*_min_days`）從 `config.example.yaml` 移回程式常數 | `config.example.yaml` < 300 行；安全語意不變（L1／L2 永不可排程、/arm 仍需開關）由既有 allowlist 測試證明；ADR-008 補 addendum | R1 |
 | D7 | **兩套向量記憶二選一** | 先寫 ADR-023：建議活動記憶＝`core/semantic_index.py`（核心）、文件＝RAG（選用）；刪 `rag/activity_indexer.py` 對五種實體的重複 embedding；RAG 對話要引用活動時透過檢索 worker 查 `semantic_index` | 同一筆活動只 embedding 一次；`omni ask` 與 `/api/v1/rag/chat` 引用同一份活動索引；ADR-023 Accepted | R2 |

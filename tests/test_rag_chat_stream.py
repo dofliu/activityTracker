@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from rag import llm_gateway as gateway_module
-from rag.llm_gateway import _resolve_api_key
+from core import llm_client as gateway_module
+from core.llm_client import resolve_provider_api_key
 
 
 class DictConfig:
@@ -38,7 +38,7 @@ class DictConfig:
 def test_api_key_resolution_returns_plain_string(monkeypatch):
     monkeypatch.setattr(gateway_module, "get_config", lambda: DictConfig())
     monkeypatch.setenv("GEMINI_API_KEY", "AIza-test-key")
-    key = _resolve_api_key("gemini", "GEMINI_API_KEY")
+    key = resolve_provider_api_key("gemini")
     assert key == "AIza-test-key"
     assert isinstance(key, str)
 
@@ -48,7 +48,7 @@ def test_missing_api_key_is_falsy_not_an_object(monkeypatch):
     monkeypatch.setattr(gateway_module, "get_config", lambda: DictConfig())
     for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
         monkeypatch.delenv(name, raising=False)
-    key = _resolve_api_key("gemini", "GEMINI_API_KEY", aliases=("GOOGLE_API_KEY",))
+    key = resolve_provider_api_key("gemini")
     assert key == ""
     assert not key  # 這一行就是當初壞掉的判斷
 
@@ -61,19 +61,19 @@ def test_api_key_env_name_follows_config(monkeypatch):
     )
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("MY_CUSTOM_KEY", "from-custom-env")
-    assert _resolve_api_key("gemini", "GEMINI_API_KEY") == "from-custom-env"
+    assert resolve_provider_api_key("gemini") == "from-custom-env"
 
 
 def test_gemini_alias_google_api_key(monkeypatch):
     monkeypatch.setattr(gateway_module, "get_config", lambda: DictConfig())
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("GOOGLE_API_KEY", "alias-key")
-    assert _resolve_api_key("gemini", "GEMINI_API_KEY", aliases=("GOOGLE_API_KEY",)) == "alias-key"
+    assert resolve_provider_api_key("gemini") == "alias-key"
 
 
 def test_secret_never_appears_in_request_url():
     """金鑰只能走 header：URL 會進 log 與錯誤訊息，不得含 secret。"""
-    source = Path(__file__).resolve().parents[1] / "rag" / "llm_gateway.py"
+    source = Path(__file__).resolve().parents[1] / "core" / "llm_client.py"
     text = source.read_text(encoding="utf-8")
     assert "key={api_key}" not in text
     assert "x-goog-api-key" in text
@@ -141,7 +141,7 @@ def test_stream_emits_done_even_when_llm_raises(monkeypatch):
         raise RuntimeError("provider blew up")
         yield  # pragma: no cover — 讓函式成為 async generator
 
-    monkeypatch.setattr(gateway_module.llm_gateway, "stream_chat", exploding_stream)
+    monkeypatch.setattr(gateway_module.llm_client, "stream_chat", exploding_stream)
     payload = _collect(_Req())
     assert _events(payload)[-1] == "done"
     assert "對話串流中止" in payload
@@ -151,7 +151,7 @@ def test_stream_emits_done_on_normal_completion(monkeypatch):
     async def ok_stream(**kwargs):
         yield "你好"
 
-    monkeypatch.setattr(gateway_module.llm_gateway, "stream_chat", ok_stream)
+    monkeypatch.setattr(gateway_module.llm_client, "stream_chat", ok_stream)
     payload = _collect(_Req())
     events = _events(payload)
     assert events[0] == "status"  # 立刻回位元組，避免被誤判為沒回應
@@ -187,7 +187,7 @@ def test_retrieval_timeout_degrades_but_still_answers(monkeypatch):
         captured["system_prompt"] = kwargs.get("system_prompt")
         yield "已回答"
 
-    monkeypatch.setattr(gateway_module.llm_gateway, "stream_chat", ok_stream)
+    monkeypatch.setattr(gateway_module.llm_client, "stream_chat", ok_stream)
     payload = _collect(_Req(enable_rag=True))
     assert _events(payload)[-1] == "done"
     assert "已回答" in payload
@@ -215,7 +215,7 @@ def test_retrieval_failure_does_not_abort_the_answer(monkeypatch):
     async def ok_stream(**kwargs):
         yield "仍然回答"
 
-    monkeypatch.setattr(gateway_module.llm_gateway, "stream_chat", ok_stream)
+    monkeypatch.setattr(gateway_module.llm_client, "stream_chat", ok_stream)
     payload = _collect(_Req(enable_rag=True))
     assert _events(payload)[-1] == "done"
     assert "仍然回答" in payload

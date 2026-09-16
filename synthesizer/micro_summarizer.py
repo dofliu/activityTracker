@@ -107,7 +107,7 @@ def build_compact_context(range_data: dict[str, Any]) -> tuple[str, int]:
 
 def _default_generate(provider: str, timeout_seconds: int) -> Callable[[str, str], str]:
     def _run(system_prompt: str, user_prompt: str) -> str:
-        from synthesizer.llm_client import LLMClient
+        from core.llm_client import LLMClient
 
         client = LLMClient(provider)
         pool = ThreadPoolExecutor(max_workers=1)

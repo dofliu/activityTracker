@@ -29,25 +29,20 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 from datetime import date, datetime, time as dtime, timedelta
 from typing import Any
 
 from sqlalchemy import func
 
+from core.activity_sources import ACTIVITY_CLAIM_BOUNDARY, project_activity_matrix
 from core.config import get_config
 from core.database import get_db
-from core.models import (
-    AIPromptEvent,
-    FileActivityEvent,
-    GitActivityEvent,
-    SecretaryNote,
-    SecretaryScheduledTask,
-)
+from core.models import SecretaryNote, SecretaryScheduledTask
 
 PATTERN_CLAIM_BOUNDARY = (
     "模式只來自（專案 × 日）的可回溯活動計數，且只算已結束的日子；不讀 prompt 內容、"
     "不推測意圖。提案仍為唯讀建議，對應的動作全部是既有 template，執行仍需批准。"
+    f"　{ACTIVITY_CLAIM_BOUNDARY}"
 )
 
 ROUTINE_TEMPLATES = ("morning_pack", "daily_digest")
@@ -120,48 +115,14 @@ def activity_matrix(
 ) -> dict[str, set[date]]:
     """``end_day``（含）往前 ``days`` 天內，每個專案哪幾天有活動。
 
-    只用三張事件表依（專案 × 日）分組計數；沒歸戶（project 為空）的活動只計入
-    ``"*"`` 這個代表「任何活動」的鍵，不猜專案。回傳值裡 ``"*"`` 一定存在。
+    D3 之後只是 :func:`core.activity_sources.project_activity_matrix` 的視窗換算——
+    「哪些表算活動、專案名在哪個欄位」只定義在那一個模組。
     """
-    database = database or get_db()
-    start = datetime.combine(end_day - timedelta(days=days - 1), dtime.min)
-    until = datetime.combine(end_day + timedelta(days=1), dtime.min)
-    matrix: dict[str, set[date]] = defaultdict(set)
-    matrix["*"]  # 保證存在
-
-    def absorb(rows: list[tuple[Any, Any]]) -> None:
-        for project, day_text in rows:
-            if not day_text:
-                continue
-            try:
-                day = date.fromisoformat(str(day_text)[:10])
-            except ValueError:
-                continue
-            matrix["*"].add(day)
-            key = (project or "").strip()
-            if key:
-                matrix[key].add(day)
-
-    with database.session_scope() as session:
-        absorb(
-            session.query(GitActivityEvent.repo_name, func.date(GitActivityEvent.timestamp))
-            .filter(GitActivityEvent.timestamp >= start, GitActivityEvent.timestamp < until)
-            .group_by(GitActivityEvent.repo_name, func.date(GitActivityEvent.timestamp))
-            .all()
-        )
-        absorb(
-            session.query(AIPromptEvent.project_tag, func.date(AIPromptEvent.timestamp))
-            .filter(AIPromptEvent.timestamp >= start, AIPromptEvent.timestamp < until)
-            .group_by(AIPromptEvent.project_tag, func.date(AIPromptEvent.timestamp))
-            .all()
-        )
-        absorb(
-            session.query(FileActivityEvent.project_name, func.date(FileActivityEvent.timestamp))
-            .filter(FileActivityEvent.timestamp >= start, FileActivityEvent.timestamp < until)
-            .group_by(FileActivityEvent.project_name, func.date(FileActivityEvent.timestamp))
-            .all()
-        )
-    return dict(matrix)
+    return project_activity_matrix(
+        start_day=end_day - timedelta(days=days - 1),
+        end_day=end_day,
+        database=database,
+    )
 
 
 def _split_windows(

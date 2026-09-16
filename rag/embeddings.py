@@ -5,7 +5,7 @@ from typing import List, Optional
 import httpx
 from rag.config import rag_settings
 from core.config import get_config
-from core.secret_resolver import resolve_secret_env
+from core.llm_client import resolve_provider_api_key
 
 logger = logging.getLogger("OmniContext.RAG.Embeddings")
 
@@ -68,8 +68,8 @@ class EmbeddingService:
                 return [self._fallback_dummy_embed(t) for t in texts]
 
         elif provider == "openai":
-            # 必須取 .value：SecretResolution 物件恆為真值，會讓下方判斷失效。
-            api_key = resolve_secret_env("OPENAI_API_KEY").value
+            # 金鑰解析只有一份（core/llm_client）：沿用 synthesizer.openai.api_key_env，並已取 .value
+            api_key = resolve_provider_api_key("openai", cfg)
             if api_key:
                 try:
                     import openai
