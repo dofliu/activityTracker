@@ -1,3 +1,5 @@
+# 核心執行期依賴（與 pyproject.toml [project].dependencies 一致）。
+# 知識庫（DeskRAG）的索引／檢索／文件解析套件是選用 extra：pip install -e ".[rag]"
 fastapi>=0.110.0
 uvicorn>=0.28.0
 sqlalchemy>=2.0.0
@@ -14,11 +16,3 @@ psutil>=5.9.0
 python-dateutil>=2.8.2
 tzdata>=2024.1; sys_platform == 'win32'
 apscheduler>=3.10.4
-chromadb>=0.4.24
-fastembed>=0.2.7
-rank-bm25>=0.2.2
-jieba>=0.42.1
-pymupdf>=1.24.0
-python-docx>=1.1.0
-python-pptx>=0.6.23
-openpyxl>=3.1.2

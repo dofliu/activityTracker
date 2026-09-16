@@ -161,6 +161,7 @@ def test_stream_emits_done_on_normal_completion(monkeypatch):
 
 def test_retrieval_timeout_degrades_but_still_answers(monkeypatch):
     """大型索引檢索卡住時：不使用文件脈絡，但仍要回答並收尾。"""
+    pytest.importorskip("chromadb")  # in_process 路徑會 import registry（Chroma client）
     import rag.router as router_module
 
     monkeypatch.setattr(router_module, "RETRIEVAL_TIMEOUT_SECONDS", 0.05)
@@ -197,6 +198,7 @@ def test_retrieval_timeout_degrades_but_still_answers(monkeypatch):
 
 
 def test_retrieval_failure_does_not_abort_the_answer(monkeypatch):
+    pytest.importorskip("chromadb")  # in_process 路徑會 import registry（Chroma client）
     class _BrokenRegistry:
         def retrieve(self, **kwargs):
             raise OSError("index unavailable")

@@ -71,3 +71,36 @@ jobs:
           path: |
             matrix-artifact-receipt.json
             matrix-installed-receipt.json
+
+  # TODO D1：知識庫依賴是選用 extra。這個 job 不裝 [rag]，證明核心在沒有
+  # chromadb／fastembed／rank-bm25／jieba／pymupdf／office parsers 時仍能啟動、測試全綠
+  # （需要它們的測試會 importorskip，並在摘要裡數得出來）。
+  test-core-without-rag-extra:
+    name: ubuntu-latest / Python 3.12 / no [rag] extra
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install core + test tools only
+        run: python -m pip install --upgrade pip ".[test]"
+
+      - name: Assert the RAG packages are really absent
+        run: |
+          python - <<'PY'
+          from rag import availability
+          missing = availability.missing_index_packages()
+          assert set(missing) == set(availability.INDEX_PACKAGES.values()), missing
+          print("rag extra absent as expected:", missing)
+          PY
+
+      - name: Main process imports without the extra
+        run: python -c "import core.server; print('core.server import ok')"
+
+      - name: Run contract tests (rag-dependent ones skip)
+        run: python -m pytest -q -rs
+

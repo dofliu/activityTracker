@@ -1,6 +1,6 @@
 # 待辦事項與已知問題（Backlog）
 
-> 最後更新：2026-09-16（R0 減法 B5–B9 已完成並移到 ROADMAP §11.2）。這頁是**唯一的待辦清單入口**；現況數據以
+> 最後更新：2026-09-16（R0 減法 B5–B9 與 D1 已完成並移到 ROADMAP §11.2）。這頁是**唯一的待辦清單入口**；現況數據以
 > [STATUS.yaml](../STATUS.yaml) 為準，接手路徑見 [NEXT_SESSION.md](NEXT_SESSION.md)。
 >
 > 每一項都標明**完成判準（收據）**——沒有收據就不算完成，這是本專案的一貫原則。
@@ -85,15 +85,14 @@
 
 ---
 
-## D. 架構整頓（ROADMAP §13；依 R0 → R1 → R2 順序）
+## D. 架構整頓（ROADMAP §13；R0 已完成，依 R1 → R2 順序）
 
 > 來源：[REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) §4–5。
 > 每一項結束時 `pytest` 必須全綠、`python main.py verify` 結果不得變化（整頓不改行為）。R2 的項目要先有 ADR。
-> R0 的 B5–B9（死碼、未用依賴、本機 marked、CLI 與 API 同一組數字）已於 2026-09-16 完成；R0 剩 D1。
+> **R0 已於 2026-09-16 完成**（B5–B9 ＋ D1，收據見 ROADMAP §11.2）；下一階段從 R1 的 D2 開始。
 
 | # | 項目 | 內容 | 完成判準（收據） | 階段 |
 | :-- | :--- | :--- | :--- | :--- |
-| D1 | **RAG 依賴改選用** | `chromadb`／`fastembed`／`rank-bm25`／`jieba`／`pymupdf`／`python-docx`／`python-pptx`／`openpyxl` 移到 `[project.optional-dependencies] rag`；未安裝時知識庫分頁與 `/api/v1/rag/*` 回明確的「未安裝 rag extra」而不是 500 | 乾淨 venv 分別安裝 `omnicontext` 與 `omnicontext[rag]`，記錄兩者體積（目標：基本安裝 < 150 MB）；`test_rag_api.py` 在無 extra 時仍全綠（以 skip 或降級斷言） | R0 |
 | D2 | **一個 LLM client** | `synthesizer/llm_client.py` 與 `rag/llm_gateway.py` 合為一個模組（同步 `generate` ＋ 非同步 `stream`）；`core/semantic_index.py:451` 與 `rag/embeddings.py:71` 的獨立呼叫改走它 | 四個 provider 各只有一處實作；預設模型名只定義一次；`test_summary_prompt_limits.py`／`test_rag_chat_stream.py`／`test_secretary_advisor.py` 全綠 | R1 |
 | D3 | **一份活躍聚合** | 新增單一 `project_activity_matrix(start, end)`，`weekly_review.py:83`、`activity_patterns.py:243`、`activity_digest.py:77`、`secretary_greeting.py:97` 全改吃它 | 四個模組不再各自查事件表；新增一支 contract test 斷言同一天四處數字相同 | R1 |
 | D4 | **`server.py` 切 router** | 依領域拆成約 8 個 `APIRouter`（health／ingest／usage／secretary／scheduled／acceptance／config／integrations／system）；34 個 Pydantic model 集中到 `core/schemas.py`；AI ingest 的去重／turn key／狀態分級（`:1370-1445`）搬到 `core/ingest.py` | `core/server.py` < 300 行且只做組裝；路由總數與路徑不變（用 `app.routes` 快照測試鎖住）；`test_api_boundary.py` 全綠 | R1 |

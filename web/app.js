@@ -5168,7 +5168,35 @@ async function refreshRAGStorage() {
 
 let ragRetrievalPollTimer = null;
 
+const RAG_EXTRA_BUTTON_IDS = [
+  "btn-rag-scan-now", "btn-rag-add-folder", "btn-rag-verify-index", "btn-rag-rebuild-bm25",
+  "btn-rag-compact-chroma", "btn-rag-memory-sync", "btn-rag-retrieval-warmup", "btn-rag-retrieval-release",
+];
+
+// TODO D1：知識庫的索引套件是選用 extra。沒裝時不藏功能，但把會失敗的按鈕灰掉並說要裝什麼。
+function applyRAGExtraAvailability(data) {
+  const missing = data && data.extra_installed === false;
+  for (const id of RAG_EXTRA_BUTTON_IDS) {
+    const btn = $(id);
+    if (!btn) continue;
+    if (missing) {
+      btn.disabled = true;
+      btn.dataset.ragExtraDisabled = "1";
+      btn.title = `需要先安裝：${data.install_hint || 'pip install "omnicontext[rag]"'}`;
+    } else if (btn.dataset.ragExtraDisabled) {
+      btn.disabled = false;
+      delete btn.dataset.ragExtraDisabled;
+      btn.removeAttribute("title");
+    }
+  }
+  return missing;
+}
+
 function describeRAGRetrieval(data) {
+  if (data.extra_installed === false) {
+    return `<div class="rag-storage-alert">知識庫的選用依賴未安裝（缺 ${esc((data.extra_missing || []).join("、"))}）。` +
+      `對話仍可用，但不會帶文件脈絡；要建索引與檢索請先執行 <code>${esc(data.install_hint || 'pip install "omnicontext[rag]"')}</code> 後重啟服務。</div>`;
+  }
   const mode = data.mode === "in_process" ? "in_process（在主服務內檢索）" : "常駐 worker";
   const stateMap = {
     cold: "尚未啟動（第一次提問時才載入索引）",
@@ -5202,6 +5230,7 @@ async function refreshRAGRetrieval() {
   try {
     const data = await getJSON("/api/v1/rag/retrieval/status");
     card.innerHTML = describeRAGRetrieval(data);
+    if (applyRAGExtraAvailability(data)) return data;
     const warmBtn = $("btn-rag-retrieval-warmup");
     const releaseBtn = $("btn-rag-retrieval-release");
     if (warmBtn) warmBtn.disabled = data.mode !== "worker" || data.state === "warming" || data.state === "ready";

@@ -34,7 +34,7 @@
 
 不必憑記憶：跑 `python main.py verify`（或看儀表板「06 系統設定 → 驗收中心」）就會列出每一項現在有沒有收據（[ADR-016](docs/ADR-016-acceptance-center.md)）。
 
-**2026-09-16 專案檢視**：功能已經夠多，接下來是**減法**——刪死碼與未用依賴、RAG 改為選用安裝、合併兩套 LLM client 與兩套向量記憶，再把「讀本機 AI agent transcript」這個唯一無替代品的核心抽成獨立套件對外。功能候選（遠端存取、LINE 雙向、更多採集來源）暫停。**R0 第一輪（死碼、未用依賴、本機 marked、CLI／API 同一組數字）已於同日完成。** 評估全文見 [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md)，三階段計畫見 [ROADMAP §13](ROADMAP.md#13-架構整頓與推廣方向2026-09-16-檢視)。
+**2026-09-16 專案檢視**：功能已經夠多，接下來是**減法**——刪死碼與未用依賴、RAG 改為選用安裝、合併兩套 LLM client 與兩套向量記憶，再把「讀本機 AI agent transcript」這個唯一無替代品的核心抽成獨立套件對外。功能候選（遠端存取、LINE 雙向、更多採集來源）暫停。**R0 已於同日完成：死碼與未用依賴移除、marked 本機化、CLI／API 同一組數字，以及知識庫依賴改為 `[rag]` 選用安裝（核心安裝 721 MB → 176 MB）。** 評估全文見 [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md)，三階段計畫見 [ROADMAP §13](ROADMAP.md#13-架構整頓與推廣方向2026-09-16-檢視)。
 
 **文件入口：**[📚 文件總覽](docs/INDEX.md) · [使用手冊](docs/USAGE.md) · [開發規劃與成果](ROADMAP.md) · [待辦與判準](docs/TODO.md) · [機器可讀現況](STATUS.yaml) · [專案檢視 2026-09-16](docs/REVIEW-2026-09-16-project-assessment.md)
 
@@ -114,7 +114,7 @@
 * **Related History 與 Work Sessions**：依 project + inactivity gap 整理為 derived work session，不新增資料表、不改寫原始事件（[ADR-006](docs/ADR-006-derived-context-sessions-and-related-history.md)）。
 * **邊界**：similarity 不是來源真實性或 coverage 的證明；session span 只是首末事件時間差，不代表實際工時或專注品質。
 
-### 6. 📚 DeskRAG 本地知識庫與文件智慧問答
+### 6. 📚 DeskRAG 本地知識庫與文件智慧問答（選用安裝：`pip install "omnicontext[rag]"`）
 
 * **單一 Web 入口、獨立索引 worker**：Dashboard 與 API 維持在 `http://127.0.0.1:8765`；掃描、解析、embedding、刪除與空間維護由另一個本機 process 執行，長時間索引不佔用主服務（[ADR-009](docs/ADR-009-deskrag-worker-index-lifecycle.md)）。
 * **全方位解析器**：PDF（PyMuPDF，保留頁碼）、Word／PowerPoint／Excel、Markdown 與程式碼、WebVTT 逐字稿，另把 Project State 與 Open Loops 併成虛擬切片。
@@ -192,8 +192,11 @@
 git clone https://github.com/dofliu/activityTracker.git
 cd activityTracker
 
-# Source checkout／開發模式
+# Source checkout／開發模式（含知識庫依賴與測試工具）
 python -m pip install -e ".[dev]"
+# 只要核心（採集、秘書、Git 同步、通知；不含知識庫索引）：約 170 MB
+#   python -m pip install -e .
+# 之後想開知識庫再補：python -m pip install -e ".[rag]"
 
 # 建立本機設定、目錄與 browser ingest token
 python main.py init --watch "/your/project/root"
@@ -207,10 +210,13 @@ python main.py
 若使用已建置的 Alpha wheel：
 
 ```console
-python -m pip install omnicontext-1.3.0a5-py3-none-any.whl
+python -m pip install omnicontext-1.3.0a5-py3-none-any.whl            # 核心
+python -m pip install "omnicontext-1.3.0a5-py3-none-any.whl[rag]"     # 核心＋知識庫（DeskRAG）
 omnicontext init --watch "/your/project/root"
 omnicontext assets-status
 ```
+
+**知識庫（DeskRAG）是選用安裝**：`[rag]` extra 帶入 ChromaDB／FastEmbed／BM25／jieba 與 PDF／Office 解析器（約 550 MB）。沒裝時其他功能照常，「02 知識庫」會直接說缺哪些套件與安裝指令，對話仍可用但不帶文件脈絡。
 
 Installed wheel 預設把 config、database 與 reports 放在使用者可寫的 `~/OmniContext`，不寫入 `site-packages`；可用 `OMNICONTEXT_HOME` 或 `OMNICONTEXT_CONFIG` 覆寫。
 

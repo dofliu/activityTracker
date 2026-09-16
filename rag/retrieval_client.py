@@ -31,6 +31,7 @@ from typing import Any, Deque, Dict, List, Optional, Sequence
 
 from core.config import get_config
 from core.time_utils import get_local_now
+from rag import availability
 
 logger = logging.getLogger("OmniContext.RAG.RetrievalClient")
 
@@ -81,6 +82,8 @@ class RetrievalWorkerClient:
     ):
         project_root = Path(__file__).resolve().parent.parent
         self._command = list(command) if command else [sys.executable, "-m", "rag.retrieval_worker"]
+        # 只有預設的 `python -m rag.retrieval_worker` 需要 [rag] extra；測試注入的替身指令不必。
+        self._requires_extra = command is None
         self._cwd = str(cwd or project_root)
         self._lock = threading.Lock()
         self._process: Optional[subprocess.Popen] = None
@@ -108,6 +111,13 @@ class RetrievalWorkerClient:
     def _spawn_locked(self) -> None:
         if self._alive():
             return
+        missing = availability.missing_index_packages() if self._requires_extra else []
+        if missing:
+            # 沒裝 [rag] extra：不啟動子程序（它會在 import 時死掉），直接說缺什麼。
+            self._state = "unavailable"
+            self._last_error = str(availability.RagExtraNotInstalled(missing))
+            self._process = None
+            raise RetrievalWorkerError(self._last_error)
         if self._process is not None:
             self._restarts += 1
         self._lines = queue.Queue()
@@ -310,6 +320,11 @@ class RetrievalWorkerClient:
         已有 4839 chunk，收據仍是 3）。自動路徑（啟動時）維持 idempotent；明示路徑一律重載。
         """
         with self._lock:
+            missing = availability.missing_index_packages() if self._requires_extra else []
+            if missing:
+                self._state = "unavailable"
+                self._last_error = str(availability.RagExtraNotInstalled(missing))
+                return self._status_locked()
             if self._warmup_thread is not None and self._warmup_thread.is_alive():
                 return self._status_locked()
             if not force and self._state == "ready" and self._warmup is not None and self._alive():
@@ -338,9 +353,13 @@ class RetrievalWorkerClient:
         state = self._state
         if not alive and state in ("ready", "loading", "starting"):
             state = "cold"
+        extra = availability.rag_extra_status()
+        if self._requires_extra and not extra["extra_installed"]:
+            state = "unavailable"
         return {
             "mode": retrieval_mode(),
             "state": state,
+            **extra,
             "pid": self._pid if alive else None,
             "started_at": self._started_at if alive else None,
             "warmup": self._warmup if alive else None,
@@ -382,5 +401,12 @@ def maybe_warmup_on_start() -> Dict[str, Any]:
         return {"warmup": "skipped", "reason": "warmup_on_start_disabled"}
     if not index_present():
         return {"warmup": "skipped", "reason": "no_index_present"}
-    retrieval_client.warmup_in_background(reason="startup")
+    receipt = retrieval_client.warmup_in_background(reason="startup")
+    if isinstance(receipt, dict) and receipt.get("state") == "unavailable":
+        # 有索引檔卻沒裝 [rag] extra（例如換了 venv）：client 不會啟動子程序，這裡把原因寫進啟動日誌
+        return {
+            "warmup": "skipped",
+            "reason": "rag_extra_not_installed",
+            "missing": list(receipt.get("extra_missing") or []),
+        }
     return {"warmup": "started", "reason": "startup"}

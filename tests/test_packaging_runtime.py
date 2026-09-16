@@ -79,3 +79,13 @@ def test_pyproject_declares_wheel_runtime_assets():
     assert setuptools["data-files"]["share/omnicontext"] == ["config.example.yaml"]
     assert "*.html" in setuptools["package-data"]["web"]
     assert "browser_extension/content_scripts/*.js" in setuptools["package-data"]["watchers"]
+
+    # TODO D1：知識庫依賴是選用 extra，核心依賴不得再帶任何一個索引／解析套件
+    base = " ".join(metadata["project"]["dependencies"]).lower()
+    extras = metadata["project"]["optional-dependencies"]
+    rag_extra = " ".join(extras["rag"]).lower()
+    for pkg in ("chromadb", "fastembed", "rank-bm25", "jieba", "pymupdf", "python-docx", "python-pptx", "openpyxl"):
+        assert pkg not in base, pkg
+        assert pkg in rag_extra, pkg
+    assert "omnicontext[rag]" in extras["dev"] and "omnicontext[test]" in extras["dev"]
+    assert "vendor/*.js" in setuptools["package-data"]["web"]

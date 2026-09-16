@@ -240,6 +240,7 @@ def test_unknown_mode_falls_back_to_worker(monkeypatch):
 
 
 def test_worker_handle_request_shapes(monkeypatch):
+    pytest.importorskip("chromadb")  # registry 會建 Chroma client；沒裝 [rag] extra 就跳過
     from rag import retrieval_worker as worker_module
 
     class _Cit:
@@ -270,6 +271,7 @@ def test_worker_handle_request_shapes(monkeypatch):
 
 
 def test_worker_reports_exception_instead_of_dying(monkeypatch):
+    pytest.importorskip("chromadb")  # registry 會建 Chroma client；沒裝 [rag] extra 就跳過
     from rag import retrieval_worker as worker_module
 
     class _Broken:
@@ -316,6 +318,7 @@ def test_real_worker_process_speaks_protocol_without_loading_index(tmp_path):
 
 
 def test_strategy_catalog_matches_registry():
+    pytest.importorskip("chromadb")  # registry 會建 Chroma client；沒裝 [rag] extra 就跳過
     from rag.retrieval.catalog import DEFAULT_STRATEGY, STRATEGY_CATALOG
     from rag.retrieval.registry import retriever_registry
 

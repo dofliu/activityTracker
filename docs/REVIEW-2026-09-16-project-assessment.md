@@ -92,10 +92,12 @@
 
 1. **安裝重量**：RAG 依賴鏈（chromadb／fastembed／onnxruntime／pymupdf／office parsers）佔了絕大部分，但主服務程序本來就不 import 它們（ADR-009）——
    改成 `pip install omnicontext[rag]` 是純打包工作。
+   → **同日已完成（D1）**：核心安裝 176 MB，`[rag]` 另 550 MB，沒裝時每條路徑都說得出缺什麼（ROADMAP §11.2）。
 2. **平台**：`watchers/window_watcher.py`、`notifiers/desktop_notifier.py`、autostart 腳本綁 Windows；`core/manager.py:182` 在其他平台仍無條件啟動視窗採集器、靜默無效。
 3. **設定門檻**：449 行設定裡有約 25 個是秘書引擎的評分權重（`proactive_secretary.*_boost`、`*_min_days`），那是程式常數不是使用者設定。
 4. **首次啟動沒有資料**：沒有示範資料、沒有「偵測到你有 Claude Code 記錄，要不要匯入」的引導。
 5. **local-first 宣稱有一個破口**：`web/index.html:12` 從 jsdelivr 載入 `marked`、第 8–10 行載入 Google Fonts——離線就壞、且對外發請求。
+   → **同日已完成（B8）**。
 
 ## 4. 架構體檢
 

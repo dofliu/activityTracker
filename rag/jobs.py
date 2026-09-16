@@ -20,6 +20,7 @@ from core.database import get_db
 from core.models import RAGIndexJob
 from core.time_utils import get_local_now
 from rag.config import rag_settings
+from rag import availability
 
 
 ACTIVE_STATUSES = {"queued", "running", "scanning", "indexing", "paused", "cancelling"}
@@ -95,6 +96,9 @@ def create_job(
 ) -> dict[str, Any]:
     if job_type not in {"index", "remove_folder", "clear_all", "audit", "rebuild_bm25", "activity_sync", "compact_chroma"}:
         raise ValueError(f"Unsupported RAG job type: {job_type}")
+    # 沒裝 [rag] extra 就不建 job：否則 worker 子程序會在 import 時死掉，
+    # 使用者只看到「worker 無法啟動」而不知道要裝什麼（TODO D1）。
+    availability.require_rag_extra()
 
     db = get_db()
     with db.session_scope() as session:
