@@ -1,8 +1,14 @@
-"""Windows 原生桌面通知 (Toast)
+"""Windows 原生桌面通知 (Toast)：**只負責送達，不組裝內容**。
 
 刻意不依賴 winotify / plyer：直接以 PowerShell 呼叫 WinRT ToastNotificationManager，
 零額外安裝、零帳號設定，符合「不需要太多設定」的目標。
 若 WinRT 不可用（舊版 Windows 或政策限制），自動降級為 MessageBox。
+
+2026-09-16（TODO D5）之前，這個模組同時也自己組晨報／晚報／停滯／里程碑的內容，
+於是同一件事在這裡與 `notifiers/messages.py` 各寫一遍、兩邊會漂移（例如未歸戶
+收容桶這裡濾、那裡沒濾）。現在內容一律由 `notifiers.messages` 組、由
+`notifiers.channels.DesktopChannel` 轉成 toast、由 `notifiers.secretary_push` 扇出；
+這裡只剩 transport：把「標題＋幾行字」送到 Windows，並留下不含內文的送達收據。
 """
 import logging
 import subprocess
@@ -14,14 +20,8 @@ from pathlib import Path
 from typing import List, Optional
 
 from core.config import get_config
-from core.time_utils import get_local_now
-from core.project_engine import get_active_projects_list, get_open_loops_list, is_bucket_project
 
 logger = logging.getLogger("OmniContext.DesktopNotifier")
-
-def _real_projects(projects: List[dict]) -> List[dict]:
-    """濾掉未歸戶的收容桶（判定邏輯集中在 project_engine，避免多份名單各自漂移）"""
-    return [p for p in projects if not is_bucket_project(p.get("project_key"))]
 
 # 使用 PowerShell 已註冊的 AppUserModelID，免去自行註冊捷徑的麻煩
 _APP_ID = r"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe"
@@ -40,8 +40,10 @@ $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
 
 
 class DesktopNotifier:
-    def __init__(self):
-        self.cfg = get_config()
+    """WinRT toast transport；``last_delivery_receipt`` 只記狀態與 transport，不含內文。"""
+
+    def __init__(self, cfg=None):
+        self.cfg = cfg or get_config()
         self.last_delivery_receipt: dict | None = None
 
     def is_enabled(self) -> bool:
@@ -151,132 +153,13 @@ class DesktopNotifier:
             }
             return False
 
-    # ------------------------------------------------------------------
-    # 內容組裝
-    # ------------------------------------------------------------------
-    def send_morning_briefing(self, dry_run: bool = False) -> bool:
-        """晨間提醒：昨天做到哪、今天有什麼還沒收尾"""
-        now = get_local_now()
-        projects = _real_projects([p for p in get_active_projects_list() if p["status"] == "active"])
-        open_loops = get_open_loops_list()
 
-        title = f"🌅 OmniContext 晨間簡報 ({now.strftime('%m/%d')})"
-        lines = []
-
-        if projects:
-            names = "、".join(p["display_name"] for p in projects[:3])
-            lines.append(f"進行中：{names}")
-        else:
-            lines.append("目前沒有活躍中的專案")
-
-        if open_loops:
-            lines.append(f"未收尾 {len(open_loops)} 項，最優先：{open_loops[0]['title'][:40]}")
-        else:
-            lines.append("沒有待收尾事項")
-
-        # 早晨包收據（若排程有跑）：一行帶出 repo 同步／STATUS／Handoff 的產出計數
-        try:
-            from core.secretary_packs import latest_pack_summary, pack_summary_line
-
-            pack_line = pack_summary_line(latest_pack_summary(now=now))
-            if pack_line:
-                lines.append(pack_line[:70])
-        except Exception:
-            pass
-
-        # P5-R4：晨報帶入秘書 top 建議（唯讀；秘書層失敗不阻斷晨報本體）
-        try:
-            from core.proactive_secretary import briefing_proposals
-
-            secretary = briefing_proposals(limit=2)
-            top = secretary.get("proposals") or []
-            if top:
-                suffix = f"（共 {secretary['total']} 項）" if secretary.get("total", 0) > 1 else ""
-                lines.append(f"秘書建議：{str(top[0].get('title') or '')[:36]}{suffix}")
-                if top[0].get("why_now"):
-                    lines.append(f"為什麼是現在：{str(top[0]['why_now'])[:50]}")
-                if secretary.get("advisor_summary"):
-                    lines.append(str(secretary["advisor_summary"])[:60])
-        except Exception:
-            pass
-
-        if dry_run:
-            self._preview(title, lines)
-            return True
-        return self.send(title, lines)
-
-    def send_evening_summary(self, dry_run: bool = False) -> bool:
-        """晚間提醒：今天推進了什麼"""
-        now = get_local_now()
-        today = now.strftime("%Y-%m-%d")
-        projects = _real_projects([
-            p for p in get_active_projects_list()
-            if p["last_activity_at"].startswith(today)
-        ])
-
-        title = f"🌙 OmniContext 今日回顧 ({now.strftime('%m/%d')})"
-        if projects:
-            names = "、".join(p["display_name"] for p in projects[:3])
-            lines = [f"今天推進了 {len(projects)} 個專案：{names}", "點此開啟完整日報"]
-        else:
-            lines = ["今天沒有偵測到專案活動"]
-
-        if dry_run:
-            self._preview(title, lines)
-            return True
-        return self.send(title, lines)
-
-    def send_stagnation_alert(self, dry_run: bool = False) -> bool:
-        """停滯提醒：太久沒碰的專案"""
-        threshold = self.cfg.get("notifiers.desktop.stagnation_days", 5)
-        stagnant = _real_projects([
-            p for p in get_active_projects_list()
-            if p["status"] in ("idle", "stale") and p["idle_days"] >= threshold
-        ])[:3]
-
-        if not stagnant:
-            logger.info("No stagnant projects to report.")
-            return True
-
-        title = "⚠️ OmniContext 專案停滯提醒"
-        lines = [f"{p['display_name']}（已 {p['idle_days']} 天沒動）" for p in stagnant]
-
-        if dry_run:
-            self._preview(title, lines)
-            return True
-        return self.send(title, lines)
-
-    def send_usage_milestone(
-        self,
-        summary: dict,
-        milestone_minutes: int,
-        message: str,
-        dry_run: bool = False,
-    ) -> bool:
-        """每日主要介面使用里程碑；message 已由可信度契約產生。"""
-        date_text = str(summary.get("date") or get_local_now().strftime("%Y-%m-%d"))
-        title = f"🏁 OmniContext 每日里程碑 ({date_text[5:]})"
-        lines = [message]
-        if summary.get("coverage_status") == "partial":
-            lines.append("資料 coverage 為 partial；顯示值是已觀察到的下限。")
-        if dry_run:
-            self._preview(title, lines)
-            return True
-        return self.send(
-            title,
-            lines,
-            launch_url=self.cfg.get(
-                "notifiers.desktop.launch_url",
-                "http://127.0.0.1:8765",
-            ),
-        )
-
-    @staticmethod
-    def _preview(title: str, lines: List[str]):
-        print("\n" + "=" * 50)
-        print("🔔 桌面通知預覽 (Dry-run Mode)")
-        print("=" * 50)
-        print(title)
-        for line in lines:
-            print(f"  {line}")
-        print("=" * 50 + "\n")
+def preview_toast(title: str, lines: List[str]) -> None:
+    """``--dry-run`` 的預覽：印出這則通知會長什麼樣，不送出任何東西。"""
+    print("\n" + "=" * 50)
+    print("🔔 桌面通知預覽 (Dry-run Mode)")
+    print("=" * 50)
+    print(title)
+    for line in lines:
+        print(f"  {line}")
+    print("=" * 50 + "\n")

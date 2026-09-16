@@ -26,7 +26,7 @@ It answers three questions at any moment:
 | Area | State |
 | :--- | :--- |
 | Code | P0–P8 and all ADR-008 executor stages landed; 22 ADRs record the boundary behind each decision |
-| Tests | **66 contract test modules, 663 tests** (662 passed + 1 skipped; 650 passed + 12 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
+| Tests | **66 contract test modules, 673 tests** (672 passed + 1 skipped; 660 passed + 11 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
 | Data | SQLite schema migration **18/18** (append-only + checksum, verified backup before upgrade) |
 | Release | `release_ready: false` |
 
@@ -318,7 +318,7 @@ activityTracker/
 │
 ├── notifiers/                  # Notification channels
 │   ├── messages.py / channels.py          # Content/presentation split, adapter capabilities
-│   ├── desktop_notifier.py                # Windows WinRT Toast (zero dependency)
+│   ├── desktop_notifier.py                # Windows WinRT Toast transport (zero dependency)
 │   ├── telegram_chat.py / telegram_approvals.py / telegram_setup.py
 │   └── line_setup.py / secretary_push.py
 ├── integrations/github_client.py          # GitHub API client
@@ -328,7 +328,7 @@ activityTracker/
 │   └── index.html / app.js / style.css
 │
 ├── scripts/                    # Verification, cleanup, autostart and E2E scripts
-├── tests/                      # 66 contract test modules (663 tests)
+├── tests/                      # 66 contract test modules (673 tests)
 ├── logs/checkpoints/           # Periodic activity snapshots
 └── reports/                    # Daily / range Markdown reports
 ```

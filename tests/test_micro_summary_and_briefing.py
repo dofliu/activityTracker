@@ -6,7 +6,6 @@ from sqlalchemy.orm import sessionmaker
 
 from core.models import ActivityMicroSummary, Base
 from exporters.daily_brief import render_html_fragment, render_markdown
-from notifiers.desktop_notifier import DesktopNotifier
 from synthesizer.aggregator import format_context_for_prompt
 from synthesizer.micro_summarizer import (
     generate_micro_summary,
@@ -220,35 +219,41 @@ def _fake_briefing(limit=2, **_kwargs):
     }
 
 
-def test_morning_briefing_includes_secretary_top_proposal(monkeypatch, capsys):
-    monkeypatch.setattr(
-        "notifiers.desktop_notifier.get_active_projects_list",
-        lambda: [{"display_name": "activityTracker", "status": "active", "project_key": "activityTracker", "last_activity_at": "2026-08-31 09:00"}],
-    )
-    monkeypatch.setattr("notifiers.desktop_notifier.get_open_loops_list", lambda: [])
-    monkeypatch.setattr("core.proactive_secretary.briefing_proposals", _fake_briefing)
+def _desktop_preview(monkeypatch, capsys, *, projects):
+    """走桌面通道的 dry-run：內容由共用組裝產生，再由 DesktopChannel 轉成 toast。"""
+    from notifiers.channels import desktop_channels
+    from notifiers.secretary_push import push_morning_briefing
 
-    assert DesktopNotifier().send_morning_briefing(dry_run=True) is True
-    output = capsys.readouterr().out
-    assert "秘書建議：驗證 Browser Extension 即時連線" in output
+    monkeypatch.setattr("core.project_engine.get_active_projects_list", lambda: projects)
+    monkeypatch.setattr("core.project_engine.get_open_loops_list", lambda: [])
+    monkeypatch.setattr("core.secretary_packs.latest_pack_summary", lambda **kwargs: None)
+    monkeypatch.setattr("core.secretary_greeting.build_greeting", lambda **kwargs: {"stats": {}})
+    cfg = DictConfig({"proactive_secretary": {"greeting": {"in_morning_briefing": False}}})
+    receipt = push_morning_briefing(cfg=cfg, channels=desktop_channels(cfg, dry_run=True))
+    assert receipt["sent"] == 1 and receipt["results"][0]["channel"] == "desktop"
+    return capsys.readouterr().out
+
+
+def test_morning_briefing_includes_secretary_top_proposal(monkeypatch, capsys):
+    """秘書 top 建議要進得了桌面通知——toast 只放得下摘要，但每一段都要露臉。"""
+    monkeypatch.setattr("core.proactive_secretary.briefing_proposals", _fake_briefing)
+    output = _desktop_preview(monkeypatch, capsys, projects=[{
+        "display_name": "activityTracker", "status": "active", "project_key": "activityTracker",
+        "last_activity_at": "2026-08-31 09:00", "last_action_summary": "修 CI", "idle_days": 0,
+    }])
+    assert "🔔 桌面通知預覽" in output and "晨間簡報" in output
+    assert "驗證 Browser Extension 即時連線" in output
     assert "共 3 項" in output
-    assert "先收掉 Extension 驗證" in output
 
 
 def test_morning_briefing_survives_secretary_failure(monkeypatch, capsys):
-    monkeypatch.setattr(
-        "notifiers.desktop_notifier.get_active_projects_list", lambda: []
-    )
-    monkeypatch.setattr("notifiers.desktop_notifier.get_open_loops_list", lambda: [])
-
     def boom(**_kwargs):
         raise RuntimeError("secretary offline")
 
     monkeypatch.setattr("core.proactive_secretary.briefing_proposals", boom)
-    assert DesktopNotifier().send_morning_briefing(dry_run=True) is True
-    output = capsys.readouterr().out
+    output = _desktop_preview(monkeypatch, capsys, projects=[])
     assert "晨間簡報" in output
-    assert "秘書建議" not in output
+    assert "待判斷建議" not in output
 
 
 def test_daily_brief_renders_secretary_section():

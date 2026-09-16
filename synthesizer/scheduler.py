@@ -2,7 +2,6 @@ import logging
 from datetime import datetime
 from core.config import get_config
 from .aggregator import generate_daily_summary_pipeline, generate_periodic_checkpoint
-from notifiers.desktop_notifier import DesktopNotifier
 from exporters.daily_brief import export_daily_brief
 from core.usage_analytics import evaluate_daily_milestones
 
@@ -13,7 +12,6 @@ class SynthesisScheduler:
     def __init__(self):
         self.cfg = get_config()
         self._apscheduler = None
-        self._desktop = DesktopNotifier()
         self._telegram_poller = None
 
     def start(self):
@@ -283,12 +281,25 @@ class SynthesisScheduler:
         except Exception as e:
             logger.error(f"Error exporting daily brief: {e}", exc_info=True)
 
+    def _desktop_channels(self):
+        """桌面通道（關閉或非 Windows 時是空清單，push 會如實回報 skipped）。"""
+        from notifiers.channels import desktop_channels
+
+        return desktop_channels(self.cfg)
+
     def _run_desktop_morning_job(self):
         logger.info("Triggering desktop morning briefing...")
         self._refresh_daily_brief()
         try:
-            self._desktop.send_morning_briefing()
-            self._desktop.send_stagnation_alert()
+            from notifiers.secretary_push import push_morning_briefing, push_stagnation_alert
+
+            channels = self._desktop_channels()
+            push_morning_briefing(cfg=self.cfg, channels=channels)
+            push_stagnation_alert(
+                cfg=self.cfg,
+                channels=channels,
+                min_idle_days=int(self.cfg.get("notifiers.desktop.stagnation_days", 5) or 5),
+            )
         except Exception as e:
             logger.error(f"Error sending desktop morning briefing: {e}", exc_info=True)
 
@@ -296,14 +307,16 @@ class SynthesisScheduler:
         logger.info("Triggering desktop evening summary...")
         self._refresh_daily_brief()
         try:
-            self._desktop.send_evening_summary()
+            from notifiers.secretary_push import push_evening_handoff
+
+            push_evening_handoff(cfg=self.cfg, channels=self._desktop_channels())
         except Exception as e:
             logger.error(f"Error sending desktop evening summary: {e}", exc_info=True)
 
     def _run_usage_milestone_job(self):
         logger.info("Evaluating daily interface usage milestones...")
         try:
-            result = evaluate_daily_milestones(notifier=self._desktop)
+            result = evaluate_daily_milestones(channels=self._desktop_channels())
             logger.info(f"Usage milestone evaluation: {result.get('status')}")
         except Exception as e:
             logger.error(f"Error evaluating usage milestone: {e}", exc_info=True)
