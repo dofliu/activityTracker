@@ -31,6 +31,28 @@ from core.llm_client import (
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# `pip install .` 會在 repo 裡留下 setuptools 的 `build/lib/` 原始碼**副本**——2026-09-16 的
+# 平台矩陣七個工作全紅就是掃描掃進了那份副本。副本不是原始碼，改它也不會改到行為；
+# 同理略過虛擬環境、打包產物與各種快取。
+GENERATED_DIRS = frozenset({
+    "build", "dist", ".venv", "venv", ".git", "__pycache__",
+    ".tox", ".pytest_cache", ".mypy_cache", "node_modules", "site-packages",
+})
+
+
+def is_generated(rel: Path) -> bool:
+    """相對路徑是否落在打包產物／虛擬環境／快取裡（而不是我們維護的原始碼）。"""
+    return any(part in GENERATED_DIRS or part.endswith(".egg-info") for part in rel.parts)
+
+
+def iter_source_files():
+    """repo 裡**真正要維護**的 Python 原始碼（不含測試與上述產物），回傳 (相對路徑, 絕對路徑)。"""
+    for path in sorted(ROOT.rglob("*.py")):
+        rel = path.relative_to(ROOT)
+        if rel.parts[0] == "tests" or is_generated(rel):
+            continue
+        yield rel.as_posix(), path
+
 
 class DictConfig:
     def __init__(self, data=None):
@@ -54,15 +76,26 @@ def test_default_model_literals_live_only_in_llm_client():
     """任何程式碼（測試與前端下拉選單除外）不得再寫死模型名；要改預設就改 DEFAULT_MODELS。"""
     literal = re.compile(r"gemini-\d|claude-3|gpt-4o|llama3\.\d")
     offenders = []
-    for path in ROOT.rglob("*.py"):
-        rel = path.relative_to(ROOT).as_posix()
-        if rel.startswith("tests/") or rel == "core/llm_client.py" or "/.venv" in rel or "site-packages" in rel:
+    for rel, path in iter_source_files():
+        if rel == "core/llm_client.py":
             continue
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             if literal.search(line) and not line.lstrip().startswith("#"):
                 offenders.append(f"{rel}:{number}")
     assert offenders == [], offenders
     assert set(DEFAULT_MODELS) == {"ollama", "gemini", "anthropic", "openai"}
+
+
+def test_the_literal_scan_ignores_build_artifacts():
+    """掃描只看原始碼：`pip install .` 留下的 build/lib 副本不算違規（CI 2026-09-16 的回歸）。"""
+    assert is_generated(Path("build/lib/core/llm_client.py"))
+    assert is_generated(Path("omnicontext.egg-info/x.py"))
+    assert is_generated(Path(".venv/lib/python3.12/site-packages/x.py"))
+    assert not is_generated(Path("core/llm_client.py"))
+
+    scanned = {rel for rel, _ in iter_source_files()}
+    assert "core/llm_client.py" in scanned  # 真的有掃到東西，不是全被濾掉
+    assert not any(rel.startswith(("build/", "dist/", "tests/")) for rel in scanned)
 
 
 def test_provider_aliases_collapse_to_four_names(monkeypatch):
