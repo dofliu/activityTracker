@@ -1,6 +1,6 @@
 # 待辦事項與已知問題（Backlog）
 
-> 最後更新：2026-09-16。這頁是**唯一的待辦清單入口**；現況數據以
+> 最後更新：2026-09-16（R0 減法 B5–B9 已完成並移到 ROADMAP §11.2）。這頁是**唯一的待辦清單入口**；現況數據以
 > [STATUS.yaml](../STATUS.yaml) 為準，接手路徑見 [NEXT_SESSION.md](NEXT_SESSION.md)。
 >
 > 每一項都標明**完成判準（收據）**——沒有收據就不算完成，這是本專案的一貫原則。
@@ -66,11 +66,6 @@
 | B2 | **Extension 覆蓋邊界** | 2026-08-31 的 live PASS 只涵蓋 ChatGPT ＋ Claude.ai；**Gemini 未在該輪驗證**，且單輪 PASS 不等於連續／全天 capture coverage | 需要時對 Gemini 補一輪 `scripts/extension_live_acceptance.py` | ⚪ P2 |
 | B3 | **PyPI 發佈不在範圍** | 目前只發 GitHub pre-release（wheel/sdist + SHA-256 receipt） | 待 stable release 條件齊備後再評估 | ⚪ P2 |
 | B4 | **Repo onboarding 動作不留收據** | `init_folder`／`attach_remote`／`clone_repo`／`create_remote` 執行後只回傳結果，不寫任何本機紀錄，因此 A5 只能靠人眼確認（驗收中心對這項永遠回 `needs_human`） | 若要讓 A5 可機器驗，需為 onboarding 動作補一張收據（migration ＋ ADR-011 邊界討論）；在那之前維持誠實空白，不用旁證推測 | ⚪ P2 |
-| B5 | **`core/server.py` 的 `SystemMaintenanceRequest` 定義兩次** | `:332`（含 `do_backup`／`checkpoint_mode`）沒有任何使用者，被 `:860` 遮蔽；讀者會以為 API 支援那兩個欄位 | 刪 `:330-337`。**判準**：grep 只剩一個定義，`test_system_health_web_api.py` 全綠 | 🟡 P1 |
-| B6 | **四個依賴零 import** | `pandas`、`pillow`、`sse-starlette`、`python-dotenv` 在非測試程式碼裡沒有任何 import（SSE 用的是 `StreamingResponse`）；另 `rag/parsers/image_parser.py:15` import 的 `rapidocr_onnxruntime` 沒有宣告 | 從 `pyproject.toml`／`requirements.txt` 移除四項；`rapidocr` 改宣告為選用或刪 `image_parser.py`。**判準**：乾淨 venv `pip install -e .` 成功、`pytest` 全綠、`pip list` 不含四項 | 🟡 P1 |
-| B7 | **死碼**：`notifiers/telegram_notifier.py`（零 importer）、`synthesizer/scheduler.py:194-385` 的 `_std_scheduler_loop`（APScheduler 是硬依賴，永遠跑不到）、`scripts/inspect_logs.py`／`inspect_codex.py`／`inspect_assistants.py`／`check_real_recent.py`（除錯草稿，卻打進 wheel）、`main.py clear-demo` | 增加維護面與 wheel 體積；備援排程會靜默漂移 | 刪除；`scripts/migrate_timezone.py`、`purge_legacy_data.py`、`windows_milestone_e2e.py` 移到 `docs/archive/` 或刪。**判準**：`pytest` 全綠、`scripts/verify_release_artifacts.py` 通過、`test_scheduler_contract.py` 改為不再依賴備援路徑 | 🟡 P1 |
-| B8 | **local-first 宣稱有破口** | `web/index.html:8-12` 對外載入 Google Fonts 與 jsdelivr `marked`；離線即壞、每次開頁對外請求 | `marked.min.js` 與字型隨 wheel 本機提供（`web/vendor/`）。**判準**：斷網開儀表板 Markdown 仍能渲染、`test_packaging_runtime.py` 涵蓋 vendor 檔 | 🟡 P1 |
-| B9 | **CLI 與 API 狀態詞彙分家** | `main.py cmd_status` 自己算 `ai_nonempty_count`／`checkpoint_errors`，API 不回；CLI 與儀表板顯示的「狀態」不是同一組數字 | 讓 `/api/v1/status`（或等價端點）回這些欄位，CLI 只呈現。**判準**：`python main.py status` 與 API 回應欄位一致的 contract test | ⚪ P2 |
 
 ---
 
@@ -94,6 +89,7 @@
 
 > 來源：[REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) §4–5。
 > 每一項結束時 `pytest` 必須全綠、`python main.py verify` 結果不得變化（整頓不改行為）。R2 的項目要先有 ADR。
+> R0 的 B5–B9（死碼、未用依賴、本機 marked、CLI 與 API 同一組數字）已於 2026-09-16 完成；R0 剩 D1。
 
 | # | 項目 | 內容 | 完成判準（收據） | 階段 |
 | :-- | :--- | :--- | :--- | :--- |

@@ -26,7 +26,7 @@
 | 面向 | 現況 |
 | :--- | :--- |
 | 程式 | P0–P8 與 ADR-008 執行器全階段已落地；22 份 ADR 記錄每個決策的邊界 |
-| 測試 | **62 個 contract test 模組、626 項**（625 passed + 1 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job 全綠 |
+| 測試 | **62 個 contract test 模組、629 項**（628 passed + 1 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job 全綠 |
 | 資料 | SQLite schema migration **18/18**（append-only + checksum，升級前自動備份） |
 | 發佈 | `release_ready: false` |
 
@@ -34,7 +34,7 @@
 
 不必憑記憶：跑 `python main.py verify`（或看儀表板「06 系統設定 → 驗收中心」）就會列出每一項現在有沒有收據（[ADR-016](docs/ADR-016-acceptance-center.md)）。
 
-**2026-09-16 專案檢視**：功能已經夠多，接下來是**減法**——刪死碼與未用依賴、RAG 改為選用安裝、合併兩套 LLM client 與兩套向量記憶，再把「讀本機 AI agent transcript」這個唯一無替代品的核心抽成獨立套件對外。功能候選（遠端存取、LINE 雙向、更多採集來源）暫停。評估全文見 [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md)，三階段計畫見 [ROADMAP §13](ROADMAP.md#13-架構整頓與推廣方向2026-09-16-檢視)。
+**2026-09-16 專案檢視**：功能已經夠多，接下來是**減法**——刪死碼與未用依賴、RAG 改為選用安裝、合併兩套 LLM client 與兩套向量記憶，再把「讀本機 AI agent transcript」這個唯一無替代品的核心抽成獨立套件對外。功能候選（遠端存取、LINE 雙向、更多採集來源）暫停。**R0 第一輪（死碼、未用依賴、本機 marked、CLI／API 同一組數字）已於同日完成。** 評估全文見 [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md)，三階段計畫見 [ROADMAP §13](ROADMAP.md#13-架構整頓與推廣方向2026-09-16-檢視)。
 
 **文件入口：**[📚 文件總覽](docs/INDEX.md) · [使用手冊](docs/USAGE.md) · [開發規劃與成果](ROADMAP.md) · [待辦與判準](docs/TODO.md) · [機器可讀現況](STATUS.yaml) · [專案檢視 2026-09-16](docs/REVIEW-2026-09-16-project-assessment.md)
 
@@ -253,7 +253,6 @@ Installed wheel 可將 `python main.py` 改為 `omnicontext` 或較短的 `omni`
 | `migration-status` | 唯讀查看目前／最新 schema version 與相容性 |
 | `maintain` / `heal` / `wal-checkpoint` | 資料庫生命週期維護／採集器自我修復／WAL 截斷 |
 | `assets-status` / `extension-path` | 檢查 packaged assets／顯示 Extension Load unpacked 目錄 |
-| `clear-demo` | 清除示範假資料與歷史噪音 |
 
 ---
 
@@ -345,7 +344,7 @@ activityTracker/
 ├── notifiers/                  # 通知推播
 │   ├── messages.py / channels.py          # 內容與呈現分離、adapter 能力宣告
 │   ├── desktop_notifier.py                # Windows WinRT Toast（零依賴）
-│   ├── telegram_notifier.py / telegram_chat.py / telegram_approvals.py / telegram_setup.py
+│   ├── telegram_chat.py / telegram_approvals.py / telegram_setup.py
 │   └── line_setup.py / secretary_push.py
 ├── integrations/github_client.py          # GitHub API Client
 ├── exporters/daily_brief.py               # OMNICONTEXT_TODAY.md/.html
@@ -354,7 +353,7 @@ activityTracker/
 │   └── index.html / app.js / style.css
 │
 ├── scripts/                    # 驗證、清理、autostart 與 E2E 腳本
-├── tests/                      # 62 個 contract test 模組（626 項）
+├── tests/                      # 62 個 contract test 模組（629 項）
 ├── logs/checkpoints/           # 週期性活動快照
 └── reports/                    # 每日／區間 Markdown 報告
 ```

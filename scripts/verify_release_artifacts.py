@@ -23,6 +23,7 @@ WHEEL_REQUIRED_SUFFIXES = (
     "web/extension-monitor.html",
     "web/app.js",
     "web/style.css",
+    "web/vendor/marked.min.js",
     "watchers/browser_extension/manifest.json",
     "watchers/browser_extension/popup.html",
     "watchers/browser_extension/popup.js",
@@ -44,6 +45,7 @@ SDIST_REQUIRED_SUFFIXES = (
     "/scripts/verify_installed_package.py",
     "/web/index.html",
     "/web/extension-monitor.html",
+    "/web/vendor/marked.min.js",
     "/watchers/browser_extension/manifest.json",
     "/docs/USAGE.md",
 )

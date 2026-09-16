@@ -4,7 +4,7 @@
 > P2.6 coverage ledger、P3 context memory、P4.2/4.3 Git 同步與對帳、P5 分級執行器與排程、P6 發佈整備、P7 DeskRAG、P8 自我修復均已實作；
 > 秘書側另有記憶區（ADR-012）／Telegram 對話（ADR-013）／多通道推播（ADR-014）／本機行事曆（ADR-015）／驗收中心（ADR-016）／模式感知提案（ADR-017）／
 > 宣告式個人檔案（ADR-018）／秘書桌面（ADR-019）／每週回顧（ADR-020）／文件落後偵測（ADR-021）／會議秘書第一層（ADR-022）。**危險能力一律預設關閉。**
-> 62 個 contract test 模組、626 項測試（625 passed + 1 skipped）；schema migration 18/18。
+> 62 個 contract test 模組、629 項測試（628 passed + 1 skipped）；schema migration 18/18。
 > **仍不具 release-ready 資格**：全天 coverage ledger 實測與各功能的使用者實機收據未齊（見 §12 與 [docs/TODO.md](docs/TODO.md)）。
 > 本文件記錄 OmniContext 從 0 到 1 的缺陷修復歷程、已完成之架構改造與未來的維運與延伸規劃。
 
@@ -97,7 +97,7 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 - 設定 `inject_into` 指向既有 HTML 儀表板時，改為在 `<!-- OMNICONTEXT:START/END -->` 標記間注入。
 - **注意**：`MCP/LabPagesCowork/` 底下的儀表板會被 `deploy_dashboard.py` 推送到公開 GitHub Pages，因此預設不注入該檔案，避免個人工作紀錄外流。
 
-### 資料清洗 `scripts/purge_legacy_data.py`
+### 資料清洗 `scripts/purge_legacy_data.py`（一次性腳本，2026-09-16 R0 已自 repo 移除，見 git 歷史）
 - 冪等腳本，清除兩類歷史污染：seed-demo 殘留的假視窗事件（`aaai2026_draft.tex`、`TestApp`）、Agent CLI 內部訊息被誤存為使用者提問。
 - 採集端 `_upsert_ai_event()` 已加上同一組過濾（`is_cli_artifact()`），並先以 `clean_prompt_text()` 脫去 `<USER_REQUEST>`、`<ADDITIONAL_METADATA>` 等包裹標籤再判斷，避免誤刪真實提問。
 - 實測清除 179 筆 CLI 雜訊與 2 筆假視窗事件，真實配對率由 84.9% 提升至 **85.9%**（Codex 98%、Antigravity 94%、Claude Code 53%）。
@@ -648,6 +648,7 @@ P2.5-S1 API 安全邊界
 - ✅ 2026-09-08：**幾個月沒動的 PR／issue 不納入考量**（ADR-007 Addendum 2026-09-08）。使用者看到 01 桌面兩張 HIGH 卡：z72-scada-system #92／#93，CI 綠燈、已開啟 100～101 天沒更新，卻寫著「只差一個 review、收益立即」——「這種已經超過 60 天的就不用納入考量了」。分流訊號原本把年齡當單調的「越久越該處理」；改為年齡有兩個區間：新增 `proactive_secretary.github_stale_after_days`（預設 60，0 = 不過濾），超過的 PR／issue 不進提案，但 `inputs.github_stale_excluded` 如實寫出門檻、數量與最舊的十個對象，`open_prs`／`open_issues` 仍是全部開著的計數，提案區多一行「另有 N 件…不列入考量」。只動 GitHub 訊號，未結事項／被冷落／文件落後各有自己的年齡語意，不動。3 項契約測試；全套 606 項（605 passed + 1 conditional skip）。
 - ✅ 2026-09-08：**會議秘書第一層**（[ADR-022](docs/ADR-022-meeting-secretary.md)，起草與實作同日）。使用者在線上會議問秘書「你可以看到嗎」，秘書答不能——對的；接著問「知道我在開會就可以做即時紀錄、翻譯、筆記嗎」。把它拆成兩層：**第一層是會後**——你把 Teams 匯出的逐字稿放進 `meetings.transcript_dir`（沒設就是關），L0 template `meeting_notes` 產出一則可刪的記憶區觀察（配對到的會議標題／發言與講者數／摘要／**候選**待辦），01 提案卡上每條候選旁邊是「加入未結事項」「忽略」——**點了才進 open_loops**，秘書自己永遠不寫。「在開會」只用兩個確定性訊號（行事曆進行中 ＋ 前景是 Teams／Zoom），只有其一時如實說差異。新增 WebVTT parser（`<v NAME>` 與 `NAME:` 兩種講者標記、字幕「同一句長出來」的重複要收斂）、`.vtt` 進 RAG 支援清單。摘要預設 **ollama（全本機）**；雲端 provider 在觀察正文明寫「與會者的發言曾送往該供應商」。**即時音訊（第二層）沒做**，五道門寫在 ADR-022 D6。容器實機（真實 Teams 格式）找到並修掉一個 bug：`LLMClient` 連不上供應商時是**回傳錯誤字串**而不是丟例外，那串錯誤被當成摘要送進事實閘，於是對使用者說「摘要編造了數字 11434」——真正原因是 ollama 沒開；已在事實閘之前判斷並改成「provider 未回覆摘要…（可跑 `python main.py llm-test` 診斷）」。驗收 A22（機器只查資料夾／整理過幾份／候選待辦計數，摘要品質留人眼）。20 項契約測試；全套 626 項（625 passed + 1 conditional skip）。
 - ✅ 2026-09-13：**文件整理**——README／README_en 依實際程式重寫（補上 2026-09-04 之後的驗收中心、模式感知提案、宣告式個人檔案、秘書桌面、每週回顧、文件落後偵測與會議秘書共七項功能，修正 53 模組／425 項等過期數字為 62 模組／626 項、schema 7/7 為 18/18、ADR-015 為 ADR-022、設定左欄 10 區塊為 11 區塊），設定與 Extension 安裝步驟改為指向 `config.example.yaml` 與 USAGE 不再各寫一份；USAGE 的「常用操作」由 32 節流水帳重組為六節（小秘書／行事曆與會議／知識庫檢索／通知與手機／摘要快照／驗收中心）並加目錄，標題移除日期、刪掉一段描述 ADR-019 之前版面的過期重複；本節（原 §11）的成果紀錄原本掛在兩個不同的父項下導致日期跳動，現合併為單一依日期排序的清單。
+- ✅ 2026-09-16：**R0 減法第一輪（TODO B5–B9）**——依同日專案檢視（[docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md) §4.2）逐項處理已核實的死碼與依賴債，**不改行為**：(B5) 刪 `core/server.py` 被遮蔽的第一個 `SystemMaintenanceRequest`；(B6) 自 `pyproject.toml`／`requirements.txt` 移除零 import 的 `pandas`／`pillow`／`sse-starlette`／`python-dotenv`，`rapidocr-onnxruntime` 改為 `[ocr]` 選用依賴（未裝時圖片解析維持檔名 stub）；(B7) 刪 `notifiers/telegram_notifier.py`（零 importer）、`synthesizer/scheduler.py` 永遠跑不到的 `_std_scheduler_loop` 備援（約 170 行，APScheduler 是硬依賴）、`scripts/inspect_logs／inspect_codex／inspect_assistants／check_real_recent／windows_milestone_e2e／migrate_timezone／purge_legacy_data／cleanup_noise.py` 與 CLI `clear-demo`；(B8) `marked` v15.0.12 改隨 wheel 本機提供（`web/vendor/`）、移除 Google Fonts 連結改全本機字型堆疊，`verify_release_artifacts` 與 `assets-status` 納入 vendor 檔，新增「index.html 不得外連」契約測試；(B9) `manager.get_status()` 的 `metrics` 成為狀態數字唯一定義（補 `project_states`／`open_loops_open_count`，非空回應排除占位字串），`main.py status` 只呈現不再自算。**收據**：`pytest` 628 passed ＋ 1 skipped（新增 3 項契約測試）；`python main.py verify` 輸出與基底 commit 逐行相同；`python -m build` ＋ `verify_release_artifacts.py` 通過且 wheel 不再含上述腳本；乾淨 venv `pip install -e ".[dev]"` 797 MB → 721 MB（pillow／python-dotenv 仍由 fastembed／chromadb 間接帶入，只是不再由本專案宣告）。R0 剩 D1（RAG 依賴改選用）。
 
 ---
 
@@ -711,7 +712,7 @@ P2.5-S1 API 安全邊界
 
 ### 13.1 檢視結論
 
-- 程式面 P0–P8 ＋ 22 份 ADR 全部落地、626 項測試容器全綠；**功能已經夠多，缺的是減法。**
+- 程式面 P0–P8 ＋ 22 份 ADR 全部落地、629 項測試容器全綠；**功能已經夠多，缺的是減法。**
 - 專案唯一沒有替代品的能力是**讀本機 AI agent transcript 並還原成有 provenance 的工作脈絡**；
   其餘（RAG、Git 同步、Telegram／LINE、會議秘書）市面都有更成熟的替代品。
 - 現在的形狀不適合對外：安裝 800 MB 起、449 行設定、視窗採集與桌面通知綁 Windows、
@@ -720,7 +721,7 @@ P2.5-S1 API 安全邊界
 
 ### 13.2 三個階段（每階段結束都要能 `pytest` 全綠、`verify` 結果不變）
 
-**R0 減法（1 個 session，零設計決策）**
+**R0 減法（1 個 session，零設計決策）**——B5–B9 已於 2026-09-16 完成（§11.2），剩 D1
 - 刪已核實的死碼與未用依賴（TODO B5–B9）：重複的 `SystemMaintenanceRequest`、`telegram_notifier.py`、`_std_scheduler_loop`、四個 `scripts/inspect_*`／`check_real_recent.py`、`pandas`／`pillow`／`sse-starlette`／`python-dotenv`、`clear-demo`。
 - `rapidocr` 二選一：宣告成選用依賴，或移除 `image_parser.py`。
 - `marked` 與字型改為隨 wheel 本機提供，恢復 local-first 宣稱。

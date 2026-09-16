@@ -329,14 +329,6 @@ class RelatedMemoryRequest(BaseModel):
     top_k: int = Field(8, ge=1, le=20)
 
 
-class SystemMaintenanceRequest(BaseModel):
-    max_backups: int = Field(7, ge=1, le=100)
-    retention_days: int = Field(90, ge=1, le=3650)
-    do_backup: bool = Field(True)
-    checkpoint_mode: str = Field("TRUNCATE", pattern="^(PASSIVE|FULL|RESTART|TRUNCATE)$")
-
-
-
 # =====================================================================
 # 1. 監控生命週期與控制 API
 # =====================================================================

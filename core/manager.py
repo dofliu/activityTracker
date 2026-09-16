@@ -12,6 +12,8 @@ from core.models import (
     FileActivityEvent,
     GitActivityEvent,
     IngestionCheckpoint,
+    OpenLoop,
+    ProjectState,
     WindowEvent,
 )
 from watchers.file_watcher import FileWatcherService
@@ -239,16 +241,34 @@ class WatcherManager:
             git_count = session.query(GitActivityEvent).count()
             win_count = session.query(WindowEvent).count()
             summary_count = session.query(DailySummary).count()
+            # 這裡是「狀態數字」的唯一定義；CLI `status` 只呈現，不自己再算一份（TODO B9）。
+            # 非空回應排除 "[... Session]" 這類占位字串，final candidate 也要求真的有內容。
+            _nonempty_response = (
+                AIPromptEvent.response_text.isnot(None),
+                func.length(func.trim(AIPromptEvent.response_text)) > 0,
+            )
             ai_nonempty_count = session.query(AIPromptEvent).filter(
-                func.length(func.trim(AIPromptEvent.response_text)) > 0
+                *_nonempty_response,
+                ~AIPromptEvent.response_text.like("[%Session]"),
+                ~AIPromptEvent.response_text.like("[%Agent Session]"),
             ).count()
             ai_final_candidate_count = session.query(AIPromptEvent).filter(
-                AIPromptEvent.response_status == "final_candidate"
+                AIPromptEvent.response_status == "final_candidate",
+                *_nonempty_response,
             ).count()
             checkpoint_count = session.query(IngestionCheckpoint).count()
             checkpoint_error_count = session.query(IngestionCheckpoint).filter(
-                IngestionCheckpoint.last_error.isnot(None)
+                IngestionCheckpoint.last_error.isnot(None),
+                func.length(func.trim(IngestionCheckpoint.last_error)) > 0,
             ).count()
+            project_state_counts = dict(
+                session.query(ProjectState.status, func.count(ProjectState.id))
+                .group_by(ProjectState.status)
+                .all()
+            )
+            open_loops_open_count = (
+                session.query(OpenLoop).filter(OpenLoop.status == "open").count()
+            )
 
             last_ai = session.query(func.max(AIPromptEvent.timestamp)).scalar()
             last_file = session.query(func.max(FileActivityEvent.timestamp)).scalar()
@@ -451,6 +471,12 @@ class WatcherManager:
                 "daily_summaries_count": summary_count,
                 "ingestion_checkpoints_count": checkpoint_count,
                 "ingestion_checkpoint_errors_count": checkpoint_error_count,
+                "project_states": {
+                    "active": int(project_state_counts.get("active", 0)),
+                    "idle": int(project_state_counts.get("idle", 0)),
+                    "stale": int(project_state_counts.get("stale", 0)),
+                },
+                "open_loops_open_count": open_loops_open_count,
             },
             "targets": {
                 "watch_directories": cfg.get("watchers.file_watcher.watch_directories", []),

@@ -1,6 +1,4 @@
 import logging
-import threading
-import time
 from datetime import datetime
 from core.config import get_config
 from .aggregator import generate_daily_summary_pipeline, generate_periodic_checkpoint
@@ -14,8 +12,6 @@ logger = logging.getLogger("OmniContext.Scheduler")
 class SynthesisScheduler:
     def __init__(self):
         self.cfg = get_config()
-        self._running = False
-        self._thread: threading.Thread | None = None
         self._apscheduler = None
         self._desktop = DesktopNotifier()
         self._telegram_poller = None
@@ -52,275 +48,144 @@ class SynthesisScheduler:
 
         interval_hours = self.cfg.get("synthesizer.periodic_checkpoint.interval_hours", 2)
 
-        try:
-            from apscheduler.schedulers.background import BackgroundScheduler
-            self._apscheduler = BackgroundScheduler()
-            
-            if daily_enabled:
-                self._apscheduler.add_job(
-                    func=self._run_daily_job,
-                    trigger="cron",
-                    hour=hour,
-                    minute=minute,
-                    id="daily_synthesis_job",
-                    replace_existing=True
-                )
-                logger.info(f"Daily synthesis scheduled for {hour:02d}:{minute:02d} daily.")
-
-            if checkpoint_enabled:
-                self._apscheduler.add_job(
-                    func=self._run_checkpoint_job,
-                    trigger="interval",
-                    hours=interval_hours,
-                    id="periodic_checkpoint_job",
-                    replace_existing=True
-                )
-                logger.info(f"Periodic checkpoint log scheduled every {interval_hours} hours.")
-
-            if telegram_enabled:
-                # 晨報 (預設 09:00)
-                m_time = self.cfg.get("notifiers.telegram.morning_briefing_time", "09:00")
-                m_h, m_m = [int(x) for x in m_time.split(":")]
-                self._apscheduler.add_job(
-                    func=self._run_morning_briefing_job,
-                    trigger="cron",
-                    hour=m_h,
-                    minute=m_m,
-                    id="morning_briefing_job",
-                    replace_existing=True
-                )
-                logger.info(f"Morning briefing scheduled for {m_h:02d}:{m_m:02d} daily.")
-
-                # P5-R4b 晚間交接（唯讀推播；預設 23:30 可調）
-                te_h, te_m = self._parse_clock(
-                    self.cfg.get("notifiers.telegram.evening_summary_time", "23:30"),
-                    (23, 30),
-                )
-                self._apscheduler.add_job(
-                    func=self._run_telegram_evening_job,
-                    trigger="cron",
-                    hour=te_h,
-                    minute=te_m,
-                    id="telegram_evening_job",
-                    replace_existing=True,
-                )
-                logger.info(f"Telegram evening handoff scheduled for {te_h:02d}:{te_m:02d} daily.")
-
-            # 桌面通知：早報與晚報（不需任何帳號或金鑰）
-            if self.cfg.get("notifiers.desktop.enabled", True):
-                for job_id, time_key, default_time, func in (
-                    ("desktop_morning_job", "notifiers.desktop.morning_briefing_time", "08:30", self._run_desktop_morning_job),
-                    ("desktop_evening_job", "notifiers.desktop.evening_summary_time", "22:00", self._run_desktop_evening_job),
-                ):
-                    try:
-                        d_h, d_m = [int(x) for x in str(self.cfg.get(time_key, default_time)).split(":")]
-                    except Exception:
-                        d_h, d_m = [int(x) for x in default_time.split(":")]
-
-                    self._apscheduler.add_job(
-                        func=func, trigger="cron", hour=d_h, minute=d_m,
-                        id=job_id, replace_existing=True
-                    )
-                    logger.info(f"Desktop notification '{job_id}' scheduled for {d_h:02d}:{d_m:02d} daily.")
-
-            if usage_milestones_enabled:
-                usage_interval = max(
-                    5,
-                    int(self.cfg.get("usage_tracking.notifications.check_interval_minutes", 15)),
-                )
-                self._apscheduler.add_job(
-                    func=self._run_usage_milestone_job,
-                    trigger="interval",
-                    minutes=usage_interval,
-                    id="usage_milestone_job",
-                    replace_existing=True,
-                )
-                logger.info(
-                    f"Usage milestone evaluation scheduled every {usage_interval} minutes."
-                )
-
-            if coverage_enabled:
-                # P2.6 coverage ledger heartbeat：記錄視窗採集器實際觀測時間段
-                from core.coverage_ledger import heartbeat_interval_seconds
-
-                coverage_seconds = heartbeat_interval_seconds(self.cfg)
-                self._apscheduler.add_job(
-                    func=self._run_coverage_ledger_job,
-                    trigger="interval",
-                    seconds=coverage_seconds,
-                    id="coverage_ledger_job",
-                    replace_existing=True,
-                )
-                logger.info(
-                    f"Coverage ledger heartbeat scheduled every {coverage_seconds} seconds."
-                )
-
-            if secretary_tasks_enabled:
-                # P5-R5 自訂排程任務：每分鐘檢查一次到期任務（僅 L0 唯讀
-                # template；due 判定在 core.scheduled_tasks，錯過只補跑一次）。
-                self._apscheduler.add_job(
-                    func=self._run_secretary_scheduled_tasks_job,
-                    trigger="interval",
-                    seconds=60,
-                    id="secretary_scheduled_tasks_job",
-                    replace_existing=True,
-                )
-                logger.info("Secretary scheduled tasks tick scheduled every 60 seconds.")
-
-            # SQLite WAL 每小時自動 Checkpoint
-            wal_interval_hours = max(1, int(self.cfg.get("data_lifecycle.wal_checkpoint_interval_hours", 1)))
+        from apscheduler.schedulers.background import BackgroundScheduler
+        self._apscheduler = BackgroundScheduler()
+        
+        if daily_enabled:
             self._apscheduler.add_job(
-                func=self._run_wal_checkpoint_job,
-                trigger="interval",
-                hours=wal_interval_hours,
-                id="wal_checkpoint_job",
-                replace_existing=True,
-            )
-            logger.info(f"SQLite WAL checkpoint scheduled every {wal_interval_hours} hours.")
-
-            # 資料庫每日深夜維護 (03:30)
-            self._apscheduler.add_job(
-                func=self._run_daily_maintenance_job,
+                func=self._run_daily_job,
                 trigger="cron",
-                hour=3,
-                minute=30,
-                id="database_maintenance_job",
+                hour=hour,
+                minute=minute,
+                id="daily_synthesis_job",
+                replace_existing=True
+            )
+            logger.info(f"Daily synthesis scheduled for {hour:02d}:{minute:02d} daily.")
+
+        if checkpoint_enabled:
+            self._apscheduler.add_job(
+                func=self._run_checkpoint_job,
+                trigger="interval",
+                hours=interval_hours,
+                id="periodic_checkpoint_job",
+                replace_existing=True
+            )
+            logger.info(f"Periodic checkpoint log scheduled every {interval_hours} hours.")
+
+        if telegram_enabled:
+            # 晨報 (預設 09:00)
+            m_time = self.cfg.get("notifiers.telegram.morning_briefing_time", "09:00")
+            m_h, m_m = [int(x) for x in m_time.split(":")]
+            self._apscheduler.add_job(
+                func=self._run_morning_briefing_job,
+                trigger="cron",
+                hour=m_h,
+                minute=m_m,
+                id="morning_briefing_job",
+                replace_existing=True
+            )
+            logger.info(f"Morning briefing scheduled for {m_h:02d}:{m_m:02d} daily.")
+
+            # P5-R4b 晚間交接（唯讀推播；預設 23:30 可調）
+            te_h, te_m = self._parse_clock(
+                self.cfg.get("notifiers.telegram.evening_summary_time", "23:30"),
+                (23, 30),
+            )
+            self._apscheduler.add_job(
+                func=self._run_telegram_evening_job,
+                trigger="cron",
+                hour=te_h,
+                minute=te_m,
+                id="telegram_evening_job",
                 replace_existing=True,
             )
-            logger.info("Database daily maintenance scheduled for 03:30 daily.")
+            logger.info(f"Telegram evening handoff scheduled for {te_h:02d}:{te_m:02d} daily.")
 
-            self._apscheduler.start()
-            self._maybe_start_telegram_poller(telegram_enabled)
-        except ImportError:
-            # 原生執行緒排程備援機制
-            self._running = True
-            self._thread = threading.Thread(
-                target=self._std_scheduler_loop,
-                args=(
-                    hour,
-                    minute,
-                    interval_hours,
-                    daily_enabled,
-                    checkpoint_enabled,
-                    telegram_enabled,
-                    desktop_enabled,
-                    usage_milestones_enabled,
-                ),
-                daemon=True
-            )
-            self._thread.start()
-            self._maybe_start_telegram_poller(telegram_enabled)
-            logger.info("Synthesis scheduler (Built-in Timer) started.")
+        # 桌面通知：早報與晚報（不需任何帳號或金鑰）
+        if self.cfg.get("notifiers.desktop.enabled", True):
+            for job_id, time_key, default_time, func in (
+                ("desktop_morning_job", "notifiers.desktop.morning_briefing_time", "08:30", self._run_desktop_morning_job),
+                ("desktop_evening_job", "notifiers.desktop.evening_summary_time", "22:00", self._run_desktop_evening_job),
+            ):
+                try:
+                    d_h, d_m = [int(x) for x in str(self.cfg.get(time_key, default_time)).split(":")]
+                except Exception:
+                    d_h, d_m = [int(x) for x in default_time.split(":")]
 
-    def _std_scheduler_loop(
-        self,
-        target_hour: int,
-        target_minute: int,
-        interval_hours: int,
-        daily_enabled: bool,
-        cp_enabled: bool,
-        telegram_enabled: bool,
-        desktop_enabled: bool,
-        usage_milestones_enabled: bool,
-    ):
-        from core.coverage_ledger import heartbeat_interval_seconds
-        from core.scheduled_tasks import scheduled_tasks_enabled
-
-        last_executed_day = None
-        last_cp_time = time.time()
-        last_usage_time = 0.0
-        last_coverage_time = 0.0
-        last_secretary_tasks_time = 0.0
-        coverage_enabled = bool(self.cfg.get("usage_tracking.enabled", False))
-        secretary_tasks_enabled = scheduled_tasks_enabled(self.cfg)
-        last_desktop_morning_day = None
-        last_desktop_evening_day = None
-        last_telegram_morning_day = None
-        last_telegram_evening_day = None
-
-        desktop_morning = self._parse_clock(
-            self.cfg.get("notifiers.desktop.morning_briefing_time", "08:30"),
-            (8, 30),
-        )
-        desktop_evening = self._parse_clock(
-            self.cfg.get("notifiers.desktop.evening_summary_time", "22:00"),
-            (22, 0),
-        )
-        telegram_morning = self._parse_clock(
-            self.cfg.get("notifiers.telegram.morning_briefing_time", "09:00"),
-            (9, 0),
-        )
-        telegram_evening = self._parse_clock(
-            self.cfg.get("notifiers.telegram.evening_summary_time", "23:30"),
-            (23, 30),
-        )
-
-        while self._running:
-            now = datetime.now()
-            today_str = now.strftime("%Y-%m-%d")
-            
-            # 每日排程
-            if daily_enabled and now.hour == target_hour and now.minute == target_minute and last_executed_day != today_str:
-                last_executed_day = today_str
-                self._run_daily_job()
-            
-            # 週期性快照
-            if cp_enabled and (time.time() - last_cp_time) >= (interval_hours * 3600):
-                last_cp_time = time.time()
-                self._run_checkpoint_job()
-
-            if usage_milestones_enabled:
-                usage_interval = max(
-                    5,
-                    int(self.cfg.get("usage_tracking.notifications.check_interval_minutes", 15)),
+                self._apscheduler.add_job(
+                    func=func, trigger="cron", hour=d_h, minute=d_m,
+                    id=job_id, replace_existing=True
                 )
-                if (time.time() - last_usage_time) >= usage_interval * 60:
-                    last_usage_time = time.time()
-                    self._run_usage_milestone_job()
+                logger.info(f"Desktop notification '{job_id}' scheduled for {d_h:02d}:{d_m:02d} daily.")
 
-            if coverage_enabled and (
-                time.time() - last_coverage_time
-            ) >= heartbeat_interval_seconds(self.cfg):
-                last_coverage_time = time.time()
-                self._run_coverage_ledger_job()
+        if usage_milestones_enabled:
+            usage_interval = max(
+                5,
+                int(self.cfg.get("usage_tracking.notifications.check_interval_minutes", 15)),
+            )
+            self._apscheduler.add_job(
+                func=self._run_usage_milestone_job,
+                trigger="interval",
+                minutes=usage_interval,
+                id="usage_milestone_job",
+                replace_existing=True,
+            )
+            logger.info(
+                f"Usage milestone evaluation scheduled every {usage_interval} minutes."
+            )
 
-            if secretary_tasks_enabled and (time.time() - last_secretary_tasks_time) >= 60:
-                last_secretary_tasks_time = time.time()
-                self._run_secretary_scheduled_tasks_job()
+        if coverage_enabled:
+            # P2.6 coverage ledger heartbeat：記錄視窗採集器實際觀測時間段
+            from core.coverage_ledger import heartbeat_interval_seconds
 
-            if (
-                desktop_enabled
-                and (now.hour, now.minute) == desktop_morning
-                and last_desktop_morning_day != today_str
-            ):
-                last_desktop_morning_day = today_str
-                self._run_desktop_morning_job()
+            coverage_seconds = heartbeat_interval_seconds(self.cfg)
+            self._apscheduler.add_job(
+                func=self._run_coverage_ledger_job,
+                trigger="interval",
+                seconds=coverage_seconds,
+                id="coverage_ledger_job",
+                replace_existing=True,
+            )
+            logger.info(
+                f"Coverage ledger heartbeat scheduled every {coverage_seconds} seconds."
+            )
 
-            if (
-                desktop_enabled
-                and (now.hour, now.minute) == desktop_evening
-                and last_desktop_evening_day != today_str
-            ):
-                last_desktop_evening_day = today_str
-                self._run_desktop_evening_job()
+        if secretary_tasks_enabled:
+            # P5-R5 自訂排程任務：每分鐘檢查一次到期任務（僅 L0 唯讀
+            # template；due 判定在 core.scheduled_tasks，錯過只補跑一次）。
+            self._apscheduler.add_job(
+                func=self._run_secretary_scheduled_tasks_job,
+                trigger="interval",
+                seconds=60,
+                id="secretary_scheduled_tasks_job",
+                replace_existing=True,
+            )
+            logger.info("Secretary scheduled tasks tick scheduled every 60 seconds.")
 
-            if (
-                telegram_enabled
-                and (now.hour, now.minute) == telegram_morning
-                and last_telegram_morning_day != today_str
-            ):
-                last_telegram_morning_day = today_str
-                self._run_morning_briefing_job()
+        # SQLite WAL 每小時自動 Checkpoint
+        wal_interval_hours = max(1, int(self.cfg.get("data_lifecycle.wal_checkpoint_interval_hours", 1)))
+        self._apscheduler.add_job(
+            func=self._run_wal_checkpoint_job,
+            trigger="interval",
+            hours=wal_interval_hours,
+            id="wal_checkpoint_job",
+            replace_existing=True,
+        )
+        logger.info(f"SQLite WAL checkpoint scheduled every {wal_interval_hours} hours.")
 
-            if (
-                telegram_enabled
-                and (now.hour, now.minute) == telegram_evening
-                and last_telegram_evening_day != today_str
-            ):
-                last_telegram_evening_day = today_str
-                self._run_telegram_evening_job()
+        # 資料庫每日深夜維護 (03:30)
+        self._apscheduler.add_job(
+            func=self._run_daily_maintenance_job,
+            trigger="cron",
+            hour=3,
+            minute=30,
+            id="database_maintenance_job",
+            replace_existing=True,
+        )
+        logger.info("Database daily maintenance scheduled for 03:30 daily.")
 
-            time.sleep(30)
+        self._apscheduler.start()
+        self._maybe_start_telegram_poller(telegram_enabled)
 
     @staticmethod
     def _parse_clock(value, fallback: tuple[int, int]) -> tuple[int, int]:
@@ -358,15 +223,11 @@ class SynthesisScheduler:
     def active_job_ids(self) -> list[str]:
         if self._apscheduler and getattr(self._apscheduler, "running", False):
             return sorted(job.id for job in self._apscheduler.get_jobs())
-        if self._thread and self._thread.is_alive():
-            return self.configured_job_ids()
         return []
 
     def backend_name(self) -> str:
         if self._apscheduler and getattr(self._apscheduler, "running", False):
             return "apscheduler"
-        if self._thread and self._thread.is_alive():
-            return "builtin_timer"
         return "stopped"
 
     def _run_daily_job(self):
@@ -564,10 +425,7 @@ class SynthesisScheduler:
         if not enabled:
             return {"status": "disabled", "healed": False}
 
-        is_running = bool(
-            (self._apscheduler and getattr(self._apscheduler, "running", False))
-            or (self._thread and self._thread.is_alive())
-        )
+        is_running = bool(self._apscheduler and getattr(self._apscheduler, "running", False))
         if is_running:
             return {"status": "healthy", "healed": False}
 
@@ -585,7 +443,4 @@ class SynthesisScheduler:
             self._telegram_poller = None
         if self._apscheduler and self._apscheduler.running:
             self._apscheduler.shutdown()
-        self._running = False
-        if self._thread:
-            self._thread.join(timeout=2.0)
         logger.info("Synthesis scheduler stopped.")
