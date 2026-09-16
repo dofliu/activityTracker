@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from core.config import get_config
 from core.database import get_db
 from core.models import RAGIndexedFolder, RAGIndexedFile, RAGChatSession, RAGChatMessage
 from core.platform_services import open_local_path
@@ -52,6 +53,21 @@ class ScanRequest(BaseModel):
 
 class ConfirmIndexRemovalRequest(BaseModel):
     confirm: bool = False
+
+
+def _chat_target(provider: Optional[str], model: Optional[str]) -> tuple[str, Optional[str]]:
+    """知識庫對話的 provider／model 預設：`rag.active_provider`／`rag.active_model`（Ollama 才有預設模型）。
+
+    以前寫在 rag/llm_gateway.py 裡；D2 之後 LLM client 只有一份，不認識 rag 的設定鍵，
+    所以由這裡（呼叫端）決定要問哪一家、哪個模型。
+    """
+    from core.llm_client import normalize_provider
+
+    cfg = get_config()
+    prov = normalize_provider(provider or cfg.get("rag.active_provider", "ollama"), cfg)
+    if not model and prov == "ollama":
+        model = cfg.get("rag.active_model") or None
+    return prov, (model or None)
 
 
 def _extra_missing_detail(exc: RagExtraNotInstalled) -> Dict[str, Any]:
@@ -506,7 +522,9 @@ async def chat_stream(req: ChatRequest):
         沒有收尾的例外都會讓介面永遠卡住。這裡把三個階段都包起來：
         檢索（含硬性逾時）、串流、收尾，失敗一律轉成可讀的訊息事件。
         """
-        from rag.llm_gateway import llm_gateway
+        from core.llm_client import llm_client
+
+        chat_provider, chat_model = _chat_target(req.provider, req.model)
 
         citations = []
         context_text = ""
@@ -549,11 +567,11 @@ async def chat_stream(req: ChatRequest):
                 prompt_parts.append(context_text)
             full_system_prompt = "\n\n".join(prompt_parts)
 
-            async for token in llm_gateway.stream_chat(
+            async for token in llm_client.stream_chat(
                 messages=llm_msgs,
                 system_prompt=full_system_prompt,
-                provider=req.provider,
-                model=req.model
+                provider=chat_provider,
+                model=chat_model,
             ):
                 data_payload = json.dumps({"token": token}, ensure_ascii=False)
                 yield f"event: message\ndata: {data_payload}\n\n"

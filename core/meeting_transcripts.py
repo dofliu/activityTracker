@@ -298,7 +298,7 @@ _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 _LLM_ERROR_MARKERS = (
     "[LLMGateway", "[OpenAI API 錯誤]", "[Claude API 錯誤]", "[Gemini API 錯誤]",
     "[Ollama", "【尚未偵測到", "Traceback (most recent call last)",
-    "[本機備援模式]",   # llm_gateway 連不上時回的降級抬頭（2026-09-08 容器實測看到的就是這個）
+    "[本機備援模式]",   # core/llm_client 連不上時回的降級抬頭（2026-09-08 容器實測看到的就是這個）
 )
 
 

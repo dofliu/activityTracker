@@ -134,6 +134,7 @@
 
 1. **兩套 LLM client**：`synthesizer/llm_client.py:88`（同步，Ollama 走 `/api/generate`）與 `rag/llm_gateway.py:24`（非同步串流，Ollama 走 `/api/chat`），讀同一組設定鍵，
    預設模型已經漂移（`gemini-3.7-flash` vs `gemini-2.5-flash`）；`core/semantic_index.py:451` 還有第三條 Ollama 呼叫；`rag/embeddings.py:71` 第四次實作 OpenAI 金鑰解析。
+   → **同日已完成（D2）**：合為 `core/llm_client.py`，四處都改走它（ROADMAP §11.2）。
 2. **兩套向量記憶**：`core/semantic_index.py`（Ollama bge-m3、向量存 SQLite BLOB、純 Python cosine）與 `rag/activity_indexer.py:54`（FastEmbed＋Chroma＋BM25）
    對**同樣五種實體**（ProjectState／OpenLoop／AI turn／Git／File）各做一次 embedding、各有查詢路徑與 UI（`omni ask` vs `/api/v1/rag/chat`）。這是 repo 裡最大的一塊重複。
 3. **四份「每專案每日活躍」聚合**：`weekly_review.py:83`、`activity_patterns.py:243-306`、`activity_digest.py:77`、`secretary_greeting.py:97`，各自從同一組事件表算一遍。

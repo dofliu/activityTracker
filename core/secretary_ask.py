@@ -172,15 +172,19 @@ def ask_secretary(
     system_prompt = "\n\n".join(prompt_parts)
 
     if gateway is None:
-        from rag.llm_gateway import llm_gateway as gateway
+        from core.llm_client import llm_client as gateway
+    # 與知識庫分頁同一組預設（rag.active_provider／rag.active_model）；D2 之後由呼叫端決定
+    from rag.router import _chat_target
+
+    chat_provider, chat_model = _chat_target(provider, model)
 
     async def _collect() -> str:
         chunks: list[str] = []
         async for token in gateway.stream_chat(
             messages=[{"role": "user", "content": question}],
             system_prompt=system_prompt,
-            provider=provider,
-            model=model,
+            provider=chat_provider,
+            model=chat_model,
         ):
             chunks.append(token)
         return "".join(chunks)

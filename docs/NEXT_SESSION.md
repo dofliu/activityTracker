@@ -16,13 +16,14 @@
 | 版本 | v1.3.0a5 已發佈為 GitHub pre-release（release workflow 自動 build → verify → release，SHA-256 receipt 交叉驗證）。`release_ready: false`，唯一**能力型**缺口是全天 coverage ledger 實測（TODO A1）。 |
 | 還缺什麼 | 別憑記憶：跑 `python main.py verify`（或看「06 系統設定 → 驗收中心」）就會列出 A1–A22 每一項現在有沒有收據，以及 ROADMAP §12.3 四個 gate 缺什麼。 |
 | Schema | migration **18/18**（append-only + checksum；**新表一律進 registry，不得靠 `create_all` 繞過**）。017 = `secretary_notes`、018 = `calendar_events`。 |
-| 測試 | **63 個 contract test 模組、639 項**（638 passed + 1 skipped；**不裝 `[rag]` extra 時 626 passed + 12 skipped**，CI 有一個 job 專跑這個）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
+| 測試 | **64 個 contract test 模組、648 項**（647 passed + 1 skipped；**不裝 `[rag]` extra 時 635 passed + 12 skipped**，CI 有一個 job 專跑這個）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
+| LLM client | **只有一份**：`core/llm_client.py`（`LLMClient.generate` 同步回字串、`stream_chat` 非同步逐 token；`DEFAULT_MODELS`／`KEY_ENVS` 單一定義；Ollama 一律 `/api/chat`）。失敗抬頭字面（`[本機備援模式]`、`[OpenAI API 錯誤]`、`【尚未偵測到`…）是下游事實閘與驗收中心的辨識依據，**不得改字**；有契約測試掃全 repo 禁止在別處寫死模型名（D2，2026-09-16）。 |
 | 知識庫依賴 | `[rag]` 是選用 extra；`rag/availability.py` 是「裝了沒」的唯一定義（`find_spec`，不 import）。會用到套件的路徑在**真的會失敗的那一層**檢查（`create_job`、worker client 的 `_spawn_locked`），router／startup 只讀它們回報的狀態（D1，2026-09-16）。 |
 | 狀態數字 | `manager.get_status()['metrics']` 是唯一定義；`main.py status` 只呈現。要加一個數字就加在那裡，不要在 CLI 自算（B9，2026-09-16）。 |
 | 導覽 | 6 分頁，**沒有右欄**（2026-09-06 依實機回饋移除；今日統計與 Focus Now 在 05 最上方、DATA TRUST 在 06 系統健康）：01 小秘書＝兩塊一屏（左：秘書桌面，問候併入、全部提案收合在底部；右：交辦與提問，記憶區收合在裡面）／02 知識庫／03 進行中工作／04 Git 同步中心／05 摘要與統計／06 系統設定（左欄 11 區塊，末項為**驗收中心**）。桌面與 494px 皆無水平溢出（Playwright 實測）。 |
 | 外觀 | 兩個獨立軸：`data-theme`（dark/light）× `data-accent`（naruto/forest/ocean），CSS 全走 `var(--accent)`；新配色只需加一組變數區塊。偏好存 localStorage（`omni-theme`／`omni-palette`／`omni-settings-pane`）。 |
 | 危險能力 | 執行器、L2、L2 寫入、自訂排程、Telegram 對話、`allow_remote_arm`、LINE、問候卡 LLM 潤飾——**全部預設關閉**；行事曆預設開但沒設路徑就等於停用。 |
-| **方向（2026-09-16 起）** | **減法優先**：功能候選 C5／C6／C3 暫停；**R0 全部完成**（B5–B9 ＋ D1）；接下來依 ROADMAP §13.2 的 R1（D2 合併 LLM client、D3 活躍聚合、D4 切 router、D5 桌面通知進 adapter、D6 旗標收斂）→ R2（向量記憶二選一、秘書四層化、前端模組化）進行。乾淨容器實測：核心安裝 **176 MB**（含 `[rag]` 約 720 MB；R0 前 797 MB）。 |
+| **方向（2026-09-16 起）** | **減法優先**：功能候選 C5／C6／C3 暫停；**R0 全部完成**（B5–B9 ＋ D1）、**R1 的 D2 完成**（一個 LLM client）；接下來依 ROADMAP §13.2 的 R1（D3 活躍聚合、D4 切 router、D5 桌面通知進 adapter、D6 旗標收斂）→ R2（向量記憶二選一、秘書四層化、前端模組化）進行。乾淨容器實測：核心安裝 **176 MB**（含 `[rag]` 約 720 MB；R0 前 797 MB）。 |
 
 ## 功能地圖（要改哪裡就看這張表）
 
@@ -47,6 +48,7 @@
 | 會議秘書（會後逐字稿） | `core/meeting_transcripts.py`（WebVTT parser、時間配對、摘要＋事實閘、候選待辦、`meeting_context`／`collect_meeting_signals`）；L0 template `meeting_notes`、`POST /api/v1/secretary/meetings/followups`（**唯一會寫 open_loops 的路徑**）、桌面 `#home-desk-meeting` | `test_meeting_transcripts.py`（19）＋A22 1 | [ADR-022](ADR-022-meeting-secretary.md) |
 | 每日包與今日視圖 | `core/secretary_packs.py` | `test_secretary_packs.py`（9） | [ADR-008](ADR-008-gated-agent-executor.md) L0 |
 | 問候卡（01 首頁＋晨報開頭） | `core/secretary_greeting.py` | `test_secretary_greeting.py`（23）＋晨報三項 | ROADMAP §11（2026-09-04） |
+| LLM client（同步＋串流） | `core/llm_client.py`；知識庫對話的 provider／model 預設在呼叫端 `rag/router._chat_target` | `test_llm_client_single_source.py`（9）、`test_rag_chat_stream.py`、`test_summary_prompt_limits.py` | ROADMAP §13 D2 |
 | 推播組裝與通道 | `notifiers/messages.py`、`notifiers/channels.py`、`notifiers/secretary_push.py` | `test_notification_channels.py`（32） | [ADR-014](ADR-014-multi-channel-push-and-arm-code.md) |
 | Telegram 對話與批准 | `notifiers/telegram_chat.py`、`notifiers/telegram_approvals.py`、`core/secretary_ask.py` | `test_telegram_chat.py`（29） | [ADR-013](ADR-013-telegram-secretary-chat.md) |
 | Git 同步中心與對帳 | `core/repo_sync.py`（`_sync_blocker` 產生逐 repo 的具體拒絕理由）、`core/repo_onboarding.py`、`core/repo_sync_report.py` | `test_repo_sync*.py`、`test_repo_onboarding.py` | [ADR-011](ADR-011-safe-local-repository-sync.md) ＋ Addendum A/B/C |
@@ -81,6 +83,7 @@
 - **idempotent 的快取要問「底下的東西會不會變」**：`warmup_in_background()` 原本只要 worker 活著且預熱過就回舊收據，於是「建完索引 → 按預熱」永遠拿到重建之前的計數，A6 還照著那份舊收據判綠。**使用者明示要求的動作不該被 idempotence 吃掉**——自動路徑可以跳過，明示路徑一律重做（ADR-009 Addendum B 的 `force`）。同理，任何拿記憶體狀態判定的驗收項，都要跟持久化的來源計數對一次帳（2026-09-07）。
 - **設定是 process 啟動時載入一次的 singleton**：`core/config.py` 的 `Config` 不會自己重讀檔案。任何「用 CLI 改了設定，跑著的服務卻不認」的問題都是這個原因（execution token 被拒是使用者實際踩到的例子）；`manager.reload_config()` 是唯一的重讀路徑，錯誤訊息要說得出「請重啟或按儲存」，也要提醒環境變數優先於設定檔。
 - **「今天的比例」不是「全天的比例」**：`get_daily_coverage` 對當天的分母是已過的時間，早上跑三小時就能顯示 97%。任何宣稱「全天／完整期間」的判定都只能採計**已結束**的日子（2026-09-05 驗收中心 A1 就是這樣出現假綠燈的）。
+- **預設值只能寫一次，而且要有測試去抓第二份**：D2 合併 LLM client 時，兩套實作的 gemini 預設已經漂移成 2.5 與 3.7，`secretary_advisor` 還有第三張私有的模型表。合併後寫了一支掃全 repo 的契約測試（`core/llm_client.py` 以外不得出現模型名字面），**第一次跑就抓到 `semantic_index.py` 漏掉的一處**——靠人眼 grep 會漏，靠測試不會（2026-09-16）。
 - **依賴檢查放在真的會失敗的那一層，不要放外圍**：D1 一開始把「[rag] 裝了沒」的檢查放在 router 的 `_retrieve_citations`／`/retrieval/warmup` 與 `maybe_warmup_on_start` 外圍，結果沒裝套件的環境裡，連注入替身 worker 指令的 13 個測試都被擋下——外圍不知道底下是替身。改成只在 `RetrievalWorkerClient` 用**預設指令**啟動子程序時檢查（`_requires_extra = command is None`），外圍只看 client 回報的 `state == "unavailable"`，測試全綠且行為更誠實（2026-09-16）。
 - **記憶體狀態不能在 CLI 假裝查得到**：檢索 worker 的 `state`／預熱計數只存在主服務程序，另開一個 Python 程序永遠是 cold。驗收中心為此有 `runtime_only` 這一格——把它報成「還沒做」等於說謊。新增任何「查現況」功能時先問：這個數字在哪個程序裡？
 
@@ -88,7 +91,7 @@
 
 - **待辦一律看 [TODO.md](TODO.md)**：A 段是等待使用者側 live 收據（👤 需在 Windows 實機操作，不是程式工作，A1 是唯一還擋 `release_ready` 的能力缺口）、B 段是已知問題與技術債、C 段是功能候選。
   **A 段的現況直接跑 `python main.py verify` 查**（[ADR-016](ADR-016-acceptance-center.md)）；改 A 段的判準時要同步改 `core/acceptance.py` 的 `_ITEMS`。
-- **方向與取捨看 [ROADMAP.md](../ROADMAP.md) §13「架構整頓與推廣方向」**（2026-09-16）：§12 的三條功能候選路線（C5／C6／C3）**暫停**，先做減法與合併；每個 D 項的完成判準在 TODO D 段。**R0 已完成**；接手時從 D2（一個 LLM client）開始——它是 R1 裡影響面最清楚的一項。
+- **方向與取捨看 [ROADMAP.md](../ROADMAP.md) §13「架構整頓與推廣方向」**（2026-09-16）：§12 的三條功能候選路線（C5／C6／C3）**暫停**，先做減法與合併；每個 D 項的完成判準在 TODO D 段。**R0 與 D2 已完成**；接手時從 D3（一份活躍聚合）開始——四個模組（weekly_review／activity_patterns／activity_digest／secretary_greeting）各自算一遍「每專案每日活躍」，先寫一支斷言四處同一天數字相同的測試再合。
 - **想先了解「為什麼要整頓」**：讀 [REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) §4（每項附檔案：行號，已逐項核對原始碼）。
 - **個性化三步（2026-09-05 檢視後的方向）**：(1) 模式感知提案 [ADR-017](ADR-017-pattern-aware-proposals.md) ✅、(2) 宣告式個人檔案 [ADR-018](ADR-018-declared-profile.md) ✅、(3) 秘書桌面 [ADR-019](ADR-019-secretary-desk-home.md) ✅（01 分頁成為真正的首頁）。三步都已落地；刻意不走的路：用 LLM 推斷個性或優先、再多採集來源、C5 遠端存取。
 - **會議秘書**（[ADR-022](ADR-022-meeting-secretary.md)）：第一層（會後逐字稿→觀察＋候選待辦）**已於 2026-09-08 實作**，實機收據待取得（TODO A22）。**第二層（即時字幕／翻譯＝錄下其他人的聲音）刻意沒做**——要做得先過 ADR-022 D6 的五道門並另寫 ADR。

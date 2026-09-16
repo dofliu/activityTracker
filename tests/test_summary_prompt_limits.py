@@ -1,5 +1,5 @@
 from synthesizer.aggregator import format_context_for_prompt
-from synthesizer.llm_client import LLMClient, diagnose_provider
+from core.llm_client import LLMClient, diagnose_provider
 
 
 class DictConfig:

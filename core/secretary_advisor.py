@@ -29,6 +29,7 @@ from datetime import datetime, timedelta
 from typing import Any, Callable
 
 from core.config import get_config
+from core.llm_client import default_model
 from core.time_utils import get_local_now
 
 logger = logging.getLogger("OmniContext.SecretaryAdvisor")
@@ -56,12 +57,6 @@ PROMPT_FIELDS = (
 MAX_NOTE_CHARS = 300
 MAX_SUMMARY_CHARS = 600
 _ALLOWED_PRIORITY_HINTS = {"high", "medium", "low"}
-_DEFAULT_MODELS = {
-    "ollama": "llama3.1:8b",
-    "gemini": "gemini-2.5-flash",
-    "anthropic": "claude-3-5-sonnet-20241022",
-    "openai": "gpt-4o",
-}
 
 _SYSTEM_PROMPT = (
     "你是一位唯讀的個人工作分流顧問。輸入是一份由規則引擎產生的工作建議清單"
@@ -94,12 +89,7 @@ def advisor_settings(cfg: Any | None = None) -> dict[str, Any]:
         "enabled": bool(cfg.get("proactive_secretary.llm_advisor.enabled", False)),
         "provider": provider,
         "cloud": provider != "ollama",
-        "model": str(
-            cfg.get(
-                f"synthesizer.{provider}.model",
-                _DEFAULT_MODELS.get(provider, ""),
-            )
-        ),
+        "model": default_model(provider, cfg),  # 預設模型只在 core/llm_client 定義一份（D2）
         "timeout_seconds": _clamped(
             "proactive_secretary.llm_advisor.timeout_seconds", 20, 5, 120
         ),
@@ -216,7 +206,7 @@ _cache = _AdvisorCache()
 
 def _default_generate(provider: str, timeout_seconds: int) -> Callable[[str, str], str]:
     def _run(system_prompt: str, user_prompt: str) -> str:
-        from synthesizer.llm_client import LLMClient
+        from core.llm_client import LLMClient
 
         client = LLMClient(provider)
         with ThreadPoolExecutor(max_workers=1) as pool:

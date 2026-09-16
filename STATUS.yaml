@@ -6,8 +6,8 @@ progress_basis: "依 P0-P8 加權里程碑估計；不是 release readiness 百�
 status: active_hardening
 release_ready: false
 last_updated: "2026-09-16"
-current_phase: "P0-P8 與 ADR-008 全階段已落地；秘書側 ADR-012~022 十一項功能（記憶區、Telegram 對話、多通道推播、行事曆、驗收中心、模式感知提案、宣告式個人檔案、秘書桌面、每週回顧、文件落後偵測、會議秘書第一層）皆已實作且危險能力預設關閉。2026-09-13 完成一輪文件整理（README／README_en 依實際程式重寫、USAGE 重組並加目錄、ROADMAP 成果紀錄合併為單一依日期清單、本檔的 known_blockers 由歷史紀錄改回真正的阻擋項）。2026-09-16 完成專案檢視（docs/REVIEW-2026-09-16-project-assessment.md）：乾淨容器 pytest 625 passed + 1 skipped、venv 797 MB；確認兩套 LLM client、兩套向量記憶、四份活躍聚合等重複，登記 TODO B5–B9 與 D1–D12；同日完成 R0 全部（B5–B9：死碼與未用依賴移除、marked 本機化、CLI 與 API 同一組狀態數字；D1：知識庫依賴改為 [rag] 選用 extra，核心安裝 721 MB → 176 MB），pytest 638+1（無 extra 626+12）、verify 輸出與基底相同。目前階段：等待使用者側 live 收據；功能候選 C5/C6/C3 暫停，改依 ROADMAP §13 做減法與合併。"
-next_milestone: "取得 TODO A1 全天 coverage ledger 實機收據後重評 release_ready；其餘 A 段收據以驗收中心（06 系統設定 → 驗收中心 或 python main.py verify）為準。A22（會議秘書）是目前最容易補齊的一項。功能候選暫停；程式面 R0 已完成；下一步是 ROADMAP §13.2 的 R1（D2 合併兩套 LLM client 起）。"
+current_phase: "P0-P8 與 ADR-008 全階段已落地；秘書側 ADR-012~022 十一項功能（記憶區、Telegram 對話、多通道推播、行事曆、驗收中心、模式感知提案、宣告式個人檔案、秘書桌面、每週回顧、文件落後偵測、會議秘書第一層）皆已實作且危險能力預設關閉。2026-09-13 完成一輪文件整理（README／README_en 依實際程式重寫、USAGE 重組並加目錄、ROADMAP 成果紀錄合併為單一依日期清單、本檔的 known_blockers 由歷史紀錄改回真正的阻擋項）。2026-09-16 完成專案檢視（docs/REVIEW-2026-09-16-project-assessment.md）：乾淨容器 pytest 625 passed + 1 skipped、venv 797 MB；確認兩套 LLM client、兩套向量記憶、四份活躍聚合等重複，登記 TODO B5–B9 與 D1–D12；同日完成 R0 全部（B5–B9：死碼與未用依賴移除、marked 本機化、CLI 與 API 同一組狀態數字；D1：知識庫依賴改為 [rag] 選用 extra，核心安裝 721 MB → 176 MB），pytest 638+1（無 extra 626+12）、verify 輸出與基底相同；再完成 R1 的 D2（兩套 LLM client 合為 core/llm_client.py，預設模型與金鑰解析只定義一次），pytest 647+1（無 extra 635+12）。目前階段：等待使用者側 live 收據；功能候選 C5/C6/C3 暫停，改依 ROADMAP §13 做減法與合併。"
+next_milestone: "取得 TODO A1 全天 coverage ledger 實機收據後重評 release_ready；其餘 A 段收據以驗收中心（06 系統設定 → 驗收中心 或 python main.py verify）為準。A22（會議秘書）是目前最容易補齊的一項。功能候選暫停；程式面 R0 與 R1 的 D2 已完成；下一步是 D3（一份 project_activity_matrix 取代四處各算一遍的活躍聚合）。"
 planned_features:
   - id: FEATURE-001
     name: "每日主要介面使用時間與里程碑教練"
@@ -467,13 +467,14 @@ quality_gates:
   ingestion_provenance: passed_local_rescan_601_sources
   response_finalization: passed_as_final_candidate_contract_not_semantic_correctness
   open_loop_lifecycle: passed_local_db_reconciliation
-  automated_tests: passed_639_contract_tests_63_modules_638_passed_1_conditional_skip_and_626_passed_12_skipped_without_rag_extra
+  automated_tests: passed_648_contract_tests_64_modules_647_passed_1_conditional_skip_and_635_passed_12_skipped_without_rag_extra
   usage_milestone_alpha: passed_contract_and_windows_dashboard_api_smoke
   background_task_receipts: passed_all_three_platform_live_acceptance_48_completed_on_2026_08_29
   repository_sync: passed_contract_tests_and_localhost_read_only_status_smoke
   documentation_current: passed_readme_usage_roadmap_status_sync_and_2026_09_16_review_snapshot
   r0_subtraction_b5_b9: passed_dead_code_and_unused_deps_removed_marked_vendored_status_metrics_single_source_verify_output_identical_to_base_venv_797mb_to_721mb
   rag_optional_extra_d1: passed_rag_deps_moved_to_extra_core_install_176mb_availability_single_source_503_machine_readable_worker_never_spawns_chat_degrades_a6_not_configured_ci_job_without_extra_11_contract_tests
+  llm_client_single_source_d2: passed_two_clients_merged_into_core_llm_client_default_models_and_key_envs_defined_once_ollama_both_paths_api_chat_error_markers_unchanged_repo_wide_literal_scan_9_contract_tests
   backup_lifecycle: passed_online_backup_and_isolated_restore_drill
   versioned_migration: passed_fresh_legacy_backup_copy_and_live_upgrade_5_of_5
   packaging_windows_alpha: passed_artifacts_fresh_upgrade_assets_and_writable_home
@@ -530,7 +531,7 @@ known_blockers:
   - "⚪ B2 · Extension 覆蓋邊界：2026-08-31 的 live PASS 只涵蓋 ChatGPT 與 Claude.ai，Gemini 未在該輪驗證；且單輪 PASS 不等於連續或全天 capture coverage。"
   - "⚪ B3 · PyPI 發佈不在範圍：目前只發 GitHub pre-release（wheel/sdist + SHA-256 receipt）。"
   - "⚪ B4 · Repo onboarding 動作不留收據：init_folder/attach_remote/clone_repo/create_remote 執行後不寫本機紀錄，因此 A5 只能人眼確認，驗收中心對這項永遠回 needs_human。要機器可驗需補一張收據（migration + ADR-011 邊界討論）；在那之前維持誠實空白。"
-  - "⚪ D2-D12 · 架構整頓（ROADMAP §13；R0 已完成）：兩套 LLM client、兩套向量記憶、四份活躍聚合待合併；server.py 2,003 行／app.js 6,055 行待切分；秘書叢集 11 模組無共同型別。整頓不改行為，每項以 pytest 全綠與 verify 結果不變為收據。"
+  - "⚪ D3-D12 · 架構整頓（ROADMAP §13；R0 與 D2 已完成）：兩套向量記憶、四份活躍聚合待合併；server.py 2,003 行／app.js 6,055 行待切分；秘書叢集 11 模組無共同型別。整頓不改行為，每項以 pytest 全綠與 verify 結果不變為收據。"
   - "⚪ autonomous_execution 仍標記 blocked_by_p2_5：ADR-007 的 proposal-only 契約未解除；ADR-008 的分級執行器是有閘門的例外，不是解除。"
 capability_boundaries:
   - "LINE 只能推播：Messaging API 沒有輪詢介面，接收訊息需要公開 webhook，會打破只在 127.0.0.1 的邊界。提問、記筆記與按鈕批准一律走 Telegram（ADR-014）。"
@@ -539,4 +540,4 @@ capability_boundaries:
   - "會議秘書只做會後逐字稿：不錄音、不讀會議軟體視窗內容、不呼叫 Teams/Graph API、不自動下載逐字稿。即時字幕與翻譯是第二層，需另寫 ADR 並過 ADR-022 D6 的五道門。"
   - "一般 Claude Desktop 雲端聊天只偵測 cache 存在，不解析 Chromium LevelDB，也不宣稱已取得對話內容。"
   - "郵件不在採集範圍；行事曆只讀本機 .ics 的時間/標題/地點/狀態，不連任何雲端 API。秘書不會編造沒被採集到的數字。"
-key_metrics: "63 個 contract test 模組、639 項測試（638 passed + 1 skipped；不裝 [rag] extra 時 626 passed + 12 skipped）；核心安裝 176 MB、含 [rag] 約 720 MB；SQLite schema migration 18/18；Windows/Ubuntu/macOS x Python 3.10/3.12 CI 六個 job 全綠。v1.3.0a5 已於 2026-08-31 發佈為 GitHub pre-release（SHA-256 receipt 交叉驗證一致）。Extension live PASS（ChatGPT+Claude.ai，2026-08-31）與 P2.7 三平台背景任務 live 驗收（2026-08-29 共 48 筆 completed、union 28,838.971 秒）皆已取得。2026-09-08 取得 A6（bm25=4,839／vector=4,839 與 source_chunks 一致）與 A21（回收 1,633,386,496 bytes）實機收據。逐項成果紀錄見 ROADMAP.md 第 11.2 節，不在本檔重複。"
+key_metrics: "64 個 contract test 模組、648 項測試（647 passed + 1 skipped；不裝 [rag] extra 時 635 passed + 12 skipped）；核心安裝 176 MB、含 [rag] 約 720 MB；SQLite schema migration 18/18；Windows/Ubuntu/macOS x Python 3.10/3.12 CI 六個 job 全綠。v1.3.0a5 已於 2026-08-31 發佈為 GitHub pre-release（SHA-256 receipt 交叉驗證一致）。Extension live PASS（ChatGPT+Claude.ai，2026-08-31）與 P2.7 三平台背景任務 live 驗收（2026-08-29 共 48 筆 completed、union 28,838.971 秒）皆已取得。2026-09-08 取得 A6（bm25=4,839／vector=4,839 與 source_chunks 一致）與 A21（回收 1,633,386,496 bytes）實機收據。逐項成果紀錄見 ROADMAP.md 第 11.2 節，不在本檔重複。"

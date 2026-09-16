@@ -453,7 +453,9 @@ def _generate_local_answer(question: str, sources: Sequence[dict], cfg: Any) -> 
         str(cfg.get("synthesizer.ollama.base_url", "http://127.0.0.1:11434")),
         bool(cfg.get("semantic_index.allow_remote", False)),
     )
-    model = str(cfg.get("synthesizer.ollama.model", "llama3.1:8b"))
+    from core.llm_client import default_model
+
+    model = default_model("ollama", cfg)  # 預設模型只在 core/llm_client 定義一份（D2）
     evidence = "\n\n".join(
         f"[{item['citation']}] source={item['source_ref']} trust={item['trust_status']} "
         f"embedding_input={item['embedding_input_mode']} "
@@ -466,18 +468,16 @@ def _generate_local_answer(question: str, sources: Sequence[dict], cfg: Any) -> 
         "若 evidence 不足，明確回答資料不足。使用繁體中文。\n\n"
         f"Question:\n{question}\n\nEvidence:\n{evidence[:14000]}"
     )
-    response = requests.post(
-        f"{base_url}/api/generate",
-        json={
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": 0.1},
-        },
+    # 唯一的 Ollama 同步實作在 core/llm_client（D2）；這裡只負責 loopback-only 的 base_url 與低溫度。
+    from core.llm_client import LLMClient
+
+    answer = LLMClient("ollama", cfg).ollama_chat(
+        [{"role": "user", "content": prompt}],
+        model=model,
+        base_url=base_url,
+        options={"temperature": 0.1},
         timeout=240,
-    )
-    response.raise_for_status()
-    answer = str(response.json().get("response") or "").strip()
+    ).strip()
     if not answer:
         raise RuntimeError("Ollama returned an empty answer")
     return answer, model
