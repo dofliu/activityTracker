@@ -71,12 +71,32 @@ class SchedulableTemplate:
     timeout_seconds: int
 
 
+LEGACY_ENABLED_KEY = "proactive_secretary.executor.scheduled_tasks.enabled"
+
+
 def scheduled_tasks_enabled(cfg: Any | None = None) -> bool:
-    """疊加開關：executor 總開關 + 排程任務獨立開關，皆預設關閉。"""
+    """排程任務跟著 executor 總開關（TODO D6；ADR-008 Addendum 2026-09-16）。
+
+    D6 之前這裡是第二個獨立開關。拿掉的理由是它擋的不是真正的門：可排程的只有
+    server 註冊的 **L0 唯讀** template（L1／L2 永不可排程，有 allowlist 測試證明），
+    而且**任務要先被建立**——建立／修改／刪除／立即執行一律需要 execution token。
+    「會不會有東西自己跑」早就由「你有沒有親手建過任務」決定，不是由這個旗標決定。
+
+    ``LEGACY_ENABLED_KEY`` 仍然有效：既有設定檔明確寫成 ``false`` 的照樣關著。
+    曾經啟用、建過任務、後來關掉的人，休眠中的任務不會因為升級就自己醒過來；
+    要改吃新語意就把那一行從設定檔刪掉（見 :func:`legacy_opt_out`）。
+    """
     cfg = cfg or get_config()
-    return executor_enabled(cfg) and bool(
-        cfg.get("proactive_secretary.executor.scheduled_tasks.enabled", False)
-    )
+    if not executor_enabled(cfg):
+        return False
+    legacy = cfg.get(LEGACY_ENABLED_KEY, None)
+    return True if legacy is None else bool(legacy)
+
+
+def legacy_opt_out(cfg: Any | None = None) -> bool:
+    """設定檔是否還留著已淘汰的 ``scheduled_tasks.enabled: false``（UI 據此提示）。"""
+    cfg = cfg or get_config()
+    return cfg.get(LEGACY_ENABLED_KEY, None) is False
 
 
 def _max_tasks(cfg: Any) -> int:
@@ -605,7 +625,8 @@ def _require_enabled(cfg: Any) -> None:
     if not scheduled_tasks_enabled(cfg):
         raise ScheduleRejected(
             "scheduled_tasks_disabled",
-            "排程任務未啟用（proactive_secretary.executor.scheduled_tasks.enabled=false）",
+            "排程任務未啟用（請開啟 proactive_secretary.executor.enabled；設定檔若仍留著"
+            "已淘汰的 executor.scheduled_tasks.enabled: false，刪掉那一行）",
         )
 
 

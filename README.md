@@ -26,7 +26,7 @@
 | 面向 | 現況 |
 | :--- | :--- |
 | 程式 | P0–P8 與 ADR-008 執行器全階段已落地；22 份 ADR 記錄每個決策的邊界 |
-| 測試 | **66 個 contract test 模組、673 項**（672 passed + 1 skipped；不裝 `[rag]` extra 時 660 passed + 11 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
+| 測試 | **67 個 contract test 模組、684 項**（683 passed + 1 skipped；不裝 `[rag]` extra 時 671 passed + 11 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
 | 資料 | SQLite schema migration **18/18**（append-only + checksum，升級前自動備份） |
 | 發佈 | `release_ready: false` |
 
@@ -276,7 +276,7 @@ Installed wheel 可將 `python main.py` 改為 `omnicontext` 或較短的 `omni`
 | `synthesizer.provider` | 摘要供應商（預設 `ollama` 全本機） |
 | `integrations.github.token` | 留空時自動使用本機 `gh auth token` |
 
-**危險能力全部預設關閉**：秘書執行器、L2、L2 寫入、自訂排程、Telegram 對話、`allow_remote_arm`、LINE、問候卡 LLM 潤飾；行事曆與會議秘書預設開但沒設路徑就等於停用。
+**危險能力全部預設關閉**：秘書執行器（含只排 L0 的自訂排程）、L2、L2 寫入、Telegram 對話、Telegram inline 批准（含 `/arm`）、LINE、問候卡 LLM 潤飾；行事曆與會議秘書預設開但沒設路徑就等於停用。
 
 ---
 
@@ -363,7 +363,7 @@ activityTracker/
 │   └── index.html / app.js / style.css
 │
 ├── scripts/                    # 驗證、清理、autostart 與 E2E 腳本
-├── tests/                      # 66 個 contract test 模組（673 項）
+├── tests/                      # 67 個 contract test 模組（684 項）
 ├── logs/checkpoints/           # 週期性活動快照
 └── reports/                    # 每日／區間 Markdown 報告
 ```

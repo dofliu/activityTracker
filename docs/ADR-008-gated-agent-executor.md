@@ -132,3 +132,48 @@ repo 檔案**的 template `agent_apply_plan`，安全契約在 D1–D6 之上再
 
 沒有任何自動 pull／push／commit；L1／L2 仍不可排程。
 
+
+## Addendum D（2026-09-16）：六層開關收成三層（TODO D6）
+
+### 問題
+
+安全模型原本靠六層預設關閉的巢狀旗標：`executor.enabled` → `l2.enabled` →
+`l2.allow_write` → `scheduled_tasks.enabled` → `telegram_approvals.enabled` →
+`telegram_approvals.allow_remote_arm`。層數看起來像縱深防禦，但其中兩層擋的
+**不是真正的門**，只是讓設定面變大、讓人更不容易看懂哪一個才是重要的那一個。
+
+### 決定
+
+保留三層真正的分級——`executor.enabled`（L0/L1 白名單動作）→ `l2.enabled`
+（調度本機 agent CLI，需一次性確認碼）→ `l2.allow_write`（依已批准計畫改檔）。
+另外兩層併入它們真正的上層開關：
+
+| 併入的旗標 | 併入哪裡 | 為什麼這層擋不住任何東西 |
+| :--- | :--- | :--- |
+| `executor.scheduled_tasks.enabled` | `executor.enabled` | 可排程的只有 server 註冊的 **L0 唯讀** template（L1／L2 永不可排程，由 `test_config_surface.py::test_only_read_only_templates_are_schedulable` 把關），而且**任務要先被建立**——建立／修改／刪除／立即執行一律需要 execution token。「會不會有東西自己跑」早就由「你有沒有親手建過任務」決定。 |
+| `executor.telegram_approvals.allow_remote_arm` | `executor.telegram_approvals.enabled` | `/arm` 要的是**儀表板簽發的一次性 6 碼**（簽發需 execution token、只存雜湊、5 分鐘失效、用過即銷毀）。沒有那個碼，開著也解不開；拿得到那個碼，代表人已經在儀表板按過按鈕。這個開關真正的意義是「這支手機能不能批准」——那就是批准通道本身的開關。 |
+
+`telegram_approvals.enabled` 本身保留：它是**通道**開關（要不要讓手機有批准能力），
+不是執行器的第四層安全分級。
+
+### 不變的事
+
+- L1／L2 永不可排程；排程任務每次執行仍寫 audit receipt（`approved_via=schedule`）。
+- L2 仍需獨立開關 ＋ 逐項批准 ＋ 一次性確認碼 ＋ 冷卻；寫入型仍需第三開關與乾淨 worktree。
+- 所有能力預設關閉：`executor.enabled` 與 `telegram_approvals.enabled` 預設都是 false。
+- 沒有任何自動 pull／push／commit。
+
+### 升級相容（不靜默放寬既有選擇）
+
+兩個被併掉的鍵**仍然有效**：既有設定檔明確寫成 `false` 的照樣關著
+（`core/scheduled_tasks.py::LEGACY_ENABLED_KEY`、
+`notifiers/telegram_chat.py::LEGACY_REMOTE_ARM_KEY`）。曾經啟用排程、建過任務、
+後來關掉的人，休眠中的任務不會因為升級就自己醒過來。要改吃新語意就把那一行從
+設定檔刪掉；儀表板「01 今天」在偵測到這個已淘汰的鍵時會直接說出來。
+
+### 同時處理的設定面
+
+`config.example.yaml` 不再列出秘書引擎的 22 個評分權重（`*_boost`／`*_min_days`／
+視窗長度／各種上限）、視窗標題忽略清單與介面辨識規則——那些是程式常數（值不變，
+由 `test_config_surface.py::test_engine_defaults_did_not_move` 鎖住），仍可在設定檔
+覆寫同名鍵，只是不再要求每個使用者讀過它們才能開始用。

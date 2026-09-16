@@ -72,3 +72,5 @@ ADR-013 的 `/arm <execution token>` 依賴「收到就刪訊息」來降低風�
 - LINE 使用者需注意免費方案的每月推播則數；本專案預設一天只推晨報與晚報。
 - 行為變更（需在 release notes 標明）：`/arm <execution token>` 不再被接受，改用 `/arm <6 位數碼>`。
 - 契約由 `tests/test_notification_channels.py`（29 項）與 `tests/test_telegram_chat.py`（29 項，含改寫後的 arm code 契約）守門：渲染分離與 escape、組裝的降級行為、adapter 能力宣告與分段／額度錯誤、扇出隔離、LINE 設定的失敗分類與 fail-closed、token 不進 URL／receipt、arm code 的單次性／過期／猜錯即焚／不回顯。
+
+> **2026-09-16 更新**：`allow_remote_arm` 這一層已併入 `telegram_approvals.enabled`（碼本來就只有儀表板簽得出來）；其餘邊界不變，理由與升級相容見 [ADR-008 Addendum D](ADR-008-gated-agent-executor.md)。

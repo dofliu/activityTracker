@@ -7,7 +7,7 @@ status: active_hardening
 release_ready: false
 last_updated: "2026-09-16"
 current_phase: "P0-P8 與 ADR-008 全階段已落地；秘書側 ADR-012~022 十一項功能（記憶區、Telegram 對話、多通道推播、行事曆、驗收中心、模式感知提案、宣告式個人檔案、秘書桌面、每週回顧、文件落後偵測、會議秘書第一層）皆已實作且危險能力預設關閉。2026-09-13 完成一輪文件整理（README／README_en 依實際程式重寫、USAGE 重組並加目錄、ROADMAP 成果紀錄合併為單一依日期清單、本檔的 known_blockers 由歷史紀錄改回真正的阻擋項）。2026-09-16 完成專案檢視（docs/REVIEW-2026-09-16-project-assessment.md）：乾淨容器 pytest 625 passed + 1 skipped、venv 797 MB；確認兩套 LLM client、兩套向量記憶、四份活躍聚合等重複，登記 TODO B5–B9 與 D1–D12；同日完成 R0 全部（B5–B9：死碼與未用依賴移除、marked 本機化、CLI 與 API 同一組狀態數字；D1：知識庫依賴改為 [rag] 選用 extra，核心安裝 721 MB → 176 MB），pytest 638+1（無 extra 626+12）、verify 輸出與基底相同；再完成 R1 的 D2（兩套 LLM client 合為 core/llm_client.py）、D3（活動來源、專案歸戶與日界收進 core/activity_sources.py）與 D4（server.py 1995→134 行，依領域切成 9 個 router，133 條路由由快照測試鎖住），pytest 662+1（無 extra 650+12）。目前階段：等待使用者側 live 收據；功能候選 C5/C6/C3 暫停，改依 ROADMAP §13 做減法與合併。"
-next_milestone: "取得 TODO A1 全天 coverage ledger 實機收據後重評 release_ready；其餘 A 段收據以驗收中心（06 系統設定 → 驗收中心 或 python main.py verify）為準。A22（會議秘書）是目前最容易補齊的一項。功能候選暫停；程式面 R0 與 R1 的 D2／D3／D4／D5 已完成；下一步是 D6（六層旗標收三層、約 25 個秘書評分權重移回程式常數）。"
+next_milestone: "取得 TODO A1 全天 coverage ledger 實機收據後重評 release_ready；其餘 A 段收據以驗收中心（06 系統設定 → 驗收中心 或 python main.py verify）為準。A22（會議秘書）是目前最容易補齊的一項。功能候選暫停；程式面 R0 與 R1（D2–D6）已完成；下一步是 R2（D7 兩套向量記憶二選一起，每項先寫 ADR）。"
 planned_features:
   - id: FEATURE-001
     name: "每日主要介面使用時間與里程碑教練"

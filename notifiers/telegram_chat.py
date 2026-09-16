@@ -57,11 +57,27 @@ def telegram_chat_enabled(cfg: Any | None = None) -> bool:
     )
 
 
+LEGACY_REMOTE_ARM_KEY = "proactive_secretary.executor.telegram_approvals.allow_remote_arm"
+
+
 def remote_arm_enabled(cfg: Any | None = None) -> bool:
+    """`/arm` 跟著 Telegram 批准通道的開關（TODO D6；ADR-008 Addendum 2026-09-16）。
+
+    D6 之前這是批准通道之外的第二個開關。拿掉的理由同樣是它擋的不是真正的門：
+    `/arm` 要的是**儀表板簽發的一次性 6 碼**（簽發需 execution token、只存雜湊、
+    5 分鐘失效、用過即銷毀）。沒有那個碼，開著也解不開；拿得到那個碼，代表人已經
+    在儀表板按過按鈕。這個開關真正的意義是「這支手機能不能批准」——那就是批准
+    通道本身的開關，不需要第二個。
+
+    ``LEGACY_REMOTE_ARM_KEY`` 仍然有效：既有設定檔明確寫成 ``false`` 的照樣拒絕。
+    """
+    from notifiers.telegram_approvals import telegram_approvals_enabled
+
     cfg = cfg or get_config()
-    return bool(
-        cfg.get("proactive_secretary.executor.telegram_approvals.allow_remote_arm", False)
-    )
+    if not telegram_approvals_enabled(cfg):
+        return False
+    legacy = cfg.get(LEGACY_REMOTE_ARM_KEY, None)
+    return True if legacy is None else bool(legacy)
 
 
 def telegram_updates_poller_enabled(cfg: Any | None = None) -> bool:
@@ -283,7 +299,8 @@ def _handle_arm(
             token,
             chat,
             "遠端解鎖未開放。請在儀表板「設定 → Telegram 通知 → 🔓 解鎖遠端批准」直接解鎖，"
-            "或先開啟 executor.telegram_approvals.allow_remote_arm。",
+            "或先開啟 Telegram inline 批准（設定檔若仍留著已淘汰的 "
+            "executor.telegram_approvals.allow_remote_arm: false，刪掉那一行）。",
             transport=transport,
         )
         return {"handled": "remote_arm_disabled"}

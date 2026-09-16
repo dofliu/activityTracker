@@ -24,7 +24,7 @@
 | 狀態數字 | `manager.get_status()['metrics']` 是唯一定義；`main.py status` 只呈現。要加一個數字就加在那裡，不要在 CLI 自算（B9，2026-09-16）。 |
 | 導覽 | 6 分頁，**沒有右欄**（2026-09-06 依實機回饋移除；今日統計與 Focus Now 在 05 最上方、DATA TRUST 在 06 系統健康）：01 小秘書＝兩塊一屏（左：秘書桌面，問候併入、全部提案收合在底部；右：交辦與提問，記憶區收合在裡面）／02 知識庫／03 進行中工作／04 Git 同步中心／05 摘要與統計／06 系統設定（左欄 11 區塊，末項為**驗收中心**）。桌面與 494px 皆無水平溢出（Playwright 實測）。 |
 | 外觀 | 兩個獨立軸：`data-theme`（dark/light）× `data-accent`（naruto/forest/ocean），CSS 全走 `var(--accent)`；新配色只需加一組變數區塊。偏好存 localStorage（`omni-theme`／`omni-palette`／`omni-settings-pane`）。 |
-| 危險能力 | 執行器、L2、L2 寫入、自訂排程、Telegram 對話、`allow_remote_arm`、LINE、問候卡 LLM 潤飾——**全部預設關閉**；行事曆預設開但沒設路徑就等於停用。 |
+| 危險能力 | 執行器（含只排 L0 的自訂排程）、L2、L2 寫入、Telegram 對話、Telegram inline 批准（含 `/arm`）、LINE、問候卡 LLM 潤飾——**全部預設關閉**；行事曆預設開但沒設路徑就等於停用。 |
 | **方向（2026-09-16 起）** | **減法優先**：功能候選 C5／C6／C3 暫停；**R0 全部完成**（B5–B9 ＋ D1）、**R1 的 D2／D3／D4 完成**（一個 LLM client、一份活動來源定義、`server.py` 切成 9 個 router）；接下來依 ROADMAP §13.2 的 R1（D5 桌面通知進 adapter、D6 旗標收斂）→ R2（向量記憶二選一、秘書四層化、前端模組化）進行。乾淨容器實測：核心安裝 **176 MB**（含 `[rag]` 約 720 MB；R0 前 797 MB）。 |
 
 ## 功能地圖（要改哪裡就看這張表）

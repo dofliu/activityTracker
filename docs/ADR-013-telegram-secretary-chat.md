@@ -68,3 +68,5 @@
 - 多一條會外送內容的通道，因此隱私邊界必須在 UI、config 註解與 USAGE 三處同時講清楚；`STATUS.yaml` 亦記為 known boundary。
 - `/arm` 開關開啟時，execution token 的保密性下降到「Telegram 帳號的安全性」；文件如實標示，預設不開。
 - 契約由 `tests/test_telegram_chat.py`（26 項）守門：開關分層、綁定 chat、問答流程與並發、筆記寫入、唯讀指令、arm/disarm 邊界與 token 不外洩、`ask_secretary` 的降級行為，以及「本功能不得讓主服務載入索引套件」的 ADR-009 契約。
+
+> **2026-09-16 更新**：`/arm` 已改為一次性 6 碼（ADR-014），且不再有獨立的 `allow_remote_arm` 開關——改為跟著 `telegram_approvals.enabled`，理由見 [ADR-008 Addendum D](ADR-008-gated-agent-executor.md)。

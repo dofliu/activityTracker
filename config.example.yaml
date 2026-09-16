@@ -17,10 +17,10 @@ data_lifecycle:
   auto_backup_on_start: false
   auto_backup_before_migration: true
 project_resolution:
-  # 依序放置專案根目錄；Project State 與 Context Handoff 只會在這些 roots 下尋找同名專案。
-  # 未設定時，會退回使用 watchers 的 watch_directories 與 repositories，完全不依賴開發者個人路徑。
+  # 專案根目錄；Project State 與 Context Handoff 只在這些 roots 下找同名專案。
+  # 留空則退回 watchers 的 watch_directories 與 repositories。
   search_roots: []
-  # 可選：本 OmniContext 專案根目錄，供「Agent Development」卡片定位；留空時以安裝位置自動推導。
+  # 本專案根目錄（供「Agent Development」卡片定位）；留空自動推導。
   self_project_path: ""
 watchers:
   file_watcher:
@@ -32,64 +32,40 @@ watchers:
     - .md
     - .pdf
     - .py
+    # 預設黑名單（node_modules／.git／__pycache__／site-packages／.venv／logs／*.log…）
+    # 已內建於 watchers/file_watcher.py::DEFAULT_IGNORES；這裡只列**額外**要忽略的。
     ignore_patterns:
-    - '**/node_modules/**'
-    - '**/.git/**'
-    - '**/__pycache__/**'
-    - '**/site-packages/**'
-    - '**/.venv/**'
-    - '**/.codex/**'
-    - '**/BladeDamage/**'
-    - '**/outputs/**'
-    - '**/results/**'
-    - '**/logs/**'
-    - '**/CASE-*'
-    - '*.log'
-    - '*.out'
-    - '*.csv'
-    - '*.tsv'
     - '**/.*'
   git_watcher:
     enabled: true
     repositories: []
     scan_interval_seconds: 300
-  # ADR-015 本機行事曆（唯讀）：把 Outlook／Google／Apple 匯出或同步的 .ics 檔
-  # 或含 .ics 的資料夾加進 paths；沒有路徑就等於停用。只讀時間／標題／地點／
-  # 狀態，DESCRIPTION、與會者、連結一律不落地；不連任何雲端 API、不寫回檔案。
+  # ADR-015 本機行事曆（唯讀）：把 .ics 檔或含 .ics 的資料夾加進 paths；沒有路徑＝停用。
+  # 只讀時間／標題／地點／狀態；DESCRIPTION、與會者、連結一律不落地，不連任何雲端 API。
   calendar_watcher:
     enabled: true
     paths: []
     scan_interval_seconds: 900
-    # 重複行程只展開到未來這麼多天（另含過去 7 天供回顧）
-    horizon_days: 30
-    # false → 連標題與地點都不存，只留時間（共用機器或敏感行事曆用）
-    store_titles: true
+    horizon_days: 30        # 重複行程展開到未來幾天（另含過去 7 天供回顧）
+    store_titles: true      # false → 只留時間，連標題與地點都不存
 repository_sync:
-  # 本機 Git 同步中心與 git_watcher 共用這些明示設定的 repository roots。
-  # 沒有排程自動 fetch / pull / commit / push；單一動作由 Dashboard 個別確認，
-  # 批次 pull/push 需先列出符合條件的清單並確認（每個 repo 執行前仍重檢）。
+  # 與 git_watcher 共用明示設定的 repository roots。沒有排程自動 fetch/pull/commit/push；
+  # 單一動作由 Dashboard 個別確認，批次 pull/push 需先列清單並確認（執行前仍重檢）。
   batch:
-    # 批次 push 會發佈 commit，預設關閉；單一 repo 的 Push 不受影響。
-    allow_push: false
+    allow_push: false       # 批次 push 會發佈 commit，預設關閉；單一 repo 的 Push 不受影響
     max_repositories: 50
   command_timeout_seconds: 30
-  # 讀取 branch/worktree 的單一 repo 上限與有限並行度；逾時只隔離該 repo。
   status_timeout_seconds: 5
   status_parallelism: 8
   max_repositories: 80
-  # Dashboard 只顯示依本機最近活動排序的近期 repo；不影響允許操作的全體範圍。
   dashboard_recent_limit: 10
   window_watcher:
     enabled: true
     heartbeat_minutes: 5
     interval_seconds: 5
-    # 前景 probe 連續不可用超過此秒數時，runtime 顯示 degraded；鎖定畫面也可能觸發。
+    # 前景 probe 連續不可用超過此秒數時 runtime 顯示 degraded（鎖定畫面也可能觸發）。
     probe_degraded_after_seconds: 30
     idle_threshold_seconds: 180
-    ignore_titles:
-    - Program Manager
-    - Task Switching
-    - Windows Shell Experience Host
   agent_log_watcher:
     enabled: true
     antigravity_logs_path: ~/.gemini/antigravity/brain
@@ -108,8 +84,8 @@ repository_sync:
     heartbeat_stale_minutes: 5
 usage_tracking:
   enabled: true
-  # P2.6 continuous coverage ledger：記錄視窗採集器實際被觀測運作的時間段。
-  # 當日 ledger 覆蓋率達 full_coverage_ratio 時，usage coverage 才顯示 observed。
+  # P2.6 coverage ledger：記錄視窗採集器實際被觀測運作的時間段；當日覆蓋率達
+  # full_coverage_ratio 時 usage coverage 才顯示 observed。
   coverage:
     heartbeat_interval_seconds: 300
     max_gap_seconds: 900
@@ -128,34 +104,8 @@ usage_tracking:
   - 240
   - 360
   max_interval_seconds: 3600
-  interface_rules:
-  - name: Codex
-    app_contains: [codex]
-    title_contains: [codex]
-  - name: Claude Code
-    app_contains: [claude-code, claude_code]
-    title_contains: [claude code]
-  - name: ChatGPT
-    app_contains: [chatgpt]
-    title_contains: [chatgpt, chat.openai.com]
-  - name: Claude
-    app_contains: [claude]
-    title_contains: [claude.ai, claude]
-  - name: Gemini
-    app_contains: [gemini]
-    title_contains: [gemini]
-  - name: Antigravity
-    app_contains: [antigravity]
-    title_contains: [antigravity]
-  - name: VS Code
-    app_contains: [code.exe, visual studio code]
-    title_contains: [visual studio code]
-  - name: Terminal
-    app_contains: [windowsterminal, powershell, terminal, cmd.exe]
-    title_contains: []
-  - name: Browser
-    app_contains: [chrome, msedge, firefox, brave]
-    title_contains: []
+  # 介面辨識規則（app/title 關鍵字）預設在 core/usage_analytics.py::DEFAULT_INTERFACE_RULES；
+  # 要自訂就在這裡寫一份完整的 interface_rules 清單覆蓋它。
   notifications:
     enabled: false
     tone: encouraging
@@ -176,15 +126,14 @@ synthesizer:
   periodic_checkpoint:
     enabled: true
     interval_hours: 2
-  # 兩層增量摘要：每次 checkpoint 順帶用本機模型把該時段壓成 ≤100 字微摘要
-  # （map，零 API 成本）；日報只讀微摘要＋統計（reduce），token 用量約降一個
-  # 數量級。微摘要失敗或缺漏時段自動回退原始節錄，不影響日報產生。
+  # 兩層增量摘要：checkpoint 順帶用本機模型把該時段壓成 ≤100 字微摘要（map，零 API
+  # 成本），日報只讀微摘要＋統計（reduce）。微摘要缺漏時自動回退原始節錄。
   micro_summary:
     enabled: true
     provider: ollama
     timeout_seconds: 90
   daily_from_micro: true
-  # 日報 prompt 總長硬上限（字元）；使用 Ollama 產日報時建議降至 60000
+  # 日報 prompt 總長硬上限（字元）；用 Ollama 產日報時建議降到 60000。
   max_prompt_chars: 180000
   provider: ollama
   gemini:
@@ -216,141 +165,92 @@ context_memory:
   recent_hours: 72
   session_gap_minutes: 45
   max_sessions: 8
-  # 0.50 是目前 bge-m3 + 本機語料的 Alpha 實測起點，不是通用真實性門檻。
+  # 0.50 是 bge-m3 ＋ 本機語料的實測起點，不是通用真實性門檻。
   related_threshold: 0.50
 
-# ADR-012 小秘書記憶區（「大腦」）：使用者筆記／偏好／決定＋秘書自己的觀察，
-# 是對話回答與主動提案的固定參考來源。全部本機；不存 prompt／response 原文。
+# ADR-012 小秘書記憶區：使用者筆記／偏好／決定＋秘書自己的觀察，是對話回答與
+# 主動提案的固定參考來源。全部本機；不存 prompt／response 原文。
 secretary_memory:
   enabled: true
-  # 每次對話把「今日狀態＋top 提案＋最近筆記」注入 system prompt（有字數上限、附收據）。
+  # 每次對話注入「今日狀態＋top 提案＋最近筆記」（有字數上限、附收據）。
   chat_context:
     enabled: true
     max_chars: 2500
-  # 秘書觀察（例如早晨包的「N 個 repo 需要 pull」）超過這個天數就不再注入對話；
-  # 觀察永遠可在介面一鍵刪除。
+  # 秘書觀察超過這個天數就不再注入對話；觀察永遠可一鍵刪除。
   observation_ttl_days: 14
 
-# 會議秘書第一層（ADR-022）：把會後逐字稿變成可回溯的紀錄。
-# **不錄音、不讀會議軟體視窗內容、不連 Teams／Graph API**——秘書只等你把 Teams
-# 匯出的逐字稿放進 transcript_dir。沒設路徑就是停用（不會有假警報）。
+# ADR-022 會議秘書：把會後逐字稿變成可回溯的紀錄。**不錄音、不讀會議軟體視窗、
+# 不連 Teams／Graph API**——只等你把匯出的逐字稿放進 transcript_dir；沒設路徑＝停用。
 meetings:
   transcript_dir: ""        # 例：C:/Users/you/OneDrive/Recordings；支援 .vtt/.docx/.txt/.md
-  # 摘要用的 provider。**預設 ollama＝全本機**：逐字稿裡有其他與會者的發言，
-  # 改成 gemini/anthropic/openai 等雲端 provider 就等於把他們的話送到那家供應商，
-  # 觀察卡與設定頁都會明白寫出來。prompt 與回應原文一律不落地（ADR-012 邊界）。
+  # **預設 ollama＝全本機**：逐字稿裡有其他與會者的發言，改成雲端 provider 就等於
+  # 把他們的話送到那家供應商（觀察卡與設定頁會明白寫出來）。原文一律不落地。
   provider: ollama
   timeout_seconds: 120
 
+# 小秘書：只產生唯讀提案，不保存、不執行。
+# 引擎參數（活躍天數門檻、加權、視窗長度、提案數上限…）是**程式常數**，2026-09-16
+# 起不再列在這裡——預設值見 core/{proactive_secretary,activity_patterns,docs_freshness,
+# weekly_review,activity_digest,secretary_profile}.py 的 DEFAULT_*。真要改仍可在此
+# 覆寫同名鍵，但那是調參，不是設定。
 proactive_secretary:
-  max_per_project: 2
-  unfinished_recent_min_idle_hours: 12
-  # 僅產生 read-only proposals；不保存、不執行。
   enabled: true
-  max_proposals: 6
-  stalled_open_loop_hours: 48
-  # 超過這個天數沒有更新的 PR／issue 不納入提案（ADR-007 Addendum 2026-09-08）：幾週沒動值得
-  # 提醒，幾個月沒動代表世界已經往前走。被排除的數量與對象如實寫在 proposals 的
-  # inputs.github_stale_excluded；0 = 不過濾。
-  github_stale_after_days: 60
-  # 01 首頁「小秘書的話」問候卡：今天／近兩小時做了什麼（只數採集器看到的活動）
-  # ＋一句規則挑選的鼓勵語（以日期為種子，同一天同一句）。display_name 是卡片
-  # 稱呼（如 Dof）；llm.enabled 開啟時用 llm_advisor 的 provider 潤飾語氣，
-  # 輸出裡出現統計以外的數字會整段丟掉、退回規則版（不得新增事實）。
-  # 每日工作誌（ADR-012 Addendum A）：把當天的活動與已保存的時段微摘要 reduce 成
-  # 一則記憶區觀察，讓小秘書真的記得你每天做了什麼。唯讀、不呼叫 LLM、不新增
-  # 任何資料類別（微摘要本來就存著）；寫出的觀察可一鍵刪除，也會隨 TTL 過期。
+  # 每日工作誌（ADR-012 Addendum A）：把當天活動與時段微摘要 reduce 成一則記憶區
+  # 觀察。唯讀、不呼叫 LLM、不新增資料類別；寫出的觀察可刪、會隨 TTL 過期。
   daily_digest:
     enabled: true
-    max_projects: 5      # 最多為幾個專案各留一則專案層觀察
-    max_highlights: 4    # 當日重點最多引用幾則時段微摘要
-  # 模式感知提案（ADR-017）：秘書用（專案 × 日）的活動計數注意到你的習慣——
-  # 近一週在工作卻沒有每日排程、前一週活躍這週歸零的專案、主線專案的既有提案
-  # 加權排前面。只算已結束的日子、不讀 prompt 內容、不推測意圖；對應的動作全部
-  # 是既有 template，執行仍需批准。
+  # 模式感知提案（ADR-017）：用（專案 × 日）的活動計數注意到習慣（沒有每日排程、
+  # 上週活躍這週歸零…）。只算已結束的日子、不讀 prompt 內容、不推測意圖。
   patterns:
     enabled: true
-    lookback_days: 7             # 「近一週」的長度；前一週用同樣長度往前推
-    routine_min_active_days: 4   # 近一週至少幾天在工作，才提「沒有每日排程」
-    neglect_min_prev_days: 3     # 前一週至少活躍幾天，近一週 0 天才提「被冷落」
-    habit_min_days: 3            # 近一週活躍幾天以上算主線，其既有提案加權
-    habit_boost: 0.15            # 加多少分（0 = 關閉加權）
-  # ADR-018 宣告式個人檔案：偏好筆記裡的「優先：X、Y」與「語氣：簡潔｜直接｜溫暖」
-  profile:
-    priority_boost: 0.2          # 「優先：」宣告的專案，其提案加分（刻意大於 patterns.habit_boost；0 = 關閉）
-  # 每週回顧（ADR-020）：說的 vs 做的。上一個完整週（週一～週日）各專案活躍幾天，對照你
-  # 宣告的本期優先；寫成一則回顧觀察（同一週只寫一次、可刪、會過期），不一致就多一張
-  # priority_drift 提案。只用（專案 × 日）計數、不讀 prompt、不呼叫 LLM、不推測原因。
-  # 文件落後程式（ADR-021）：文件檔最後異動後又累積了幾個 commit。超過門檻就提一張
-  # docs_behind_code，動作是既有的兩段式 L2（起草文件更新計畫 → 你讀過批准 → 實際改檔、
-  # 不 commit）。只比時間與數量、不判斷文件內容；沒有文件異動紀錄的專案一律不提。
+  # 文件落後程式（ADR-021）：文件檔最後異動後又累積了幾個 commit。只比時間與數量、
+  # 不判斷文件內容；沒有文件異動紀錄的專案一律不提。
   docs_freshness:
     enabled: true
-    min_commits: 8       # 文件最後更新後累積幾個 commit 才提
-    min_days: 2          # 且文件至少幾天沒動（避免剛改完就提）
-    lookback_days: 60    # 只看近幾天的事件（界定查詢範圍）
+  # 每週回顧（ADR-020）：說的 vs 做的。上一個完整週各專案活躍幾天，對照宣告的優先。
   weekly_review:
     enabled: true
-    drift_max_days: 1            # 宣告優先的專案上週活躍 ≤ 幾天算「說了沒做」
-    drift_min_other_days: 3      # 且同週有別的專案 ≥ 幾天才算「時間去了別處」（整週安靜不算偏移）
+  # 01 首頁「小秘書的話」問候卡：今天／近兩小時做了什麼（只數採集器看到的活動）
+  # ＋一句規則挑選的鼓勵語。llm.enabled 開啟時用 llm_advisor 的 provider 潤飾語氣，
+  # 輸出裡出現統計以外的數字會整段丟掉、退回規則版（不得新增事實）。
   greeting:
     display_name: ''
-    # 晨報（Telegram／LINE）開頭也帶這段話；07:30 多半還沒有今日活動，會改說昨天
-    in_morning_briefing: true
+    in_morning_briefing: true   # 晨報（Telegram／LINE／桌面）開頭也帶這段話
     llm:
       enabled: false
-      timeout_seconds: 20
-      cache_minutes: 30
-  # P5-R1 LLM advisory（預設關閉）：只能為既有建議附加唯讀註解與排序提示，
-  # 不能新增/刪除/執行任何項目；失敗自動回退純規則結果。
-  # provider 選 ollama 為全本機；選 gemini/anthropic/openai 代表同意將建議的
-  # 非敏感欄位送往該供應商（模型沿用 synthesizer.<provider>.model 設定）。
+  # P5-R1 LLM advisory（預設關閉）：只能為既有建議附加唯讀註解與排序提示，不能
+  # 新增/刪除/執行任何項目；失敗自動回退純規則結果。provider 選 ollama 為全本機；
+  # 選雲端供應商代表同意將建議的非敏感欄位送往該供應商。
   llm_advisor:
     enabled: false
     provider: ollama
-    timeout_seconds: 20
-    cache_minutes: 10
-  # P5-R2 gated executor（預設關閉；ADR-008）：啟用後可在您逐項批准下
-  # 代辦白名單動作（產 Handoff、repo fetch、open loop 標記 stale）。
-  # 只接受 proposal_id，動作由 server 白名單 template 決定；每次批准需
-  # execution token（init 產生，--show-token 顯示），每次執行留 audit receipt。
+  # P5-R2 gated executor（預設關閉；ADR-008）：啟用後可在您逐項批准下代辦白名單
+  # 動作（產 Handoff、repo fetch、open loop 標 stale）。只接受 proposal_id，動作由
+  # server 白名單 template 決定；每次批准需 execution token，每次執行留 audit receipt。
+  # 2026-09-16（ADR-008 Addendum D6）起，自訂排程任務（只能排 L0 唯讀 template）
+  # 跟著這個總開關——任務本來就要您親手建立，建立本身就需要 execution token。
   executor:
     enabled: false
-    # P5-R3 L2 dispatcher（獨立開關，預設關閉）：批准後另需回填 server
-    # 產生的一次性 6 碼確認碼；同一 template 有冷卻時間。啟用後秘書可
-    # 調度本機 agent CLI（argv 白名單、禁 shell、cwd 限已探索 repo、
-    # 環境變數 allowlist 重建——不轉發任何 API key）為停滯事項起草計畫。
-    # 注意：CLI 會消耗您本機 Claude Code / Codex 的訂閱或 API 額度。
+    # P5-R3 L2 dispatcher（獨立開關，預設關閉）：批准後另需回填 server 產生的一次性
+    # 6 碼確認碼；同一 template 有冷卻時間。啟用後秘書可調度本機 agent CLI（argv
+    # 白名單、禁 shell、cwd 限已探索 repo、環境變數 allowlist 重建——不轉發任何 API
+    # key）。注意：CLI 會消耗您本機 Claude Code / Codex 的訂閱或 API 額度。
     l2:
       enabled: false
       confirm_ttl_seconds: 300
       cooldown_seconds: 600
-      # 第三開關（ADR-008 Addendum）：允許 agent 依「已批准的 draft 計畫」
-      # 實際修改該專案 repo 內檔案（agent_apply_plan）。dispatch 前 worktree
-      # 必須乾淨；agent 永不 commit/push——改動留在 worktree 供您 git diff
-      # 檢視，git checkout . 可整批還原。
+      # 第三開關（ADR-008 Addendum）：允許 agent 依「已批准的 draft 計畫」實際修改該
+      # 專案 repo 內檔案。dispatch 前 worktree 必須乾淨；agent 永不 commit/push——
+      # 改動留在 worktree 供您 git diff 檢視，git checkout . 可整批還原。
       allow_write: false
-    # P5-R5 自訂排程任務（預設關閉）：只能排程 server 註冊的 L0 唯讀
-    # template（產 Handoff、週報／月報 rollup、STATUS 維護草稿）；L1/L2
-    # 永不可排程。每次執行寫 audit receipt（approved_via=schedule）；
-    # 任務的新增／修改／刪除／立即執行需 execution token。
-    scheduled_tasks:
-      enabled: false
-      max_tasks: 20
-    # P5-R4b Telegram inline 批准（預設關閉）：晨報／晚間交接附上建議的
-    # 「✅ 批准」按鈕，在外一鍵批准 L0/L1 白名單動作（L2 一律回儀表板走
-    # 一次性確認碼）。批准通道需先在儀表板以 execution token 解鎖（arm），
-    # armed 狀態只存記憶體、有 TTL、服務重啟即失效；只處理綁定 chat id
-    # 的回呼，全部走 getUpdates 長輪詢（outbound only，不開任何 port）。
+    # P5-R4b Telegram inline 批准（預設關閉）：晨報／晚間交接附「✅ 批准」按鈕，在外
+    # 一鍵批准 L0/L1（L2 一律回儀表板走確認碼）。通道需先在儀表板以 execution token
+    # 解鎖（arm），armed 只存記憶體、有 TTL、重啟即失效；只處理綁定 chat id 的回呼。
+    # 手機端 `/arm <6 位數碼>` 跟著這個開關（碼由儀表板簽發、5 分鐘失效、用過即銷毀）。
     telegram_approvals:
       enabled: false
       arm_ttl_hours: 24
       max_actions_per_push: 4
-      # ADR-013／014：允許在 Telegram 用 `/arm <6 位數碼>` 從手機解鎖批准通道。
-      # 碼由儀表板「🔑 產生解鎖碼」簽發（需 execution token），只存雜湊在
-      # 記憶體、arm_code_ttl_seconds 後失效、用過即銷毀——手機因此永遠不需要
-      # 持有長期的 execution token。預設關閉；`/disarm`（上鎖）不受此開關限制。
-      allow_remote_arm: false
       arm_code_ttl_seconds: 300
     agent_cli:
       binary: claude          # 或 codex
@@ -370,10 +270,9 @@ notifiers:
     stagnation_days: 5
     launch_url: http://127.0.0.1:8765
   telegram:
-    # 建議直接在儀表板「設定 → Telegram 通知」完成設定：貼 bot token
-    # → 偵測 chat id → 即時連線測試（getMe＋實發測試訊息）→ 通過才寫入此檔。
-    # 環境變數（bot_token_env / chat_id_env）優先於此處的值，且不會被複製進檔案；
-    # Web API 讀取設定時 bot_token / chat_id 一律遮蔽為 ***REDACTED***。
+    # 建議在儀表板「設定 → Telegram 通知」完成設定：貼 bot token → 偵測 chat id →
+    # 即時連線測試（getMe＋實發測試訊息）→ 通過才寫入此檔。環境變數優先於此處的值
+    # 且不會被複製進檔案；Web API 讀取設定時 bot_token / chat_id 一律遮蔽。
     enabled: false
     bot_token_env: TELEGRAM_BOT_TOKEN
     chat_id_env: TELEGRAM_CHAT_ID
@@ -381,22 +280,19 @@ notifiers:
     chat_id: ''
     morning_briefing_time: 09:00
     evening_summary_time: '23:30'
-    # ADR-013 小秘書對話（預設關閉）：開啟後在綁定 chat 直接打字就是提問，
-    # 走與儀表板交辦框同一條管線（記憶區脈絡＋知識庫檢索＋所選 LLM）；
-    # 「記下來：…／偏好：…／決定：…」直接寫記憶區不送 LLM。
-    # 注意：這是唯一會把「你的提問與秘書的回答」送出本機的通道——內容會
-    # 經過 Telegram 伺服器（引用只送檔名，不送文件內容切片）；provider 選
-    # 雲端供應商時內容另會送往該供應商。全本機請留 provider: ollama。
+    # ADR-013 小秘書對話（預設關閉）：在綁定 chat 直接打字就是提問，走與儀表板交辦框
+    # 同一條管線；「記下來：…／偏好：…／決定：…」直接寫記憶區不送 LLM。
+    # 注意：這是唯一會把「你的提問與秘書的回答」送出本機的通道——內容會經過 Telegram
+    # 伺服器（引用只送檔名）；provider 選雲端供應商時內容另會送往該供應商。
     chat:
       enabled: false
       provider: ''        # 空＝沿用 rag.active_provider
       model: ''           # 空＝沿用該 provider 的預設模型
       enable_rag: true
       max_question_chars: 1000
-  # ADR-014 LINE 推播（預設關閉）。**只能推播**：LINE Messaging API 沒有輪詢
-  # 介面，要接收訊息必須由 LINE 平台 webhook POST 到公開 HTTPS 網址，那會
-  # 打破本專案的 loopback-only 邊界（ADR-001）——因此提問與批准仍走 Telegram。
-  # 另注意：LINE 官方帳號免費方案有每月推播則數上限（依地區方案不同）。
+  # ADR-014 LINE 推播（預設關閉）。**只能推播**：要接收訊息必須由 LINE 平台 webhook
+  # POST 到公開 HTTPS 網址，那會打破 loopback-only 邊界（ADR-001）——因此提問與批准
+  # 仍走 Telegram。LINE 官方帳號免費方案有每月推播則數上限。
   # to 要填 userId（U 開頭長字串），不是 LINE ID（@xxxx）；取得方式見 USAGE。
   line:
     enabled: false
@@ -408,7 +304,6 @@ exporters:
   daily_brief:
     enabled: true
     output_dir: ~/OmniContext
-    inject_into: ''
     inject_into: ''
   reports_dir: reports
   checkpoints_dir: logs/checkpoints

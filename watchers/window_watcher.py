@@ -14,6 +14,14 @@ from core.time_utils import get_local_now
 
 logger = logging.getLogger("OmniContext.WindowWatcher")
 
+# Windows 殼層自己的視窗，不是任何人的工作；預設就過濾（TODO D6：從設定檔搬回程式常數）。
+# 設定 `watchers.window_watcher.ignore_titles` 會整份取代這裡的預設。
+DEFAULT_IGNORE_TITLES = (
+    "Program Manager",
+    "Task Switching",
+    "Windows Shell Experience Host",
+)
+
 
 def get_active_window_info() -> Tuple[Optional[str], Optional[str]]:
     """取得當前 Windows 前景作用中視窗的 (應用程式名稱, 視窗標題)，若無有效視窗回傳 (None, None)"""
@@ -227,7 +235,8 @@ class WindowWatcherService:
 
     def _monitor_loop(self):
         interval = self.cfg.get("watchers.window_watcher.interval_seconds", 5)
-        ignore_titles = set(self.cfg.get("watchers.window_watcher.ignore_titles", []))
+        configured_titles = self.cfg.get("watchers.window_watcher.ignore_titles", None)
+        ignore_titles = set(configured_titles if configured_titles else DEFAULT_IGNORE_TITLES)
         # 心跳週期：定期把「實際讀到什麼」寫進日誌，讓靜默失效可以直接定位是讀不到還是寫不進
         heartbeat_seconds = self.cfg.get("watchers.window_watcher.heartbeat_minutes", 5) * 60
         last_heartbeat = 0.0
