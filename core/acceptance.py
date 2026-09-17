@@ -30,16 +30,18 @@ from sqlalchemy import func
 from core.config import get_config
 from core.coverage_ledger import get_daily_coverage
 from core.database import get_db
-from core.models import (
-    AgentExecutionReceipt,
-    CalendarEvent,
-    RAGChatMessage,
-    RAGIndexedFile,
-    RAGIndexJob,
-    SecretaryNote,
-)
+from core.models import AgentExecutionReceipt, CalendarEvent, RAGChatMessage, RAGIndexJob, RAGIndexedFile, SecretaryNote
 from core.runtime_paths import resolve_runtime_path, source_checkout_root
 from core.time_utils import get_local_now
+from core.repo_sync_report import load_snapshot
+from core.activity_patterns import collect_pattern_signals, pattern_settings
+from core.secretary.memory import load_profile, priority_boost_value
+from core.secretary.present import build_home
+from core.weekly_review import collect_priority_drift_signals, review_enabled, review_period
+from core.docs_freshness import collect_docs_freshness_signals, docs_freshness_enabled
+from core.agent_executor import executor_enabled, l2_enabled, l2_write_enabled
+from core.meeting_transcripts import SOURCE_PREFIX, list_transcripts, meetings_enabled, parse_followups, provider_is_cloud, summary_provider
+from core.manager import get_manager
 
 
 ACCEPTANCE_CLAIM_BOUNDARY = (
@@ -464,7 +466,6 @@ def _check_a6(ctx: _Ctx) -> dict[str, Any]:
 
 
 def _check_a7(ctx: _Ctx) -> dict[str, Any]:
-    from core.repo_sync_report import load_snapshot
 
     snapshot = load_snapshot(ctx.cfg)
     reports = _latest_files(_reports_dir(ctx.cfg) / "repo_sync", "RepoSync_*.md")
@@ -669,7 +670,6 @@ def _check_a13(ctx: _Ctx) -> dict[str, Any]:
         }
     if ctx.runtime:
         # 只有真的設了路徑才去問採集器診斷；沒設路徑不值得為此碰 manager。
-        from core.manager import get_manager
 
         diagnostics = (
             get_manager().get_status().get("collector_diagnostics", {}).get("calendar_watcher", {})
@@ -701,7 +701,6 @@ def _check_a13(ctx: _Ctx) -> dict[str, Any]:
 def _check_a14(ctx: _Ctx) -> dict[str, Any]:
     # 判準是「按下去會不會動、理由對不對」，那要跑 git 也要人眼看，兩者都不在
     # 本模組範圍（D1）。這裡只回報同步報告快照裡有多少 repo 落後遠端當作旁證。
-    from core.repo_sync_report import load_snapshot
 
     snapshot = load_snapshot(ctx.cfg) or {}
     repositories = snapshot.get("repositories", [])
@@ -760,7 +759,6 @@ def _check_a15(ctx: _Ctx) -> dict[str, Any]:
 def _check_a16(ctx: _Ctx) -> dict[str, Any]:
     """模式提案的判準是「N 對得上你的印象、X 確實是你放下的」——那是人眼；機器只回報
     模式層現在算出什麼，讓你有東西可以對。"""
-    from core.activity_patterns import collect_pattern_signals, pattern_settings
 
     settings = pattern_settings(ctx.cfg)
     evidence: dict[str, Any] = {"enabled": settings["enabled"], "basis": "activity_patterns.collect_pattern_signals"}
@@ -794,7 +792,6 @@ def _check_a16(ctx: _Ctx) -> dict[str, Any]:
 def _check_a17(ctx: _Ctx) -> dict[str, Any]:
     """宣告式個人檔案（ADR-018）：機器只回報你現在宣告了什麼、加分值多少；「提案排序與問候
     語氣是否如你所想」是人眼。沒宣告就是 pending——這是你還沒寫，不是壞掉。"""
-    from core.secretary_profile import load_profile, priority_boost_value
 
     profile = load_profile(database=ctx.database)
     evidence: dict[str, Any] = {
@@ -829,7 +826,6 @@ def _check_a17(ctx: _Ctx) -> dict[str, Any]:
 def _check_a18(ctx: _Ctx) -> dict[str, Any]:
     """01 首頁（ADR-019）：機器只能回報桌面現在挑出什麼、哪一節壞了；「焦點與記得是不是你會挑的、
     一天離開首頁幾次有沒有變少」是人眼——次數只在你的瀏覽器裡。"""
-    from core.secretary_home import build_home
 
     home = build_home(database=ctx.database, cfg=ctx.cfg, now=ctx.now)
     focus = (home.get("focus") or {}).get("proposal") or {}
@@ -871,8 +867,6 @@ def _check_a18(ctx: _Ctx) -> dict[str, Any]:
 def _check_a19(ctx: _Ctx) -> dict[str, Any]:
     """說的 vs 做的（ADR-020）：機器只回報寫了幾週的回顧、上一個完整週的宣告與偏移現在算出什麼；
     「天數與你的印象相符、偏移提案合理」是人眼。"""
-    from core.models import SecretaryNote
-    from core.weekly_review import collect_priority_drift_signals, review_enabled, review_period
 
     if not review_enabled(ctx.cfg):
         return {"status": NOT_CONFIGURED, "detail": "每週回顧已關閉。", "evidence": {"enabled": False}}
@@ -922,12 +916,10 @@ def _check_a19(ctx: _Ctx) -> dict[str, Any]:
 def _check_a20(ctx: _Ctx) -> dict[str, Any]:
     """ADR-021：機器能回報「哪些 repo 的文件落後幾個 commit」與 L2 三道門的狀態；
     「起草的計畫值不值得批准、改出來的文件對不對」是人眼，且改動要由你 commit。"""
-    from core.docs_freshness import collect_docs_freshness_signals, docs_freshness_enabled
 
     if not docs_freshness_enabled(ctx.cfg):
         return {"status": NOT_CONFIGURED, "detail": "文件落後偵測已關閉。", "evidence": {"enabled": False}}
     signals, meta = collect_docs_freshness_signals(database=ctx.database, cfg=ctx.cfg, now=ctx.now)
-    from core.agent_executor import executor_enabled, l2_enabled, l2_write_enabled
 
     executor = executor_enabled(ctx.cfg)
     l2 = l2_enabled(ctx.cfg)
@@ -1084,14 +1076,6 @@ def _check_a21(ctx: _Ctx) -> dict[str, Any]:
 def _check_a22(ctx: _Ctx) -> dict[str, Any]:
     """ADR-022 第一層：機器能回報「資料夾設了嗎、整理過幾份、還有幾條候選待辦沒處理」；
     「摘要有沒有編造、配對對不對」是人眼。"""
-    from core.meeting_transcripts import (
-        SOURCE_PREFIX,
-        list_transcripts,
-        meetings_enabled,
-        parse_followups,
-        provider_is_cloud,
-        summary_provider,
-    )
 
     if not meetings_enabled(ctx.cfg):
         return {

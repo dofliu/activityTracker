@@ -6,29 +6,22 @@ ADR-007／008／012～022 的對外端點。危險能力（執行器、排程）
 路徑與 handler 名稱與切分前完全相同，由 `tests/test_api_route_snapshot.py` 鎖住。
 """
 
-from core.agent_executor import ExecutionRejected
-from core.agent_executor import attach_execution_actions
-from core.agent_executor import cancel_execution
-from core.agent_executor import execute_proposal
-from core.agent_executor import list_execution_receipts
+from core.agent_executor import ExecutionRejected, attach_execution_actions, cancel_execution, execute_proposal, list_execution_receipts
 from core.api.deps import _require_execution_token
 from core.config import get_config
-from core.proactive_secretary import build_action_proposals
-from core.proactive_secretary import snooze_proposal
-from core.scheduled_tasks import create_scheduled_task
-from core.scheduled_tasks import delete_scheduled_task
-from core.scheduled_tasks import list_scheduled_tasks
-from core.scheduled_tasks import run_scheduled_task_now
-from core.scheduled_tasks import update_scheduled_task
+from core.secretary.aggregate import annotate_action_proposals, build_action_proposals, snooze_proposal
+from core.scheduled_tasks import create_scheduled_task, delete_scheduled_task, list_scheduled_tasks, run_scheduled_task_now, update_scheduled_task
 from core.schemas import ExecuteProposalRequest, MeetingFollowupRequest, MemoryNoteRequest, ScheduledTaskCreateRequest, ScheduledTaskUpdateRequest, SnoozeProposalRequest
-from core.secretary_advisor import annotate_action_proposals
 from datetime import datetime
-from fastapi import APIRouter
-from fastapi import HTTPException
-from fastapi import Query
-from fastapi import Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from typing import Optional
+from core.secretary.greeting import GreetingRejected, build_greeting
+from core.calendar_agenda import day_agenda
+from core.scheduled_tasks import ensure_default_schedules
+from core.secretary.present import build_today_view, full_memory_context
+from core.secretary.memory import MemoryRejected, USER_KINDS, add_note, clear_notes, delete_note, list_notes, load_profile
+from core.secretary.present import build_home
 
 
 router = APIRouter()
@@ -112,7 +105,6 @@ def cancel_secretary_execution(receipt_id: int, request: Request):
 @router.get("/api/v1/secretary/greeting")
 def get_secretary_greeting(window: str = Query("today")):
     """小秘書問候卡：今天／近兩小時做了什麼＋一句鼓勵。只讀本機統計，數字皆可回溯。"""
-    from core.secretary_greeting import GreetingRejected, build_greeting
 
     try:
         return build_greeting(window=window)
@@ -123,7 +115,6 @@ def get_secretary_greeting(window: str = Query("today")):
 @router.get("/api/v1/calendar/agenda")
 def get_calendar_agenda(date: Optional[str] = Query(None, max_length=10)):
     """ADR-015：某一天（預設今天）的本機行事曆行程，唯讀；每個回應都帶 claim boundary。"""
-    from core.calendar_agenda import day_agenda
 
     target = None
     if date:
@@ -137,7 +128,6 @@ def get_calendar_agenda(date: Optional[str] = Query(None, max_length=10)):
 @router.get("/api/v1/secretary/today")
 def get_secretary_today():
     """「01 今天」的唯讀彙整：上次做到哪、最近一次早晨包收據、預設排程狀態。"""
-    from core.secretary_packs import build_today_view
 
     return build_today_view()
 
@@ -149,7 +139,6 @@ def get_secretary_memory(
     limit: int = Query(50, ge=1, le=500),
 ):
     """記憶區筆記清單與各類計數；唯讀。observation 一律標記可刪除。"""
-    from core.secretary_memory import MemoryRejected, list_notes
 
     try:
         return list_notes(kind=kind, project_key=project_key, limit=limit)
@@ -164,7 +153,6 @@ def add_secretary_memory(payload: MemoryNoteRequest):
     這不是 L1 動作（沒有外部效果），因此沿用 loopback 邊界即可、不需 execution token。
     kind 只接受 user_note / preference / decision；observation 由秘書自己的 L0 收據產生。
     """
-    from core.secretary_memory import USER_KINDS, MemoryRejected, add_note
 
     if payload.kind not in USER_KINDS:
         raise HTTPException(status_code=422, detail="kind_not_user_writable")
@@ -184,7 +172,6 @@ def add_secretary_memory(payload: MemoryNoteRequest):
 @router.delete("/api/v1/secretary/memory/{note_id}")
 def delete_secretary_memory(note_id: int):
     """一鍵刪除單筆（含秘書觀察）。"""
-    from core.secretary_memory import delete_note
 
     result = delete_note(note_id)
     if not result.get("deleted"):
@@ -195,7 +182,6 @@ def delete_secretary_memory(note_id: int):
 @router.delete("/api/v1/secretary/memory")
 def clear_secretary_memory(kind: str = Query("observation")):
     """整類清除；預設只清秘書自己的觀察，使用者筆記需明確指定 kind。"""
-    from core.secretary_memory import MemoryRejected, clear_notes
 
     try:
         return clear_notes(kind=kind)
@@ -206,9 +192,8 @@ def clear_secretary_memory(kind: str = Query("observation")):
 @router.get("/api/v1/secretary/memory/context")
 def get_secretary_memory_context():
     """秘書「當下記得什麼」：與注入對話 system prompt 完全相同的文字與收據；唯讀。"""
-    from core.secretary_memory import memory_context
 
-    return memory_context()
+    return full_memory_context()
 
 
 @router.post("/api/v1/secretary/meetings/followups")
@@ -260,7 +245,6 @@ def get_secretary_profile():
     沒有寫入端點——要改就在對話框或 Telegram 打「偏好：優先：…」「偏好：語氣：…」，
     或刪掉那則偏好筆記；個人檔案永遠只是偏好筆記的一種讀法，不是第二套資料。
     """
-    from core.secretary_profile import load_profile
 
     return load_profile()
 
@@ -271,7 +255,6 @@ def get_secretary_home():
 
     只重新排列既有唯讀資料，規則確定性、不呼叫 LLM、不寫任何東西；每一節各自隔離失敗。
     """
-    from core.secretary_home import build_home
 
     return build_home()
 
@@ -280,7 +263,6 @@ def get_secretary_home():
 def create_secretary_schedule_presets(request: Request):
     """一鍵建立預設每日排程（早晨包 07:30、晚間 Handoff 21:30）；已存在者跳過。"""
     _require_execution_token(request)
-    from core.secretary_packs import ensure_default_schedules
 
     try:
         return ensure_default_schedules()

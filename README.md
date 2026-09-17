@@ -26,7 +26,7 @@
 | 面向 | 現況 |
 | :--- | :--- |
 | 程式 | P0–P8 與 ADR-008 執行器全階段已落地；22 份 ADR 記錄每個決策的邊界 |
-| 測試 | **68 個 contract test 模組、695 項**（694 passed + 1 skipped；不裝 `[rag]` extra 時 681 passed + 12 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
+| 測試 | **71 個 contract test 模組、776 項**（775 passed + 1 skipped；不裝 `[rag]` extra 時 762 passed + 13 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
 | 資料 | SQLite schema migration **18/18**（append-only + checksum，升級前自動備份） |
 | 發佈 | `release_ready: false` |
 
@@ -319,10 +319,9 @@ activityTracker/
 │   ├── project_engine.py / project_paths.py      # 專案歸戶與根目錄定位
 │   ├── semantic_index.py / context_memory.py     # 本機 embeddings 與 Related History
 │   ├── handoff_engine.py       # Provider-neutral Context Handoff
-│   ├── proactive_secretary.py / secretary_advisor.py   # 提案引擎與 LLM 註解層
+│   ├── secretary/             # 小秘書四層（ADR-024）：types／memory／signals／
+│   │                          #   aggregate／packs／greeting／present
 │   ├── agent_executor.py / agent_dispatch.py / scheduled_tasks.py  # L0/L1/L2 與排程
-│   ├── secretary_memory.py / secretary_profile.py      # 記憶區與宣告式個人檔案
-│   ├── secretary_home.py / secretary_greeting.py / secretary_packs.py  # 桌面／問候／每日包
 │   ├── activity_digest.py / activity_patterns.py / weekly_review.py    # 工作誌／模式／週回顧
 │   ├── meeting_transcripts.py  # 會議秘書（WebVTT、配對、事實閘、候選待辦）
 │   ├── docs_freshness.py       # 文件落後程式偵測
@@ -330,7 +329,7 @@ activityTracker/
 │   ├── repo_sync.py / repo_onboarding.py / repo_sync_report.py  # Git 同步中心
 │   ├── acceptance.py           # 驗收中心（TODO A 段的可執行副本）
 │   ├── usage_analytics.py / capture_coverage.py / coverage_ledger.py
-│   ├── background_tasks.py / triage_signals.py / status_draft.py
+│   ├── background_tasks.py / status_draft.py
 │   └── platform_services.py / runtime_paths.py / fs_utils.py / time_utils.py
 │
 ├── rag/                        # 📚 DeskRAG 子系統
@@ -343,7 +342,11 @@ activityTracker/
 │
 ├── watchers/                   # 多源採集器
 │   ├── file_watcher.py git_watcher.py window_watcher.py
-│   ├── agent_log_watcher.py    # Claude Code/Desktop、Codex、Antigravity
+│   ├── agent_log_watcher.py    # 採集服務：執行緒、checkpoint、寫入、漂移警示
+│   ├── transcripts/            # 一個平台一個 parser（ADR-025）
+│   │   ├── base.py             # 共同介面：TranscriptTurn ＋ discover/parse
+│   │   ├── claude_code.py claude_desktop.py codex.py antigravity.py
+│   │   └── drift.py            # 「檔案在動、事件是零」的漂移判定
 │   ├── calendar_watcher.py     # 本機 .ics
 │   └── browser_extension/      # Chrome MV3 擴充套件
 │
@@ -360,10 +363,16 @@ activityTracker/
 ├── exporters/daily_brief.py               # OMNICONTEXT_TODAY.md/.html
 │
 ├── web/                        # 儀表板前端（6 分頁 + extension-monitor）
-│   └── index.html / app.js / style.css
+│   ├── index.html / style.css
+│   ├── js/                     # ES module（ADR-026）：一個分頁一個檔
+│   │   ├── main.js             # 進入點：載字典 → 初始化各分頁
+│   │   ├── core/               # api（唯一碰 fetch）／i18n／state／ui／dom
+│   │   └── tabs/               # assistant memory knowledge projects repos
+│   │                           # summaries settings github status health
+│   └── i18n/zh-TW.json / en.json   # 語系字典（兩份 key 集合由測試把關）
 │
 ├── scripts/                    # 驗證、清理、autostart 與 E2E 腳本
-├── tests/                      # 68 個 contract test 模組（695 項）
+├── tests/                      # 69 個 contract test 模組（710 項）
 ├── logs/checkpoints/           # 週期性活動快照
 └── reports/                    # 每日／區間 Markdown 報告
 ```

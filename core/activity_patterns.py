@@ -38,6 +38,7 @@ from core.activity_sources import ACTIVITY_CLAIM_BOUNDARY, project_activity_matr
 from core.config import get_config
 from core.database import get_db
 from core.models import SecretaryNote, SecretaryScheduledTask
+from core.time_utils import get_local_now
 
 PATTERN_CLAIM_BOUNDARY = (
     "模式只來自（專案 × 日）的可回溯活動計數，且只算已結束的日子；不讀 prompt 內容、"
@@ -213,7 +214,6 @@ def collect_pattern_signals(
     ``exclude_projects`` 是已經有未結事項提案的專案——它們已經在清單上，
     不必再用「被冷落」重複提醒。
     """
-    from core.time_utils import get_local_now
 
     database = database or get_db()
     cfg = cfg or get_config()
@@ -318,7 +318,6 @@ def apply_habit_boost(
 
     這是排序，不是新提案：讓你目前的主線排在一個月沒碰的 repo 前面。
     """
-    from core.time_utils import get_local_now
 
     cfg = cfg or get_config()
     settings = pattern_settings(cfg)

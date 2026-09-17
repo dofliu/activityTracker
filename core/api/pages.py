@@ -33,11 +33,19 @@ def asset_version(web_dir: Path | None = None) -> str:
     """
     web_dir = web_dir or WEB_DIR
     digest = hashlib.sha1()
-    for name in ("app.js", "style.css"):
+    # D10 之後前端是一棵 ES module 樹（web/js/）＋ 兩份語系 JSON，不再是單一 app.js。
+    # 任何一個檔案改動都要換掉進入點的 ?v=，否則使用者可能拿到新舊混搭的模組。
+    sources = [web_dir / "style.css"]
+    for folder in ("js", "i18n"):
+        sources.extend(sorted((web_dir / folder).rglob("*")) if (web_dir / folder).is_dir() else [])
+    for source in sources:
+        if source.is_dir():
+            continue
         try:
-            digest.update((web_dir / name).read_bytes())
+            digest.update(source.name.encode("utf-8"))
+            digest.update(source.read_bytes())
         except OSError:
-            digest.update(name.encode("utf-8"))
+            digest.update(str(source).encode("utf-8"))
     return f"{__version__}-{digest.hexdigest()[:10]}"
 
 

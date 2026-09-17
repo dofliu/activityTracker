@@ -1,7 +1,7 @@
 import copy
 import json
 
-from core.secretary_advisor import (
+from core.secretary.aggregate import (
     annotate_action_proposals,
     reset_advisor_cache,
 )

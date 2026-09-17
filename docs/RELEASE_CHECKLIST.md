@@ -39,7 +39,8 @@ Publish 已獲使用者授權（2026-08-31）；`release_ready` 指「穩定版�
 ## Post-Deploy
 
 - [ ] 驗證 `omnicontext init`、`assets-status`、`extension-path` 與 `migration-status`。
-- [ ] 驗證 Dashboard、Extension Monitor 與 `/static/app.js` HTTP 200。
+- [ ] 驗證 Dashboard、Extension Monitor 與 `/static/js/main.js` HTTP 200。
+- [ ] 跑 `python scripts/dashboard_smoke.py`：六分頁、兩種寬度、零 console error、字典切換正常。
 - [ ] 確認 Browser event、foreground coverage 與 notification claim boundary 未被放寬。
 - [x] 更新 release notes、STATUS 與遠端 tag SHA（STATUS.yaml `first_public_release`）。
 

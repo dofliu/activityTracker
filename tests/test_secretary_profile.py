@@ -20,12 +20,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from core import secretary_profile as sp
+import core.secretary.memory as sp
 from core.models import Base, GitActivityEvent, SecretaryScheduledTask
-from core.proactive_secretary import build_action_proposals
-from core.secretary_greeting import build_greeting, compose_greeting, plain_text
-from core.secretary_memory import add_note, memory_context
-from core.secretary_profile import (
+import core.secretary.aggregate as agg  # D8：提案引擎改模組層 import
+from core.secretary.aggregate import build_action_proposals
+from core.secretary.greeting import build_greeting, compose_greeting, plain_text
+from core.secretary.memory import add_note, memory_context
+from core.secretary.memory import (
     DEFAULT_PRIORITY_BOOST,
     apply_priority_boost,
     load_profile,
@@ -223,7 +224,7 @@ def test_declared_priority_outranks_the_inferred_main_line(db, monkeypatch):
     """uav 近一週天天在動（習慣加權 +0.15）；你卻宣告 thesis 是本期優先（+0.2）→ thesis 排前面。"""
     import core.repo_sync_report as rsr
 
-    monkeypatch.setattr(rsr, "collect_repo_sync_signals", _fake_repo_signals)
+    monkeypatch.setattr(agg, "collect_repo_sync_signals", _fake_repo_signals)
     _active_on(db, "uav", [1, 2, 3, 4, 5])
     _pref(db, "優先：thesis")
     result = _proposals(db, _cfg())
@@ -241,7 +242,7 @@ def test_declared_priority_outranks_the_inferred_main_line(db, monkeypatch):
 def test_without_a_declaration_the_engine_reports_it_and_changes_nothing(db, monkeypatch):
     import core.repo_sync_report as rsr
 
-    monkeypatch.setattr(rsr, "collect_repo_sync_signals", _fake_repo_signals)
+    monkeypatch.setattr(agg, "collect_repo_sync_signals", _fake_repo_signals)
     result = _proposals(db, _cfg())
     pulls = [p for p in result["proposals"] if p["proposal_type"] == "repo_needs_pull"]
     assert all("priority_declared" not in p for p in pulls) and all(p["score"] == pytest.approx(0.55) for p in pulls)
@@ -252,7 +253,7 @@ def test_profile_failure_does_not_break_the_proposal_list(db, monkeypatch):
     def boom(**_kwargs):
         raise RuntimeError("profile exploded")
 
-    monkeypatch.setattr(sp, "load_profile", boom)
+    monkeypatch.setattr(agg, "load_profile", boom)
     result = _proposals(db, _cfg())
     assert result["status"] == "proposal_only"
     assert result["inputs"]["profile"] == {"declared": False, "reason": "error:RuntimeError"}
@@ -299,7 +300,7 @@ def test_tone_changes_only_the_encouragement_never_the_facts():
 
 
 def sp_direct_pool():
-    from core.secretary_greeting import ENCOURAGEMENT_POOLS
+    from core.secretary.greeting import ENCOURAGEMENT_POOLS
 
     return ENCOURAGEMENT_POOLS["direct"]
 
@@ -321,7 +322,7 @@ def test_build_greeting_survives_profile_failure(db, monkeypatch):
     def boom(**_kwargs):
         raise RuntimeError("profile exploded")
 
-    monkeypatch.setattr(sp, "load_profile", boom)
+    monkeypatch.setattr(agg, "load_profile", boom)
     cfg = DictConfig({"proactive_secretary": {"greeting": {"display_name": "", "llm": {"enabled": False}}}})
     greeting = build_greeting(window="today", now=NOW, database=db, cfg=cfg, use_llm=False)
     assert greeting["tone"] == "warm" and greeting["source"] == "rules"
@@ -333,7 +334,7 @@ def test_build_greeting_survives_profile_failure(db, monkeypatch):
 def test_profile_endpoint_is_read_only(monkeypatch, tmp_path):
     db = TempDatabase(tmp_path / "profile.db")
     _pref(db, "優先：uavMonitor")
-    monkeypatch.setattr("core.secretary_profile.get_db", lambda: db)
+    monkeypatch.setattr("core.secretary.memory.get_db", lambda: db)
     client = TestClient(app)
     res = client.get("/api/v1/secretary/profile", headers={"Origin": _LOCAL_ORIGIN})
     assert res.status_code == 200

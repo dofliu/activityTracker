@@ -21,7 +21,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from core.models import ActivityMicroSummary, Base, SecretaryNote
-from core.secretary_memory import (
+from core.secretary.memory import (
     MAX_BODY_CHARS,
     MemoryRejected,
     add_note,
@@ -150,7 +150,7 @@ def test_observations_from_pack_write_once_per_day_and_respect_switch():
 
 
 def test_morning_pack_survives_memory_failure(monkeypatch, tmp_path):
-    from core import secretary_packs
+    import core.secretary.packs as secretary_packs
 
     class BrokenDB:
         @contextmanager
@@ -190,7 +190,7 @@ def test_preference_mutes_and_project_memory_lines():
 
 
 def test_build_action_proposals_applies_mutes_and_attaches_memory(monkeypatch):
-    import core.proactive_secretary as ps
+    import core.secretary.aggregate as ps
 
     db = TempDatabase()
     add_note(kind="preference", body="不要提醒 legacy-app", database=db, now=NOW)
@@ -252,7 +252,7 @@ def test_memory_context_without_anything_is_empty_not_noise():
 
 
 def test_memory_endpoints(monkeypatch, tmp_path):
-    import core.secretary_memory as mem
+    import core.secretary.memory as mem
 
     db = TempDatabase(tmp_path / "memory.db")
     monkeypatch.setattr(mem, "get_db", lambda: db)
@@ -287,7 +287,7 @@ def test_memory_endpoints(monkeypatch, tmp_path):
 
 
 def test_today_view_reports_memory_counts(tmp_path):
-    from core.secretary_packs import build_today_view
+    from core.secretary.present import build_today_view
 
     db = TempDatabase()
     add_note(kind="decision", body="d", database=db, now=NOW)

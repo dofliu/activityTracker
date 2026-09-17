@@ -179,7 +179,7 @@ def test_pairing_returns_none_outside_the_window_and_for_all_day(transcripts):
 
 
 def _notes(db):
-    from core.secretary_memory import list_notes
+    from core.secretary.memory import list_notes
 
     return list_notes(kind="observation", limit=50, database=db)["notes"]
 

@@ -21,25 +21,33 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FutureTimeoutError
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Callable, Optional
 
 from sqlalchemy.exc import IntegrityError
 
-from core.agent_executor import (
-    EXECUTOR_CLAIM_BOUNDARY,
-    ExecutionRejected,
-    RISK_L0,
-    executor_enabled,
-)
+from core.agent_executor import EXECUTOR_CLAIM_BOUNDARY, ExecutionRejected, RISK_L0, executor_enabled
 from core.config import get_config
 from core.database import get_db
 from core.models import AgentExecutionReceipt, ProjectState, SecretaryScheduledTask
 from core.runtime_paths import resolve_runtime_path
 from core.time_utils import get_local_now
+from core.handoff_engine import build_project_handoff, format_handoff_markdown
+from core.status_draft import build_status_draft
+from core.secretary.packs import (
+    ACTIVE_HANDOFFS_TEMPLATE,
+    DEFAULT_PRESETS,
+    MORNING_PACK_TEMPLATE,
+    PACK_CLAIM_BOUNDARY,
+    build_active_handoffs,
+    build_morning_pack,
+)
+from core.meeting_transcripts import build_meeting_notes
+from core.activity_digest import build_daily_digest
+from core.weekly_review import build_weekly_review
+from core.repo_sync_report import build_repo_sync_report
 
 logger = logging.getLogger("OmniContext.ScheduledTasks")
 
@@ -152,7 +160,6 @@ def _run_handoff(params: dict[str, Any]) -> Callable[[dict[str, Any]], dict[str,
     project_key = params["project_key"]
 
     def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
-        from core.handoff_engine import build_project_handoff, format_handoff_markdown
 
         markdown = format_handoff_markdown(build_project_handoff(project_key))
         cfg = get_config()
@@ -185,7 +192,6 @@ def _run_rollup(kind: str) -> Callable[[dict[str, Any]], Callable[[dict[str, Any
 
 def _run_status_draft(_params: dict[str, Any]) -> Callable[[dict[str, Any]], dict[str, Any]]:
     def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
-        from core.status_draft import build_status_draft
 
         return build_status_draft()
 
@@ -206,7 +212,6 @@ def _validate_active_handoff_params(params: dict[str, Any], _database: Any) -> d
 
 def _run_active_handoffs(params: dict[str, Any]) -> Callable[[dict[str, Any]], dict[str, Any]]:
     def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
-        from core.secretary_packs import build_active_handoffs
 
         return build_active_handoffs(
             hours=int(params.get("hours", 24)), max_projects=int(params.get("max_projects", 10))
@@ -217,7 +222,6 @@ def _run_active_handoffs(params: dict[str, Any]) -> Callable[[dict[str, Any]], d
 
 def _run_morning_pack(_params: dict[str, Any]) -> Callable[[dict[str, Any]], dict[str, Any]]:
     def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
-        from core.secretary_packs import build_morning_pack
 
         return build_morning_pack()
 
@@ -250,7 +254,6 @@ def _run_meeting_notes(params: dict[str, Any]) -> Callable[[dict[str, Any]], dic
     limit = int(params.get("limit", 5))
 
     def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
-        from core.meeting_transcripts import build_meeting_notes
 
         return build_meeting_notes(limit=limit)
 
@@ -261,7 +264,6 @@ def _run_daily_digest(params: dict[str, Any]) -> Callable[[dict[str, Any]], dict
     days_back = int(params.get("days_back", 1))
 
     def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
-        from core.activity_digest import build_daily_digest
 
         return build_daily_digest(days_back=days_back)
 
@@ -283,7 +285,6 @@ def _run_weekly_review(params: dict[str, Any]) -> Callable[[dict[str, Any]], dic
     weeks_back = int(params.get("weeks_back", 1))
 
     def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
-        from core.weekly_review import build_weekly_review
 
         return build_weekly_review(weeks_back=weeks_back)
 
@@ -292,7 +293,6 @@ def _run_weekly_review(params: dict[str, Any]) -> Callable[[dict[str, Any]], dic
 
 def _run_repo_sync_report(_params: dict[str, Any]) -> Callable[[dict[str, Any]], dict[str, Any]]:
     def _runner(ctx: dict[str, Any]) -> dict[str, Any]:
-        from core.repo_sync_report import build_repo_sync_report
 
         return build_repo_sync_report()
 
@@ -947,3 +947,61 @@ def run_due_scheduled_tasks(
         except Exception as exc:  # noqa: BLE001 — 單一任務失敗不阻斷其餘排程
             logger.error("Scheduled task %s crashed: %s", row_id, type(exc).__name__)
     return {"status": "ok", "ran": ran}
+
+
+# ---------------------------------------------------------------- 預設排程（ADR-008 Addendum C）
+#
+# ADR-024：這兩個函式在「建立／列出排程」，所以住在排程模組——放在 secretary/packs.py
+# 會讓 packs ↔ scheduled_tasks 互相 import，那個環正是 D8 要拆掉的東西。
+
+def ensure_default_schedules(
+    *,
+    database: Any | None = None,
+    cfg: Any | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """建立缺少的預設排程；已有同 template 的任務就跳過。需 executor＋排程開關。"""
+    database = database or get_db()
+    cfg = cfg or get_config()
+    now = now or get_local_now()
+    existing = {
+        task["template_id"] for task in list_scheduled_tasks(database=database).get("tasks", [])
+    }
+    created: list[dict[str, Any]] = []
+    skipped: list[str] = []
+    for preset in DEFAULT_PRESETS:
+        if preset["template_id"] in existing:
+            skipped.append(preset["template_id"])
+            continue
+        result = create_scheduled_task(
+            {
+                "template_id": preset["template_id"],
+                "params": dict(preset["params"]),
+                "schedule_kind": preset["schedule_kind"],
+                "run_time": preset["run_time"],
+                "enabled": True,
+            },
+            database=database,
+            cfg=cfg,
+            now=now,
+        )
+        created.append(result.get("task") or result)
+    return {
+        "created": created,
+        "already_present": skipped,
+        "presets": [
+            {k: v for k, v in preset.items() if k != "params"} | {"params": dict(preset["params"])}
+            for preset in DEFAULT_PRESETS
+        ],
+        "claim_boundary": PACK_CLAIM_BOUNDARY,
+    }
+
+
+def presets_status(*, database: Any | None = None, now: datetime | None = None) -> dict[str, Any]:
+    tasks = list_scheduled_tasks(database=database).get("tasks", [])
+    present = {task["template_id"] for task in tasks}
+    return {
+        "morning_pack": MORNING_PACK_TEMPLATE in present,
+        "evening_handoffs": ACTIVE_HANDOFFS_TEMPLATE in present,
+        "all_present": all(p["template_id"] in present for p in DEFAULT_PRESETS),
+    }

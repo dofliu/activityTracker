@@ -21,17 +21,21 @@ from sqlalchemy.orm import sessionmaker
 
 from core.agent_executor import RISK_L0
 from core.models import AgentExecutionReceipt, Base
-from core.proactive_secretary import SUGGESTED_ACTIONS, _signal_to_proposal, why_now
-from core.scheduled_tasks import SCHEDULABLE_TEMPLATES, ScheduleRejected
-from core.secretary_packs import (
+from core.secretary.aggregate import SUGGESTED_ACTIONS, _proposal_from_signal, why_now
+from core.secretary.types import Signal
+from core.scheduled_tasks import (
+    SCHEDULABLE_TEMPLATES,
+    ScheduleRejected,
+    ensure_default_schedules,   # D8：建立排程的事住在排程模組
+)
+from core.secretary.packs import (
     DEFAULT_PRESETS,
     build_active_handoffs,
     build_morning_pack,
-    build_today_view,
-    ensure_default_schedules,
     latest_pack_summary,
     pack_summary_line,
 )
+from core.secretary.present import build_today_view   # D8：「01 今天」是呈現層
 from core.server import app
 
 _LOCAL_ORIGIN = "http://127.0.0.1:8765"
@@ -193,19 +197,19 @@ def test_today_view_is_read_only_summary(tmp_path):
 def test_every_proposal_type_explains_why_now():
     for signal_type in list(SUGGESTED_ACTIONS) + ["repo_diverged"]:
         assert why_now(signal_type, 3.0), signal_type
-    proposal = _signal_to_proposal({
+    proposal = _proposal_from_signal(Signal.from_dict({
         "signal_type": "unfinished_recent", "project_key": "alpha", "subject_ref": "project_states:1",
         "title": "alpha 尚未收尾", "detail": "", "reasons": ["最近有活動"], "score": 0.66,
         "evidence_ref": "project_states:1", "observed_at": None, "age_days": 0.75, "open_loop_refs": [],
-    }, NOW)
-    assert proposal["why_now"] == "18 小時前還在動，脈絡還新鮮，現在收尾最省力"
+    }), NOW)
+    assert proposal.to_dict()["why_now"] == "18 小時前還在動，脈絡還新鮮，現在收尾最省力"
 
 
 # ---- API ----
 
 
 def test_today_and_presets_endpoints(monkeypatch):
-    import core.secretary_packs as packs
+    import core.api.secretary as packs  # D8：端點在 API router 綁 build_today_view
 
     monkeypatch.setattr(packs, "build_today_view", lambda: {"resume": None, "pack_line": None, "schedules": {}})
     client = TestClient(app)
@@ -217,7 +221,7 @@ def test_today_and_presets_endpoints(monkeypatch):
 
 
 def test_sync_snapshot_endpoint_is_honest_when_missing(monkeypatch):
-    import core.repo_sync_report as report
+    import core.api.repos as report  # D8：router 改模組層 import，patch 綁在使用端
 
     monkeypatch.setattr(report, "load_snapshot", lambda cfg=None: None)
     client = TestClient(app)

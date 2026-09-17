@@ -20,6 +20,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from core import activity_patterns as ap
+import core.secretary.aggregate as agg  # D8：提案引擎改模組層 import
 from core.activity_patterns import (
     activity_matrix,
     apply_habit_boost,
@@ -36,7 +37,7 @@ from core.models import (
     SecretaryNote,
     SecretaryScheduledTask,
 )
-from core.proactive_secretary import build_action_proposals
+from core.secretary.aggregate import build_action_proposals
 
 NOW = datetime(2026, 9, 15, 10, 0)            # 週二早上
 YESTERDAY = NOW.date() - timedelta(days=1)    # 「近一週」的最後一天
@@ -309,8 +310,7 @@ def test_habit_boost_reorders_existing_repo_signals_inside_the_engine(db, cfg, m
              "subject_ref": "repo:2", "title": "uav 落後"},
         ], {"used": True}
 
-    import core.repo_sync_report as rsr
-    monkeypatch.setattr(rsr, "collect_repo_sync_signals", fake_repo_signals)
+    monkeypatch.setattr(agg, "collect_repo_sync_signals", fake_repo_signals)  # D8：patch 綁使用端
     result = _proposals(db, cfg)
     pulls = [p for p in result["proposals"] if p["proposal_type"] == "repo_needs_pull"]
     assert [p["project_key"] for p in pulls] == ["uav", "old"]      # 主線排前面
@@ -323,7 +323,7 @@ def test_pattern_layer_failure_does_not_break_the_proposal_list(db, cfg, monkeyp
     def boom(**_kwargs):
         raise RuntimeError("matrix exploded")
 
-    monkeypatch.setattr(ap, "collect_pattern_signals", boom)
+    monkeypatch.setattr(agg, "collect_pattern_signals", boom)
     result = _proposals(db, cfg)
     assert result["status"] == "proposal_only"
     assert result["inputs"]["patterns"] == {"used": False, "reason": "error:RuntimeError"}

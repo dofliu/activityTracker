@@ -139,10 +139,10 @@
    對**同樣五種實體**（ProjectState／OpenLoop／AI turn／Git／File）各做一次 embedding、各有查詢路徑與 UI（`omni ask` vs `/api/v1/rag/chat`）。這是 repo 裡最大的一塊重複。
 3. **四份「每專案每日活躍」聚合**：`weekly_review.py:83`、`activity_patterns.py:243-306`、`activity_digest.py:77`、`secretary_greeting.py:97`，各自從同一組事件表算一遍。
    → **同日已完成（D3）**，但**這條當時的描述只對一半**：其中兩組早就互相委派了。真正的重複是「哪些表算活動、專案名在哪個欄位、一天從哪到哪」各寫三遍，已收進 `core/activity_sources.py`（ROADMAP §11.2）。
-4. **秘書叢集 11 個模組、4,109 行、沒有共同型別**：全部是回傳 `dict[str, Any]` 的自由函式（`build_*`／`collect_*_signals`），
+4. **秘書叢集 11 個模組、4,109 行、沒有共同型別**（→ **同日已完成（D8）**：收成 `core/secretary/` 四層七檔，`Signal`／`Proposal` 取代自由 dict，ADR-024）：全部是回傳 `dict[str, Any]` 的自由函式（`build_*`／`collect_*_signals`），
    五個訊號收集器與 `build_action_proposals`（`proactive_secretary.py:242`）之間的契約是未定型的 dict。`secretary_ask`（202 行）、`secretary_profile`（150 行）、`secretary_home`（242 行）不值得各自一個模組。
 5. **桌面通知在抽象之外**：`notifiers/desktop_notifier.py`（282 行）自己再扇出一次晨報／交接／停滯／里程碑，沒走 `ChannelAdapter`。→ **同日已完成（D5）**：內容併回 `notifiers/messages.py`、新增 `DesktopChannel`、扇出只剩 `secretary_push`；該模組剩 165 行純 transport。合併時抓到一個實際漂移：未歸戶收容桶桌面有濾、Telegram／LINE 沒濾。
-6. **循環依賴用延遲 import 撐著**：`core/` 內 110 處函式內 import；`proactive_secretary ↔ secretary_memory ↔ secretary_home ↔ agent_executor` 是一個真的環。
+6. **循環依賴用延遲 import 撐著**：`core/` 內 110 處函式內 import；`proactive_secretary ↔ secretary_memory ↔ secretary_home ↔ agent_executor` 是一個真的環。→ **同日已完成（D8）**：環拆在呈現層的組合點與兩次搬家（`build_today_view` → present、preset 函式 → `scheduled_tasks`）；指向 `core.*` 的函式內 import 116 → 15。
 7. **模組層可變全域狀態**：`_PENDING_L2_CONFIRMS`（`agent_executor.py:72`）、`_ARMED_UNTIL`／`_PROCESSED_CALLBACK_IDS`（`telegram_approvals.py:74-76`）、advisor／project 快取、
    `server.py:79-80` 在 import 時凍結的 CORS 來源（改設定不重啟不生效）——並因此長出三個 `_reset_*_for_tests` 鉤子。
 8. **四種檢索策略**（Hybrid RRF／Weighted Fusion／Vector Only／BM25 Only）對個人工具多了一到兩種。
@@ -153,7 +153,9 @@
    → **同日已完成（D4）**：切成 9 個領域 router，server.py 剩 134 行；model 進 `core/schemas.py`、ingest 規則進 `core/ingest.py`；133 條路由由快照測試鎖住（ROADMAP §11.2）。
    `rag/router.py`（655 行、31 條）也把資料夾 CRUD、job、儲存、檔案瀏覽、檢索、對話 session 混在一起。
 2. **`web/app.js` 6,055 行單檔**：約 30 個模組層 `let` 當狀態、105 處 `innerHTML`、9 處繞過共用 fetch helper 的裸 `fetch()`、126 個 `catch` 只有 13 個記 log、17 處字串內嵌 `onclick=`。
+   → **2026-09-17 已完成（D10）**：拆成 `web/js/` 的 ES module 樹（最大一檔 915 行），字典搬到 `web/i18n/*.json`（抽的時候抓到三個真的翻譯缺口），九處裸 `fetch` 收回 `core/api.js`，17 處 `onclick=` 改成 `data-action` 委派，49 個模組層 `let` 集中到 `state.js`（ADR-026，ROADMAP §11.2）。**`innerHTML` 與 `catch` 不記 log 兩項原封不動**——把它們和模組化混在同一輪會讓「行為不變」變成無法驗證的宣稱。
 3. **`watchers/agent_log_watcher.py` 1,066 行**解析四種**無穩定性保證的私有格式**（Codex 還有 json／jsonl 兩套 parser）；測試用合成 fixture，鎖的是今天的形狀，**格式一變就是靜默零事件**。
+   → **2026-09-17 已完成（D9）**：拆成 `watchers/transcripts/` 一個平台一個 parser（每個 < 300 行）＋ 共同介面，服務剩 515 行且不再認識任何格式；「靜默零事件」這一半另補漂移警示——**檔案 mtime 在視窗內 ∧ 該平台視窗內零事件**才警示，成立時把採集器標成 `degraded` 並顯示在系統健康頁（ADR-025，ROADMAP §11.2）。合成 fixture 的根本限制沒有消失：它偵測的是「有沒有採到東西」，不是「格式對不對」。
 4. **六層巢狀預設關閉旗標**（`executor` → `l2` → `l2.allow_write` → `scheduled_tasks` → `telegram_approvals` → `allow_remote_arm`）守著約 2,800 行預設安裝永不執行的程式。→ **同日已完成（D6）**：收成三層真正的分級，另兩層併入它們的上層開關（ADR-008 Addendum D）；既有設定檔明確寫成 false 的照樣有效。
 5. **`core/acceptance.py` 1,564 行**：22 個手寫 `_check_aN` ＋ 200 行 `_ITEMS`——把 TODO A 段做成可執行是好主意，但 3% 的程式碼在做自我證明，應改為少數幾個通用探針上的宣告式表格。
 6. **API 錯誤契約不一致**：48 處 `HTTPException` 與多處回 HTTP 200 的 `{"status": "skipped"/"error"}` 並存；87 個 `except Exception` 大多靜默吞掉。

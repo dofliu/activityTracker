@@ -17,17 +17,9 @@ from sqlalchemy import desc
 
 from core.config import get_config
 from core.database import get_db
-from core.models import (
-    ActivityMicroSummary,
-    AIPromptEvent,
-    FileActivityEvent,
-    GitActivityEvent,
-    OpenLoop,
-    ProjectState,
-    SecretaryNote,
-    SemanticDocument,
-)
+from core.models import AIPromptEvent, ActivityMicroSummary, FileActivityEvent, GitActivityEvent, OpenLoop, ProjectState, SecretaryNote, SemanticDocument
 from core.time_utils import get_local_now
+from core.llm_client import LLMClient, default_model
 
 
 @dataclass(frozen=True)
@@ -516,7 +508,6 @@ def _generate_local_answer(question: str, sources: Sequence[dict], cfg: Any) -> 
         str(cfg.get("synthesizer.ollama.base_url", "http://127.0.0.1:11434")),
         bool(cfg.get("semantic_index.allow_remote", False)),
     )
-    from core.llm_client import default_model
 
     model = default_model("ollama", cfg)  # 預設模型只在 core/llm_client 定義一份（D2）
     evidence = "\n\n".join(
@@ -532,7 +523,6 @@ def _generate_local_answer(question: str, sources: Sequence[dict], cfg: Any) -> 
         f"Question:\n{question}\n\nEvidence:\n{evidence[:14000]}"
     )
     # 唯一的 Ollama 同步實作在 core/llm_client（D2）；這裡只負責 loopback-only 的 base_url 與低溫度。
-    from core.llm_client import LLMClient
 
     answer = LLMClient("ollama", cfg).ollama_chat(
         [{"role": "user", "content": prompt}],

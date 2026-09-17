@@ -52,6 +52,10 @@ from core.database import get_db
 from core.models import AgentExecutionReceipt
 from core.runtime_paths import runtime_data_root
 from core.time_utils import get_local_now
+from core.secretary.aggregate import build_action_proposals
+from core.repo_sync import LocalRepositorySync
+from core.handoff_engine import build_project_handoff, format_handoff_markdown
+from core.project_engine import transition_open_loop
 
 logger = logging.getLogger("OmniContext.AgentExecutor")
 
@@ -124,7 +128,6 @@ class ExecutorServices:
 
     def __post_init__(self) -> None:
         if self.repo_references is None or self.repo_execute is None:
-            from core.repo_sync import LocalRepositorySync
 
             sync = LocalRepositorySync()
             if self.repo_references is None:
@@ -133,14 +136,12 @@ class ExecutorServices:
             if self.repo_execute is None:
                 self.repo_execute = lambda repo_id, action: sync.execute(repo_id, action)
         if self.build_handoff is None or self.format_handoff is None:
-            from core.handoff_engine import build_project_handoff, format_handoff_markdown
 
             if self.build_handoff is None:
                 self.build_handoff = build_project_handoff
             if self.format_handoff is None:
                 self.format_handoff = format_handoff_markdown
         if self.loop_transition is None:
-            from core.project_engine import transition_open_loop
 
             self.loop_transition = transition_open_loop
 
@@ -816,7 +817,6 @@ def _find_live_proposal(
     cfg: Any | None,
     now: datetime | None,
 ) -> dict[str, Any] | None:
-    from core.proactive_secretary import build_action_proposals
 
     live = build_action_proposals(database=database, cfg=cfg, now=now, limit=12)
     for item in live.get("proposals", []):

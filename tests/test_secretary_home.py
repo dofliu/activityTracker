@@ -18,11 +18,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from core import secretary_home as sh
+import core.secretary.present as sh
 from core.acceptance import ITEM_IDS, build_acceptance_report
 from core.models import Base, SecretaryNote
-from core.secretary_home import MEMORY_PICK_RULES, NO_MEMORY_HINT, build_home, pick_memory
-from core.secretary_memory import add_note, record_observation
+from core.secretary.present import MEMORY_PICK_RULES, NO_MEMORY_HINT, build_home, pick_memory
+from core.secretary.memory import add_note, record_observation
 from core.server import app
 
 _LOCAL_ORIGIN = "http://127.0.0.1:8765"
@@ -128,7 +128,7 @@ def test_focus_is_about_your_work_not_the_tools_own_setup(db):
 
 
 def test_focus_comes_from_the_real_engine_when_not_injected(db, monkeypatch):
-    import core.proactive_secretary as ps
+    import core.secretary.aggregate as ps
 
     monkeypatch.setattr(ps, "build_action_proposals", lambda **kw: {"proposals": [_proposal("uav", "uav 落後", 0.7)]})
     home = build_home(database=db, cfg=_cfg(), now=NOW, today=_today())
@@ -192,7 +192,7 @@ def test_home_composes_resume_calendar_profile_and_detail_counts(db):
 
 
 def test_a_broken_today_view_does_not_take_the_focus_down(db, monkeypatch):
-    import core.secretary_packs as packs
+    import core.secretary.present as packs  # D8：build_today_view 搬到呈現層
 
     def boom(**_kwargs):
         raise RuntimeError("today exploded")
@@ -231,7 +231,7 @@ def test_home_never_writes_and_never_calls_an_llm(db):
 
 
 def test_home_endpoint_is_read_only(monkeypatch):
-    monkeypatch.setattr("core.secretary_home.build_home", lambda: {"focus": {"proposal": None, "total": 0, "remaining": 0}, "sections": {}, "claim_boundary": "x"})
+    monkeypatch.setattr("core.secretary.present.build_home", lambda: {"focus": {"proposal": None, "total": 0, "remaining": 0}, "sections": {}, "claim_boundary": "x"})
     client = TestClient(app)
     res = client.get("/api/v1/secretary/home", headers={"Origin": _LOCAL_ORIGIN})
     assert res.status_code == 200 and res.json()["focus"]["total"] == 0
@@ -242,7 +242,7 @@ def test_home_endpoint_is_read_only(monkeypatch):
 
 
 def _a18(db, cfg, monkeypatch, home):
-    monkeypatch.setattr("core.secretary_home.build_home", lambda **kw: home)
+    monkeypatch.setattr("core.acceptance.build_home", lambda **kw: home)  # D8：驗收中心改模組層 import
     report = build_acceptance_report(database=db, cfg=cfg, now=NOW, only=["A18"])
     return report["items"][0]
 

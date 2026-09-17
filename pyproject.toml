@@ -74,7 +74,7 @@ where = ["."]
 include = ["core*", "exporters*", "integrations*", "notifiers*", "rag*", "scripts*", "synthesizer*", "watchers*", "web*"]
 
 [tool.setuptools.package-data]
-web = ["*.html", "*.css", "*.js", "vendor/*.js"]
+web = ["*.html", "*.css", "*.js", "vendor/*.js", "js/*.js", "js/core/*.js", "js/tabs/*.js", "i18n/*.json"]
 watchers = [
   "browser_extension/*.html",
   "browser_extension/*.js",

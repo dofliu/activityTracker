@@ -8,6 +8,7 @@ from core.config import get_config
 from core.security import execution_authorized
 from fastapi import HTTPException
 from fastapi import Request
+from core.security import get_execution_token
 
 
 def _require_execution_token(request: Request) -> None:
@@ -17,7 +18,6 @@ def _require_execution_token(request: Request) -> None:
     設定檔是 process 啟動時載入一次的，所以「服務啟動後才用 init 產生 token」會讓任何
     token 都被拒——訊息必須說得出這件事，否則使用者只會看到「代碼錯誤」而無從排查。
     """
-    from core.security import get_execution_token
 
     cfg = get_config()
     if execution_authorized(request.headers.get("x-omnicontext-execution-token"), cfg):

@@ -13,13 +13,14 @@ import json
 from datetime import datetime
 from typing import Any, Iterable
 
-from .models import (
+from core.models import (
     GitHubIssueEvent,
     GitHubPREvent,
     GitHubRepoState,
     OpenLoop,
     ProjectState,
 )
+
 
 # 分數區間刻意重疊：同一類訊號內部靠年齡/嚴重度拉開差距，
 # 跨類別則由這裡的基準值決定誰通常比較急。

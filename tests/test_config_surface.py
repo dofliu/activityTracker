@@ -150,8 +150,8 @@ def test_engine_defaults_did_not_move():
     )
     from core.docs_freshness import DEFAULT_LOOKBACK_DAYS as DOCS_LOOKBACK
     from core.docs_freshness import DEFAULT_MIN_COMMITS, DEFAULT_MIN_DAYS
-    from core.secretary_profile import DEFAULT_PRIORITY_BOOST
-    from core.triage_signals import DEFAULT_GITHUB_STALE_AFTER_DAYS
+    from core.secretary.memory import DEFAULT_PRIORITY_BOOST
+    from core.secretary.signals import DEFAULT_GITHUB_STALE_AFTER_DAYS
     from core.weekly_review import DEFAULT_DRIFT_MAX_DAYS, DEFAULT_DRIFT_MIN_OTHER_DAYS
 
     assert (DEFAULT_LOOKBACK_DAYS, DEFAULT_ROUTINE_MIN_ACTIVE_DAYS, DEFAULT_NEGLECT_MIN_PREV_DAYS,

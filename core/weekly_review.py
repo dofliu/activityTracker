@@ -26,6 +26,7 @@ from core.config import get_config
 from core.database import get_db
 from core.models import SecretaryNote
 from core.time_utils import get_local_now
+from core.secretary.memory import load_profile, memory_enabled, record_observation
 
 logger = logging.getLogger("OmniContext.WeeklyReview")
 
@@ -200,7 +201,6 @@ def compose_review_body(
 
 
 def _priorities(database: Any) -> list[str]:
-    from core.secretary_profile import load_profile
 
     return list(load_profile(database=database).get("priorities") or [])
 
@@ -255,7 +255,6 @@ def build_weekly_review(
     })
     if not (write_memory and total_days > 0):
         return receipt
-    from core.secretary_memory import memory_enabled, record_observation
 
     if not memory_enabled(cfg):
         return receipt

@@ -558,10 +558,11 @@ async def chat_stream(req: ChatRequest):
     memory_receipt: Dict[str, Any] = {"included": False, "reason": "not_requested"}
     if getattr(req, "include_memory", True):
         try:
-            from core.secretary_memory import chat_context_enabled, memory_context
+            from core.secretary.memory import chat_context_enabled
+            from core.secretary.present import full_memory_context
 
             if chat_context_enabled():
-                memory = await asyncio.wait_for(asyncio.to_thread(memory_context), timeout=MEMORY_CONTEXT_TIMEOUT_SECONDS)
+                memory = await asyncio.wait_for(asyncio.to_thread(full_memory_context), timeout=MEMORY_CONTEXT_TIMEOUT_SECONDS)
                 memory_text = memory["text"]
                 memory_receipt = memory["receipt"]
             else:

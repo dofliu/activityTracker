@@ -136,7 +136,7 @@ def _loop_lines(open_loops: Sequence[dict[str, Any]], limit: int = 6) -> tuple[s
 def _pack_line(now: datetime) -> str | None:
     """早晨包收據的一行摘要；沒有排程或讀不到就不說話。"""
     try:
-        from core.secretary_packs import latest_pack_summary, pack_summary_line
+        from core.secretary.packs import latest_pack_summary, pack_summary_line
 
         return pack_summary_line(latest_pack_summary(now=now))
     except Exception as exc:  # noqa: BLE001 — 收據讀不到不該讓推播消失
@@ -152,7 +152,7 @@ def _greeting_section(now: datetime, cfg: Any | None = None) -> Section | None:
     """
     try:
         from core.config import get_config
-        from core.secretary_greeting import build_greeting
+        from core.secretary.greeting import build_greeting
 
         cfg = cfg or get_config()
         if not bool(cfg.get("proactive_secretary.greeting.in_morning_briefing", True)):
@@ -198,7 +198,7 @@ def _calendar_section(now: datetime, cfg: Any | None = None, limit: int = 8) -> 
 def _secretary_section(limit: int = 2) -> Section | None:
     """秘書 top 建議（唯讀）；秘書層失敗不阻斷推播本體。"""
     try:
-        from core.proactive_secretary import briefing_proposals
+        from core.secretary.aggregate import briefing_proposals
 
         result = briefing_proposals(limit=limit)
     except Exception as exc:  # noqa: BLE001

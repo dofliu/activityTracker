@@ -8,14 +8,16 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from core.models import AIPromptEvent, BackgroundTaskRun, Base
-from watchers.agent_log_watcher import (
-    AgentLogWatcherService,
+from watchers.agent_log_watcher import AgentLogWatcherService
+from watchers.transcripts import (
     build_turn_key,
     classify_response_status,
     eof_response_status,
     iter_jsonl_records,
     select_last_assistant_message,
 )
+from watchers.transcripts import claude_code as claude_parser   # D9：格式住在 parser 模組
+from watchers.transcripts import codex as codex_parser
 
 
 class TempDB:
@@ -83,7 +85,7 @@ def test_codex_phase_upgrades_commentary_to_explicit_final(tmp_path):
     source.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
     db = TempDB()
     service = AgentLogWatcherService()
-    service._parse_codex_jsonl_session(db, source)
+    service.ingest_turns(db, codex_parser.parse_jsonl_session(source))
     with db.session_scope() as session:
         event = session.query(AIPromptEvent).one()
         assert event.response_status == "partial"
@@ -97,7 +99,7 @@ def test_codex_phase_upgrades_commentary_to_explicit_final(tmp_path):
         }
     )
     source.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
-    service._parse_codex_jsonl_session(db, source)
+    service.ingest_turns(db, codex_parser.parse_jsonl_session(source))
     with db.session_scope() as session:
         event = session.query(AIPromptEvent).one()
         assert event.response_status == "final_candidate"
@@ -138,8 +140,8 @@ def test_claude_desktop_project_log_preserves_provenance_and_is_idempotent(tmp_p
 
     database = TempDB()
     service = AgentLogWatcherService()
-    service._parse_claude_project_log(database, source, platform="claude_desktop")
-    service._parse_claude_project_log(database, source, platform="claude_desktop")
+    service.ingest_turns(database, claude_parser.parse_claude_jsonl(source, platform="claude_desktop"))
+    service.ingest_turns(database, claude_parser.parse_claude_jsonl(source, platform="claude_desktop"))
 
     with database.session_scope() as session:
         events = session.query(AIPromptEvent).all()
