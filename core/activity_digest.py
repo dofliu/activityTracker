@@ -32,6 +32,8 @@ from core.config import get_config
 from core.database import get_db
 from core.models import ActivityMicroSummary
 from core.time_utils import get_local_now
+from core.secretary.greeting import collect_activity_stats
+from core.secretary.memory import memory_enabled, record_observation
 
 logger = logging.getLogger("OmniContext.ActivityDigest")
 
@@ -75,7 +77,6 @@ def collect_day_stats(
     ``[now.date() - 1 天 00:00, now.date() 00:00)``；把 ``now`` 設成隔天午夜，
     邊界就正好是 ``day`` 這一整天。這樣就不必再維護第二套一樣的查詢。
     """
-    from core.secretary_greeting import collect_activity_stats
 
     _, day_end = day_bounds(day)
     return collect_activity_stats(
@@ -243,7 +244,6 @@ def build_daily_digest(
 
     written = 0
     if write_memory and stats.get("observed_anything"):
-        from core.secretary_memory import memory_enabled, record_observation
 
         if memory_enabled(cfg):
             def _write(source_ref: str, title: str, body: str, project_key: str | None) -> None:

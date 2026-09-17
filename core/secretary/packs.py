@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any, Callable
 
 from core.config import get_config
@@ -25,6 +24,14 @@ from core.database import get_db
 from core.models import AgentExecutionReceipt
 from core.runtime_paths import resolve_runtime_path
 from core.time_utils import get_local_now
+from core.repo_sync_report import build_repo_sync_report
+from core.status_draft import build_status_draft
+from core.activity_digest import build_daily_digest
+from core.weekly_review import build_weekly_review
+from core.project_engine import get_active_projects_list
+from core.handoff_engine import build_project_handoff, format_handoff_markdown
+from core.secretary.memory import observations_from_pack
+
 
 logger = logging.getLogger("OmniContext.SecretaryPacks")
 
@@ -81,11 +88,9 @@ def build_active_handoffs(
     max_projects = max(1, min(int(max_projects), 30))
 
     if projects is None:
-        from core.project_engine import get_active_projects_list
 
         projects = get_active_projects_list()
     if build is None or fmt is None:
-        from core.handoff_engine import build_project_handoff, format_handoff_markdown
 
         build = build or build_project_handoff
         fmt = fmt or format_handoff_markdown
@@ -154,12 +159,10 @@ def build_morning_pack(
             return None
 
     def _default_repo_sync() -> dict[str, Any]:
-        from core.repo_sync_report import build_repo_sync_report
 
         return build_repo_sync_report(cfg=cfg, now=now)
 
     def _default_status_draft() -> dict[str, Any]:
-        from core.status_draft import build_status_draft
 
         return build_status_draft()
 
@@ -183,7 +186,6 @@ def build_morning_pack(
 
     def _default_digest() -> dict[str, Any]:
         # 早晨跑的時候「昨天」已經是完整的一天，適合定稿成一則工作誌。
-        from core.activity_digest import build_daily_digest
 
         return build_daily_digest(days_back=1, database=database, cfg=cfg, now=now)
 
@@ -194,7 +196,6 @@ def build_morning_pack(
 
     def _default_review() -> dict[str, Any]:
         # ADR-020：每天都確認上一個完整週有沒有回顧；source_ref 去重，同一週只會寫一次。
-        from core.weekly_review import build_weekly_review
 
         return build_weekly_review(weeks_back=1, database=database, cfg=cfg, now=now)
 
@@ -206,7 +207,6 @@ def build_morning_pack(
     receipt["generated_at"] = now.isoformat(timespec="seconds")
     # 秘書自己的觀察（ADR-012）：只寫當日一次、標記 observation、介面可一鍵刪除。
     try:
-        from core.secretary_memory import observations_from_pack
 
         receipt["observations_written"] = len(
             observations_from_pack(receipt, database=database, now=now, cfg=cfg)
@@ -268,150 +268,3 @@ def pack_summary_line(summary: dict[str, Any] | None) -> str | None:
     if errors:
         parts.append(f"{len(errors)} 步失敗")
     return "早晨包：" + "、".join(parts) if parts else None
-
-
-def ensure_default_schedules(
-    *,
-    database: Any | None = None,
-    cfg: Any | None = None,
-    now: datetime | None = None,
-) -> dict[str, Any]:
-    """建立缺少的預設排程；已有同 template 的任務就跳過。需 executor＋排程開關。"""
-    from core.scheduled_tasks import create_scheduled_task, list_scheduled_tasks
-
-    database = database or get_db()
-    cfg = cfg or get_config()
-    now = now or get_local_now()
-    existing = {
-        task["template_id"] for task in list_scheduled_tasks(database=database).get("tasks", [])
-    }
-    created: list[dict[str, Any]] = []
-    skipped: list[str] = []
-    for preset in DEFAULT_PRESETS:
-        if preset["template_id"] in existing:
-            skipped.append(preset["template_id"])
-            continue
-        result = create_scheduled_task(
-            {
-                "template_id": preset["template_id"],
-                "params": dict(preset["params"]),
-                "schedule_kind": preset["schedule_kind"],
-                "run_time": preset["run_time"],
-                "enabled": True,
-            },
-            database=database,
-            cfg=cfg,
-            now=now,
-        )
-        created.append(result.get("task") or result)
-    return {
-        "created": created,
-        "already_present": skipped,
-        "presets": [
-            {k: v for k, v in preset.items() if k != "params"} | {"params": dict(preset["params"])}
-            for preset in DEFAULT_PRESETS
-        ],
-        "claim_boundary": PACK_CLAIM_BOUNDARY,
-    }
-
-
-def presets_status(*, database: Any | None = None, now: datetime | None = None) -> dict[str, Any]:
-    from core.scheduled_tasks import list_scheduled_tasks
-
-    tasks = list_scheduled_tasks(database=database).get("tasks", [])
-    present = {task["template_id"] for task in tasks}
-    return {
-        "morning_pack": MORNING_PACK_TEMPLATE in present,
-        "evening_handoffs": ACTIVE_HANDOFFS_TEMPLATE in present,
-        "all_present": all(p["template_id"] in present for p in DEFAULT_PRESETS),
-    }
-
-
-def build_today_view(
-    *,
-    database: Any | None = None,
-    cfg: Any | None = None,
-    now: datetime | None = None,
-    projects: list[dict[str, Any]] | None = None,
-) -> dict[str, Any]:
-    """儀表板「01 今天」用：上次做到哪＋早晨包摘要＋預設排程狀態。提案另由 /proposals 提供。"""
-    from core.agent_executor import executor_enabled, l2_enabled
-    from core.scheduled_tasks import legacy_opt_out, scheduled_tasks_enabled
-
-    cfg = cfg or get_config()
-    now = now or get_local_now()
-    if projects is None:
-        from core.project_engine import get_active_projects_list
-
-        projects = get_active_projects_list()
-    top = projects[0] if projects else None
-    resume = None
-    if top:
-        resume = {
-            "project_key": top.get("project_key"),
-            "display_name": top.get("display_name"),
-            "category": top.get("category"),
-            "last_activity_at": top.get("last_activity_at"),
-            "last_action_summary": top.get("last_action_summary"),
-            "open_loops_count": top.get("open_loops_count"),
-            "local_path": top.get("local_path"),
-            "github_url": top.get("github_url"),
-        }
-    pack = latest_pack_summary(database=database, now=now)
-    try:
-        presets = presets_status(database=database, now=now)
-    except Exception as exc:  # noqa: BLE001 — 排程表讀不到也不該讓今日視圖消失
-        presets = {"error": type(exc).__name__}
-    calendar: dict[str, Any] = {"enabled": False, "count": 0, "line": None}
-    try:
-        from core.calendar_agenda import day_agenda, schedule_sentence
-
-        agenda = day_agenda(now=now, database=database, cfg=cfg)
-        calendar = {
-            "enabled": agenda["enabled"],
-            "count": agenda["count"],
-            "remaining_count": agenda["remaining_count"],
-            "ongoing": agenda["ongoing"],
-            "next": agenda["next"],
-            "line": schedule_sentence(agenda),
-            "claim_boundary": agenda["claim_boundary"],
-        }
-    except Exception as exc:  # noqa: BLE001 — 行事曆讀不到也不該讓今日視圖消失
-        calendar = {"enabled": False, "error": type(exc).__name__, "count": 0, "line": None}
-    # ADR-022 D2：「在開會」只用行事曆事件 ＋ 前景應用程式名稱兩個確定性訊號。
-    meeting: dict[str, Any] = {"enabled": False, "in_meeting": False, "line": None}
-    try:
-        from core.meeting_transcripts import meeting_context
-
-        meeting = meeting_context(database=database, cfg=cfg, now=now)
-    except Exception as exc:  # noqa: BLE001 — 會議訊號讀不到也不該讓今日視圖消失
-        meeting = {"enabled": False, "in_meeting": False, "line": None, "error": type(exc).__name__}
-    memory: dict[str, Any] = {"enabled": False, "counts": {}, "total": 0}
-    try:
-        from core.secretary_memory import list_notes, memory_enabled
-
-        if memory_enabled(cfg):
-            listed = list_notes(limit=1, database=database)
-            memory = {"enabled": True, "counts": listed["counts"], "total": listed["total"]}
-    except Exception as exc:  # noqa: BLE001 — 記憶區讀不到也不該讓今日視圖消失
-        memory = {"enabled": False, "error": type(exc).__name__, "counts": {}, "total": 0}
-    return {
-        "generated_at": (now.replace(tzinfo=None) if now.tzinfo else now).isoformat(timespec="seconds"),
-        "resume": resume,
-        "active_project_count": sum(1 for p in projects if p.get("status") == "active"),
-        "pack": pack,
-        "pack_line": pack_summary_line(pack),
-        "memory": memory,
-        "calendar": calendar,
-        "meeting": meeting,
-        "schedules": {
-            "executor_enabled": executor_enabled(cfg),
-            "scheduled_tasks_enabled": scheduled_tasks_enabled(cfg),
-            # 設定檔還留著已淘汰的 scheduled_tasks.enabled: false 時，UI 要講得出
-            # 「為什麼開了執行器還是沒排程」（TODO D6）。
-            "scheduled_tasks_legacy_opt_out": legacy_opt_out(cfg),
-            "l2_enabled": l2_enabled(cfg),
-            **presets,
-        },
-        "claim_boundary": "只彙整既有唯讀資料（專案狀態、最近一次早晨包收據、排程表）；不執行任何動作。",
-    }

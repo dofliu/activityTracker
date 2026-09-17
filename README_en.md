@@ -26,7 +26,7 @@ It answers three questions at any moment:
 | Area | State |
 | :--- | :--- |
 | Code | P0–P8 and all ADR-008 executor stages landed; 22 ADRs record the boundary behind each decision |
-| Tests | **68 contract test modules, 695 tests** (694 passed + 1 skipped; 681 passed + 12 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
+| Tests | **69 contract test modules, 710 tests** (709 passed + 1 skipped; 696 passed + 12 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
 | Data | SQLite schema migration **18/18** (append-only + checksum, verified backup before upgrade) |
 | Release | `release_ready: false` |
 
@@ -284,10 +284,9 @@ activityTracker/
 │   ├── project_engine.py / project_paths.py      # Project resolution and root detection
 │   ├── semantic_index.py / context_memory.py     # Local embeddings and related history
 │   ├── handoff_engine.py       # Provider-neutral context handoff
-│   ├── proactive_secretary.py / secretary_advisor.py   # Proposal engine and LLM advisory
+│   ├── secretary/             # Four secretary layers (ADR-024): types / memory / signals /
+│   │                          #   aggregate / packs / greeting / present
 │   ├── agent_executor.py / agent_dispatch.py / scheduled_tasks.py  # L0/L1/L2 and scheduling
-│   ├── secretary_memory.py / secretary_profile.py      # Memory and declared profile
-│   ├── secretary_home.py / secretary_greeting.py / secretary_packs.py  # Desk / greeting / packs
 │   ├── activity_digest.py / activity_patterns.py / weekly_review.py    # Digest / patterns / review
 │   ├── meeting_transcripts.py  # Meeting secretary (WebVTT, pairing, fact gate, follow-ups)
 │   ├── docs_freshness.py       # Docs-behind-code detection
@@ -295,7 +294,7 @@ activityTracker/
 │   ├── repo_sync.py / repo_onboarding.py / repo_sync_report.py  # Git sync center
 │   ├── acceptance.py           # Acceptance center (executable copy of TODO section A)
 │   ├── usage_analytics.py / capture_coverage.py / coverage_ledger.py
-│   ├── background_tasks.py / triage_signals.py / status_draft.py
+│   ├── background_tasks.py / status_draft.py
 │   └── platform_services.py / runtime_paths.py / fs_utils.py / time_utils.py
 │
 ├── rag/                        # 📚 DeskRAG subsystem
@@ -328,7 +327,7 @@ activityTracker/
 │   └── index.html / app.js / style.css
 │
 ├── scripts/                    # Verification, cleanup, autostart and E2E scripts
-├── tests/                      # 68 contract test modules (695 tests)
+├── tests/                      # 69 contract test modules (710 tests)
 ├── logs/checkpoints/           # Periodic activity snapshots
 └── reports/                    # Daily / range Markdown reports
 ```

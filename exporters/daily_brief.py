@@ -39,7 +39,7 @@ def _collect() -> Dict[str, Any]:
     # P5-R4：帶入秘書 top 建議（唯讀；失敗不阻斷簡報）
     secretary = None
     try:
-        from core.proactive_secretary import briefing_proposals
+        from core.secretary.aggregate import briefing_proposals
 
         secretary = briefing_proposals(limit=3)
     except Exception:

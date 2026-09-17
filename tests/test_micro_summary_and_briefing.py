@@ -226,8 +226,8 @@ def _desktop_preview(monkeypatch, capsys, *, projects):
 
     monkeypatch.setattr("core.project_engine.get_active_projects_list", lambda: projects)
     monkeypatch.setattr("core.project_engine.get_open_loops_list", lambda: [])
-    monkeypatch.setattr("core.secretary_packs.latest_pack_summary", lambda **kwargs: None)
-    monkeypatch.setattr("core.secretary_greeting.build_greeting", lambda **kwargs: {"stats": {}})
+    monkeypatch.setattr("core.secretary.packs.latest_pack_summary", lambda **kwargs: None)
+    monkeypatch.setattr("core.secretary.greeting.build_greeting", lambda **kwargs: {"stats": {}})
     cfg = DictConfig({"proactive_secretary": {"greeting": {"in_morning_briefing": False}}})
     receipt = push_morning_briefing(cfg=cfg, channels=desktop_channels(cfg, dry_run=True))
     assert receipt["sent"] == 1 and receipt["results"][0]["channel"] == "desktop"
@@ -236,7 +236,7 @@ def _desktop_preview(monkeypatch, capsys, *, projects):
 
 def test_morning_briefing_includes_secretary_top_proposal(monkeypatch, capsys):
     """秘書 top 建議要進得了桌面通知——toast 只放得下摘要，但每一段都要露臉。"""
-    monkeypatch.setattr("core.proactive_secretary.briefing_proposals", _fake_briefing)
+    monkeypatch.setattr("core.secretary.aggregate.briefing_proposals", _fake_briefing)
     output = _desktop_preview(monkeypatch, capsys, projects=[{
         "display_name": "activityTracker", "status": "active", "project_key": "activityTracker",
         "last_activity_at": "2026-08-31 09:00", "last_action_summary": "修 CI", "idle_days": 0,
@@ -250,7 +250,7 @@ def test_morning_briefing_survives_secretary_failure(monkeypatch, capsys):
     def boom(**_kwargs):
         raise RuntimeError("secretary offline")
 
-    monkeypatch.setattr("core.proactive_secretary.briefing_proposals", boom)
+    monkeypatch.setattr("core.secretary.aggregate.briefing_proposals", boom)
     output = _desktop_preview(monkeypatch, capsys, projects=[])
     assert "晨間簡報" in output
     assert "待判斷建議" not in output

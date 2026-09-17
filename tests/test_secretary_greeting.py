@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from core import secretary_greeting as sg
+import core.secretary.greeting as sg
 from core.models import (
     ActivityMicroSummary,
     AIPromptEvent,
@@ -28,7 +28,7 @@ from core.models import (
     OpenLoop,
     ProjectState,
 )
-from core.secretary_greeting import (
+from core.secretary.greeting import (
     GreetingRejected,
     achievement_lines,
     build_greeting,
@@ -308,7 +308,7 @@ def test_build_greeting_reads_display_name_from_config():
 
 def test_greeting_endpoint(monkeypatch):
     monkeypatch.setattr(
-        "core.secretary_greeting.build_greeting",
+        "core.secretary.greeting.build_greeting",
         lambda window="today": {"window": window, "headline": "Dof，早安。", "achievements": [], "source": "rules", "claim_boundary": "x"},
     )
     client = TestClient(app)
@@ -318,17 +318,17 @@ def test_greeting_endpoint(monkeypatch):
     def reject(window="today"):
         raise GreetingRejected("invalid_window", "bad")
 
-    monkeypatch.setattr("core.secretary_greeting.build_greeting", reject)
+    monkeypatch.setattr("core.secretary.greeting.build_greeting", reject)
     assert client.get("/api/v1/secretary/greeting?window=week", headers={"Origin": _LOCAL_ORIGIN}).status_code == 422
 
 
 def test_telegram_today_starts_with_the_greeting(monkeypatch):
     from notifiers import telegram_chat
 
-    monkeypatch.setattr("core.secretary_packs.build_today_view", lambda **kw: {"resume": {}, "pack_line": None, "active_project_count": 0})
-    monkeypatch.setattr("core.proactive_secretary.build_action_proposals", lambda **kw: {"proposals": []})
+    monkeypatch.setattr("core.secretary.present.build_today_view", lambda **kw: {"resume": {}, "pack_line": None, "active_project_count": 0})
+    monkeypatch.setattr("core.secretary.aggregate.build_action_proposals", lambda **kw: {"proposals": []})
     monkeypatch.setattr(
-        "core.secretary_greeting.build_greeting",
+        "core.secretary.greeting.build_greeting",
         lambda **kw: {"headline": "Dof，早安。", "lead": "今天到目前為止，你已經：", "achievements": ["3 個 commit"],
                       "recent_summary": None, "encouragement": "很好。"},
     )

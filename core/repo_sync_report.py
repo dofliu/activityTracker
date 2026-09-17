@@ -27,6 +27,7 @@ from typing import Any
 from core.config import get_config
 from core.runtime_paths import resolve_runtime_path
 from core.time_utils import get_local_now
+from core.repo_sync import LocalRepositorySync
 
 SNAPSHOT_FILENAME = "latest.json"
 DEFAULT_SNAPSHOT_MAX_AGE_HOURS = 36
@@ -118,7 +119,6 @@ def build_repo_sync_report(
     cfg = cfg or get_config()
     now = now or get_local_now()
     if sync is None:
-        from core.repo_sync import LocalRepositorySync
 
         sync = LocalRepositorySync(cfg)
     payload = sync.list_statuses(scope="all")

@@ -29,6 +29,17 @@ from typing import Any, Callable
 from core.config import get_config
 from core.database import get_db
 from core.time_utils import get_local_now
+from core.activity_sources import source_for, within_window
+from core.models import ActivityMicroSummary, GitHubPREvent, OpenLoop, ProjectState
+from core.secretary.aggregate import advisor_settings
+from core.calendar_agenda import meetings_started_between
+from core.usage_analytics import get_usage_summary
+from core.background_tasks import get_background_task_summary
+from core.calendar_agenda import schedule_sentence
+from core.secretary.aggregate import _default_generate
+from core.secretary.memory import load_profile
+from core.calendar_agenda import day_agenda
+
 
 logger = logging.getLogger("OmniContext.SecretaryGreeting")
 
@@ -105,8 +116,6 @@ def collect_activity_stats(
     """在視窗內數一遍本機資料庫；每個數字都可回溯到一張表。"""
     from sqlalchemy import func
 
-    from core.activity_sources import source_for, within_window
-    from core.models import ActivityMicroSummary, GitHubPREvent, OpenLoop, ProjectState
 
     # 三張事件表「查哪張、看哪個時間欄位」由 core.activity_sources 單一定義（D3）：
     # 新增一種活動來源時，這裡與每週回顧／模式提案／工作誌一起變，不會各走各的。
@@ -205,7 +214,6 @@ def collect_activity_stats(
     stats["meetings"] = 0
     stats["meeting_minutes"] = 0
     try:
-        from core.calendar_agenda import meetings_started_between
 
         meetings = meetings_started_between(since, until or now, database=database, cfg=cfg)
         stats["calendar_enabled"] = bool(meetings.get("enabled"))
@@ -225,7 +233,6 @@ def collect_activity_stats(
     stats["background_tasks"] = None
     if include_usage and window == "today":
         try:
-            from core.usage_analytics import get_usage_summary
 
             usage = get_usage_summary(database=database, cfg=cfg, now=now)
             stats["foreground_minutes"] = float(((usage.get("goal") or {}).get("foreground_minutes")) or 0.0)
@@ -233,7 +240,6 @@ def collect_activity_stats(
         except Exception as exc:  # noqa: BLE001 — 使用時間讀不到不該讓卡片消失
             logger.debug("usage summary unavailable for greeting: %s", type(exc).__name__)
         try:
-            from core.background_tasks import get_background_task_summary
 
             background = get_background_task_summary(database=database, cfg=cfg, now=now)
             stats["background_tasks"] = int(background.get("completed_count") or background.get("count") or 0)
@@ -403,7 +409,6 @@ def compose_greeting(
     schedule_line = None
     schedule: dict[str, Any] | None = None
     if agenda and window == "today" and agenda.get("enabled") and agenda.get("count"):
-        from core.calendar_agenda import schedule_sentence
 
         schedule_line = schedule_sentence(agenda)
         nxt = agenda.get("next") or {}
@@ -473,7 +478,6 @@ def compose_greeting(
 
 def llm_settings(cfg: Any | None = None) -> dict[str, Any]:
     cfg = cfg or get_config()
-    from core.secretary_advisor import advisor_settings
 
     advisor = advisor_settings(cfg)
     try:
@@ -548,7 +552,6 @@ def polish_with_llm(
     user_prompt = json.dumps(facts, ensure_ascii=False, indent=1)
     try:
         if generate is None:
-            from core.secretary_advisor import _default_generate
 
             generate = _default_generate(settings["provider"], settings["timeout_seconds"])
         text = str(generate(system_prompt, user_prompt) or "").strip()
@@ -589,14 +592,12 @@ def build_greeting(
     agenda = None
     if window == "today" and stats.get("calendar_enabled"):
         try:
-            from core.calendar_agenda import day_agenda
 
             agenda = day_agenda(now=now, database=database, cfg=cfg)
         except Exception as exc:  # noqa: BLE001 — 行程讀不到只少一句話
             logger.debug("agenda unavailable for greeting: %s", type(exc).__name__)
     tone = "warm"
     try:
-        from core.secretary_profile import load_profile
 
         tone = load_profile(database=database).get("tone", "warm")
     except Exception as exc:  # noqa: BLE001 — 個人檔案讀不到就用預設語氣

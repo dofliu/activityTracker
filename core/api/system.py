@@ -9,23 +9,19 @@ health／extension 狀態與心跳／capture 覆蓋／control start-stop／syste
 import logging
 from core.capture_coverage import build_capture_coverage
 from core.config import get_config
-from core.extension_monitor import build_extension_status
-from core.extension_monitor import record_extension_heartbeat
+from core.extension_monitor import build_extension_status, record_extension_heartbeat
 from core.extension_verification import extension_verification_registry
 from core.manager import get_manager
-from core.platform_services import open_local_path
-from core.platform_services import open_web_url
+from core.platform_services import open_local_path, open_web_url
 from core.project_engine import get_project_state_count
 from core.schemas import AcceptanceConfirmRequest, ExtensionHeartbeatCreate, ExtensionVerificationStart, OpenPathRequest, SystemMaintenanceRequest
 from core.security import extension_ingest_authorized
 from core.time_utils import get_local_now
-from fastapi import APIRouter
-from fastapi import Body
-from fastapi import HTTPException
-from fastapi import Query
-from fastapi import Request
+from fastapi import APIRouter, Body, HTTPException, Query, Request
 from pathlib import Path
 from typing import Optional
+from core.data_lifecycle import checkpoint_sqlite_database, configured_database_path, get_latest_maintenance_receipt, run_database_maintenance
+from core.acceptance import build_acceptance_report, record_human_confirmation
 
 logger = logging.getLogger("OmniContext.Server")
 
@@ -102,7 +98,6 @@ def stop_monitoring():
 @router.post("/api/v1/system/maintenance")
 def trigger_system_maintenance(payload: SystemMaintenanceRequest = Body(default_factory=SystemMaintenanceRequest)):
     """手動觸發資料庫生命週期維護（Checkpoint、完整性檢查、歷史修剪、線上備份、輪替）"""
-    from core.data_lifecycle import run_database_maintenance
     res = run_database_maintenance(
         max_backups=payload.max_backups or 7,
         retention_days=payload.retention_days or 90,
@@ -114,7 +109,6 @@ def trigger_system_maintenance(payload: SystemMaintenanceRequest = Body(default_
 @router.get("/api/v1/system/maintenance/receipt")
 def get_system_maintenance_receipt():
     """取得最近一次資料庫維護收據與健康資訊"""
-    from core.data_lifecycle import get_latest_maintenance_receipt
     receipt = get_latest_maintenance_receipt()
     if not receipt:
         return {"has_receipt": False, "status": "no_receipt", "message": "尚未執行過資料庫維護"}
@@ -124,7 +118,6 @@ def get_system_maintenance_receipt():
 @router.post("/api/v1/system/wal-checkpoint")
 def trigger_wal_checkpoint(mode: str = Query("TRUNCATE", description="PASSIVE, FULL, RESTART, TRUNCATE")):
     """手動執行 SQLite WAL Checkpoint"""
-    from core.data_lifecycle import checkpoint_sqlite_database
     return checkpoint_sqlite_database(mode=mode)
 
 
@@ -138,7 +131,6 @@ def trigger_system_heal():
 @router.get("/api/v1/system/health")
 def get_system_health():
     """全域系統健康診斷端點：整合採集器診斷、自我修復狀態、維護收據與資料庫指標"""
-    from core.data_lifecycle import get_latest_maintenance_receipt, configured_database_path
     manager = get_manager()
     status = manager.get_status()
     receipt = get_latest_maintenance_receipt()
@@ -178,7 +170,6 @@ def get_acceptance_checklist(item: Optional[str] = Query(None, max_length=100)):
     不載入索引。runtime=True 因為這裡就是服務程序，檢索 worker 這類
     記憶體狀態只有在這個程序內才看得到。
     """
-    from core.acceptance import build_acceptance_report
 
     only = [part.strip() for part in item.split(",") if part.strip()] if item else None
     return build_acceptance_report(runtime=True, only=only)
@@ -191,7 +182,6 @@ def confirm_acceptance_item(payload: AcceptanceConfirmRequest):
     這是人工署名收據，不是機器證據：只讓機器沒有判準可查的項目收斂，
     永遠不會覆蓋機器已查到的結果。沒有外部效果，沿用 loopback 邊界即可。
     """
-    from core.acceptance import record_human_confirmation
 
     try:
         return record_human_confirmation(

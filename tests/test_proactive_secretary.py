@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from core.models import Base, OpenLoop, ProjectState
-from core.proactive_secretary import build_action_proposals
+from core.secretary.aggregate import build_action_proposals
 
 
 class DictConfig:

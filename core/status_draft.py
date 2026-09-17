@@ -19,6 +19,7 @@ from core.database import get_db
 from core.models import ProjectState
 from core.runtime_paths import resolve_runtime_path
 from core.time_utils import get_local_now
+from core.repo_sync import LocalRepositorySync
 
 logger = logging.getLogger("OmniContext.StatusDraft")
 
@@ -34,7 +35,6 @@ STATUS_DRAFT_CLAIM_BOUNDARY = (
 
 
 def _default_repo_references() -> list[Any]:
-    from core.repo_sync import LocalRepositorySync
 
     return LocalRepositorySync()._discover_references()[0]
 

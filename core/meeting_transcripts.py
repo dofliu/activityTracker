@@ -21,6 +21,9 @@ from typing import Any, Callable, Iterable
 from core.config import get_config
 from core.runtime_paths import resolve_runtime_path
 from core.time_utils import get_local_now
+from core.secretary.memory import memory_enabled, record_observation
+from core.database import get_db
+from core.models import SecretaryNote
 
 SUPPORTED_SUFFIXES = (".vtt", ".txt", ".md", ".docx")
 SOURCE_PREFIX = "meeting:"
@@ -471,7 +474,6 @@ def build_meeting_notes(
         result["skipped"].append({"reason": meta.get("reason")})
         return result
 
-    from core.secretary_memory import memory_enabled, record_observation
 
     if not memory_enabled(cfg):
         result["skipped"].append({"reason": "memory_disabled"})
@@ -608,7 +610,6 @@ def meeting_context(
         context["calendar_error"] = type(exc).__name__
 
     try:
-        from core.database import get_db
         from core.models import WindowEvent
 
         db = database or get_db()
@@ -665,7 +666,7 @@ def collect_meeting_signals(
     # (1) 記憶區裡的會議觀察還有沒有人沒處理的候選待辦
     pending_total = 0
     try:
-        from core.secretary_memory import list_notes, memory_enabled
+        from core.secretary.memory import list_notes, memory_enabled
 
         if memory_enabled(cfg):
             listed = list_notes(kind="observation", limit=200, database=database)
@@ -752,8 +753,6 @@ def accept_followup(
     database: Any | None = None,
 ) -> dict[str, Any]:
     """把一條候選待辦變成未結事項（或忽略它）。**只有這條路徑會寫 open_loops。**"""
-    from core.database import get_db
-    from core.models import SecretaryNote
 
     if action not in ("accept", "ignore"):
         raise ValueError("action 必須是 accept 或 ignore")

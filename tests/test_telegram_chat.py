@@ -22,7 +22,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from core.models import Base
-from core.secretary_ask import AskRejected, ask_secretary
+from core.secretary.present import AskRejected, ask_secretary
 from notifiers import telegram_approvals as approvals
 from notifiers import telegram_chat as chat_module
 from notifiers.telegram_approvals import handle_telegram_update
@@ -288,7 +288,7 @@ def test_long_answer_is_split_not_truncated():
 
 
 def test_note_prefix_writes_memory_without_calling_the_model(monkeypatch):
-    import core.secretary_memory as mem
+    import core.secretary.memory as mem
 
     db = TempDatabase()
     monkeypatch.setattr(mem, "get_db", lambda: db)
@@ -305,7 +305,7 @@ def test_note_prefix_writes_memory_without_calling_the_model(monkeypatch):
 
 
 def test_preference_note_from_phone_reaches_the_proposal_mutes(monkeypatch):
-    import core.secretary_memory as mem
+    import core.secretary.memory as mem
 
     db = TempDatabase()
     monkeypatch.setattr(mem, "get_db", lambda: db)
@@ -320,18 +320,18 @@ def test_preference_note_from_phone_reaches_the_proposal_mutes(monkeypatch):
 
 
 def test_read_only_commands_never_call_the_model(monkeypatch):
-    import core.secretary_memory as mem
+    import core.secretary.memory as mem
 
     db = TempDatabase()
     monkeypatch.setattr(mem, "get_db", lambda: db)
     monkeypatch.setattr(
-        "core.secretary_packs.build_today_view",
+        "core.secretary.present.build_today_view",
         lambda **kw: {"resume": {"display_name": "alpha", "last_activity_at": "2026-09-03T08:00:00",
                                  "last_action_summary": "修 CI"}, "pack_line": "早晨包：repo 需 pull 2",
                       "active_project_count": 3},
     )
     monkeypatch.setattr(
-        "core.proactive_secretary.build_action_proposals",
+        "core.secretary.aggregate.build_action_proposals",
         lambda **kw: {"proposals": [{"project_key": "alpha", "title": "PR 等 review", "why_now": "只差一個 merge"}]},
     )
     calls = []
@@ -348,7 +348,7 @@ def test_read_only_commands_never_call_the_model(monkeypatch):
 
 def test_today_survives_a_broken_today_view(monkeypatch):
     monkeypatch.setattr(
-        "core.secretary_packs.build_today_view",
+        "core.secretary.present.build_today_view",
         lambda **kw: (_ for _ in ()).throw(RuntimeError("db locked")),
     )
     transport = RecordingTransport()
@@ -553,7 +553,7 @@ def test_ask_never_returns_an_empty_answer():
 
 
 def test_chat_modules_do_not_import_index_libraries_at_module_level():
-    for path in ("notifiers/telegram_chat.py", "core/secretary_ask.py"):
+    for path in ("notifiers/telegram_chat.py", "core/secretary/present.py"):
         for line in Path(path).read_text(encoding="utf-8").splitlines():
             if line.startswith(("import ", "from ")):
                 assert not any(

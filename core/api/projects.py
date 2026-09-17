@@ -14,6 +14,7 @@ from fastapi import APIRouter
 from fastapi import HTTPException
 from fastapi import Query
 from typing import Optional
+from core.handoff_engine import build_project_handoff, format_handoff_markdown
 
 logger = logging.getLogger("OmniContext.Server")
 
@@ -32,7 +33,6 @@ def get_project_handoff_api(
     turns: int = Query(5, ge=1, le=20, description="納入之歷史 AI 對話回合數")
 ):
     """取得指定專案的 Context Handoff 結構化接續 Prompt (P3-1)"""
-    from core.handoff_engine import build_project_handoff, format_handoff_markdown
     try:
         data = build_project_handoff(project_key, turns_limit=turns)
         markdown_text = format_handoff_markdown(data)

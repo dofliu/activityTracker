@@ -169,13 +169,13 @@ def _stub_greeting(monkeypatch, responses):
         calls.append(window)
         return responses[window]
 
-    monkeypatch.setattr("core.secretary_greeting.build_greeting", fake)
+    monkeypatch.setattr("core.secretary.greeting.build_greeting", fake)
     return calls
 
 
 def test_morning_briefing_opens_with_the_secretary_greeting(monkeypatch):
-    monkeypatch.setattr("core.secretary_packs.latest_pack_summary", lambda **kw: None)
-    monkeypatch.setattr("core.proactive_secretary.briefing_proposals", lambda limit=2: {"proposals": [], "total": 0})
+    monkeypatch.setattr("core.secretary.packs.latest_pack_summary", lambda **kw: None)
+    monkeypatch.setattr("core.secretary.aggregate.briefing_proposals", lambda limit=2: {"proposals": [], "total": 0})
     calls = _stub_greeting(monkeypatch, {"today": _greeting()})
     message = build_morning_briefing(projects=[_projects()], open_loops=[], cfg=_cfg())
     first = message.sections[0]
@@ -194,8 +194,8 @@ def test_morning_briefing_opens_with_the_secretary_greeting(monkeypatch):
 
 
 def test_morning_briefing_says_yesterday_when_today_is_still_empty(monkeypatch):
-    monkeypatch.setattr("core.secretary_packs.latest_pack_summary", lambda **kw: None)
-    monkeypatch.setattr("core.proactive_secretary.briefing_proposals", lambda limit=2: {"proposals": []})
+    monkeypatch.setattr("core.secretary.packs.latest_pack_summary", lambda **kw: None)
+    monkeypatch.setattr("core.secretary.aggregate.briefing_proposals", lambda limit=2: {"proposals": []})
     calls = _stub_greeting(monkeypatch, {
         "today": _greeting(observed=False),
         "yesterday": _greeting(window="yesterday"),
@@ -211,8 +211,8 @@ def test_morning_briefing_says_yesterday_when_today_is_still_empty(monkeypatch):
 
 
 def test_morning_briefing_uses_llm_text_verbatim_and_can_be_switched_off(monkeypatch):
-    monkeypatch.setattr("core.secretary_packs.latest_pack_summary", lambda **kw: None)
-    monkeypatch.setattr("core.proactive_secretary.briefing_proposals", lambda limit=2: {"proposals": []})
+    monkeypatch.setattr("core.secretary.packs.latest_pack_summary", lambda **kw: None)
+    monkeypatch.setattr("core.secretary.aggregate.briefing_proposals", lambda limit=2: {"proposals": []})
     _stub_greeting(monkeypatch, {"today": _greeting(source="llm")})
     message = build_morning_briefing(projects=[], open_loops=[], cfg=_cfg())
     assert message.sections[0].lines == ("Dof，早安。（LLM 潤飾版）今天開工兩小時就開了 1 個 PR。",)
@@ -224,17 +224,17 @@ def test_morning_briefing_uses_llm_text_verbatim_and_can_be_switched_off(monkeyp
     def boom(**kw):
         raise RuntimeError("db locked")
 
-    monkeypatch.setattr("core.secretary_greeting.build_greeting", boom)
+    monkeypatch.setattr("core.secretary.greeting.build_greeting", boom)
     text = render_plain(build_morning_briefing(projects=[], open_loops=[], cfg=_cfg()))
     assert "Dof，早安" not in text and "晨間簡報" in text and "尚無高頻專案" in text
 
 
 def test_morning_briefing_includes_projects_loops_and_degrades_gracefully(monkeypatch):
     _stub_greeting(monkeypatch, {"today": _greeting()})
-    monkeypatch.setattr("core.secretary_packs.latest_pack_summary", lambda **kw: {"needs_pull": 2})
-    monkeypatch.setattr("core.secretary_packs.pack_summary_line", lambda summary: "早晨包：repo 需 pull 2")
+    monkeypatch.setattr("core.secretary.packs.latest_pack_summary", lambda **kw: {"needs_pull": 2})
+    monkeypatch.setattr("core.secretary.packs.pack_summary_line", lambda summary: "早晨包：repo 需 pull 2")
     monkeypatch.setattr(
-        "core.proactive_secretary.briefing_proposals",
+        "core.secretary.aggregate.briefing_proposals",
         lambda limit=2: {"proposals": [{"project_key": "alpha", "title": "PR 等 review", "why_now": "只差一個 merge"}], "total": 3},
     )
     message = build_morning_briefing(
@@ -250,9 +250,9 @@ def test_morning_briefing_survives_secretary_and_pack_failure(monkeypatch):
     def boom(*args, **kwargs):
         raise RuntimeError("offline")
 
-    monkeypatch.setattr("core.secretary_packs.latest_pack_summary", boom)
-    monkeypatch.setattr("core.proactive_secretary.briefing_proposals", boom)
-    monkeypatch.setattr("core.secretary_greeting.build_greeting", boom)
+    monkeypatch.setattr("core.secretary.packs.latest_pack_summary", boom)
+    monkeypatch.setattr("core.secretary.aggregate.briefing_proposals", boom)
+    monkeypatch.setattr("core.secretary.greeting.build_greeting", boom)
     text = render_plain(build_morning_briefing(projects=[], open_loops=[]))
     assert "晨間簡報" in text and "尚無高頻專案" in text and "無待辦未結事項" in text
     # 秘書層與早晨包都掛掉時，那兩段完全不出現（也不留談建議的 footer）
@@ -260,7 +260,7 @@ def test_morning_briefing_survives_secretary_and_pack_failure(monkeypatch):
 
 
 def test_evening_handoff_only_counts_today(monkeypatch):
-    monkeypatch.setattr("core.secretary_packs.latest_pack_summary", lambda **kw: None)
+    monkeypatch.setattr("core.secretary.packs.latest_pack_summary", lambda **kw: None)
     from datetime import datetime
 
     now = datetime(2026, 9, 3, 22, 0)

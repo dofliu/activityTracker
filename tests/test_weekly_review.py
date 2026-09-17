@@ -22,10 +22,11 @@ from sqlalchemy.orm import sessionmaker
 
 from core import weekly_review as wr
 from core.acceptance import ITEM_IDS, build_acceptance_report
+import core.secretary.aggregate as agg  # D8：提案引擎改模組層 import
 from core.models import AIPromptEvent, Base, GitActivityEvent, SecretaryNote, SecretaryScheduledTask
-from core.proactive_secretary import SUGGESTED_ACTIONS, build_action_proposals, why_now
-from core.secretary_home import pick_memory
-from core.secretary_memory import add_note, record_observation
+from core.secretary.aggregate import SUGGESTED_ACTIONS, build_action_proposals, why_now
+from core.secretary.present import pick_memory
+from core.secretary.memory import add_note, record_observation
 from core.weekly_review import (
     active_days_by_project,
     build_weekly_review,
@@ -283,7 +284,7 @@ def test_drift_card_respects_mute_and_review_failure_is_isolated(db, monkeypatch
     def boom(**_kwargs):
         raise RuntimeError("review exploded")
 
-    monkeypatch.setattr(wr, "collect_priority_drift_signals", boom)
+    monkeypatch.setattr(agg, "collect_priority_drift_signals", boom)
     result = _proposals(db, _cfg())
     assert result["status"] == "proposal_only" and result["inputs"]["weekly_review"] == {"used": False, "reason": "error:RuntimeError"}
 
@@ -307,7 +308,7 @@ def test_weekly_review_is_a_read_only_schedulable_template_with_bounded_params()
 
 
 def test_morning_pack_backfills_last_weeks_review_and_survives_its_failure(db, monkeypatch):
-    from core.secretary_packs import build_morning_pack
+    from core.secretary.packs import build_morning_pack
 
     _active(db, "uav", [0, 1, 2])
     ok = lambda: {"status": "ok"}  # noqa: E731
@@ -320,7 +321,9 @@ def test_morning_pack_backfills_last_weeks_review_and_survives_its_failure(db, m
     def boom(**_kwargs):
         raise RuntimeError("review exploded")
 
-    monkeypatch.setattr(wr, "build_weekly_review", boom)
+    import core.secretary.packs as packs_module  # D8：早晨包改模組層 import，patch 綁使用端
+
+    monkeypatch.setattr(packs_module, "build_weekly_review", boom)
     broken = build_morning_pack(cfg=_cfg(), now=NOW, repo_sync=ok, status_draft=ok, handoffs=ok, database=db)
     assert "weekly_review: RuntimeError" in broken["errors"] and "weekly_review_label" not in broken
 

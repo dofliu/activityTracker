@@ -10,16 +10,14 @@ import yaml
 
 from core.config import get_config
 from core.database import get_db
-from core.models import GitHubPREvent
-from core.models import GitHubRepoState
+from core.models import GitHubPREvent, GitHubRepoState
 from core.project_engine import refresh_project_states
-from core.repo_sync import LocalRepositorySync
-from core.repo_sync import RepositorySyncRejected
+from core.repo_sync import LocalRepositorySync, RepositorySyncRejected
 from core.schemas import GitHubConnectRequest, RepoOnboardingActionRequest, RepositorySyncActionRequest, RepositorySyncBatchRequest, RepositorySyncFetchAllRequest
-from fastapi import APIRouter
-from fastapi import HTTPException
-from fastapi import Query
+from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
+from core.repo_sync_report import load_snapshot
+from core.repo_onboarding import RepoOnboarding, RepoOnboardingRejected
 
 
 router = APIRouter()
@@ -40,7 +38,6 @@ def get_local_repository_sync_status(
 @router.get("/api/v1/repos/sync-snapshot")
 def get_local_repository_sync_snapshot():
     """最近一次 L0 同步報告留下的快照（只讀檔，不跑 git）；專案卡用它顯示 git 狀態 chip。"""
-    from core.repo_sync_report import load_snapshot
 
     snapshot = load_snapshot()
     if snapshot is None:
@@ -107,7 +104,6 @@ def get_repo_onboarding_report():
     """P4.3 對帳（唯讀）：未 git init 的資料夾、無 remote 的 repo、
     尚未 clone 的 GitHub repo。已 clone 與否只以 remote URL 比對；
     同名僅提示、不自動配對。"""
-    from core.repo_onboarding import RepoOnboarding
 
     return RepoOnboarding().build_report()
 
@@ -116,7 +112,6 @@ def get_repo_onboarding_report():
 def run_repo_onboarding_action(req: RepoOnboardingActionRequest):
     """執行單一、已確認的 onboarding 動作（init／attach remote／clone／
     create remote）。不覆寫非空目錄、不批次、永不 force、永不代為 push。"""
-    from core.repo_onboarding import RepoOnboarding, RepoOnboardingRejected
 
     service = RepoOnboarding()
     try:

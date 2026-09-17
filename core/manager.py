@@ -1,27 +1,20 @@
 import logging
 import sys
 import threading
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 from datetime import datetime
 from core.time_utils import get_local_now
 from core.config import get_config
 from core.database import get_db
-from core.models import (
-    AIPromptEvent,
-    DailySummary,
-    FileActivityEvent,
-    GitActivityEvent,
-    IngestionCheckpoint,
-    OpenLoop,
-    ProjectState,
-    WindowEvent,
-)
+from core.models import AIPromptEvent, DailySummary, FileActivityEvent, GitActivityEvent, IngestionCheckpoint, OpenLoop, ProjectState, WindowEvent
 from watchers.file_watcher import FileWatcherService
 from watchers.git_watcher import GitWatcherService
 from watchers.window_watcher import WindowWatcherService
 from watchers.agent_log_watcher import AgentLogWatcherService
 from watchers.calendar_watcher import CalendarWatcherService, calendar_effective
 from synthesizer.scheduler import SynthesisScheduler
+from core.coverage_ledger import record_observation_heartbeat
+from core.coverage_ledger import close_open_intervals
 
 logger = logging.getLogger("OmniContext.Manager")
 
@@ -164,7 +157,6 @@ class WatcherManager:
 
     def record_coverage_heartbeat(self) -> Dict[str, Any]:
         """依目前觀測狀態寫入 coverage ledger heartbeat；失敗不影響採集。"""
-        from core.coverage_ledger import record_observation_heartbeat
 
         state = self.window_observation_state()
         receipt = record_observation_heartbeat(
@@ -206,7 +198,6 @@ class WatcherManager:
             self.scheduler.shutdown()
             self._is_running = False
             try:
-                from core.coverage_ledger import close_open_intervals
 
                 close_open_intervals(reason="monitoring_stopped")
             except Exception as e:

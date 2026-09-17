@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from core import secretary_greeting as sg
+import core.secretary.greeting as sg
 from core.calendar_agenda import (
     CALENDAR_CLAIM_BOUNDARY,
     day_agenda,
@@ -456,9 +456,9 @@ def test_morning_briefing_lists_todays_events(monkeypatch, tmp_path):
 
     db = _seeded_db(tmp_path)
     cfg = _cfg([tmp_path])
-    monkeypatch.setattr("core.secretary_packs.latest_pack_summary", lambda **kw: None)
-    monkeypatch.setattr("core.proactive_secretary.briefing_proposals", lambda limit=2: {"proposals": []})
-    monkeypatch.setattr("core.secretary_greeting.build_greeting", lambda **kw: {
+    monkeypatch.setattr("core.secretary.packs.latest_pack_summary", lambda **kw: None)
+    monkeypatch.setattr("core.secretary.aggregate.briefing_proposals", lambda limit=2: {"proposals": []})
+    monkeypatch.setattr("core.secretary.greeting.build_greeting", lambda **kw: {
         "headline": "Dof，早安。", "lead": "今天到目前為止，你已經：", "achievements": ["開了 2 場會（60 分鐘）"],
         "schedule_line": "今天 6 場行程，下一場 14:00 專案會議。", "encouragement": "穩。", "source": "rules",
         "stats": {"observed_anything": True},
@@ -486,7 +486,7 @@ def test_morning_briefing_lists_todays_events(monkeypatch, tmp_path):
 
 
 def test_today_view_carries_calendar_block(tmp_path):
-    from core.secretary_packs import build_today_view
+    from core.secretary.present import build_today_view
 
     db = _seeded_db(tmp_path)
     view = build_today_view(database=db, cfg=_cfg([tmp_path]), now=NOW, projects=[])
@@ -508,7 +508,7 @@ def test_agenda_endpoint(monkeypatch):
         captured["day"] = day
         return {"date": "2026-09-04", "enabled": False, "events": [], "count": 0, "claim_boundary": CALENDAR_CLAIM_BOUNDARY}
 
-    monkeypatch.setattr("core.calendar_agenda.day_agenda", fake)
+    monkeypatch.setattr("core.api.secretary.day_agenda", fake)  # D8：改為模組層 import，patch 綁在使用端
     response = client.get("/api/v1/calendar/agenda?date=2026-09-04", headers=headers)
     assert response.status_code == 200 and response.json()["claim_boundary"] == CALENDAR_CLAIM_BOUNDARY
     assert captured["day"] == datetime(2026, 9, 4)

@@ -21,6 +21,7 @@ from sqlalchemy.orm import sessionmaker
 
 from core import docs_freshness as df
 from core.acceptance import ITEM_IDS, build_acceptance_report
+import core.secretary.aggregate as agg  # D8：提案引擎改模組層 import
 from core.agent_executor import _DRAFT_PLAN_TYPES, _draft_prompt
 from core.docs_freshness import (
     collect_docs_freshness_signals,
@@ -31,8 +32,8 @@ from core.docs_freshness import (
     is_doc_file,
 )
 from core.models import Base, FileActivityEvent, GitActivityEvent, SecretaryNote
-from core.proactive_secretary import SUGGESTED_ACTIONS, build_action_proposals, why_now
-from core.secretary_memory import record_observation
+from core.secretary.aggregate import SUGGESTED_ACTIONS, build_action_proposals, why_now
+from core.secretary.memory import record_observation
 
 NOW = datetime(2026, 9, 20, 10, 0)
 
@@ -237,7 +238,7 @@ def test_engine_emits_the_card_with_reason_and_reports_inputs(db):
 
 
 def test_mute_suppresses_it_and_failure_is_isolated(db, monkeypatch):
-    from core.secretary_memory import add_note
+    from core.secretary.memory import add_note
 
     _behind(db, "uav", commits=12, docs_days=6)
     add_note(kind="preference", body="不要提醒 docs_behind_code", database=db, now=NOW)
@@ -248,7 +249,7 @@ def test_mute_suppresses_it_and_failure_is_isolated(db, monkeypatch):
     def boom(**_kwargs):
         raise RuntimeError("docs exploded")
 
-    monkeypatch.setattr(df, "collect_docs_freshness_signals", boom)
+    monkeypatch.setattr(agg, "collect_docs_freshness_signals", boom)
     result = _proposals(db, _cfg())
     assert result["status"] == "proposal_only"
     assert result["inputs"]["docs_freshness"] == {"used": False, "reason": "error:RuntimeError"}

@@ -179,7 +179,7 @@ HELP_TEXT = (
 
 
 def _today_text(cfg: Any, now: datetime) -> str:
-    from core.secretary_packs import build_today_view
+    from core.secretary.present import build_today_view
 
     try:
         view = build_today_view(cfg=cfg, now=now)
@@ -188,7 +188,7 @@ def _today_text(cfg: Any, now: datetime) -> str:
     lines = [f"📅 今天 {now.strftime('%m-%d %H:%M')}"]
     # 先來一句小秘書的話（今天做了什麼＋鼓勵）；讀不到就略過
     try:
-        from core.secretary_greeting import build_greeting, plain_text
+        from core.secretary.greeting import build_greeting, plain_text
 
         greeting = build_greeting(window="today", now=now, cfg=cfg, use_llm=False)
         lines.extend([plain_text(greeting), ""])
@@ -207,7 +207,7 @@ def _today_text(cfg: Any, now: datetime) -> str:
     lines.append(f"進行中專案：{view.get('active_project_count', 0)} 個")
 
     try:
-        from core.proactive_secretary import build_action_proposals
+        from core.secretary.aggregate import build_action_proposals
 
         proposals = build_action_proposals(cfg=cfg, now=now, limit=3).get("proposals", [])
     except Exception as exc:  # noqa: BLE001
@@ -226,7 +226,7 @@ def _today_text(cfg: Any, now: datetime) -> str:
 
 
 def _notes_text(limit: int = 8) -> str:
-    from core.secretary_memory import list_notes
+    from core.secretary.memory import list_notes
 
     try:
         listed = list_notes(limit=max(1, min(limit, 30)))
@@ -265,7 +265,7 @@ def _status_text(cfg: Any, now: datetime) -> str:
     lines.append(f"遠端 /arm：{'允許' if remote_arm_enabled(cfg) else '未開放（只能在儀表板解鎖）'}")
     lines.append(f"長輪詢：{'運行中' if approvals.get('poller_running') else '未運行'}")
     try:
-        from core.secretary_memory import list_notes
+        from core.secretary.memory import list_notes
 
         lines.append(f"記憶區：{list_notes(limit=1).get('total', 0)} 筆")
     except Exception as exc:  # noqa: BLE001
@@ -414,7 +414,7 @@ def _handle_question(
         _ASK_IN_FLIGHT = True
 
     if ask is None:
-        from core.secretary_ask import ask_secretary as ask
+        from core.secretary.present import ask_secretary as ask
 
     send_text(token, chat, "🤔 查一下…", transport=transport)
     runner = submit or _default_submit
@@ -438,7 +438,7 @@ def handle_chat_message(
     submit: Optional[Callable[[Callable[[], None]], None]] = None,
 ) -> dict[str, Any]:
     """處理綁定 chat 的一則文字訊息；呼叫端已完成 chat 綁定檢查。"""
-    from core.secretary_memory import add_note, parse_note_command
+    from core.secretary.memory import add_note, parse_note_command
 
     now = now or get_local_now()
     raw = (text or "").strip()

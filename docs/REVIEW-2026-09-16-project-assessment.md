@@ -139,10 +139,10 @@
    對**同樣五種實體**（ProjectState／OpenLoop／AI turn／Git／File）各做一次 embedding、各有查詢路徑與 UI（`omni ask` vs `/api/v1/rag/chat`）。這是 repo 裡最大的一塊重複。
 3. **四份「每專案每日活躍」聚合**：`weekly_review.py:83`、`activity_patterns.py:243-306`、`activity_digest.py:77`、`secretary_greeting.py:97`，各自從同一組事件表算一遍。
    → **同日已完成（D3）**，但**這條當時的描述只對一半**：其中兩組早就互相委派了。真正的重複是「哪些表算活動、專案名在哪個欄位、一天從哪到哪」各寫三遍，已收進 `core/activity_sources.py`（ROADMAP §11.2）。
-4. **秘書叢集 11 個模組、4,109 行、沒有共同型別**：全部是回傳 `dict[str, Any]` 的自由函式（`build_*`／`collect_*_signals`），
+4. **秘書叢集 11 個模組、4,109 行、沒有共同型別**（→ **同日已完成（D8）**：收成 `core/secretary/` 四層七檔，`Signal`／`Proposal` 取代自由 dict，ADR-024）：全部是回傳 `dict[str, Any]` 的自由函式（`build_*`／`collect_*_signals`），
    五個訊號收集器與 `build_action_proposals`（`proactive_secretary.py:242`）之間的契約是未定型的 dict。`secretary_ask`（202 行）、`secretary_profile`（150 行）、`secretary_home`（242 行）不值得各自一個模組。
 5. **桌面通知在抽象之外**：`notifiers/desktop_notifier.py`（282 行）自己再扇出一次晨報／交接／停滯／里程碑，沒走 `ChannelAdapter`。→ **同日已完成（D5）**：內容併回 `notifiers/messages.py`、新增 `DesktopChannel`、扇出只剩 `secretary_push`；該模組剩 165 行純 transport。合併時抓到一個實際漂移：未歸戶收容桶桌面有濾、Telegram／LINE 沒濾。
-6. **循環依賴用延遲 import 撐著**：`core/` 內 110 處函式內 import；`proactive_secretary ↔ secretary_memory ↔ secretary_home ↔ agent_executor` 是一個真的環。
+6. **循環依賴用延遲 import 撐著**：`core/` 內 110 處函式內 import；`proactive_secretary ↔ secretary_memory ↔ secretary_home ↔ agent_executor` 是一個真的環。→ **同日已完成（D8）**：環拆在呈現層的組合點與兩次搬家（`build_today_view` → present、preset 函式 → `scheduled_tasks`）；指向 `core.*` 的函式內 import 116 → 15。
 7. **模組層可變全域狀態**：`_PENDING_L2_CONFIRMS`（`agent_executor.py:72`）、`_ARMED_UNTIL`／`_PROCESSED_CALLBACK_IDS`（`telegram_approvals.py:74-76`）、advisor／project 快取、
    `server.py:79-80` 在 import 時凍結的 CORS 來源（改設定不重啟不生效）——並因此長出三個 `_reset_*_for_tests` 鉤子。
 8. **四種檢索策略**（Hybrid RRF／Weighted Fusion／Vector Only／BM25 Only）對個人工具多了一到兩種。

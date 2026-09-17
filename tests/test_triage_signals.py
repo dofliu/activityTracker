@@ -18,8 +18,8 @@ from core.models import (
     OpenLoop,
     ProjectState,
 )
-from core.proactive_secretary import build_action_proposals, snooze_proposal
-from core.triage_signals import repo_issue_backlog
+from core.secretary.aggregate import build_action_proposals, snooze_proposal
+from core.secretary.signals import repo_issue_backlog
 
 NOW = datetime(2026, 8, 28, 10, 0)
 
@@ -360,7 +360,7 @@ def test_stale_cutoff_is_configurable_and_zero_disables_it(tmp_path):
 
 
 def test_split_stale_keeps_the_boundary_day():
-    from core.triage_signals import split_stale_github_signals
+    from core.secretary.signals import split_stale_github_signals
 
     signals = [{"subject_ref": "a", "age_days": 60.0}, {"subject_ref": "b", "age_days": 60.1}]
     kept, dropped = split_stale_github_signals(signals, 60)

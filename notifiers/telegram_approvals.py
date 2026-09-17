@@ -286,7 +286,7 @@ def build_proposals_push(
     cfg = cfg or get_config()
     now = now or get_local_now()
     if proposals_result is None:
-        from core.proactive_secretary import build_action_proposals
+        from core.secretary.aggregate import build_action_proposals
 
         proposals_result = attach_execution_actions(
             build_action_proposals(database=database, cfg=cfg, now=now, limit=limit),

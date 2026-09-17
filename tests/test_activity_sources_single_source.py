@@ -34,7 +34,7 @@ from core.activity_sources import (
     source_for,
 )
 from core.models import AIPromptEvent, Base, FileActivityEvent, GitActivityEvent
-from core.secretary_greeting import collect_activity_stats
+from core.secretary.greeting import collect_activity_stats
 from core.weekly_review import active_days_by_project
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -206,7 +206,8 @@ def test_consumers_do_not_query_the_event_tables_themselves():
     """四個使用端不得再自己對三張事件表做（專案 × 時間）查詢——那正是漂移的來源。"""
     pattern = re.compile(r"(GitActivityEvent|AIPromptEvent|FileActivityEvent)\.(repo_name|project_tag|project_name)")
     offenders = []
-    for name in ("activity_patterns.py", "weekly_review.py", "activity_digest.py", "secretary_greeting.py"):
+    # D8 之後問候卡在 core/secretary/greeting.py；其餘三個仍是 domain 模組
+    for name in ("activity_patterns.py", "weekly_review.py", "activity_digest.py", "secretary/greeting.py"):
         text = (ROOT / "core" / name).read_text(encoding="utf-8")
         if pattern.search(text):
             offenders.append(name)
