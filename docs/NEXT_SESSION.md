@@ -16,7 +16,7 @@
 | 版本 | v1.3.0a5 已發佈為 GitHub pre-release（release workflow 自動 build → verify → release，SHA-256 receipt 交叉驗證）。`release_ready: false`，唯一**能力型**缺口是全天 coverage ledger 實測（TODO A1）。 |
 | 還缺什麼 | 別憑記憶：跑 `python main.py verify`（或看「06 系統設定 → 驗收中心」）就會列出 A1–A22 每一項現在有沒有收據，以及 ROADMAP §12.3 四個 gate 缺什麼。 |
 | Schema | migration **18/18**（append-only + checksum；**新表一律進 registry，不得靠 `create_all` 繞過**）。017 = `secretary_notes`、018 = `calendar_events`。 |
-| 測試 | **66 個 contract test 模組、663 項**（662 passed + 1 skipped；**不裝 `[rag]` extra 時 650 passed + 12 skipped**，CI 有一個 job 專跑這個）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
+| 測試 | **70 個 contract test 模組、733 項**（732 passed + 1 skipped；**不裝 `[rag]` extra 時 719 passed + 13 skipped**，CI 有一個 job 專跑這個）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
 | API 路由 | `core/server.py` **只做組裝**（134 行）；端點在 `core/api/*.py` 依領域分 9 個 router，請求結構在 `core/schemas.py`，AI ingest 規則在 `core/ingest.py`，execution token 閘門在 `core/api/deps.py`。**改動端點前先看 `tests/test_api_route_snapshot.py`**——133 條路由的（路徑、方法、handler 名稱）鎖在那裡，新增端點要在清單多一行（D4，2026-09-16）。 |
 | 活動來源 | **只有一份**：`core/activity_sources.py`（`EVENT_SOURCES` 決定哪三張表算活動與專案欄位在哪、`normalize_project` 空白＝沒歸戶不猜、`day_bounds` 一律半開區間）。每週回顧／模式提案／每日工作誌／問候卡都吃它；**要增減活動來源就只改 `EVENT_SOURCES`**，有契約測試禁止使用端自己查三張事件表的專案欄位（D3，2026-09-16）。 |
 | LLM client | **只有一份**：`core/llm_client.py`（`LLMClient.generate` 同步回字串、`stream_chat` 非同步逐 token；`DEFAULT_MODELS`／`KEY_ENVS` 單一定義；Ollama 一律 `/api/chat`）。失敗抬頭字面（`[本機備援模式]`、`[OpenAI API 錯誤]`、`【尚未偵測到`…）是下游事實閘與驗收中心的辨識依據，**不得改字**；有契約測試掃全 repo 禁止在別處寫死模型名（D2，2026-09-16）。 |

@@ -1232,6 +1232,14 @@ function renderCollectors(w, lastEvents = {}, health = {}, diagnostics = {}) {
     if (it.key === "agent_log_watcher" && it.d && it.d.sources) {
       const failed = Object.entries(it.d.sources).filter(([, value]) => value.state === "error").map(([key]) => key);
       if (failed.length) diagnosticText = `${currentLang === "zh-TW" ? "來源錯誤" : "Source error"}: ${failed.join(", ")}`;
+      // 漂移（檔案在動、事件是零）比單一來源錯誤更該被看見：解析沒報錯，但什麼都沒採到。
+      const drifted = ((it.d.drift || {}).platforms || []).map(p => p.platform);
+      if (drifted.length) {
+        const days = Number((it.d.drift || {}).window_days || 0);
+        diagnosticText = currentLang === "zh-TW"
+          ? `⚠️ 疑似格式漂移：${drifted.join(", ")}（檔案有更新，${days} 天零事件）`
+          : `⚠️ Possible format drift: ${drifted.join(", ")} (files updated, zero events in ${days}d)`;
+      }
     }
 
     return `
@@ -5932,11 +5940,18 @@ function renderCollectorDiagnosticsMatrix(data) {
     } else if (c.key === "agent_log_watcher") {
       const restarts = (c.d.healing_history || []).length;
       const errCode = c.d.last_error_code || "None";
+      const drift = c.d.drift || {};
+      const drifted = (drift.platforms || []);
       metricHtml = `
         <div class="collector-diag-metric-row"><span>多 AI 來源隔離解析</span><span>Claude / Codex / Antigravity</span></div>
         <div class="collector-diag-metric-row"><span>最後錯誤代碼</span><span>${esc(errCode)}</span></div>
         <div class="collector-diag-metric-row"><span>自動修復線程次數</span><span>${restarts} 次</span></div>
+        <div class="collector-diag-metric-row"><span>格式漂移偵測（${Number(drift.window_days || 0)} 天）</span><span>${drifted.length ? `⚠️ ${drifted.length} 個平台` : "正常"}</span></div>
       `;
+      if (drifted.length) {
+        // 解析沒報錯、檔案也在更新，卻一筆事件都沒有——這是靜默失效，不是「沒在用」。
+        isolatedAlert = `<div class="collector-diag-isolated-box">⚠️ 疑似 transcript 格式漂移：${esc(drifted.map(p => p.platform).join(", "))}（檔案有更新，視窗內零事件）</div>`;
+      }
     } else if (c.key === "scheduler") {
       const restarts = (c.d.healing_history || []).length;
       metricHtml = `

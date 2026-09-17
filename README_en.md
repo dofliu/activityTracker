@@ -26,7 +26,7 @@ It answers three questions at any moment:
 | Area | State |
 | :--- | :--- |
 | Code | P0–P8 and all ADR-008 executor stages landed; 22 ADRs record the boundary behind each decision |
-| Tests | **69 contract test modules, 710 tests** (709 passed + 1 skipped; 696 passed + 12 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
+| Tests | **70 contract test modules, 733 tests** (732 passed + 1 skipped; 719 passed + 13 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
 | Data | SQLite schema migration **18/18** (append-only + checksum, verified backup before upgrade) |
 | Release | `release_ready: false` |
 
@@ -307,7 +307,11 @@ activityTracker/
 │
 ├── watchers/                   # Collectors
 │   ├── file_watcher.py git_watcher.py window_watcher.py
-│   ├── agent_log_watcher.py    # Claude Code/Desktop, Codex, Antigravity
+│   ├── agent_log_watcher.py    # Collector service: thread, checkpoints, writes, drift alert
+│   ├── transcripts/            # One parser per platform (ADR-025)
+│   │   ├── base.py             # Shared contract: TranscriptTurn + discover/parse
+│   │   ├── claude_code.py claude_desktop.py codex.py antigravity.py
+│   │   └── drift.py            # "files moving, events at zero" detection
 │   ├── calendar_watcher.py     # Local .ics
 │   └── browser_extension/      # Chrome MV3 extension
 │

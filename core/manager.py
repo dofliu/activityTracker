@@ -382,9 +382,11 @@ class WatcherManager:
             degraded_after_seconds=window_degraded_after,
         ):
             collector_health["window_watcher"] = "degraded"
-        if (
-            collector_runtime["agent_log_watcher"] == "running"
-            and agent_diagnostics.get("state") == "degraded"
+        # 漂移（檔案在動、事件是零）與解析錯誤一樣算 degraded：靜默的零事件本來就是故障，
+        # 它必須讓整體監控狀態變色，而不是躲在一個沒人展開的欄位裡（ADR-025）。
+        if collector_runtime["agent_log_watcher"] == "running" and (
+            agent_diagnostics.get("state") == "degraded"
+            or agent_diagnostics.get("drift", {}).get("platforms")
         ):
             collector_health["agent_log_watcher"] = "degraded"
         if (

@@ -26,7 +26,7 @@
 | 面向 | 現況 |
 | :--- | :--- |
 | 程式 | P0–P8 與 ADR-008 執行器全階段已落地；22 份 ADR 記錄每個決策的邊界 |
-| 測試 | **69 個 contract test 模組、710 項**（709 passed + 1 skipped；不裝 `[rag]` extra 時 696 passed + 12 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
+| 測試 | **70 個 contract test 模組、733 項**（732 passed + 1 skipped；不裝 `[rag]` extra 時 719 passed + 13 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
 | 資料 | SQLite schema migration **18/18**（append-only + checksum，升級前自動備份） |
 | 發佈 | `release_ready: false` |
 
@@ -342,7 +342,11 @@ activityTracker/
 │
 ├── watchers/                   # 多源採集器
 │   ├── file_watcher.py git_watcher.py window_watcher.py
-│   ├── agent_log_watcher.py    # Claude Code/Desktop、Codex、Antigravity
+│   ├── agent_log_watcher.py    # 採集服務：執行緒、checkpoint、寫入、漂移警示
+│   ├── transcripts/            # 一個平台一個 parser（ADR-025）
+│   │   ├── base.py             # 共同介面：TranscriptTurn ＋ discover/parse
+│   │   ├── claude_code.py claude_desktop.py codex.py antigravity.py
+│   │   └── drift.py            # 「檔案在動、事件是零」的漂移判定
 │   ├── calendar_watcher.py     # 本機 .ics
 │   └── browser_extension/      # Chrome MV3 擴充套件
 │
