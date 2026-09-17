@@ -5,7 +5,7 @@ include ROADMAP.md
 include STATUS.yaml
 include config.example.yaml
 recursive-include docs *.md *.png
-recursive-include web *.html *.css *.js
+recursive-include web *.html *.css *.js *.json
 recursive-include watchers/browser_extension *.html *.js *.json
 prune build
 prune dist

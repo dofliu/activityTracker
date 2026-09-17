@@ -39,7 +39,7 @@ def verify_install(expected_home: str | Path) -> dict:
         "health": client.get("/api/v1/health", headers=origin).status_code,
         "dashboard": client.get("/", headers=origin).status_code,
         "extension_monitor": client.get("/extension-monitor", headers=origin).status_code,
-        "static_app_js": client.get("/static/app.js", headers=origin).status_code,
+        "static_main_js": client.get("/static/js/main.js", headers=origin).status_code,
     }
 
     config_path = default_config_path()

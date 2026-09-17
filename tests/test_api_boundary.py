@@ -394,7 +394,7 @@ def test_localhost_monitor_page_is_dashboard_native_not_extension_storage():
     assert "extension-capture-badge" not in dashboard.text
     from core.api.pages import asset_version  # 資產版本改為內容雜湊，不再寫死
     assert f"style.css?v={asset_version()}" in dashboard.text
-    assert f"app.js?v={asset_version()}" in dashboard.text
+    assert f"js/main.js?v={asset_version()}" in dashboard.text
     assert "focus-carousel" in dashboard.text
     assert "repo-sync-panel" in dashboard.text
     assert "data-trust-runtime-badge" in dashboard.text

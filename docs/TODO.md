@@ -89,11 +89,10 @@
 
 > 來源：[REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) §4–5。
 > 每一項結束時 `pytest` 必須全綠、`python main.py verify` 結果不得變化（整頓不改行為）。R2 的項目要先有 ADR。
-> **R0 已於 2026-09-16 完成**（B5–B9 ＋ D1）、**R1 全部於同日完成**（D2 一個 LLM client、D3 一份活動來源定義、D4 `server.py` 切成 9 個 router、D5 桌面通知併入 `ChannelAdapter`、D6 旗標六層收三層），收據見 ROADMAP §11.2；R2 已完成 D7（一份活動記憶，ADR-023）、D8（秘書四層化，ADR-024）與 D9（transcript parser 分拆與漂移警示，ADR-025）；剩 D10–D12，每項都要先寫 ADR。
+> **R0 已於 2026-09-16 完成**（B5–B9 ＋ D1）、**R1 全部於同日完成**（D2 一個 LLM client、D3 一份活動來源定義、D4 `server.py` 切成 9 個 router、D5 桌面通知併入 `ChannelAdapter`、D6 旗標六層收三層），收據見 ROADMAP §11.2；R2 已完成 D7（一份活動記憶，ADR-023）、D8（秘書四層化，ADR-024）、D9（transcript parser 分拆與漂移警示，ADR-025）與 D10（前端模組化，ADR-026）；剩 D11／D12，每項都要先寫 ADR。
 
 | # | 項目 | 內容 | 完成判準（收據） | 階段 |
 | :-- | :--- | :--- | :--- | :--- |
-| D10 | **前端模組化** | `web/app.js` 拆 ES module（依分頁）；`I18N` 移到 `web/i18n/{zh-TW,en}.json` 並加「兩份 key 集合相同」測試；9 處裸 `fetch()` 改走共用 helper；移除字串內嵌 `onclick=` | 無單檔 > 1,500 行；Playwright 六分頁載入無 console error、494px 無水平溢出（沿用既有腳本） | R2 |
 | D11 | **全域狀態改注入** | `_PENDING_L2_CONFIRMS`、`_ARMED_UNTIL`／`_PROCESSED_CALLBACK_IDS`、advisor／project 快取、`server.py:79-80` 的 CORS 凍結改為 app state 或注入的 store | 三個 `_reset_*_for_tests` 鉤子刪除；`POST /api/v1/config` 改 `allowed_origins` 不重啟即生效（contract test） | R2 |
 | D12 | **驗收中心宣告式** | 22 個 `_check_aN` 改為少數通用探針（receipt 存在／端點欄位／檔案存在／資料表計數）上的宣告式表格 | `core/acceptance.py` < 600 行；`test_acceptance_center.py` 36 項全綠且 `verify` 輸出逐項相同 | R2 |
 

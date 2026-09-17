@@ -357,8 +357,11 @@ def test_drift_reaches_the_system_health_page_as_a_degraded_collector(monkeypatc
 
 def test_the_web_health_page_renders_the_drift_alert():
     """兩個渲染點都要說得出是哪個平台——使用者不該只看到一顆變紅的燈。"""
-    app_js = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
-    assert app_js.count("drift.platforms") + app_js.count("(it.d.drift || {}).platforms") >= 1
-    assert "疑似格式漂移" in app_js          # 採集器列表
-    assert "疑似 transcript 格式漂移" in app_js  # 系統健康頁的診斷卡
-    assert "格式漂移偵測" in app_js
+    # D10：前端拆成 ES module，兩個渲染點分別住在採集器列表與系統健康頁的診斷卡
+    status_js = (ROOT / "web" / "js" / "tabs" / "status.js").read_text(encoding="utf-8")
+    health_js = (ROOT / "web" / "js" / "tabs" / "health.js").read_text(encoding="utf-8")
+    assert "(it.d.drift || {}).platforms" in status_js
+    assert "疑似格式漂移" in status_js            # 採集器列表
+    assert "drift.platforms" in health_js
+    assert "疑似 transcript 格式漂移" in health_js  # 系統健康頁的診斷卡
+    assert "格式漂移偵測" in health_js

@@ -153,6 +153,7 @@
    → **同日已完成（D4）**：切成 9 個領域 router，server.py 剩 134 行；model 進 `core/schemas.py`、ingest 規則進 `core/ingest.py`；133 條路由由快照測試鎖住（ROADMAP §11.2）。
    `rag/router.py`（655 行、31 條）也把資料夾 CRUD、job、儲存、檔案瀏覽、檢索、對話 session 混在一起。
 2. **`web/app.js` 6,055 行單檔**：約 30 個模組層 `let` 當狀態、105 處 `innerHTML`、9 處繞過共用 fetch helper 的裸 `fetch()`、126 個 `catch` 只有 13 個記 log、17 處字串內嵌 `onclick=`。
+   → **2026-09-17 已完成（D10）**：拆成 `web/js/` 的 ES module 樹（最大一檔 915 行），字典搬到 `web/i18n/*.json`（抽的時候抓到三個真的翻譯缺口），九處裸 `fetch` 收回 `core/api.js`，17 處 `onclick=` 改成 `data-action` 委派，49 個模組層 `let` 集中到 `state.js`（ADR-026，ROADMAP §11.2）。**`innerHTML` 與 `catch` 不記 log 兩項原封不動**——把它們和模組化混在同一輪會讓「行為不變」變成無法驗證的宣稱。
 3. **`watchers/agent_log_watcher.py` 1,066 行**解析四種**無穩定性保證的私有格式**（Codex 還有 json／jsonl 兩套 parser）；測試用合成 fixture，鎖的是今天的形狀，**格式一變就是靜默零事件**。
    → **2026-09-17 已完成（D9）**：拆成 `watchers/transcripts/` 一個平台一個 parser（每個 < 300 行）＋ 共同介面，服務剩 515 行且不再認識任何格式；「靜默零事件」這一半另補漂移警示——**檔案 mtime 在視窗內 ∧ 該平台視窗內零事件**才警示，成立時把採集器標成 `degraded` 並顯示在系統健康頁（ADR-025，ROADMAP §11.2）。合成 fixture 的根本限制沒有消失：它偵測的是「有沒有採到東西」，不是「格式對不對」。
 4. **六層巢狀預設關閉旗標**（`executor` → `l2` → `l2.allow_write` → `scheduled_tasks` → `telegram_approvals` → `allow_remote_arm`）守著約 2,800 行預設安裝永不執行的程式。→ **同日已完成（D6）**：收成三層真正的分級，另兩層併入它們的上層開關（ADR-008 Addendum D）；既有設定檔明確寫成 false 的照樣有效。

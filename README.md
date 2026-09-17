@@ -26,7 +26,7 @@
 | 面向 | 現況 |
 | :--- | :--- |
 | 程式 | P0–P8 與 ADR-008 執行器全階段已落地；22 份 ADR 記錄每個決策的邊界 |
-| 測試 | **70 個 contract test 模組、733 項**（732 passed + 1 skipped；不裝 `[rag]` extra 時 719 passed + 13 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
+| 測試 | **71 個 contract test 模組、776 項**（775 passed + 1 skipped；不裝 `[rag]` extra 時 762 passed + 13 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
 | 資料 | SQLite schema migration **18/18**（append-only + checksum，升級前自動備份） |
 | 發佈 | `release_ready: false` |
 
@@ -363,7 +363,13 @@ activityTracker/
 ├── exporters/daily_brief.py               # OMNICONTEXT_TODAY.md/.html
 │
 ├── web/                        # 儀表板前端（6 分頁 + extension-monitor）
-│   └── index.html / app.js / style.css
+│   ├── index.html / style.css
+│   ├── js/                     # ES module（ADR-026）：一個分頁一個檔
+│   │   ├── main.js             # 進入點：載字典 → 初始化各分頁
+│   │   ├── core/               # api（唯一碰 fetch）／i18n／state／ui／dom
+│   │   └── tabs/               # assistant memory knowledge projects repos
+│   │                           # summaries settings github status health
+│   └── i18n/zh-TW.json / en.json   # 語系字典（兩份 key 集合由測試把關）
 │
 ├── scripts/                    # 驗證、清理、autostart 與 E2E 腳本
 ├── tests/                      # 69 個 contract test 模組（710 項）

@@ -26,7 +26,7 @@ It answers three questions at any moment:
 | Area | State |
 | :--- | :--- |
 | Code | P0–P8 and all ADR-008 executor stages landed; 22 ADRs record the boundary behind each decision |
-| Tests | **70 contract test modules, 733 tests** (732 passed + 1 skipped; 719 passed + 13 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
+| Tests | **71 contract test modules, 776 tests** (775 passed + 1 skipped; 762 passed + 13 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
 | Data | SQLite schema migration **18/18** (append-only + checksum, verified backup before upgrade) |
 | Release | `release_ready: false` |
 
@@ -328,7 +328,13 @@ activityTracker/
 ├── exporters/daily_brief.py               # OMNICONTEXT_TODAY.md/.html
 │
 ├── web/                        # Dashboard frontend (6 tabs + extension-monitor)
-│   └── index.html / app.js / style.css
+│   ├── index.html / style.css
+│   ├── js/                     # ES modules (ADR-026): one file per tab
+│   │   ├── main.js             # Entry point: load dictionaries, then init tabs
+│   │   ├── core/               # api (the only fetch), i18n, state, ui, dom
+│   │   └── tabs/               # assistant memory knowledge projects repos
+│   │                           # summaries settings github status health
+│   └── i18n/zh-TW.json / en.json   # Locale dictionaries (key parity enforced by a test)
 │
 ├── scripts/                    # Verification, cleanup, autostart and E2E scripts
 ├── tests/                      # 69 contract test modules (710 tests)
