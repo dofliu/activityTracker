@@ -16,7 +16,6 @@ from core.agent_executor import (
     ExecutionRejected,
     ExecutorServices,
     _agent_cli_write_settings,
-    _reset_pending_confirms,
     derive_actions,
     execute_proposal,
 )
@@ -63,9 +62,7 @@ class FakeRepoRef:
 
 @pytest.fixture(autouse=True)
 def _clean_confirm_state():
-    _reset_pending_confirms()
     yield
-    _reset_pending_confirms()
 
 
 PROJECT = "AI_Papers"

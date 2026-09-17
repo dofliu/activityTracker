@@ -145,6 +145,7 @@
 6. **循環依賴用延遲 import 撐著**：`core/` 內 110 處函式內 import；`proactive_secretary ↔ secretary_memory ↔ secretary_home ↔ agent_executor` 是一個真的環。→ **同日已完成（D8）**：環拆在呈現層的組合點與兩次搬家（`build_today_view` → present、preset 函式 → `scheduled_tasks`）；指向 `core.*` 的函式內 import 116 → 15。
 7. **模組層可變全域狀態**：`_PENDING_L2_CONFIRMS`（`agent_executor.py:72`）、`_ARMED_UNTIL`／`_PROCESSED_CALLBACK_IDS`（`telegram_approvals.py:74-76`）、advisor／project 快取、
    `server.py:79-80` 在 import 時凍結的 CORS 來源（改設定不重啟不生效）——並因此長出三個 `_reset_*_for_tests` 鉤子。
+   → **2026-09-17 已完成（D11）**：六處狀態收進 `core/runtime_state.py` 的五個具名 store（每個自帶自己的鎖），呼叫端改成可注入、預設仍是行程實例；**五個**（不是三個——清點後比當初數的多兩個）重設鉤子從產品程式碼刪除，改由 `tests/conftest.py` 的 autouse fixture 每個測試換一份新狀態。CORS 改成每個請求比對當下設定，`POST /api/v1/config` 改 `allowed_origins` 不重啟即生效（ADR-027，ROADMAP §11.2）。**行程預設仍是單例**：買到的是「可注入」而不是「無全域」，理由記在 ADR-027。
 8. **四種檢索策略**（Hybrid RRF／Weighted Fusion／Vector Only／BM25 Only）對個人工具多了一到兩種。
 
 ### 4.4 結構問題（大工程，要排期）

@@ -34,7 +34,6 @@ import logging
 import secrets as py_secrets
 import threading
 import time as time_module
-from collections import OrderedDict
 from datetime import datetime, timedelta
 from typing import Any, Callable, Optional
 
@@ -45,6 +44,7 @@ from core.agent_executor import (
     executor_enabled,
 )
 from core.config import get_config
+from core.runtime_state import ApprovalState, runtime_state
 from core.time_utils import get_local_now
 from notifiers.telegram_setup import (
     Transport,
@@ -70,16 +70,13 @@ APPROVALS_CLAIM_BOUNDARY = (
     "一次性確認碼流程。每次批准寫入 audit receipt（approved_via=telegram_inline）。"
 )
 
-# ---- in-memory 狀態（重啟即歸零；這是刻意的安全性質，不是缺陷） ----
-_STATE_LOCK = threading.Lock()
-_ARMED_UNTIL: datetime | None = None
-_PROCESSED_CALLBACK_IDS: "OrderedDict[str, bool]" = OrderedDict()
-_PROCESSED_CALLBACK_CAP = 300
-_POLLER_RUNNING = False
-_LAST_POLL_AT: datetime | None = None
-_IGNORED_FOREIGN_UPDATES = 0
-# 一次性 arm code：只存雜湊與到期時間，用過即銷毀；重啟即失效（ADR-014）。
-_PENDING_ARM_CODE: dict[str, Any] | None = None
+# in-memory 狀態住在 core/runtime_state 的 ApprovalState（ADR-027）：arm 視窗、一次性
+# arm code（只存雜湊）、callback 去重表與 poller 觀測值。重啟即歸零仍然是刻意的安全性質
+# （ADR-014），不是缺陷；改的只是它現在有名字、能被注入，測試不必再去動線上那一份。
+
+
+def _approvals(state: ApprovalState | None = None) -> ApprovalState:
+    return state if state is not None else runtime_state().approvals
 
 
 def telegram_approvals_enabled(cfg: Any | None = None) -> bool:
@@ -116,9 +113,10 @@ def _max_actions_per_push(cfg: Any) -> int:
     return min(8, max(1, raw))
 
 
-def arm_approvals(cfg: Any | None = None, now: datetime | None = None) -> dict[str, Any]:
+def arm_approvals(
+    cfg: Any | None = None, now: datetime | None = None, *, state: ApprovalState | None = None
+) -> dict[str, Any]:
     """解鎖批准通道；呼叫端（API 層）必須已通過 execution token 驗證。"""
-    global _ARMED_UNTIL
     cfg = cfg or get_config()
     now = now or get_local_now()
     if not telegram_approvals_enabled(cfg):
@@ -127,9 +125,7 @@ def arm_approvals(cfg: Any | None = None, now: datetime | None = None) -> dict[s
             "Telegram 批准未啟用（executor.telegram_approvals.enabled=false）",
         )
     ttl_hours = _arm_ttl_hours(cfg)
-    with _STATE_LOCK:
-        _ARMED_UNTIL = now + timedelta(hours=ttl_hours)
-        armed_until = _ARMED_UNTIL
+    armed_until = _approvals(state).arm(now + timedelta(hours=ttl_hours))
     logger.info("Telegram approvals armed for %d hours.", ttl_hours)
     return {
         "armed": True,
@@ -156,14 +152,15 @@ def _hash_code(code: str) -> str:
     return hashlib.sha256(code.encode("utf-8")).hexdigest()
 
 
-def issue_arm_code(cfg: Any | None = None, now: datetime | None = None) -> dict[str, Any]:
+def issue_arm_code(
+    cfg: Any | None = None, now: datetime | None = None, *, state: ApprovalState | None = None
+) -> dict[str, Any]:
     """簽發一次性 arm code；呼叫端（API 層）必須已通過 execution token 驗證。
 
     ADR-014：手機不再需要持有長期的 execution token——在儀表板按一下取得
     6 位數短效碼，用它 arm 即可。code 只以雜湊留在記憶體，回傳值是**唯一**
     一次看到明碼的機會，且不寫 log。
     """
-    global _PENDING_ARM_CODE
     cfg = cfg or get_config()
     now = now or get_local_now()
     if not telegram_approvals_enabled(cfg):
@@ -174,8 +171,7 @@ def issue_arm_code(cfg: Any | None = None, now: datetime | None = None) -> dict[
     ttl = _arm_code_ttl_seconds(cfg)
     code = f"{py_secrets.randbelow(1_000_000):06d}"
     expires_at = now + timedelta(seconds=ttl)
-    with _STATE_LOCK:
-        _PENDING_ARM_CODE = {"code_hash": _hash_code(code), "expires_at": expires_at}
+    _approvals(state).put_arm_code(code_hash=_hash_code(code), expires_at=expires_at)
     logger.info("Arm code issued (valid %ds); code itself is never logged.", ttl)
     return {
         "code": code,
@@ -190,18 +186,16 @@ def issue_arm_code(cfg: Any | None = None, now: datetime | None = None) -> dict[
 
 
 def consume_arm_code(
-    provided: str, *, cfg: Any | None = None, now: datetime | None = None
+    provided: str, *, cfg: Any | None = None, now: datetime | None = None,
+    state: ApprovalState | None = None,
 ) -> tuple[bool, str]:
     """驗證並銷毀 arm code；回傳 ``(是否通過, 原因)``。
 
     不論通過或失敗都銷毀待驗碼——避免對同一個碼反覆猜測。
     """
-    global _PENDING_ARM_CODE
     now = now or get_local_now()
     candidate = str(provided or "").strip()
-    with _STATE_LOCK:
-        pending = _PENDING_ARM_CODE
-        _PENDING_ARM_CODE = None
+    pending = _approvals(state).take_arm_code()
     if pending is None:
         return False, "no_pending_code"
     if now >= pending["expires_at"]:
@@ -211,58 +205,46 @@ def consume_arm_code(
     return True, "ok"
 
 
-def arm_code_status(now: datetime | None = None) -> dict[str, Any]:
+def arm_code_status(now: datetime | None = None, *, state: ApprovalState | None = None) -> dict[str, Any]:
     now = now or get_local_now()
-    with _STATE_LOCK:
-        pending = _PENDING_ARM_CODE
+    pending = _approvals(state).peek_arm_code()
     if pending is None or now >= pending["expires_at"]:
         return {"pending": False}
     return {"pending": True, "expires_at": pending["expires_at"].isoformat(timespec="seconds")}
 
 
-def disarm_approvals() -> dict[str, Any]:
+def disarm_approvals(*, state: ApprovalState | None = None) -> dict[str, Any]:
     """上鎖批准通道（降低權限的方向，不需 token）；同時銷毀待驗的 arm code。"""
-    global _ARMED_UNTIL, _PENDING_ARM_CODE
-    with _STATE_LOCK:
-        _ARMED_UNTIL = None
-        _PENDING_ARM_CODE = None
+    _approvals(state).disarm()
     return {"armed": False, "claim_boundary": APPROVALS_CLAIM_BOUNDARY}
 
 
-def _is_armed(now: datetime | None = None) -> bool:
-    now = now or get_local_now()
-    with _STATE_LOCK:
-        return _ARMED_UNTIL is not None and now < _ARMED_UNTIL
+def _is_armed(now: datetime | None = None, *, state: ApprovalState | None = None) -> bool:
+    return _approvals(state).is_armed(now or get_local_now())
 
 
-def approvals_status(cfg: Any | None = None, now: datetime | None = None) -> dict[str, Any]:
+def approvals_status(
+    cfg: Any | None = None, now: datetime | None = None, *, state: ApprovalState | None = None
+) -> dict[str, Any]:
     cfg = cfg or get_config()
     now = now or get_local_now()
-    with _STATE_LOCK:
-        armed_until = _ARMED_UNTIL
-        last_poll = _LAST_POLL_AT
-        poller_running = _POLLER_RUNNING
-        ignored = _IGNORED_FOREIGN_UPDATES
+    approvals = _approvals(state)
+    snapshot = approvals.snapshot()
+    armed_until = snapshot["armed_until"]
+    last_poll = snapshot["last_poll_at"]
+    poller_running = snapshot["poller_running"]
+    ignored = snapshot["ignored_foreign_updates"]
     armed = armed_until is not None and now < armed_until
     return {
         "enabled": telegram_approvals_enabled(cfg),
         "armed": armed,
         "armed_until": armed_until.isoformat(timespec="seconds") if armed else None,
-        "arm_code": arm_code_status(now),
+        "arm_code": arm_code_status(now, state=approvals),
         "poller_running": poller_running,
         "last_poll_at": last_poll.isoformat(timespec="seconds") if last_poll else None,
         "ignored_foreign_updates": ignored,
         "claim_boundary": APPROVALS_CLAIM_BOUNDARY,
     }
-
-
-def _reset_state_for_tests() -> None:
-    global _ARMED_UNTIL, _IGNORED_FOREIGN_UPDATES, _PENDING_ARM_CODE
-    with _STATE_LOCK:
-        _ARMED_UNTIL = None
-        _PENDING_ARM_CODE = None
-        _PROCESSED_CALLBACK_IDS.clear()
-        _IGNORED_FOREIGN_UPDATES = 0
 
 
 # ---- 建議推播（訊息＋inline keyboard） ----
@@ -384,15 +366,9 @@ def push_proposals_to_telegram(
 # ---- update 處理（poller 與 contract tests 共用同一入口） ----
 
 
-def _remember_callback(callback_id: str) -> bool:
+def _remember_callback(callback_id: str, *, state: ApprovalState | None = None) -> bool:
     """回傳 True 表示第一次見到；重複的 callback 不再處理。"""
-    with _STATE_LOCK:
-        if callback_id in _PROCESSED_CALLBACK_IDS:
-            return False
-        _PROCESSED_CALLBACK_IDS[callback_id] = True
-        while len(_PROCESSED_CALLBACK_IDS) > _PROCESSED_CALLBACK_CAP:
-            _PROCESSED_CALLBACK_IDS.popitem(last=False)
-    return True
+    return not _approvals(state).seen_callback(callback_id)
 
 
 def _answer_callback(
@@ -448,11 +424,12 @@ def handle_telegram_update(
     execute: Optional[Callable[..., dict[str, Any]]] = None,
     push_proposals: Optional[Callable[..., dict[str, Any]]] = None,
     chat_handler: Optional[Callable[..., dict[str, Any]]] = None,
+    state: ApprovalState | None = None,
 ) -> dict[str, Any]:
     """處理單一 update；回傳非敏感 receipt 供 log 與 contract tests。"""
-    global _IGNORED_FOREIGN_UPDATES
     cfg = cfg or get_config()
     now = now or get_local_now()
+    approvals = _approvals(state)
     token, _ = _resolve_bot_token(cfg)
     chat_configured, _ = _resolve_chat_id(cfg)
     if not token or not chat_configured:
@@ -464,12 +441,11 @@ def handle_telegram_update(
         from_chat = str(((callback.get("message") or {}).get("chat") or {}).get("id"))
         if from_chat != str(chat_configured):
             # 非綁定 chat：靜默忽略（不回覆、不外洩任何存在性資訊）。
-            with _STATE_LOCK:
-                _IGNORED_FOREIGN_UPDATES += 1
+            approvals.count_ignored_foreign_update()
             return {"handled": "ignored_foreign_chat"}
-        if not callback_id or not _remember_callback(callback_id):
+        if not callback_id or not _remember_callback(callback_id, state=approvals):
             return {"handled": "duplicate_callback"}
-        if not telegram_approvals_enabled(cfg) or not _is_armed(now):
+        if not telegram_approvals_enabled(cfg) or not _is_armed(now, state=approvals):
             _answer_callback(
                 token,
                 callback_id,
@@ -538,8 +514,7 @@ def handle_telegram_update(
     if message:
         from_chat = str((message.get("chat") or {}).get("id"))
         if from_chat != str(chat_configured):
-            with _STATE_LOCK:
-                _IGNORED_FOREIGN_UPDATES += 1
+            approvals.count_ignored_foreign_update()
             return {"handled": "ignored_foreign_chat"}
         text_raw = str(message.get("text") or "").strip()
         text = text_raw.lower()
@@ -589,11 +564,12 @@ def _default_execute(*args: Any, **kwargs: Any) -> dict[str, Any]:
 class TelegramApprovalPoller:
     """背景長輪詢執行緒；只有 outbound HTTPS，錯誤退避、可停止。"""
 
-    def __init__(self, transport: Optional[Transport] = None):
+    def __init__(self, transport: Optional[Transport] = None, *, state: ApprovalState | None = None):
         self._transport = transport
         self._running = False
         self._thread: threading.Thread | None = None
         self._offset: int | None = None
+        self._state = state   # None＝用行程預設（ADR-027）
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -606,19 +582,15 @@ class TelegramApprovalPoller:
         logger.info("Telegram approval poller started (long polling; outbound only).")
 
     def stop(self) -> None:
-        global _POLLER_RUNNING
         self._running = False
-        with _STATE_LOCK:
-            _POLLER_RUNNING = False
+        _approvals(self._state).mark_poller(False)
         # daemon thread；長輪詢最多再持續一個 timeout 週期後自然結束。
 
     def is_alive(self) -> bool:
         return bool(self._thread and self._thread.is_alive() and self._running)
 
     def _run(self) -> None:
-        global _POLLER_RUNNING, _LAST_POLL_AT
-        with _STATE_LOCK:
-            _POLLER_RUNNING = True
+        _approvals(self._state).mark_poller(True)
         backoff = 5
         while self._running:
             try:
@@ -640,8 +612,7 @@ class TelegramApprovalPoller:
                     transport=self._transport,
                     timeout=LONG_POLL_SECONDS + 10,
                 )
-                with _STATE_LOCK:
-                    _LAST_POLL_AT = get_local_now()
+                _approvals(self._state).mark_poll(get_local_now())
                 if status_code != 200 or not body.get("ok"):
                     logger.warning("getUpdates returned HTTP %s", status_code)
                     time_module.sleep(backoff)
@@ -671,6 +642,5 @@ class TelegramApprovalPoller:
                 logger.warning("Telegram poll cycle failed: %s", type(exc).__name__)
                 time_module.sleep(backoff)
                 backoff = min(60, backoff * 2)
-        with _STATE_LOCK:
-            _POLLER_RUNNING = False
+        _approvals(self._state).mark_poller(False)
         logger.info("Telegram approval poller stopped.")

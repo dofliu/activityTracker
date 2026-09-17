@@ -3,7 +3,6 @@ import json
 
 from core.secretary.aggregate import (
     annotate_action_proposals,
-    reset_advisor_cache,
 )
 
 
@@ -101,7 +100,6 @@ def _valid_llm_reply():
 
 
 def test_disabled_advisor_is_pure_passthrough():
-    reset_advisor_cache()
     result = _result()
     baseline = copy.deepcopy(result)
 
@@ -115,7 +113,6 @@ def test_disabled_advisor_is_pure_passthrough():
 
 
 def test_annotations_only_attach_to_known_ids_and_are_clamped():
-    reset_advisor_cache()
     calls = []
 
     def fake_generate(system_prompt, user_prompt):
@@ -145,7 +142,6 @@ def test_annotations_only_attach_to_known_ids_and_are_clamped():
 
 
 def test_prompt_only_contains_whitelisted_fields():
-    reset_advisor_cache()
     captured = {}
 
     def fake_generate(system_prompt, user_prompt):
@@ -162,7 +158,6 @@ def test_prompt_only_contains_whitelisted_fields():
 
 
 def test_cloud_provider_flips_cloud_llm_used_flag():
-    reset_advisor_cache()
     cfg = _config(provider="gemini")
     cfg.data["synthesizer"]["gemini"] = {"model": "gemini-2.5-flash"}
 
@@ -175,7 +170,6 @@ def test_cloud_provider_flips_cloud_llm_used_flag():
 
 
 def test_invalid_json_and_exception_fall_back_to_deterministic():
-    reset_advisor_cache()
     baseline = copy.deepcopy(_result())
 
     bad_json = annotate_action_proposals(
@@ -186,7 +180,6 @@ def test_invalid_json_and_exception_fall_back_to_deterministic():
     assert all("llm_note" not in item for item in bad_json["proposals"])
     assert {k: v for k, v in bad_json.items() if k != "advisor"} == baseline
 
-    reset_advisor_cache()
 
     def boom(system_prompt, user_prompt):
         raise TimeoutError("advisor timed out")
@@ -199,7 +192,6 @@ def test_invalid_json_and_exception_fall_back_to_deterministic():
 
 def test_fallback_markdown_embedding_payload_json_is_not_treated_as_annotation():
     """LLMClient 失敗時回傳含原 payload 的備援 markdown；不得誤判為 annotated。"""
-    reset_advisor_cache()
 
     def echoing_fallback(system_prompt, user_prompt):
         return f"# [本機備援模式]\n\n```text\n{user_prompt[:2500]}\n```\n"
@@ -220,7 +212,6 @@ def test_fallback_markdown_embedding_payload_json_is_not_treated_as_annotation()
 
 
 def test_cache_avoids_repeated_llm_calls_for_same_payload():
-    reset_advisor_cache()
     call_count = {"n": 0}
 
     def counting_generate(system_prompt, user_prompt):
@@ -238,7 +229,6 @@ def test_cache_avoids_repeated_llm_calls_for_same_payload():
 
 
 def test_no_proposals_is_skipped_without_llm_call():
-    reset_advisor_cache()
 
     def must_not_call(system_prompt, user_prompt):
         raise AssertionError("advisor must not run without proposals")

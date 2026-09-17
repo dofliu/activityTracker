@@ -24,7 +24,6 @@ from core.agent_executor import (
     ActionPlan,
     ExecutionRejected,
     ExecutorServices,
-    _reset_pending_confirms,
     attach_execution_actions,
     cancel_execution,
     derive_actions,
@@ -78,9 +77,7 @@ class FakeRepoRef:
 
 @pytest.fixture(autouse=True)
 def _clean_confirm_state():
-    _reset_pending_confirms()
     yield
-    _reset_pending_confirms()
 
 
 def _l2_config(binary=None, args=None, cooldown=600, ttl=300):

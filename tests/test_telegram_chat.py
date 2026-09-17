@@ -18,6 +18,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
+
+from core.runtime_state import runtime_state
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -121,11 +123,7 @@ def _clean_state(monkeypatch):
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
     monkeypatch.delenv("OMNICONTEXT_EXECUTION_TOKEN", raising=False)
-    approvals._reset_state_for_tests()
-    chat_module._reset_state_for_tests()
     yield
-    approvals._reset_state_for_tests()
-    chat_module._reset_state_for_tests()
 
 
 def _inline(fn):
@@ -447,13 +445,13 @@ def test_expired_code_is_refused():
 def test_arm_code_is_never_stored_in_plaintext_and_status_hides_it():
     cfg = _cfg(remote_arm=True)
     issued = approvals.issue_arm_code(cfg=cfg, now=NOW)
-    pending = approvals._PENDING_ARM_CODE
+    pending = runtime_state().approvals.peek_arm_code()
     assert pending is not None and issued["code"] not in str(pending)
     status = approvals.approvals_status(cfg=cfg, now=NOW)
     assert status["arm_code"]["pending"] is True and issued["code"] not in str(status)
     # disarm 也銷毀待驗碼
     approvals.disarm_approvals()
-    assert approvals._PENDING_ARM_CODE is None
+    assert runtime_state().approvals.peek_arm_code() is None
     assert approvals.approvals_status(cfg=cfg, now=NOW)["arm_code"] == {"pending": False}
 
 

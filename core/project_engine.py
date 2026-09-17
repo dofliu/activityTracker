@@ -2,7 +2,6 @@ import re
 import os
 import time
 import hashlib
-from threading import RLock
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Set
 from pathlib import Path
@@ -11,6 +10,7 @@ from sqlalchemy import desc, func
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from core.database import get_db
+from core.runtime_state import ProjectCache, runtime_state
 from core.models import AIPromptEvent, FileActivityEvent, GitActivityEvent, WindowEvent, ProjectState, OpenLoop, GitHubRepoState, GitHubPREvent
 from core.project_paths import configured_self_project_path, find_configured_project_path
 from core.time_utils import get_local_now
@@ -90,13 +90,12 @@ def shorten_filename(name: str, max_len: int = 26) -> str:
     return name[:max_len] + "…"
 
 
-# 快取機制：避免前端每 4 秒輪詢時重複全量查詢三張表
-_PROJECT_CACHE: List[Dict[str, Any]] = []
-_LAST_PROJECT_REFRESH_TIME: float = 0.0
-_PROJECT_CACHE_TTL: float = 30.0  # 30 秒快取
-# 同一個服務的多個 API 請求可能同時發現快取過期；鎖住重整流程，
-# 避免兩邊都先讀到「尚未建立」而競爭寫入同一個 project_key。
-_PROJECT_REFRESH_LOCK = RLock()
+# 快取機制住在 core/runtime_state 的 ProjectCache（ADR-027）：避免前端每 4 秒輪詢時
+# 重複全量查詢三張表；重整流程互斥的鎖也在那個物件裡。
+
+
+def _project_cache(cache: ProjectCache | None = None) -> ProjectCache:
+    return cache if cache is not None else runtime_state().projects
 
 
 CATEGORY_FOLDERS = {
@@ -195,15 +194,15 @@ def normalize_project_name(path_or_tag: str | None) -> str:
     return clean_str.strip()
 
 
-def refresh_project_states(force: bool = False):
+def refresh_project_states(force: bool = False, *, cache: "ProjectCache | None" = None):
     """從各類事件動態計算並更新 project_states 資料表 (採用歷史事件多數決與 Git 倉庫判定)"""
-    global _LAST_PROJECT_REFRESH_TIME
-    if not force and (time.time() - _LAST_PROJECT_REFRESH_TIME) < _PROJECT_CACHE_TTL:
+    cache = _project_cache(cache)
+    if not force and cache.states_fresh(time.time()):
         return
 
-    with _PROJECT_REFRESH_LOCK:
+    with cache.refresh_lock:
         # 等待前一個請求完成後必須重新檢查 TTL，否則仍會重複進行全量掃描。
-        if not force and (time.time() - _LAST_PROJECT_REFRESH_TIME) < _PROJECT_CACHE_TTL:
+        if not force and cache.states_fresh(time.time()):
             return
 
         db = get_db()
@@ -346,7 +345,7 @@ def refresh_project_states(force: bool = False):
             # 刪除已不在 valid_keys 中的歷史碎片專案
             session.query(ProjectState).filter(~ProjectState.project_key.in_(valid_keys)).delete(synchronize_session=False)
 
-        _LAST_PROJECT_REFRESH_TIME = time.time()
+        cache.mark_states_refreshed(time.time())
 
 
 def get_project_state_count() -> int:
@@ -361,15 +360,17 @@ def get_project_state_count() -> int:
         )
 
 
-def get_active_projects_list(force_refresh: bool = False) -> List[Dict[str, Any]]:
+def get_active_projects_list(
+    force_refresh: bool = False, *, cache: "ProjectCache | None" = None
+) -> List[Dict[str, Any]]:
     """取得所有進行中專案清單與狀態 (具備 30 秒快取)"""
-    global _PROJECT_CACHE
-    now_ts = time.time()
+    cache = _project_cache(cache)
+    if not force_refresh:
+        cached = cache.rows_if_fresh(time.time())
+        if cached is not None:
+            return cached
 
-    if not force_refresh and _PROJECT_CACHE and (now_ts - _LAST_PROJECT_REFRESH_TIME) < _PROJECT_CACHE_TTL:
-        return _PROJECT_CACHE
-
-    refresh_project_states(force=force_refresh)
+    refresh_project_states(force=force_refresh, cache=cache)
     db = get_db()
     now = get_local_now()
 
@@ -506,7 +507,7 @@ def get_active_projects_list(force_refresh: bool = False) -> List[Dict[str, Any]
                 "ai_info": ai_info
             })
 
-        _PROJECT_CACHE = result
+        cache.put_rows(result)
         return result
 
 

@@ -22,11 +22,11 @@ import json
 import logging
 import random
 import re
-import threading
 from datetime import datetime, time as dtime, timedelta
 from typing import Any, Callable
 
 from core.config import get_config
+from core.runtime_state import TtlCache, runtime_state
 from core.database import get_db
 from core.time_utils import get_local_now
 from core.activity_sources import source_for, within_window
@@ -63,8 +63,7 @@ def claim_boundary_text(calendar_enabled: bool) -> str:
 WRITING_TYPES = {".tex", ".bib", ".docx", ".doc", ".md", ".txt", ".rst", ".pptx", ".xlsx"}
 CODE_TYPES = {".py", ".js", ".ts", ".tsx", ".jsx", ".go", ".rs", ".java", ".c", ".cpp", ".h", ".css", ".html", ".yaml", ".yml", ".json", ".toml", ".sh"}
 
-_LLM_CACHE_LOCK = threading.Lock()
-_LLM_CACHE: dict[str, tuple[datetime, str]] = {}
+# 問候卡的 LLM 文字快取住在 core/runtime_state 的 TtlCache（ADR-027）。
 
 
 class GreetingRejected(ValueError):
@@ -523,6 +522,7 @@ def polish_with_llm(
     cfg: Any | None = None,
     now: datetime | None = None,
     generate: Callable[[str, str], str] | None = None,
+    cache: TtlCache | None = None,
 ) -> dict[str, Any]:
     """關閉或失敗都原樣回傳規則版；成功才把 source 標成 llm。"""
     cfg = cfg or get_config()
@@ -539,10 +539,10 @@ def polish_with_llm(
     }
     digest = hashlib.sha256(json.dumps(facts, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
     cache_key = f"{greeting['window']}:{digest}"
-    with _LLM_CACHE_LOCK:
-        cached = _LLM_CACHE.get(cache_key)
-    if cached and now - cached[0] <= timedelta(minutes=settings["cache_minutes"]):
-        return {**greeting, "text": cached[1], "source": "llm", "llm_provider": settings["provider"], "llm_cached": True}
+    cache = cache if cache is not None else runtime_state().greeting_cache
+    cached = cache.get(cache_key, now)
+    if cached is not None:
+        return {**greeting, "text": cached, "source": "llm", "llm_provider": settings["provider"], "llm_cached": True}
 
     system_prompt = (
         "你是一位溫暖、簡潔的工作秘書。把下面的事實改寫成 2 到 3 句自然的繁體中文問候，"
@@ -561,14 +561,8 @@ def polish_with_llm(
     if not llm_text_is_safe(text, greeting["stats"]):
         logger.info("greeting LLM output rejected by fact guard; using rules text.")
         return {**greeting, "llm_rejected": "fact_guard"}
-    with _LLM_CACHE_LOCK:
-        _LLM_CACHE[cache_key] = (now, text)
+    cache.put(cache_key, text, now, timedelta(minutes=settings["cache_minutes"]))
     return {**greeting, "text": text, "source": "llm", "llm_provider": settings["provider"], "llm_cached": False}
-
-
-def _reset_llm_cache_for_tests() -> None:
-    with _LLM_CACHE_LOCK:
-        _LLM_CACHE.clear()
 
 
 # ---------------------------------------------------------------- 入口
