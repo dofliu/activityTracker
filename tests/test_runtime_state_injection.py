@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import ast
 import copy
+import re
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -141,21 +142,18 @@ def _product_sources() -> list[Path]:
     ]
 
 
+# 「定義了一個測試專用的重設函式」＝違規；「文件裡提到它們的名字」不是。
+# ADR-027 與 core/runtime_state.py 的 docstring 刻意寫出五個被刪掉的鉤子叫什麼，
+# 那是歷史紀錄，不是鉤子本身——所以這裡比對的是 def，不是字串出現。
+_HOOK_DEF = re.compile(r"^\s*def\s+(\w*_for_tests|reset_advisor_cache)\s*\(", re.MULTILINE)
+
+
 def test_no_reset_for_tests_hooks_in_product_code():
     """五個只為測試存在的函式全部刪掉了，一個都不准長回來。"""
-    banned = [
-        "_reset_state_for_tests",
-        "_reset_llm_cache_for_tests",
-        "_reset_pending_confirms",
-        "reset_advisor_cache",
-        "_for_tests",
-    ]
     offenders = []
     for path in _product_sources():
-        text = path.read_text(encoding="utf-8")
-        for needle in banned:
-            if needle in text:
-                offenders.append(f"{path.relative_to(REPO_ROOT)}: {needle}")
+        for match in _HOOK_DEF.finditer(path.read_text(encoding="utf-8")):
+            offenders.append(f"{path.relative_to(REPO_ROOT)}: def {match.group(1)}()")
     assert offenders == [], f"產品程式碼不該帶測試專用的重設鉤子：{offenders}"
 
 
