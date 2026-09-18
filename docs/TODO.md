@@ -89,11 +89,10 @@
 
 > 來源：[REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) §4–5。
 > 每一項結束時 `pytest` 必須全綠、`python main.py verify` 結果不得變化（整頓不改行為）。R2 的項目要先有 ADR。
-> **R0 已於 2026-09-16 完成**（B5–B9 ＋ D1）、**R1 全部於同日完成**（D2 一個 LLM client、D3 一份活動來源定義、D4 `server.py` 切成 9 個 router、D5 桌面通知併入 `ChannelAdapter`、D6 旗標六層收三層），收據見 ROADMAP §11.2；R2 已完成 D7（一份活動記憶，ADR-023）、D8（秘書四層化，ADR-024）、D9（transcript parser 分拆與漂移警示，ADR-025）、D10（前端模組化，ADR-026）與 D11（程序內狀態改注入，ADR-027）；剩 D12，要先寫 ADR。
+> **R0 已於 2026-09-16 完成**（B5–B9 ＋ D1）、**R1 全部於同日完成**（D2 一個 LLM client、D3 一份活動來源定義、D4 `server.py` 切成 9 個 router、D5 桌面通知併入 `ChannelAdapter`、D6 旗標六層收三層），收據見 ROADMAP §11.2；**R2 也全部完成**（D7 一份活動記憶 ADR-023、D8 秘書四層化 ADR-024、D9 transcript parser 分拆與漂移警示 ADR-025、D10 前端模組化 ADR-026、D11 程序內狀態改注入 ADR-027、D12 驗收中心宣告式 ADR-028）。**這張減法清單到此結束**；下一輪要做什麼要先決定，不要自動往下找事做。
 
 | # | 項目 | 內容 | 完成判準（收據） | 階段 |
 | :-- | :--- | :--- | :--- | :--- |
-| D12 | **驗收中心宣告式** | 22 個 `_check_aN` 改為少數通用探針（receipt 存在／端點欄位／檔案存在／資料表計數）上的宣告式表格 | `core/acceptance.py` < 600 行；`test_acceptance_center.py` 36 項全綠且 `verify` 輸出逐項相同 | R2 |
 
 ## 維護這頁的規則
 

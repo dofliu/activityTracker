@@ -172,7 +172,7 @@ def test_generate_returns_fallback_markdown_instead_of_raising(monkeypatch):
 
 def test_error_markers_still_match_downstream_detectors():
     """事實閘與驗收中心靠這些抬頭辨識供應商錯誤；client 產生的字面必須被它們接住。"""
-    from core.acceptance import _LLM_ERROR_MARKERS as acceptance_markers
+    from core.acceptance.readings import LLM_ERROR_MARKERS as acceptance_markers
     from core.meeting_transcripts import looks_like_llm_error
 
     async def _unknown():

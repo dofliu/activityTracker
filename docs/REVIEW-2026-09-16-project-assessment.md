@@ -159,6 +159,7 @@
    → **2026-09-17 已完成（D9）**：拆成 `watchers/transcripts/` 一個平台一個 parser（每個 < 300 行）＋ 共同介面，服務剩 515 行且不再認識任何格式；「靜默零事件」這一半另補漂移警示——**檔案 mtime 在視窗內 ∧ 該平台視窗內零事件**才警示，成立時把採集器標成 `degraded` 並顯示在系統健康頁（ADR-025，ROADMAP §11.2）。合成 fixture 的根本限制沒有消失：它偵測的是「有沒有採到東西」，不是「格式對不對」。
 4. **六層巢狀預設關閉旗標**（`executor` → `l2` → `l2.allow_write` → `scheduled_tasks` → `telegram_approvals` → `allow_remote_arm`）守著約 2,800 行預設安裝永不執行的程式。→ **同日已完成（D6）**：收成三層真正的分級，另兩層併入它們的上層開關（ADR-008 Addendum D）；既有設定檔明確寫成 false 的照樣有效。
 5. **`core/acceptance.py` 1,564 行**：22 個手寫 `_check_aN` ＋ 200 行 `_ITEMS`——把 TODO A 段做成可執行是好主意，但 3% 的程式碼在做自我證明，應改為少數幾個通用探針上的宣告式表格。
+   → **2026-09-18 已完成（D12）**：22 個手寫探針換成「一個 reading（去查什麼）＋ 一張階梯表（查到什麼就算什麼）」，拆成 `core/acceptance/` 五個模組（最大一檔 585 行，測試禁止任何一檔超過 600）。**這一條的建議只對了一半**：22 項並沒有收斂到「少數幾個通用探針」——每一項讀的東西本來就不同（coverage ledger、worker 記憶體狀態、逐字稿資料夾…），硬塞進通用探針只會做出九個參數的怪物。真正重複的是**判定的協定**，那個收成了十行的直譯器。**總行數幾乎沒有變少（1,560 → 1,505）**，如實記在 ADR-028：省下的樣板被表格結構吃回去，買到的是「每個分支的判準與訊息看得見、順序有測試守著」（ADR-028，ROADMAP §11.2）。
 6. **API 錯誤契約不一致**：48 處 `HTTPException` 與多處回 HTTP 200 的 `{"status": "skipped"/"error"}` 並存；87 個 `except Exception` 大多靜默吞掉。
 7. **CLI 與 API 詞彙分家**：`main.py cmd_status` 自己多算 `ai_nonempty_count`／`checkpoint_errors`，儀表板拿不到。
 8. **`legacy_*` provenance 哨兵值**穿過六個模組（B1 的 337 筆 rows）——pre-migration 相容路徑至今全活著。

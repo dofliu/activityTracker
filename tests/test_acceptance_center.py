@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -161,10 +162,14 @@ def test_report_is_read_only_and_leaves_no_row_behind(db, cfg):
 
 
 def test_module_never_shells_out_or_goes_online():
-    source = (acceptance.__file__ or "")
-    text = open(source, encoding="utf-8").read()
-    for forbidden in ("import subprocess", "import requests", "import httpx", "urllib.request"):
-        assert forbidden not in text, f"驗收中心不得 {forbidden}"
+    """D12 之後驗收中心是一個套件——這裡掃的是**每一個檔案**，不是只掃 __init__。"""
+    package = Path(acceptance.__file__ or "").parent
+    files = sorted(package.glob("*.py"))
+    assert len(files) >= 5, f"套件檔案掃不到（只看到 {files}）——這個測試會變成空轉"
+    for path in files:
+        text = path.read_text(encoding="utf-8")
+        for forbidden in ("import subprocess", "import requests", "import httpx", "urllib.request"):
+            assert forbidden not in text, f"驗收中心不得 {forbidden}（{path.name}）"
 
 
 # ---- A1 coverage ledger ----
@@ -563,9 +568,9 @@ def test_one_broken_probe_does_not_break_the_page(db, cfg, monkeypatch):
         raise RuntimeError("probe exploded")
 
     patched = tuple(
-        {**spec, "probe": boom} if spec["id"] == "A9" else spec for spec in acceptance._ITEMS
+        {**spec, "probe": boom} if spec["id"] == "A9" else spec for spec in acceptance.ITEMS
     )
-    monkeypatch.setattr(acceptance, "_ITEMS", patched)
+    monkeypatch.setattr(acceptance.report, "ITEMS", patched)
     report = _report(db, cfg)
     assert len(report["items"]) == len(ITEM_IDS)
     assert _item(report, "A9")["evidence"]["probe_error"] == "RuntimeError"
