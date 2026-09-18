@@ -26,7 +26,7 @@ It answers three questions at any moment:
 | Area | State |
 | :--- | :--- |
 | Code | P0–P8 and all ADR-008 executor stages landed; 22 ADRs record the boundary behind each decision |
-| Tests | **73 contract test modules, 807 tests** (806 passed + 1 skipped; 793 passed + 13 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
+| Tests | **73 contract test modules, 811 tests** (810 passed + 1 skipped; 793 passed + 13 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
 | Data | SQLite schema migration **18/18** (append-only + checksum, verified backup before upgrade) |
 | Release | `release_ready: false` |
 
@@ -337,7 +337,7 @@ activityTracker/
 │   └── i18n/zh-TW.json / en.json   # Locale dictionaries (key parity enforced by a test)
 │
 ├── scripts/                    # Verification, cleanup, autostart and E2E scripts
-├── tests/                      # 73 contract test modules (807 tests)
+├── tests/                      # 73 contract test modules (811 tests)
 ├── logs/checkpoints/           # Periodic activity snapshots
 └── reports/                    # Daily / range Markdown reports
 ```

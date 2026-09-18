@@ -172,3 +172,6 @@ def test_acceptance_shares_the_job_status_vocabulary():
     from rag.jobs import ACTIVE_STATUSES
 
     assert set(ACTIVE_JOB_STATUSES) == ACTIVE_STATUSES
+    # A21 的第一列（「回收正在進行中」）把查到的 status 直接當真假值用，
+    # 所以字彙裡不能出現空字串——否則那一列接不住，會掉到後面的 KeyError。
+    assert all(ACTIVE_JOB_STATUSES), "active status 不得有空字串"

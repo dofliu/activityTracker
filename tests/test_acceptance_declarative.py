@@ -135,3 +135,125 @@ def test_dependency_direction_is_downward_only():
     assert _imports(PACKAGE / "readings.py") <= {"rules"}
     assert _imports(PACKAGE / "items.py") <= {"readings", "rules"}
     assert _imports(PACKAGE / "report.py") <= {"items", "rules"}
+
+
+# ---- 順序就是語意：每一組都是「對調之後測試仍然全綠」的地方 ----
+#
+# D12 的差分收據（85 個合成狀態同時餵給改動前與改動後）證明了搬家沒有改行為，但那份
+# harness 需要改動前的檔案才跑得動，不會留在 repo 裡。下面這幾支是它留下來的**常駐**部分：
+# 每一支鎖住一組「前面那列先接住」的事實——把兩列對調，訊息會變，但既有測試不會紅。
+
+from contextlib import contextmanager  # noqa: E402
+from datetime import datetime, timedelta  # noqa: E402
+
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
+
+from core.acceptance import build_acceptance_report  # noqa: E402
+from core.models import Base, RAGIndexJob, SecretaryNote  # noqa: E402
+
+NOW = datetime(2026, 9, 4, 14, 0)
+
+
+class _DictConfig:
+    def __init__(self, data):
+        self.data = data
+
+    def get(self, key_path, default=None):
+        value = self.data
+        for key in key_path.split("."):
+            if not isinstance(value, dict) or key not in value:
+                return default
+            value = value[key]
+        return value
+
+
+class _TempDatabase:
+    def __init__(self):
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.factory = sessionmaker(bind=self.engine)
+
+    @contextmanager
+    def session_scope(self):
+        session = self.factory()
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+
+@pytest.fixture
+def ordering_db():
+    return _TempDatabase()
+
+
+def _item_of(db, cfg, item_id):
+    report = build_acceptance_report(database=db, cfg=cfg, now=NOW, only=[item_id])
+    return report["items"][0]
+
+
+def _cfg(tmp_path, **tree):
+    data = {"exporters": {"reports_dir": str(tmp_path / "reports")}}
+    data.update(tree)
+    return _DictConfig(data)
+
+
+def test_a15_keeps_reporting_digests_even_when_the_switch_is_off(ordering_db, tmp_path):
+    """A15 的開關在**最後**：已經有工作誌就照實說，不會因為關掉功能就變 not_configured。
+
+    （A16 剛好相反，見下一支——兩者不能被「統一的 enabled 處理」合併。）
+    """
+    with ordering_db.session_scope() as session:
+        session.add(SecretaryNote(kind="observation", source="daily_digest",
+                                  body="x", source_ref="daily_digest:2026-09-01",
+                                  created_at=NOW - timedelta(hours=2)))
+    cfg = _cfg(tmp_path, proactive_secretary={"daily_digest": {"enabled": False}})
+    item = _item_of(ordering_db, cfg, "A15")
+    assert item["status"] == PARTIAL
+    assert "只有 2026-09-01 一天的工作誌" in item["detail"]
+
+
+def test_a16_says_it_is_switched_off_rather_than_idle(ordering_db, tmp_path):
+    """A16 關掉時 facts 是空的，所以「沒有活動」那條**也會成立**——靠順序才說對話。"""
+    cfg = _cfg(tmp_path, proactive_secretary={"patterns": {"enabled": False}})
+    item = _item_of(ordering_db, cfg, "A16")
+    assert item["status"] == NOT_CONFIGURED
+    assert item["detail"] == "模式感知提案已關閉。"
+    assert item["evidence"] == {"enabled": False,
+                                "basis": "activity_patterns.collect_pattern_signals"}
+
+
+def test_a21_unfinished_beats_orphan_directories(ordering_db, tmp_path):
+    """沒跑完的回收要先說「沒跑完」；孤兒目錄那句是留給**跑完了**但刪不掉的情況。"""
+    with ordering_db.session_scope() as session:
+        session.add(RAGIndexJob(
+            id="j1", job_type="compact_chroma", status="failed",
+            requested_at=NOW - timedelta(hours=1), completed_at=NOW - timedelta(minutes=30),
+            result_json='{"failed_dirs": ["/x/y"], "reclaimed_bytes": 0}',
+        ))
+    item = _item_of(ordering_db, _cfg(tmp_path), "A21")
+    assert item["status"] == PARTIAL
+    assert "沒有完成（failed）" in item["detail"]
+
+
+def test_a21_running_beats_the_older_finished_receipt(ordering_db, tmp_path):
+    """進行中優先：同時有舊的完成收據與一個還在跑的工作時，說的是「正在進行中」。"""
+    with ordering_db.session_scope() as session:
+        session.add(RAGIndexJob(
+            id="j-old", job_type="compact_chroma", status="completed",
+            requested_at=NOW - timedelta(hours=3), completed_at=NOW - timedelta(hours=2),
+            result_json='{"reclaimed_bytes": 0, "removed_dirs": [], "failed_dirs": []}',
+        ))
+        session.add(RAGIndexJob(
+            id="j-run", job_type="compact_chroma", status="running",
+            requested_at=NOW - timedelta(seconds=40),
+        ))
+    item = _item_of(ordering_db, _cfg(tmp_path), "A21")
+    assert item["status"] == PENDING
+    assert "回收正在進行中（running）" in item["detail"]
+    assert item["evidence"]["receipt_available"] is False
