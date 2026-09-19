@@ -13,6 +13,8 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 
 import pytest
+
+from core.runtime_state import TtlCache
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -88,9 +90,7 @@ class TempDatabase:
 
 @pytest.fixture(autouse=True)
 def _clear_cache():
-    sg._reset_llm_cache_for_tests()
     yield
-    sg._reset_llm_cache_for_tests()
 
 
 def _seed(db, *, now=NOW):
@@ -273,9 +273,9 @@ def test_llm_polish_cannot_add_facts():
     ok = polish_with_llm(greeting, cfg=_cfg(llm=True), now=NOW,
                          generate=lambda s, u: "Dof 早安！才開工 2 小時就推進了 2 個專案、3 個 commit，很棒，記得休息。")
     assert ok["source"] == "llm" and ok["llm_provider"] == "ollama" and ok["llm_cached"] is False
-    # 編出「10 個 PR」→ 整段丟掉
-    sg._reset_llm_cache_for_tests()
-    bad = polish_with_llm(greeting, cfg=_cfg(llm=True), now=NOW, generate=lambda s, u: "Dof 你今天已經有 10 個 PR 了！")
+    # 編出「10 個 PR」→ 整段丟掉（給它一份全新的快取，否則會拿到上一次的結果）
+    bad = polish_with_llm(greeting, cfg=_cfg(llm=True), now=NOW, cache=TtlCache(),
+                          generate=lambda s, u: "Dof 你今天已經有 10 個 PR 了！")
     assert bad["source"] == "rules" and bad["llm_rejected"] == "fact_guard"
     assert llm_text_is_safe("字" * 400, greeting["stats"]) is False
 

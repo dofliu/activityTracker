@@ -49,6 +49,7 @@ from core.agent_dispatch import (
 )
 from core.config import get_config
 from core.database import get_db
+from core.runtime_state import ConfirmStore, runtime_state
 from core.models import AgentExecutionReceipt
 from core.runtime_paths import runtime_data_root
 from core.time_utils import get_local_now
@@ -72,8 +73,8 @@ EXECUTOR_CLAIM_BOUNDARY = (
 
 RESPONSE_TEXT_LIMIT = 20000
 
-# L2 confirm code：一次性、短效；只存在 server 記憶體，不落庫、不進 log。
-_PENDING_L2_CONFIRMS: dict[str, dict[str, Any]] = {}
+# L2 confirm code 的住處是 core/runtime_state 的 ConfirmStore（ADR-027）：一次性、短效、
+# 只存雜湊與到期時間，不落庫、不進 log。呼叫端可注入自己的 store，預設用行程那一份。
 
 
 class ExecutionRejected(RuntimeError):
@@ -848,15 +849,10 @@ def _receipt_dict(row: AgentExecutionReceipt) -> dict[str, Any]:
     }
 
 
-def _reset_pending_confirms() -> None:
-    """測試用：清空 in-memory confirm code 狀態。"""
-    _PENDING_L2_CONFIRMS.clear()
-
-
-def discard_pending_confirm(proposal_id: str) -> None:
+def discard_pending_confirm(proposal_id: str, *, confirms: ConfirmStore | None = None) -> None:
     """作廢某 proposal 的待確認 confirm code（P5-R4b：Telegram 批准通道
     不支援 L2，誤觸時立即銷毀剛簽發的碼，確認流程只能回儀表板重走）。"""
-    _PENDING_L2_CONFIRMS.pop(str(proposal_id), None)
+    (confirms or runtime_state().confirms).discard(proposal_id)
 
 
 def _check_l2_cooldown(
@@ -888,16 +884,17 @@ def _check_l2_cooldown(
 
 
 def _issue_confirm_code(
-    proposal_id: str, plan: ActionPlan, *, cfg: Any, now: datetime
+    proposal_id: str, plan: ActionPlan, *, cfg: Any, now: datetime, confirms: ConfirmStore
 ) -> dict[str, Any]:
     """產生一次性 confirm code（只回傳給呼叫端顯示，不落庫、不進 log）。"""
     ttl = _l2_confirm_ttl_seconds(cfg)
     code = f"{py_secrets.randbelow(1_000_000):06d}"
-    _PENDING_L2_CONFIRMS[str(proposal_id)] = {
-        "code_hash": hashlib.sha256(code.encode("utf-8")).hexdigest(),
-        "expires_at": now + timedelta(seconds=ttl),
-        "template_id": plan.template_id,
-    }
+    confirms.issue(
+        proposal_id,
+        code_hash=hashlib.sha256(code.encode("utf-8")).hexdigest(),
+        expires_at=now + timedelta(seconds=ttl),
+        template_id=plan.template_id,
+    )
     return {
         "status": "confirmation_required",
         "confirm": {
@@ -913,10 +910,11 @@ def _issue_confirm_code(
 
 
 def _consume_confirm_code(
-    proposal_id: str, template_id: str, confirm_code: str, *, now: datetime
+    proposal_id: str, template_id: str, confirm_code: str, *, now: datetime, confirms: ConfirmStore
 ) -> None:
     """單次有效：無論驗證成敗都先銷毀 pending 記錄（防重放與暴力嘗試）。"""
-    pending = _PENDING_L2_CONFIRMS.pop(str(proposal_id), None)
+    pending = confirms.peek(proposal_id)
+    confirms.discard(proposal_id)
     if pending is None:
         raise ExecutionRejected(
             "confirm_code_not_issued",
@@ -950,6 +948,7 @@ def execute_proposal(
     now: datetime | None = None,
     services: ExecutorServices | None = None,
     proposal_lookup: Callable[..., dict[str, Any] | None] | None = None,
+    confirms: ConfirmStore | None = None,
 ) -> dict[str, Any]:
     """執行一個仍然成立的 proposal 的白名單動作；全程 fail-closed。
 
@@ -958,6 +957,7 @@ def execute_proposal(
     """
     cfg = cfg or get_config()
     database = database or get_db()
+    confirms = confirms if confirms is not None else runtime_state().confirms
     now = now or get_local_now()
 
     if not executor_enabled(cfg):
@@ -1007,8 +1007,8 @@ def execute_proposal(
         if plan.precheck is not None:
             plan.precheck()
         if not confirm_code:
-            return _issue_confirm_code(proposal_id, plan, cfg=cfg, now=now)
-        _consume_confirm_code(proposal_id, plan.template_id, confirm_code, now=now)
+            return _issue_confirm_code(proposal_id, plan, cfg=cfg, now=now, confirms=confirms)
+        _consume_confirm_code(proposal_id, plan.template_id, confirm_code, now=now, confirms=confirms)
         approved_via = f"{approved_via}+confirm_code"
     elif plan.precheck is not None:
         plan.precheck()

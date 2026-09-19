@@ -13,7 +13,6 @@ import hashlib
 import json
 import logging
 import re
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from typing import Any, Callable
@@ -21,6 +20,7 @@ from typing import Any, Callable
 from dataclasses import replace
 
 from core.config import get_config
+from core.runtime_state import TtlCache, runtime_state
 from core.database import get_db
 from core.secretary.types import Proposal, Signal
 from core.extension_monitor import build_extension_status
@@ -756,42 +756,8 @@ def _sanitize(
     return summary, annotations
 
 
-class _AdvisorCache:
-    """程序內 TTL cache；不寫 SQLite，重啟即失效（與『不保存』一致）。"""
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._key: str | None = None
-        self._expires_at: datetime | None = None
-        self._value: tuple[str | None, dict[str, dict[str, Any]]] | None = None
-
-    def get(self, key: str, now: datetime):
-        with self._lock:
-            if (
-                self._key == key
-                and self._value is not None
-                and self._expires_at is not None
-                and now < self._expires_at
-            ):
-                return self._value
-            return None
-
-    def put(self, key: str, value, now: datetime, ttl_minutes: int) -> None:
-        if ttl_minutes <= 0:
-            return
-        with self._lock:
-            self._key = key
-            self._value = value
-            self._expires_at = now + timedelta(minutes=ttl_minutes)
-
-    def clear(self) -> None:
-        with self._lock:
-            self._key = None
-            self._value = None
-            self._expires_at = None
-
-
-_cache = _AdvisorCache()
+# advisor 摘要快取住在 core/runtime_state 的 TtlCache（ADR-027）：程序內、不寫 SQLite、
+# 重啟即失效——與「註解不落地」一致。
 
 
 def _default_generate(provider: str, timeout_seconds: int) -> Callable[[str, str], str]:
@@ -811,9 +777,11 @@ def annotate_action_proposals(
     cfg: Any | None = None,
     now: datetime | None = None,
     llm_generate: Callable[[str, str], str] | None = None,
+    cache: TtlCache | None = None,
 ) -> dict[str, Any]:
     """包裝 ``build_action_proposals`` 的輸出；永不改變 deterministic 內容。"""
     cfg = cfg or get_config()
+    cache = cache if cache is not None else runtime_state().advisor_cache
     settings = advisor_settings(cfg)
     advisor: dict[str, Any] = {
         "enabled": settings["enabled"],
@@ -840,7 +808,7 @@ def annotate_action_proposals(
     ).hexdigest()
     valid_ids = {str(item.get("proposal_id")) for item in proposals}
 
-    cached = _cache.get(cache_key, now)
+    cached = cache.get(cache_key, now)
     if cached is not None:
         summary, annotations = cached
         advisor["status"] = "cached"
@@ -867,7 +835,7 @@ def annotate_action_proposals(
             advisor["status"] = "fallback_deterministic"
             advisor["fallback_reason"] = "no_usable_annotations"
             return result
-        _cache.put(cache_key, (summary, annotations), now, settings["cache_minutes"])
+        cache.put(cache_key, (summary, annotations), now, timedelta(minutes=settings["cache_minutes"]))
         advisor["status"] = "annotated"
 
     for item in proposals:
@@ -881,8 +849,3 @@ def annotate_action_proposals(
         # 誠實旗標：cloud advisor 實際被使用時，envelope 不得再宣稱未用 cloud LLM。
         result["cloud_llm_used"] = True
     return result
-
-
-def reset_advisor_cache() -> None:
-    """測試用：清空程序內 cache。"""
-    _cache.clear()

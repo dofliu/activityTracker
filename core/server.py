@@ -37,8 +37,35 @@ from .security import (
 from rag.router import router as rag_router
 
 logger = logging.getLogger("OmniContext.Server")
-_startup_cfg = get_config()
-_allowed_origins = configured_allowed_origins(_startup_cfg)
+
+
+class DynamicCorsMiddleware(CORSMiddleware):
+    """每個請求看**當下**的 allowlist（ADR-027，TODO D11）。
+
+    D11 之前這個清單在 import 時就算好、凍結在 middleware 裡：使用者在儀表板改了
+    `security.allowed_origins` 並存檔，下面的 `enforce_local_security_boundary`（每個請求
+    重讀設定）立刻生效、CORS 標頭卻還是舊的，**必須重啟服務**——而且沒有任何地方寫著這件事。
+
+    只有在清單真的變了的時候才用公開建構子重算一次衍生標頭；沒變就只是一次 list 比較。
+    邊界沒有放寬：允許清單仍然只來自設定檔，loopback 限制與 extension token 邊界原封不動，
+    改的只是「什麼時候讀」。
+    """
+
+    def __init__(self, app, **options):
+        self._cors_options = options
+        super().__init__(app, **options)
+        self._origins_snapshot = list(options.get("allow_origins") or ())
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            current = configured_allowed_origins(get_config())
+            if current != self._origins_snapshot:
+                options = {**self._cors_options, "allow_origins": current}
+                CORSMiddleware.__init__(self, self.app, **options)
+                self._cors_options = options
+                self._origins_snapshot = list(current)
+                logger.info("CORS allowlist reloaded from config (%d origin(s)).", len(current))
+        await super().__call__(scope, receive, send)
 
 app = FastAPI(
     title="OmniContext Local Engine & Web Dashboard",
@@ -47,9 +74,10 @@ app = FastAPI(
 )
 
 # 僅允許本機 dashboard origins；browser extension 走獨立 write-only token boundary。
+# 清單每個請求對照一次當下設定（DynamicCorsMiddleware），改設定不必重啟。
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_allowed_origins,
+    DynamicCorsMiddleware,
+    allow_origins=configured_allowed_origins(get_config()),
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -26,7 +26,7 @@
 | 面向 | 現況 |
 | :--- | :--- |
 | 程式 | P0–P8 與 ADR-008 執行器全階段已落地；22 份 ADR 記錄每個決策的邊界 |
-| 測試 | **71 個 contract test 模組、776 項**（775 passed + 1 skipped；不裝 `[rag]` extra 時 762 passed + 13 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
+| 測試 | **73 個 contract test 模組、811 項**（810 passed + 1 skipped；不裝 `[rag]` extra 時 793 passed + 13 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
 | 資料 | SQLite schema migration **18/18**（append-only + checksum，升級前自動備份） |
 | 發佈 | `release_ready: false` |
 
@@ -372,7 +372,7 @@ activityTracker/
 │   └── i18n/zh-TW.json / en.json   # 語系字典（兩份 key 集合由測試把關）
 │
 ├── scripts/                    # 驗證、清理、autostart 與 E2E 腳本
-├── tests/                      # 69 個 contract test 模組（710 項）
+├── tests/                      # 73 個 contract test 模組（811 項）
 ├── logs/checkpoints/           # 週期性活動快照
 └── reports/                    # 每日／區間 Markdown 報告
 ```

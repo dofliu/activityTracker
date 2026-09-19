@@ -30,6 +30,7 @@ from datetime import datetime
 from typing import Any, Callable, Optional
 
 from core.config import get_config
+from core.runtime_state import ChatState, runtime_state
 from core.time_utils import get_local_now
 from notifiers.telegram_setup import Transport, _call_api
 
@@ -44,9 +45,12 @@ CHAT_CLAIM_BOUNDARY = (
     "提問與回答會經過 Telegram 伺服器，引用只送檔名不送文件內容。"
 )
 
-_ASK_LOCK = threading.Lock()
-_ASK_IN_FLIGHT = False
-_ASKS_ANSWERED = 0
+# 「同時只回答一題」與「本次啟動已回答幾題」住在 core/runtime_state 的 ChatState
+# （ADR-027）；重啟歸零仍是刻意的，只是現在有名字、能被注入。
+
+
+def _chat_state(state: ChatState | None = None) -> ChatState:
+    return state if state is not None else runtime_state().chat
 
 
 def telegram_chat_enabled(cfg: Any | None = None) -> bool:
@@ -96,11 +100,9 @@ def _max_question_chars(cfg: Any) -> int:
     return max(50, min(value, 4000))
 
 
-def chat_status(cfg: Any | None = None) -> dict[str, Any]:
+def chat_status(cfg: Any | None = None, *, state: ChatState | None = None) -> dict[str, Any]:
     cfg = cfg or get_config()
-    with _ASK_LOCK:
-        in_flight = _ASK_IN_FLIGHT
-        answered = _ASKS_ANSWERED
+    in_flight, answered = _chat_state(state).snapshot()
     return {
         "enabled": telegram_chat_enabled(cfg),
         "remote_arm_enabled": remote_arm_enabled(cfg),
@@ -108,13 +110,6 @@ def chat_status(cfg: Any | None = None) -> dict[str, Any]:
         "asks_answered": answered,
         "claim_boundary": CHAT_CLAIM_BOUNDARY,
     }
-
-
-def _reset_state_for_tests() -> None:
-    global _ASK_IN_FLIGHT, _ASKS_ANSWERED
-    with _ASK_LOCK:
-        _ASK_IN_FLIGHT = False
-        _ASKS_ANSWERED = 0
 
 
 # ---- 傳送 ----
@@ -270,8 +265,8 @@ def _status_text(cfg: Any, now: datetime) -> str:
         lines.append(f"記憶區：{list_notes(limit=1).get('total', 0)} 筆")
     except Exception as exc:  # noqa: BLE001
         lines.append(f"記憶區：讀不到（{type(exc).__name__}）")
-    with _ASK_LOCK:
-        lines.append(f"本次啟動已回答 {_ASKS_ANSWERED} 題" + ("（目前有一題進行中）" if _ASK_IN_FLIGHT else ""))
+    chat_in_flight, chat_answered = _chat_state().snapshot()
+    lines.append(f"本次啟動已回答 {chat_answered} 題" + ("（目前有一題進行中）" if chat_in_flight else ""))
     return "\n".join(lines)
 
 
@@ -372,8 +367,8 @@ def _run_ask(
     chat: str,
     transport: Optional[Transport],
     ask: Callable[..., dict[str, Any]],
+    state: ChatState | None = None,
 ) -> None:
-    global _ASK_IN_FLIGHT, _ASKS_ANSWERED
     try:
         result = ask(
             question,
@@ -387,9 +382,7 @@ def _run_ask(
         logger.error("Telegram ask failed: %s", exc, exc_info=True)
         send_text(token, chat, f"（回答失敗：{type(exc).__name__}）", transport=transport)
     finally:
-        with _ASK_LOCK:
-            _ASK_IN_FLIGHT = False
-            _ASKS_ANSWERED += 1
+        _chat_state(state).finish_ask(answered=True)
 
 
 def _handle_question(
@@ -401,17 +394,15 @@ def _handle_question(
     transport: Optional[Transport],
     ask: Optional[Callable[..., dict[str, Any]]],
     submit: Optional[Callable[[Callable[[], None]], None]],
+    state: ChatState | None = None,
 ) -> dict[str, Any]:
-    global _ASK_IN_FLIGHT
     limit = _max_question_chars(cfg)
     if len(question) > limit:
         send_text(token, chat, f"問題太長了（上限 {limit} 字）。", transport=transport)
         return {"handled": "question_too_long"}
-    with _ASK_LOCK:
-        if _ASK_IN_FLIGHT:
-            send_text(token, chat, "上一題還在回答中，等這題回完再問。", transport=transport)
-            return {"handled": "chat_busy"}
-        _ASK_IN_FLIGHT = True
+    if not _chat_state(state).begin_ask():
+        send_text(token, chat, "上一題還在回答中，等這題回完再問。", transport=transport)
+        return {"handled": "chat_busy"}
 
     if ask is None:
         from core.secretary.present import ask_secretary as ask

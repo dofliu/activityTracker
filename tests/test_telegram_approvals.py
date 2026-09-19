@@ -12,7 +12,8 @@ from datetime import datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from core.agent_executor import ExecutionRejected, _PENDING_L2_CONFIRMS
+from core.agent_executor import ExecutionRejected
+from core.runtime_state import runtime_state
 from core.server import app
 from notifiers import telegram_approvals as approvals
 from notifiers.telegram_approvals import (
@@ -67,11 +68,7 @@ def _cfg(enabled=True, executor=True, token=FAKE_TOKEN, chat=FAKE_CHAT, ttl_hour
 def _clean_state(monkeypatch):
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
-    approvals._reset_state_for_tests()
-    _PENDING_L2_CONFIRMS.clear()
     yield
-    approvals._reset_state_for_tests()
-    _PENDING_L2_CONFIRMS.clear()
 
 
 class RecordingTransport:
@@ -241,7 +238,7 @@ def test_l2_confirmation_required_discards_pending_code():
     arm_approvals(cfg=_cfg(), now=NOW)
     transport = RecordingTransport()
     # 模擬 execute_proposal 對 L2 首呼叫簽發 confirm code 的狀態
-    _PENDING_L2_CONFIRMS["abc123"] = {"code_hash": "x", "expires_at": NOW, "template_id": "agent_draft_plan"}
+    runtime_state().confirms.issue("abc123", code_hash="x", expires_at=NOW, template_id="agent_draft_plan")
 
     receipt = handle_telegram_update(
         _callback_update(data="ap:abc123:agent_draft_plan"),
@@ -251,7 +248,7 @@ def test_l2_confirmation_required_discards_pending_code():
         execute=lambda *a, **k: {"status": "confirmation_required"},
     )
     assert receipt["handled"] == "l2_refused_confirm_discarded"
-    assert "abc123" not in _PENDING_L2_CONFIRMS  # 剛簽發的碼立即作廢
+    assert "abc123" not in runtime_state().confirms  # 剛簽發的碼立即作廢
     assert transport.methods() == ["answerCallbackQuery"]
     assert "L2" in transport.calls[0][1]["text"]
 

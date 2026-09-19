@@ -168,7 +168,10 @@ def test_compact_chroma_is_a_known_job_type():
 
 def test_acceptance_shares_the_job_status_vocabulary():
     """A21 用「工作是否還在跑」判斷要不要說『進行中』；狀態字彙必須跟 rag/jobs.py 同步。"""
-    from core.acceptance import _ACTIVE_JOB_STATUSES
+    from core.acceptance.readings import ACTIVE_JOB_STATUSES
     from rag.jobs import ACTIVE_STATUSES
 
-    assert set(_ACTIVE_JOB_STATUSES) == ACTIVE_STATUSES
+    assert set(ACTIVE_JOB_STATUSES) == ACTIVE_STATUSES
+    # A21 的第一列（「回收正在進行中」）把查到的 status 直接當真假值用，
+    # 所以字彙裡不能出現空字串——否則那一列接不住，會掉到後面的 KeyError。
+    assert all(ACTIVE_JOB_STATUSES), "active status 不得有空字串"

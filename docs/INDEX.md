@@ -70,6 +70,8 @@
 | [ADR-023](ADR-023-one-activity-memory.md) | 一份活動記憶（活動進 `semantic_index`，文件留給 DeskRAG） | 依「這東西是什麼」分工而不是依技術棧、活動記憶不得綁在選用依賴上、知識庫對話的活動段改查同一份核心索引、舊切片一次性清除並寫進收據、代價（活動段沒有 BM25）如實記下 |
 | [ADR-024](ADR-024-secretary-layers.md) | 秘書叢集四層化 ＋ 兩個定型契約 | 方向只准往下且由掃 import 的測試把關、`Signal` 在聚合層入口一次驗完必填、`Proposal.to_dict()` 就是 API 形狀、記憶層不自己往上拿資料（組合點在呈現層）、四層不等於四個檔案 |
 | [ADR-025](ADR-025-transcript-parsers-and-drift.md) | 每平台一個 transcript parser ＋ 漂移警示 | 服務不認識任何格式、共同介面只有 `discover`／`parse` 兩個函式、`parse` 是不碰 DB 的產生器、漂移＝檔案在動 ∧ 事件是零（兩半缺一不可，所以不誤報「沒在用」）、靜默零事件要讓採集器變 degraded |
+| [ADR-028](ADR-028-declarative-acceptance.md) | 驗收中心改成「一個 reading ＋ 一張階梯表」 | 「去查什麼」與「查到什麼就算什麼」分開、順序就是語意（OTHERWISE 只能在最後，由測試守著）、evidence 是對外契約所以另開 facts 給判準用、功能關掉就不做昂貴收集、拆檔不等於變短（總行數幾乎沒少，如實記在 ADR 裡）|
+| [ADR-027](ADR-027-injected-runtime-state.md) | 程序內可變狀態收成可注入的 store | 狀態有名字、有把手，重設＝換一份新的而不是呼叫鉤子；鎖跟著它保護的資料走；只存在記憶體、一次性碼只留雜湊（安全性質一個都沒放寬）；CORS 允許清單每個請求看當下設定，改設定不必重啟；行程預設仍是單例（買到的是「可注入」不是「無全域」）|
 | [ADR-026](ADR-026-frontend-modules.md) | 前端拆成 ES module：一個分頁一個檔 | 沒有打包步驟（本機工具，少一層是一層）、字典是資料且兩份 key 集合由測試把關、`fetch` 只准出現在 `core/api.js`、點擊動作走 `data-action` 委派而不是字串裡的 handler、`state.js` 是過渡形狀（改成注入是 D11） |
 
 ## 功能規格與驗證
@@ -99,5 +101,5 @@
 | [NEXT_SESSION.md](NEXT_SESSION.md) | 下一個開發 session 的接手指南（現況、待辦、環境備忘） |
 | [../promo/](../promo/) | 3 分鐘介紹影片的 18 個場景源檔、分鏡表與渲染腳本（可單景重渲） |
 | [assets/](assets/) | 文件用圖片（架構與 roadmap 卡片等） |
-| `../tests/` | **71 個 contract test 模組（776 項，775 passed + 1 conditional skip；不裝 `[rag]` extra 時 762 passed + 13 skipped）**；執行 `python -m pytest tests/` |
+| `../tests/` | **73 個 contract test 模組（811 項，810 passed + 1 conditional skip；不裝 `[rag]` extra 時 793 passed + 13 skipped）**；執行 `python -m pytest tests/` |
 | `../scripts/` | 驗證、清理、autostart 與 E2E 腳本 |

@@ -242,7 +242,7 @@ def test_home_endpoint_is_read_only(monkeypatch):
 
 
 def _a18(db, cfg, monkeypatch, home):
-    monkeypatch.setattr("core.acceptance.build_home", lambda **kw: home)  # D8：驗收中心改模組層 import
+    monkeypatch.setattr("core.acceptance.readings.build_home", lambda **kw: home)  # D12：reading 住在 readings.py
     report = build_acceptance_report(database=db, cfg=cfg, now=NOW, only=["A18"])
     return report["items"][0]
 

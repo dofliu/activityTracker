@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 import core.project_engine as project_engine
 from core.models import AIPromptEvent, Base, ProjectState
+from core.runtime_state import ProjectCache
 
 
 class TempDatabase:
@@ -56,8 +57,8 @@ def test_concurrent_project_refresh_creates_one_state_per_key(tmp_path, monkeypa
     """同時快取失效時，僅一個請求應執行重整，且唯一鍵不應使任何請求失敗。"""
     database = TempDatabase(tmp_path / "project_refresh.db")
     monkeypatch.setattr(project_engine, "get_db", lambda: database)
-    monkeypatch.setattr(project_engine, "_LAST_PROJECT_REFRESH_TIME", 0.0)
-    monkeypatch.setattr(project_engine, "_PROJECT_CACHE", [])
+    # D11：不再 monkeypatch 兩個模組全域——直接給這個測試一份全新的快取
+    cache = ProjectCache()
 
     with database.session_scope() as session:
         session.add(
@@ -73,7 +74,7 @@ def test_concurrent_project_refresh_creates_one_state_per_key(tmp_path, monkeypa
 
     def refresh_from_parallel_request():
         barrier.wait()
-        project_engine.refresh_project_states()
+        project_engine.refresh_project_states(cache=cache)
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = [executor.submit(refresh_from_parallel_request) for _ in range(4)]
