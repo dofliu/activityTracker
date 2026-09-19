@@ -1,0 +1,6 @@
+{
+  "body": "{\"database\":{\"db_path\":\"omni_context.db\"},\"data_lifecycle\":{\"auto_backup_before_migration\":false,\"backups_dir\":\"/omni/home/backups\"},\"integrations\":{\"github\":{\"token\":\"\"}},\"security\":{\"browser_extension_ingest_token\":\"\"}}",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/config"
+}

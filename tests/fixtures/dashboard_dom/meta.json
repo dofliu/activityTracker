@@ -1,0 +1,24 @@
+{
+  "asset_version": "domlock",
+  "endpoint_count": 35,
+  "frozen_clock": "2026-09-19T10:43:53",
+  "frozen_epoch_ms": 1789814633000,
+  "langs": [
+    "zh-TW",
+    "en"
+  ],
+  "locale": "zh-TW",
+  "tabs": [
+    "tab-assistant",
+    "tab-knowledge",
+    "tab-projects",
+    "tab-repos",
+    "tab-summaries",
+    "tab-settings"
+  ],
+  "timezone_id": "UTC",
+  "viewport": {
+    "height": 2400,
+    "width": 1440
+  }
+}

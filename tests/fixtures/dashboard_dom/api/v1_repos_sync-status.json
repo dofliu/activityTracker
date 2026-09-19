@@ -1,0 +1,6 @@
+{
+  "body": "{\"scope\":\"recent\",\"repositories\":[],\"repository_count\":0,\"displayed_count\":0,\"recent_limit\":10,\"attention_count\":0,\"attention_scope\":\"displayed_repositories\",\"summary\":{\"synced\":0,\"behind\":0,\"ahead\":0,\"diverged\":0,\"no_upstream\":0,\"dirty\":0,\"unavailable\":0},\"batch\":{\"fetch_all\":true,\"pull_ff_only\":true,\"push\":false,\"max_repositories\":50},\"recent_ranking_basis\":\"last_local_commit_then_displayed_worktree_activity\",\"truncated\":false,\"remote_tracking_basis\":\"cached_local_remote_tracking_ref\",\"automatic_sync\":false,\"commit_policy\":\"staged_only_no_automatic_git_add\"}",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/repos/sync-status"
+}

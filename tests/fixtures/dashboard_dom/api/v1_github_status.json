@@ -1,0 +1,6 @@
+{
+  "body": "{\"connected\":true,\"username\":\"dofliu\",\"name\":\"JuiHung Liu\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/90171766?v=4\",\"html_url\":\"https://github.com/dofliu\",\"public_repos\":40,\"total_private_repos\":0,\"scopes\":[],\"rate_limit\":{\"limit\":\"15000\",\"remaining\":\"14926\",\"reset\":\"1789815468\"}}",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/github/status"
+}

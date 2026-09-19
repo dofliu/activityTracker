@@ -1,0 +1,6 @@
+{
+  "body": "{\"enabled\":false,\"remote_arm_enabled\":false,\"ask_in_flight\":false,\"asks_answered\":0,\"claim_boundary\":\"Telegram 對話與儀表板交辦框走同一條管線（記憶區脈絡＋知識庫檢索＋所選 LLM）；提問與回答會經過 Telegram 伺服器，引用只送檔名不送文件內容。\"}",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/telegram/chat/status"
+}

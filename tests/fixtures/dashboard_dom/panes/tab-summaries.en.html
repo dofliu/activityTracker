@@ -1,0 +1,252 @@
+
+        <!-- 原 01 右欄（今日統計、Focus Now）移入 05：首頁只留秘書桌面與交辦框（ADR-019 Addendum B） -->
+        <div class="summaries-rail-strip mb-14">
+          <details class="panel rail-stats" id="rail-stats" open="">
+        <summary class="rail-head rail-stats-head"><span data-i18n="rail_stats_title">Today's stats</span><span>▾</span></summary>
+        <div id="assistant-strip" class="assistant-strip rail-strip">
+    <div class="assistant-chip">
+      <span class="mono-mini muted">AI FOREGROUND</span>
+      <span class="assistant-chip-value ">0 min</span>
+    </div>
+    <div class="assistant-chip">
+      <span class="mono-mini muted">COVERAGE</span>
+      <span class="assistant-chip-value ">UNAVAILABLE</span>
+    </div>
+    <div class="assistant-chip">
+      <span class="mono-mini muted">BG TASKS</span>
+      <span class="assistant-chip-value ">40 min · 1 done</span>
+    </div>
+    <div class="assistant-chip">
+      <span class="mono-mini muted">SUGGESTIONS</span>
+      <span class="assistant-chip-value ">1</span>
+    </div></div>
+      </details>
+          <div class="panel focus-carousel-panel">
+        <div class="rail-head"><span data-i18n="rail_focus_now">FOCUS NOW</span><span id="loop-tally">3/5 · 2</span></div>
+        <div id="open-loops-list" class="focus-carousel">
+    <article class="focus-card focus-proposal" data-id="">
+      <div class="focus-card-top">
+        <span class="focus-source">READ-ONLY · PROPOSAL</span>
+        <span class="focus-priority medium">MEDIUM</span>
+      </div>
+      <div class="focus-project">activityTracker</div>
+      <h2 class="focus-title" title="D11＋D12：狀態注入與驗收中心宣告式化 &quot;雙引號&quot; &lt;b&gt;粗體&lt;/b&gt; &amp; '單引號' &lt;img src=x onerror=1&gt;">D11＋D12：狀態注入與驗收中心宣告式化 "雙引號" &lt;b&gt;粗體&lt;/b&gt; &amp; '單引號' &lt;img src=x onerror=1&gt;</h2>
+      <div class="focus-detail">確認這個 PR 還要不要——繼續推進、轉回 draft 或關閉。</div>
+      <div class="focus-card-bottom">
+        <div class="focus-controls">
+          <button class="focus-nav" data-focus-prev="" aria-label="Previous item">←</button>
+          <div class="focus-dots">
+    <button class="focus-dot active" data-focus-index="0" aria-label="Card 1 / 3 · 2 open" aria-current="true"></button>
+    <button class="focus-dot " data-focus-index="1" aria-label="Card 2 / 3 · 2 open" aria-current="false"></button>
+    <button class="focus-dot " data-focus-index="2" aria-label="Card 3 / 3 · 2 open" aria-current="false"></button></div>
+          <button class="focus-nav" data-focus-next="" aria-label="Next item">→</button>
+          <button class="focus-nav focus-toggle" data-focus-toggle="" aria-label="Pause rotation" aria-pressed="false">Ⅱ</button>
+        </div>
+        <div class="focus-actions">
+          <button class="focus-action focus-primary-action" data-focus-project="activityTracker">View project ↗</button>
+          <button class="focus-action focus-secondary-action" data-focus-snooze="1">Snooze 7d</button>
+        </div>
+        <div class="focus-boundary">Only the top five rotate. Observed items can be resolved; proposals never execute automatically. · Card 1 / 3 · 2 open</div>
+      </div>
+    </article></div>
+      </div>
+        </div>
+        <!-- 統計（前景使用／資料收集／背景任務）自 02 移入：02 只留專案 -->
+        <div class="overview-grid mb-14">
+          <div class="panel usage-panel">
+            <div class="panel-head">
+              <span class="mono-label accent" data-i18n="usage_title">TODAY · FOREGROUND USE &amp; MILESTONES</span>
+              <span id="usage-coverage" class="trust broken">UNAVAILABLE</span>
+              <button id="btn-refresh-usage" class="btn btn-ghost btn-sm head-right" data-i18n="btn_refresh_usage">Refresh</button>
+            </div>
+            <div class="usage-body">
+              <div class="usage-goal">
+                <div class="mono-mini muted" data-i18n="usage_goal_label">AI collaboration foreground time</div>
+                <div id="usage-goal-value" class="usage-value">0m</div>
+                <div id="usage-goal-progress" class="muted small">AI 協作: 0.0 / 360 min (0.0%)</div>
+                <div class="usage-progress"><span id="usage-progress-bar" style="width: 0%;"></span></div>
+                <div id="usage-boundary" class="usage-boundary">Observed foreground time only; not productivity or actual work hours. Coverage: usage_tracking_disabled; last data: 2026/9/19 上午9:33:53</div>
+              </div>
+              <div id="usage-interface-list" class="usage-list">
+    <div class="usage-row">
+      <span class="usage-interface">Other</span>
+      <span class="usage-duration">1h 30m</span>
+      <span class="usage-interactions">0 turns</span>
+    </div>
+    <div class="usage-row">
+      <span class="usage-interface">ChatGPT</span>
+      <span class="usage-duration">0m</span>
+      <span class="usage-interactions">1 turns</span>
+    </div>
+    <div class="usage-row">
+      <span class="usage-interface">Claude Code</span>
+      <span class="usage-duration">0m</span>
+      <span class="usage-interactions">1 turns</span>
+    </div></div>
+            </div>
+          </div>
+
+          <div class="panel capture-panel">
+            <div class="panel-head">
+              <span class="mono-label accent" data-i18n="capture_status_title">DATA CAPTURE</span>
+              <span id="capture-coverage-badge" class="trust noisy">0 OBSERVED</span>
+              <a href="/extension-monitor" class="btn btn-ghost btn-sm head-right" data-i18n="btn_extension_details" title="開啟 Browser Extension 進階診斷">Details</a>
+            </div>
+            <div id="capture-extension-summary" class="capture-extension-summary">Browser Extension: 0 events today · no recent heartbeat</div>
+            <div id="capture-coverage-list" class="capture-coverage-list"><div class="capture-coverage-row">
+      <div class="capture-platform-name">ChatGPT</div>
+      <div class="capture-signal waiting" title="WAITING">
+    <span class="capture-signal-label">FOCUS</span>
+    <span class="capture-signal-value">—</span>
+  </div>
+      <div class="capture-signal waiting" title="WAITING">
+    <span class="capture-signal-label">WEB</span>
+    <span class="capture-signal-value">—</span>
+  </div>
+      <div class="capture-signal unsupported" title="UNSUPPORTED">
+    <span class="capture-signal-label">LOG</span>
+    <span class="capture-signal-value">—</span>
+  </div>
+    </div><div class="capture-coverage-row">
+      <div class="capture-platform-name">Claude</div>
+      <div class="capture-signal waiting" title="WAITING">
+    <span class="capture-signal-label">FOCUS</span>
+    <span class="capture-signal-value">—</span>
+  </div>
+      <div class="capture-signal waiting" title="WAITING">
+    <span class="capture-signal-label">WEB</span>
+    <span class="capture-signal-value">—</span>
+  </div>
+      <div class="capture-signal waiting" title="WAITING">
+    <span class="capture-signal-label">LOG</span>
+    <span class="capture-signal-value">—</span>
+  </div>
+    </div><div class="capture-coverage-row">
+      <div class="capture-platform-name">Codex</div>
+      <div class="capture-signal waiting" title="WAITING">
+    <span class="capture-signal-label">FOCUS</span>
+    <span class="capture-signal-value">—</span>
+  </div>
+      <div class="capture-signal not_applicable" title="N/A">
+    <span class="capture-signal-label">WEB</span>
+    <span class="capture-signal-value">—</span>
+  </div>
+      <div class="capture-signal waiting" title="WAITING">
+    <span class="capture-signal-label">LOG</span>
+    <span class="capture-signal-value">—</span>
+  </div>
+    </div><div class="capture-coverage-row">
+      <div class="capture-platform-name">Gemini</div>
+      <div class="capture-signal waiting" title="WAITING">
+    <span class="capture-signal-label">FOCUS</span>
+    <span class="capture-signal-value">—</span>
+  </div>
+      <div class="capture-signal waiting" title="WAITING">
+    <span class="capture-signal-label">WEB</span>
+    <span class="capture-signal-value">—</span>
+  </div>
+      <div class="capture-signal unsupported" title="UNSUPPORTED">
+    <span class="capture-signal-label">LOG</span>
+    <span class="capture-signal-value">—</span>
+  </div>
+    </div></div>
+            <div id="capture-coverage-boundary" class="usage-boundary capture-boundary">FOCUS is foreground time; WEB is Extension turns/responses; LOG is local transcript turns/responses. These signals are independent.</div>
+          </div>
+        </div>
+
+        <section class="panel background-task-panel mb-14">
+          <div class="panel-head">
+            <span class="mono-label accent" data-i18n="background_tasks_title">BACKGROUND AGENT TASKS</span>
+            <span id="background-tasks-evidence" class="trust ok">VERIFIED</span>
+          </div>
+          <div class="background-task-body">
+            <div class="background-task-summary">
+              <div class="mono-mini muted" data-i18n="background_tasks_label">Verified background agent / CLI execution time</div>
+              <div id="background-tasks-value" class="usage-value">40m</div>
+              <div id="background-tasks-meta" class="muted small">1 completed · 0 awaiting final receipt</div>
+              <div id="background-tasks-boundary" class="usage-boundary" data-i18n="background_tasks_boundary">Only local prompt-start and explicit final-completion receipts are included. It is separate from foreground time, productivity, generic terminal time, and all work.</div>
+            </div>
+            <div id="background-tasks-list" class="background-task-list"><div class="background-task-row">
+      <span class="background-task-platform">Claude Code</span>
+      <span class="background-task-project" title="omnicontext">omnicontext</span>
+      <span class="background-task-duration">40m</span>
+      <span class="background-task-completed">上午09:43</span>
+    </div></div>
+          </div>
+        </section>
+
+        <div class="two-col">
+          <div class="side">
+            <div class="panel" style="padding: 10px; margin-bottom: 6px;">
+              <div class="mono-mini muted mb-6" data-i18n="label_date_range">DATE RANGE</div>
+              <div class="range-inputs" style="display: flex; flex-direction: column; gap: 6px;">
+                <div>
+                  <span class="mono-mini muted" style="font-size: 9.5px;">FROM</span>
+                  <input type="date" id="input-summary-start-date" style="width: 100%; font-size: 11px;">
+                </div>
+                <div>
+                  <span class="mono-mini muted" style="font-size: 9.5px;">TO</span>
+                  <input type="date" id="input-summary-end-date" style="width: 100%; font-size: 11px;">
+                </div>
+              </div>
+              <div class="quick-ranges" style="display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0;">
+                <button class="chip btn-sm" data-range="today" data-i18n="chip_today">Today</button>
+                <button class="chip btn-sm" data-range="yesterday" data-i18n="chip_yesterday">Yesterday</button>
+                <button class="chip btn-sm" data-range="this_week" data-i18n="chip_this_week">This Week</button>
+                <button class="chip btn-sm" data-range="7d" data-i18n="chip_7d">Last 7 Days</button>
+                <button class="chip btn-sm" data-range="30d" data-i18n="chip_30d">Last 30 Days</button>
+              </div>
+              <button class="btn btn-primary btn-block" id="btn-generate-custom-summary" data-i18n="btn_generate_range">⚡ Generate Range Review</button>
+            </div>
+            <div id="summary-history-list" class="sidelist">
+        <div class="sideitem active" data-date="2026-09-18">
+          <div class="sideitem-title">2026-09-18</div>
+          <div class="sideitem-sub">GEMINI · 10:43:53</div>
+        </div></div>
+          </div>
+          <article class="panel">
+            <div class="panel-head">
+              <span id="summary-meta" class="mono-mini muted">2026-09-18 · GEMINI / lock-model-1</span>
+              <div class="head-actions">
+                <div class="viewswitch">
+                  <button class="chip active" data-view="day" data-i18n="view_day">Day</button>
+                  <button class="chip" data-view="week" data-i18n="view_week">Week</button>
+                  <button class="chip" data-view="month" data-i18n="view_month">Month</button>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="btn-copy-markdown" data-i18n="btn_copy_markdown">Copy Markdown</button>
+              </div>
+            </div>
+            <div id="summary-view-day" class="markdown"><h2>昨天</h2>
+<ul>
+<li>把驗收中心拆成五個檔案 "雙引號" <b>粗體</b> &amp; '單引號' <img src="x" onerror="1"></li>
+<li>補了四支順序回歸測試</li>
+</ul>
+</div>
+            <div id="summary-view-week" class="rangeview" hidden=""></div>
+            <div id="summary-view-month" class="rangeview" hidden=""></div>
+          </article>
+        </div>
+
+        <details class="panel panel-collapsible mt-14" id="panel-checkpoints">
+          <summary class="panel-head">
+            <span class="mono-label accent">📸</span><span class="panel-title" data-i18n="checkpoints_panel_title">Activity Snapshots (periodic checkpoint logs)</span>
+            <span class="muted small" data-i18n="checkpoints_panel_note">Expand only when you need the raw per-period logs</span>
+          </summary>
+          <div style="padding: 14px;">
+        <div class="two-col">
+          <div class="side">
+            <button class="btn btn-primary btn-block" id="btn-trigger-cp-now" data-i18n="btn_trigger_cp_now">+ New Checkpoint</button>
+            <div id="checkpoint-history-list" class="sidelist"><div class="placeholder">目前尚無快照日誌。</div></div>
+          </div>
+          <article class="panel">
+            <div class="panel-head">
+              <span id="cp-title" class="mono-mini muted">—</span>
+              <button class="btn btn-ghost btn-sm" id="btn-copy-cp" data-i18n="btn_copy_log">Copy Log</button>
+            </div>
+            <div id="checkpoint-markdown-viewer" class="markdown"><p class="muted" data-i18n="ph_cp_click">Select a checkpoint log on the left to inspect detailed activity records.</p></div>
+          </article>
+        </div>
+      
+          </div>
+        </details>
+      

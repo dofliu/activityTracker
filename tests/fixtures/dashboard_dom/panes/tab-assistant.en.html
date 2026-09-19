@@ -1,0 +1,201 @@
+
+        <!-- 01 小秘書首頁（ADR-019 Addendum B）：兩塊、一屏——
+             左：秘書桌面（問候卡併入，底部收合的「全部提案」）；右：交辦與提問（記憶區併入，預設收合）。
+             原右欄的今日統計／Focus Now 移到 05 摘要與統計，DATA TRUST 移到 06 系統健康。 -->
+        <div class="assistant-columns">
+          <div class="assistant-col assistant-col-today">
+            <section class="panel home-desk" id="home-desk">
+              <div class="panel-head">
+                <span class="mono-label accent" data-i18n="home_desk_title">🗂 Secretary desk · what to look at now</span>
+                <span id="home-desk-badge" class="trust ok" title="首頁只重新排列既有的唯讀資料：焦點＝提案引擎排序後的第一張（含你宣告的優先與習慣加權）、記得＝依固定順序挑的一則筆記（焦點專案的決定 → 剛出爐的每週回顧 → 最近一天的工作誌 → 釘選 → 最近記下的）。規則是確定性的，不呼叫 LLM、不寫任何資料；完整清單仍在下方詳情與其他分頁。">RULES</span>
+                <span id="greeting-source" class="trust ok" title="pool: weekend" hidden="">RULES</span>
+                <span class="head-right home-desk-tools">
+                  <span id="home-desk-profile" class="mono-mini muted home-desk-profile" hidden="" title=""></span>
+                  <span class="head-right greeting-tools">
+              <button class="chip active" data-window="today" data-i18n="greeting_win_today">Today</button>
+              <button class="chip" data-window="2h" data-i18n="greeting_win_2h">Last 2 h</button>
+            </span>
+                  <button class="btn btn-ghost btn-sm" id="btn-home-refresh" title="重新整理桌面與問候">↻</button>
+                </span>
+              </div>
+              <!-- 小秘書的話：今天／近兩小時做了什麼＋一句鼓勵；數字全部來自本機統計，每 10 分鐘自動整理 -->
+              <div class="home-greeting" id="greeting-card">
+            <div id="greeting-text" class="greeting-text">
+      <p class="greeting-line greeting-headline">早安。</p>
+      <p class="greeting-line">今天到目前為止，你已經：</p>
+      <ul class="greeting-list"><li>推進了 4 個專案（omnicontext、omni、activityTracker）</li><li>動了 1 個 PR</li><li>1 個 commit，＋1505 行</li><li>改了 1 個文件檔（論文／文檔類）</li><li>和 AI 對話 2 輪（chatgpt、claude_code）</li></ul>
+      
+      
+      <p class="greeting-line greeting-encourage">假日的進度都是加分。做到一個段落就放下，好好休息。</p></div>
+            <div id="greeting-stats" class="greeting-stats"><span class="pchip" title="project_states">projects 4</span><span class="pchip" title="git_activity_events">commit 1</span><span class="pchip" title="github_pr_events">PR 1</span><span class="pchip" title="ai_prompt_events">AI turns 2</span><span class="pchip" title="file_activity_events">docs 1</span></div>
+            <div class="context-memory-boundary" id="greeting-boundary" title="只統計採集器看到的活動（Git commit、GitHub PR、AI 對話、檔案異動、專案、前景時間、未結事項）；沒被採集到的工作不代表沒做，郵件與行事曆目前不在採集範圍。">只統計採集器看到的活動（Git commit、GitHub PR、AI 對話、檔案異動、專案、前景時間、未結事項）；沒被採集到的工作不代表沒做，郵件與行事曆目前不在採集範圍。</div>
+              </div>
+              <div id="today-resume" class="today-resume">
+    <div style="min-width:0">
+      <div class="today-resume-label">Resume here</div>
+      <div class="today-resume-title">omnicontext</div>
+      <div class="today-resume-action">[CLAUDE_CODE] 繼續做 D11，先補前端行為鎖 "雙引號" &lt;b&gt;粗體&lt;/b&gt; &amp; '單引號' &lt;img src=x onerror=1&gt;</div>
+      <div class="today-resume-meta">2026-09-19 10:35 · AI / Research · Open 1</div>
+    </div>
+    <div class="today-resume-buttons">
+      
+    <div class="action-group" data-stop-propagation="">
+      <button class="action-btn disabled" title="No local path">📁</button>
+      <button class="action-btn disabled" title="No local path">💻</button>
+      <button class="action-btn disabled" title="No GitHub repo">🐙</button>
+    </div>
+      <button class="btn" data-copy-handoff="omnicontext" data-name="omnicontext" style="background:var(--s2); border:1px solid var(--bd); color:var(--tx); font-weight:600; font-size:12px; padding:6px 12px; cursor:pointer;" title="Copy structured handoff prompt for AI">📋 Copy Handoff Prompt</button>
+      <button class="btn btn-primary" data-resume="omnicontext">Resume →</button>
+    </div></div>
+              <div id="home-desk-calendar" class="today-pack mono-mini muted" hidden=""></div>
+              <div id="home-desk-meeting" class="today-pack mono-mini muted" hidden=""></div>
+              <div id="home-desk-slots" class="home-desk-slots">
+      <div class="home-slot home-slot-focus">
+        <div class="home-slot-label">Focus · the one thing to look at<span class="trust noisy">MEDIUM</span></div>
+        <div class="home-slot-project">activityTracker · aging_pr</div>
+        <div class="home-slot-title">activityTracker #40</div>
+        <div class="home-slot-body">D11＋D12：狀態注入與驗收中心宣告式化 "雙引號" &lt;b&gt;粗體&lt;/b&gt; &amp; '單引號' &lt;img src=x onerror=1&gt;</div>
+        <div class="home-slot-why"><strong>Why now：</strong>已放 0 天，再放下去脈絡會流失、衝突會累積</div>
+        <div class="home-slot-why">仍是 draft，尚未進入 review</div>
+        <div class="home-slot-actions">
+          <a class="btn btn-ghost btn-sm" href="https://github.com/dofliu/activityTracker/pull/40" target="_blank" rel="noopener">GitHub →</a>
+          <button class="btn btn-ghost btn-sm" data-home-ask="About “activityTracker #40” (activityTracker): 已放 0 天，再放下去脈絡會流失、衝突會累積 What should I do about it now?">💬 Ask the secretary</button>
+          <button class="btn btn-ghost btn-sm" data-home-detail="proposals">All proposals →</button>
+        </div>
+      </div>
+      <div class="home-slot home-slot-memory">
+        <div class="home-slot-label">Remembered · one note the secretary picked<span class="trust noisy">note</span></div>
+        <div class="home-slot-project">omnicontext · 2026-09-14 10:43</div>
+        <div class="home-slot-title">收據文化</div>
+        <div class="home-slot-body">測試綠不等於能用；每一步都要留可驗證的收據。"雙引號" &lt;b&gt;粗體&lt;/b&gt; &amp; '單引號' &lt;img src=x onerror=1&gt;</div>
+        <div class="home-slot-why"><strong>Why this one：</strong>你釘選的</div>
+        <div class="home-slot-actions">
+          <button class="btn btn-ghost btn-sm" data-home-ask="You remembered “收據文化” — how does it affect what I'm doing now?">💬 Ask the secretary</button>
+          <button class="btn btn-ghost btn-sm" data-home-detail="memory">Memory →</button>
+        </div>
+      </div></div>
+              <div id="home-desk-details" class="home-desk-details"><span class="mono-label">DETAILS</span><button class="home-detail-chip" data-home-detail="proposals">All proposals<b>1</b></button><button class="home-detail-chip" data-home-detail="memory">Memory<b>3</b></button><button class="home-detail-chip" data-home-detail="projects">Active projects<b>4</b></button><button class="home-detail-chip" data-home-detail="repos">Git sync center</button><button class="home-detail-chip" data-home-detail="knowledge">Knowledge base</button><button class="home-detail-chip" data-home-detail="summaries">Summaries &amp; stats</button><span class="home-leaves" id="home-leaves">Left home 0× today · 0× yesterday (tab switches in this browser only)</span></div>
+              <details class="home-more secretary-inbox panel-collapsible" id="today-panel">
+          <summary class="panel-head memory-head">
+            <span class="mono-label accent" data-i18n="today_title">TODAY · All proposals (details)</span>
+            <span class="trust noisy">PROPOSAL ONLY</span>
+            <span id="secretary-proposals-badge" class="trust noisy">1 ITEMS</span>
+            <span class="head-right" style="display:flex; gap:6px; align-items:center;">
+              <button id="btn-create-presets" class="btn btn-ghost btn-sm" data-i18n="btn_create_presets" title="建立每日 07:30 早晨包（同步報告＋STATUS 草稿＋活躍專案 Handoff）與 21:30 晚間 Handoff；全部 L0 唯讀，需 execution token">📦 Create daily schedules</button>
+              <button id="btn-refresh-proposals" class="btn btn-ghost btn-sm" data-i18n="btn_refresh_proposals">Refresh</button>
+            </span>
+          </summary>
+          <div class="secretary-inbox-body">
+            <div id="today-pack" class="today-pack mono-mini muted">Scheduled tasks are off (Settings → Executor); enable the executor to create the daily morning pack.</div>
+            <div id="today-calendar" class="today-pack mono-mini muted" hidden=""></div>
+            <div class="secretary-inbox-tools">
+              <span data-i18n="secretary_inbox_hint">Suggestions awaiting your judgement — not a to-do list.</span>
+            </div>
+            <div id="secretary-proposals-list" class="secretary-proposals-list">
+      <article class="proposal-card">
+        <div class="proposal-card-top">
+          <span class="proposal-project">activityTracker</span>
+          <span class="trust noisy">MEDIUM</span>
+        </div>
+        <div class="proposal-title">activityTracker #40</div>
+        <div class="proposal-detail">D11＋D12：狀態注入與驗收中心宣告式化 "雙引號" &lt;b&gt;粗體&lt;/b&gt; &amp; '單引號' &lt;img src=x onerror=1&gt;</div>
+        <div class="proposal-reason">仍是 draft，尚未進入 review</div>
+        <div class="proposal-why"><span>Why now：</span>已放 0 天，再放下去脈絡會流失、衝突會累積</div>
+        
+        <div class="proposal-action"><span>Suggested</span>確認這個 PR 還要不要——繼續推進、轉回 draft 或關閉。</div>
+        
+        
+        
+        
+        <div class="proposal-meta">
+          <span>L0_READ_ONLY</span>
+          <span>NOT EXECUTABLE</span>
+          
+          <a class="proposal-link" href="https://github.com/dofliu/activityTracker/pull/40" target="_blank" rel="noopener">Open on GitHub →</a>
+          <button class="btn btn-ghost btn-sm" data-action="snooze-proposal" data-proposal-type="aging_pr" data-project-key="activityTracker" data-subject-ref="pr:activityTracker#40" data-days="7">Snooze 7d</button>
+          <button class="btn btn-ghost btn-sm" data-action="snooze-proposal" data-proposal-type="aging_pr" data-project-key="activityTracker" data-subject-ref="pr:activityTracker#40" data-days="">Dismiss</button>
+        </div>
+        <div class="proposal-refs"><span class="proposal-ref">github_pr_events:1</span></div>
+      </article></div>
+            <div id="secretary-stale-note" class="context-memory-boundary" hidden=""></div>
+            <div class="context-memory-boundary" data-i18n="secretary_boundary">Local evidence-derived suggestions; never persisted or auto-executed. Optional LLM notes are advisory only (local model by default).</div>
+          </div>
+        </details>
+              <div class="context-memory-boundary" id="home-desk-boundary" title="首頁只重新排列既有的唯讀資料：焦點＝提案引擎排序後的第一張（含你宣告的優先與習慣加權）、記得＝依固定順序挑的一則筆記（焦點專案的決定 → 剛出爐的每週回顧 → 最近一天的工作誌 → 釘選 → 最近記下的）。規則是確定性的，不呼叫 LLM、不寫任何資料；完整清單仍在下方詳情與其他分頁。">首頁只重新排列既有的唯讀資料：焦點＝提案引擎排序後的第一張（含你宣告的優先與習慣加權）、記得＝依固定順序挑的一則筆記（焦點專案的決定 → 剛出爐的每週回顧 → 最近一天的工作誌 → 釘選 → 最近記下的）。規則是確定性的，不呼叫 LLM、不寫任何資料；完整清單仍在下方詳情與其他分頁。</div>
+            </section>
+          </div>
+          <div class="assistant-col assistant-col-chat">
+            <div class="panel assistant-hero" id="assistant-panel">
+          <div class="panel-head">
+            <span class="mono-label accent" data-i18n="assistant_title">🤖 ASSISTANT · ASK OR DELEGATE</span>
+            <span id="assistant-advisor-badge" class="trust noisy">RULES</span>
+          </div>
+          <div id="assistant-chat-messages" class="assistant-chat-messages">
+            <div class="placeholder" data-i18n="assistant_chat_empty">Ask about documents or project progress, or request a next step — answers cite the local knowledge base and work history.</div>
+          </div>
+          <div class="assistant-input-row">
+            <input id="input-assistant-prompt" type="text" maxlength="4000" data-i18n-ph="assistant_input_ph" placeholder="Ask for documents, summaries, or the next step…">
+            <select id="select-assistant-provider" class="assistant-select" title="LLM provider">
+                  <option value="ollama">Ollama (本機離線)</option>
+                  <option value="gemini">Google Gemini</option>
+                  <option value="claude">Anthropic Claude</option>
+                  <option value="openai">OpenAI</option>
+                </select>
+            <select id="select-assistant-model" class="assistant-select" title="模型">
+      <option value="llama3.1:8b" selected="">llama3.1:8b (預設)</option>
+    
+      <option value="mistral:7b">mistral:7b</option>
+    
+      <option value="gemma4:e4b">gemma4:e4b</option>
+    
+      <option value="qwen3:4b">qwen3:4b</option>
+    </select>
+            <button id="btn-assistant-send" class="btn btn-primary" data-i18n="btn_assistant_send">Send ⚡</button>
+          </div>
+          <div class="context-memory-boundary" data-i18n="assistant_chat_boundary">Chats use the local knowledge base (RAG) and the selected model; full citation cards and history live in the Knowledge &amp; RAG block below.</div>
+        
+              <!-- ADR-012 小秘書記憶區：筆記／偏好／決定＋秘書觀察；併進交辦框，預設收合 -->
+              <details class="memory-panel panel-collapsible" id="memory-panel">
+          <summary class="panel-head memory-head">
+            <span class="mono-label accent" data-i18n="memory_title">🧠 Secretary memory</span>
+            <span id="memory-badge" class="trust ok">3 NOTES</span>
+            <span class="head-right memory-head-tools">
+              <button id="btn-memory-context" class="btn btn-ghost btn-sm" data-i18n="btn_memory_context" title="顯示這次對話會注入給小秘書的記憶脈絡（與 system prompt 相同）">👁 What I remember now</button>
+              <button id="btn-memory-clear-obs" class="btn btn-ghost btn-sm" data-i18n="btn_memory_clear_obs" title="只刪除秘書自己寫的觀察；您的筆記不受影響">🧹 Clear observations</button>
+            </span>
+          </summary>
+          <div class="memory-body">
+            <div class="memory-add-row">
+              <select id="select-memory-kind" class="assistant-select" title="種類">
+                <option value="user_note" data-i18n="memory_kind_user_note">Note</option>
+                <option value="preference" data-i18n="memory_kind_preference">Preference</option>
+                <option value="decision" data-i18n="memory_kind_decision">Decision</option>
+              </select>
+              <input id="input-memory-project" type="text" maxlength="120" data-i18n-ph="memory_project_ph" placeholder="Project (optional)">
+              <input id="input-memory-body" type="text" maxlength="4000" data-i18n-ph="memory_input_ph" placeholder="Something the secretary should remember; a preference may say “mute &lt;project&gt;”, “priority: &lt;project&gt;” or “tone: brief”">
+              <button id="btn-memory-add" class="btn btn-primary btn-sm" data-i18n="btn_memory_add">Remember</button>
+            </div>
+            <pre id="memory-context-box" class="memory-context" hidden=""></pre>
+            <div id="memory-list" class="memory-list"><div class="memory-profile is-empty mono-mini muted" title="Declare with “preference: priority: &lt;project&gt;” or “preference: tone: brief / direct / warm”; delete that preference to reset">No profile declared yet (priorities / tone)</div>
+      <div class="memory-item" data-note-id="1">
+        <span class="memory-kind user_note">note</span>
+        <div class="memory-item-body"><strong>收據文化</strong> · 測試綠不等於能用；每一步都要留可驗證的收據。"雙引號" &lt;b&gt;粗體&lt;/b&gt; &amp; '單引號' &lt;img src=x onerror=1&gt;<span class="pchip">omnicontext</span><div class="memory-item-meta">2026-09-14 10:43</div></div>
+        <button class="btn btn-ghost btn-sm btn-delete" data-delete-note="1" title="Delete">✕</button>
+      </div>
+      <div class="memory-item" data-note-id="3">
+        <span class="memory-kind observation">observation</span>
+        <div class="memory-item-body">這週的 commit 幾乎都集中在 core/ 之下。<span class="pchip">omnicontext</span><div class="memory-item-meta">2026-09-19 01:43 · morning_pack</div></div>
+        <button class="btn btn-ghost btn-sm btn-delete" data-delete-note="3" title="Delete">✕</button>
+      </div>
+      <div class="memory-item" data-note-id="2">
+        <span class="memory-kind preference">preference</span>
+        <div class="memory-item-body"><strong>不要自動找事做</strong> · 減法清單做完就停，下一輪要先決定。<div class="memory-item-meta">2026-09-17 10:43</div></div>
+        <button class="btn btn-ghost btn-sm btn-delete" data-delete-note="2" title="Delete">✕</button>
+      </div></div>
+            <div class="context-memory-boundary" data-i18n="memory_boundary">Memory holds only short text you typed plus observations the secretary derives from local read-only receipts (deletable). The context injected into each chat is capped and comes with a receipt. Typing “remember: …” in the chat box writes here too.</div>
+          </div>
+        </details>
+            </div>
+          </div>
+        </div>
+      

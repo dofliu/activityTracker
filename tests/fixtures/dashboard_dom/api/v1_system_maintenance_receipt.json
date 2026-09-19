@@ -1,0 +1,6 @@
+{
+  "body": "{\"has_receipt\":false,\"status\":\"no_receipt\",\"message\":\"尚未執行過資料庫維護\"}",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/system/maintenance/receipt"
+}

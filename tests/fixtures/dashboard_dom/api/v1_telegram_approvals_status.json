@@ -1,0 +1,6 @@
+{
+  "body": "{\"enabled\":false,\"armed\":false,\"armed_until\":null,\"arm_code\":{\"pending\":false},\"poller_running\":false,\"last_poll_at\":null,\"ignored_foreign_updates\":0,\"claim_boundary\":\"Telegram 只能批准 server 白名單的 L0/L1 動作；批准通道需先在儀表板以 execution token 解鎖（記憶體內、有 TTL、重啟即失效），L2 一律回儀表板走一次性確認碼流程。每次批准寫入 audit receipt（approved_via=telegram_inline）。\"}",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/telegram/approvals/status"
+}
