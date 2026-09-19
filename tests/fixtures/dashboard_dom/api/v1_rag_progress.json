@@ -1,0 +1,6 @@
+{
+  "body": "{\"id\":\"11111111-2222-3333-4444-555555555555\",\"job_type\":\"index\",\"folder_id\":1,\"status\":\"completed\",\"requested_at\":\"2026-09-19T05:43:53\",\"started_at\":\"2026-09-19T05:43:53\",\"completed_at\":\"2026-09-19T06:43:53\",\"updated_at\":\"2026-09-19T10:43:53.494249\",\"worker_pid\":null,\"total_files\":2,\"processed_files\":2,\"progress_percent\":100.0,\"indexed_chunks\":51,\"error_count\":0,\"max_files\":null,\"throttle_ms\":0,\"current_file\":\"\",\"message\":\"索引完成\",\"error_message\":null,\"pause_requested\":false,\"cancel_requested\":false,\"result\":null,\"is_running\":false,\"elapsed_seconds\":18036.5,\"total_indexed_chunks\":51}",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/rag/progress"
+}

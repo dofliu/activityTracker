@@ -1,0 +1,6 @@
+{
+  "body": "{\"date\":\"2026-09-19\",\"enabled\":true,\"metric_label\":\"verified_background_agent_execution_time\",\"claim_boundary\":\"Only paired local agent task receipts with a prompt start and explicit final completion. Not foreground time, generic terminal time, productivity, or total computer work.\",\"evidence_status\":\"verified_receipts\",\"verified_seconds\":2400.0,\"verified_minutes\":40.0,\"completed_task_count\":1,\"awaiting_final_count\":0,\"untrusted_duration_count\":0,\"interfaces\":[{\"platform\":\"claude_code\",\"label\":\"Claude Code\",\"verified_seconds\":2400.0,\"completed_tasks\":1}],\"recent_tasks\":[{\"platform\":\"claude_code\",\"label\":\"Claude Code\",\"project_tag\":\"omnicontext\",\"started_at\":\"2026-09-19T09:03:53\",\"completed_at\":\"2026-09-19T09:43:53\",\"duration_seconds\":2400.0,\"status\":\"completed\",\"completion_evidence_kind\":\"assistant_final\"}],\"max_task_duration_seconds\":28800,\"data_updated_at\":\"2026-09-19T10:44:45\"}",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/background-tasks/today"
+}

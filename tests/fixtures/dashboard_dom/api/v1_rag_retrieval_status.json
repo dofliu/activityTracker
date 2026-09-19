@@ -1,0 +1,6 @@
+{
+  "body": "{\"mode\":\"worker\",\"state\":\"cold\",\"extra_installed\":true,\"extra_missing\":[],\"parser_missing\":[],\"install_hint\":\"pip install \\\"omnicontext[rag]\\\"\",\"pid\":null,\"started_at\":null,\"warmup\":null,\"warmup_at\":null,\"warmup_on_start\":true,\"index_present\":false,\"requests_served\":0,\"last_retrieval_ms\":null,\"last_retrieval_at\":null,\"restarts\":0,\"spawns\":0,\"last_error\":null,\"stderr_tail\":[],\"timeout_seconds\":60,\"basis\":\"in_memory_process_state\",\"claim_boundary\":\"只描述檢索 worker 程序狀態與載入計數；不代表檢索結果正確或索引完整。\"}",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/rag/retrieval/status"
+}

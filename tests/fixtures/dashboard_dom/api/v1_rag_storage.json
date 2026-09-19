@@ -1,0 +1,6 @@
+{
+  "body": "{\"source_files\":2,\"source_bytes\":204800,\"source_chunks\":51,\"vector_chunks\":null,\"bm25_chunks\":null,\"vector_delta\":null,\"consistency\":\"unverified\",\"bm25_loaded\":false,\"chroma_bytes\":null,\"bm25_bytes\":null,\"sqlite_bytes\":1137288,\"sqlite_aux_bytes\":490120,\"index_bytes\":null,\"paths\":{\"chroma\":\"/omni/home/data/chroma\",\"bm25\":\"/omni/home/data/bm25_index.pkl\",\"sqlite\":\"/omni/home/omni_context.db\"}}",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/rag/storage"
+}

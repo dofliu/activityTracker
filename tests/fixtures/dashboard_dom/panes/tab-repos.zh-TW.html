@@ -1,0 +1,45 @@
+
+        <div class="panel mb-14" id="repo-sync-panel">
+          <div class="panel-head">
+            <span class="mono-label accent">🔧</span><span class="panel-title" data-i18n="repo_sync_title">本機 Git 同步中心</span>
+            <span id="repo-sync-badge" class="trust neutral" data-i18n="repo_sync_manual">逐項手動確認</span>
+          </div>
+          <div class="repo-sync-body">
+            <div class="repo-sync-intro">
+              <div>
+                <strong data-i18n="repo_sync_intro_title">檢查本機 branch 與遠端追蹤差異</strong>
+                <p data-i18n="repo_sync_intro_detail">狀態只讀取本機已保存的 remote-tracking refs。先按 Fetch 更新遠端參照，再依條件執行 fast-forward Pull、staged Commit 或 Push。</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="btn-repo-sync-refresh" data-i18n="btn_repo_sync_refresh">↻ 重讀同步狀態</button>
+            </div>
+            <div id="repo-sync-summary" class="repo-sync-summary mono-mini muted" data-i18n="repo_sync_loading">尚未在監控設定中加入 Git repository root。</div>
+            <div id="repo-sync-list" class="repo-sync-list" aria-live="polite"></div>
+            <div id="repo-sync-result" class="repo-sync-result mono-mini muted"></div>
+            <div class="repo-sync-intro" style="margin-top: 14px;">
+              <div>
+                <strong data-i18n="repo_overview_title">全覽與批次</strong>
+                <p data-i18n="repo_overview_intro">列出設定範圍內的全部 repo。「全部 Fetch」只更新遠端參照、不動 worktree；批次 Pull／Push 會先列出目前符合條件的清單讓你確認，執行時每個 repo 仍會重檢一次，不符者跳過、永不 force。</p>
+              </div>
+              <div class="repo-overview-toolbar">
+                <button class="btn btn-ghost btn-sm" id="btn-repo-overview-load" data-i18n="btn_repo_overview_load">📋 載入全覽</button>
+                <button class="btn btn-ghost btn-sm" id="btn-repo-fetch-all" data-i18n="btn_repo_fetch_all">🔄 全部 Fetch</button>
+                <button class="btn btn-ghost btn-sm" id="btn-repo-batch-pull" data-i18n="btn_repo_batch_pull">⬇ 批次 Pull (FF only)</button>
+                <button class="btn btn-ghost btn-sm" id="btn-repo-batch-push" data-i18n="btn_repo_batch_push">⬆ 批次 Push</button>
+              </div>
+            </div>
+            <div id="repo-overview-filters" class="repo-overview-filters" hidden=""></div>
+            <div id="repo-overview-table" class="repo-overview-table" aria-live="polite"></div>
+            <div id="repo-overview-result" class="repo-sync-result mono-mini muted"></div>
+            <div class="repo-sync-intro" style="margin-top: 14px;">
+              <div>
+                <strong data-i18n="onboarding_title">Repo Onboarding／對帳（P4.3）</strong>
+                <p data-i18n="onboarding_intro">找出尚未 git init 的資料夾、沒有 remote 的 repo、以及尚未 clone 的 GitHub repo。已 clone 與否只以 remote URL 比對；同名僅提示、不自動配對。每個動作都是單一目標、逐一確認。</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="btn-onboarding-scan" data-i18n="btn_onboarding_scan">🔍 掃描對帳</button>
+            </div>
+            <div id="onboarding-report" class="mono-mini" aria-live="polite"></div>
+            <div id="onboarding-result" class="repo-sync-result mono-mini muted"></div>
+          </div>
+          <div class="panel-foot repo-sync-foot" data-i18n="repo_sync_boundary">不會自動同步、不會自動 git add、不會 force push；Commit 只會提交您已明確 staged 的檔案。Onboarding 動作不覆寫非空目錄、不批次 create/clone、永不代為 push。</div>
+        </div>
+      

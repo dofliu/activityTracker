@@ -1,0 +1,6 @@
+{
+  "body": "{\"path\":\"/omni/home/data/chroma\",\"total_bytes\":0,\"sqlite_bytes\":0,\"sqlite_free_bytes\":0,\"live_segment_dirs\":[],\"orphan_dirs\":[],\"unknown_entries\":[],\"orphan_bytes\":0,\"reclaimable_bytes\":0,\"segments_readable\":false,\"reason\":\"no_chroma_sqlite\",\"claim_boundary\":\"只比對目錄名稱與 chroma.sqlite3 的 segments 表，並讀 SQLite 空頁數；讀不到 segments 表就一律不算孤兒（也不會刪）。不代表索引內容正確。\"}",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/rag/storage/chroma"
+}

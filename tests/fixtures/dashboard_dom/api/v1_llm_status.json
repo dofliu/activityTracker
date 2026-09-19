@@ -1,0 +1,6 @@
+{
+  "body": "{\"selected_provider\":\"gemini\",\"providers\":{\"gemini\":{\"configured\":false,\"source\":\"missing\",\"env_var\":\"GEMINI_API_KEY\"},\"anthropic\":{\"configured\":false,\"source\":\"missing\",\"env_var\":\"ANTHROPIC_API_KEY\"},\"openai\":{\"configured\":false,\"source\":\"missing\",\"env_var\":\"OPENAI_API_KEY\"},\"ollama\":{\"configured\":true,\"source\":\"local_service\",\"env_var\":\"\"}},\"secret_boundary\":\"status_only_no_secret_values\"}",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/llm/status"
+}

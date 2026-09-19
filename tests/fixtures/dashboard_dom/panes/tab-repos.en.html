@@ -1,0 +1,45 @@
+
+        <div class="panel mb-14" id="repo-sync-panel">
+          <div class="panel-head">
+            <span class="mono-label accent">🔧</span><span class="panel-title" data-i18n="repo_sync_title">Local Git Sync Center</span>
+            <span id="repo-sync-badge" class="trust neutral" data-i18n="repo_sync_manual">Manual confirmation per repository</span>
+          </div>
+          <div class="repo-sync-body">
+            <div class="repo-sync-intro">
+              <div>
+                <strong data-i18n="repo_sync_intro_title">Check local branches against tracked remotes</strong>
+                <p data-i18n="repo_sync_intro_detail">Status reads locally cached remote-tracking refs only. Fetch refreshes refs, then Fast-forward Pull, staged Commit, or Push is enabled only when safe.</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="btn-repo-sync-refresh" data-i18n="btn_repo_sync_refresh">↻ Refresh sync status</button>
+            </div>
+            <div id="repo-sync-summary" class="repo-sync-summary mono-mini muted" data-i18n="repo_sync_loading">No Git repository root is configured for monitoring.</div>
+            <div id="repo-sync-list" class="repo-sync-list" aria-live="polite"></div>
+            <div id="repo-sync-result" class="repo-sync-result mono-mini muted"></div>
+            <div class="repo-sync-intro" style="margin-top: 14px;">
+              <div>
+                <strong data-i18n="repo_overview_title">Overview &amp; batch</strong>
+                <p data-i18n="repo_overview_intro">Lists every repository in the configured roots. “Fetch all” only refreshes remote-tracking refs; batch Pull/Push first shows the list of repositories that currently qualify, rechecks each one when it runs, skips the rest and never forces.</p>
+              </div>
+              <div class="repo-overview-toolbar">
+                <button class="btn btn-ghost btn-sm" id="btn-repo-overview-load" data-i18n="btn_repo_overview_load">📋 Load overview</button>
+                <button class="btn btn-ghost btn-sm" id="btn-repo-fetch-all" data-i18n="btn_repo_fetch_all">🔄 Fetch all</button>
+                <button class="btn btn-ghost btn-sm" id="btn-repo-batch-pull" data-i18n="btn_repo_batch_pull">⬇ Batch Pull (FF only)</button>
+                <button class="btn btn-ghost btn-sm" id="btn-repo-batch-push" data-i18n="btn_repo_batch_push">⬆ Batch Push</button>
+              </div>
+            </div>
+            <div id="repo-overview-filters" class="repo-overview-filters" hidden=""></div>
+            <div id="repo-overview-table" class="repo-overview-table" aria-live="polite"></div>
+            <div id="repo-overview-result" class="repo-sync-result mono-mini muted"></div>
+            <div class="repo-sync-intro" style="margin-top: 14px;">
+              <div>
+                <strong data-i18n="onboarding_title">Repo Onboarding / Reconciliation (P4.3)</strong>
+                <p data-i18n="onboarding_intro">Finds folders without git init, repos without a remote, and GitHub repos not cloned locally. Cloned-or-not is decided by remote URL only; same names are just hints, never auto-paired. Every action targets one repo with explicit confirmation.</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="btn-onboarding-scan" data-i18n="btn_onboarding_scan">🔍 Scan &amp; reconcile</button>
+            </div>
+            <div id="onboarding-report" class="mono-mini" aria-live="polite"></div>
+            <div id="onboarding-result" class="repo-sync-result mono-mini muted"></div>
+          </div>
+          <div class="panel-foot repo-sync-foot" data-i18n="repo_sync_boundary">No scheduled automatic sync, git add, or force push. Commit only includes files you explicitly staged. Batch Pull/Push only runs on the list you confirmed and rechecks each repository; batch Push is off by default. Onboarding actions never overwrite non-empty directories, never batch create/clone, and never push on your behalf.</div>
+        </div>
+      

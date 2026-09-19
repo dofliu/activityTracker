@@ -1,0 +1,6 @@
+{
+  "body": "{\"available\":false,\"repositories\":[],\"reason\":\"no_snapshot_yet\",\"hint\":\"排程或手動執行 repo_sync_report／早晨包後才會有快照。\"}",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/repos/sync-snapshot"
+}

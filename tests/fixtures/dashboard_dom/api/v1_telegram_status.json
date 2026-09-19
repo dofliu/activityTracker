@@ -1,0 +1,6 @@
+{
+  "body": "{\"enabled\":false,\"token_configured\":false,\"token_source\":\"missing\",\"chat_id_configured\":false,\"chat_id_source\":\"missing\",\"morning_briefing_time\":\"09:00\",\"evening_summary_time\":\"23:30\",\"secret_boundary\":\"status_only_no_secret_values\"}",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/telegram/status"
+}

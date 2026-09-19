@@ -1,0 +1,6 @@
+{
+  "body": "{\"enabled\":false,\"token_configured\":false,\"token_source\":\"missing\",\"to_configured\":false,\"to_source\":\"missing\",\"push_only\":true,\"push_only_reason\":\"LINE Messaging API 沒有輪詢介面；接收訊息需要公開 webhook，本專案維持 loopback-only，因此 LINE 只做推播。\",\"secret_boundary\":\"status_only_no_secret_values\"}",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/line/status"
+}
