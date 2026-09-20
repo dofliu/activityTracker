@@ -100,11 +100,11 @@ export function repoSyncLabels() {
 }
 
 export function repoSyncStateText(repo, labels) {
-  const state = repo.sync_state || "unknown";
-  const base = labels[state] || labels.unknown;
-  if (state === "ahead" && Number.isInteger(repo.ahead)) return `${base} ↑${repo.ahead}`;
-  if (state === "behind" && Number.isInteger(repo.behind)) return `${base} ↓${repo.behind}`;
-  if (state === "diverged") return `${base} ↑${repo.ahead ?? "?"} ↓${repo.behind ?? "?"}`;
+  const syncState = repo.sync_state || "unknown";
+  const base = labels[syncState] || labels.unknown;
+  if (syncState === "ahead" && Number.isInteger(repo.ahead)) return `${base} ↑${repo.ahead}`;
+  if (syncState === "behind" && Number.isInteger(repo.behind)) return `${base} ↓${repo.behind}`;
+  if (syncState === "diverged") return `${base} ↑${repo.ahead ?? "?"} ↓${repo.behind ?? "?"}`;
   return base;
 }
 
@@ -112,12 +112,12 @@ export function repoSyncStateText(repo, labels) {
 // （使用者回報：repo 明明落後遠端卻沒得按 pull，灰按鈕沒有任何可見說明。）
 export function repoBlockedReason(repo) {
   const actions = repo.actions || {};
-  const state = repo.sync_state;
+  const syncState = repo.sync_state;
   const pull = actions.pull_ff_only || {};
   const push = actions.push || {};
-  if (state === "behind" || state === "diverged") return pull.allowed ? "" : (pull.reason || "");
-  if (state === "ahead") return push.allowed ? "" : (push.reason || "");
-  if (state === "no_upstream" || state === "detached_head" || state === "upstream_unavailable") {
+  if (syncState === "behind" || syncState === "diverged") return pull.allowed ? "" : (pull.reason || "");
+  if (syncState === "ahead") return push.allowed ? "" : (push.reason || "");
+  if (syncState === "no_upstream" || syncState === "detached_head" || syncState === "upstream_unavailable") {
     return pull.reason || "";
   }
   return "";

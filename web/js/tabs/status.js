@@ -67,18 +67,18 @@ export async function refreshStatus() {
   }
 }
 
-export function renderRuntimeTrust(state, degradedCollectors) {
+export function renderRuntimeTrust(monitoringState, degradedCollectors) {
   const badge = $("data-trust-runtime-badge");
   if (!badge) return;
-  const degraded = state === "degraded";
-  const healthy = state === "healthy";
+  const degraded = monitoringState === "degraded";
+  const healthy = monitoringState === "healthy";
   badge.className = `mono-mini runtime-trust-badge ${healthy ? "runtime-ok" : degraded ? "runtime-degraded" : "runtime-stopped"}`;
   if (healthy) {
     badge.textContent = "8/8 CONTRACT · RUNTIME OK ▾";
   } else if (degraded) {
     badge.textContent = `8/8 CONTRACT · ${degradedCollectors.length} DEGRADED ▾`;
   } else {
-    badge.textContent = `8/8 CONTRACT · ${state === "stopped" ? "STOPPED" : "DISCONNECTED"} ▾`;
+    badge.textContent = `8/8 CONTRACT · ${monitoringState === "stopped" ? "STOPPED" : "DISCONNECTED"} ▾`;
   }
 }
 
@@ -144,7 +144,11 @@ export function renderUsagePanelError() {
   $("usage-interface-list").innerHTML = `<div class="placeholder">${state.currentLang === "zh-TW" ? "無法載入使用時間。" : "Unable to load usage data."}</div>`;
 }
 
-export function captureStateLabel(state) {
+// 參數原本叫 `state`，把 `core/state.js` 匯入的共享 `state` 遮蔽掉了：`state.currentLang`
+// 讀的是一個字串（"observed" 之類）的 `.currentLang`，永遠 undefined，所以中文介面一直拿到
+// 英文標籤。同一個檔案裡的 `renderCaptureCoverage` 用的就是共享的 `state.currentLang`，可見
+// 這裡是不小心遮到，不是刻意。
+export function captureStateLabel(captureState) {
   const labels = state.currentLang === "zh-TW" ? {
     observed: "已觀察", waiting: "等待資料", available_waiting: "可讀取／待掃描",
     cache_detected_unparsed: "快取存在／未解析", unsupported: "目前不支援", not_applicable: "不適用"
@@ -152,7 +156,7 @@ export function captureStateLabel(state) {
     observed: "OBSERVED", waiting: "WAITING", available_waiting: "READY TO SCAN",
     cache_detected_unparsed: "CACHE / UNPARSED", unsupported: "UNSUPPORTED", not_applicable: "N/A"
   };
-  return labels[state] || String(state || "UNKNOWN").toUpperCase();
+  return labels[captureState] || String(captureState || "UNKNOWN").toUpperCase();
 }
 
 export function renderCaptureCoverage(data, extensionData) {

@@ -163,6 +163,37 @@ def test_shared_mutable_state_lives_only_in_state_js():
     assert "export const state = {" in state
 
 
+def test_nothing_shadows_the_shared_state():
+    """匯入了共享 `state` 的檔案裡，不准再有叫 `state` 的參數或區域變數。
+
+    這不是潔癖。`status.js` 的 `captureStateLabel(state)` 就是這樣壞掉的：參數是一個字串
+    （"observed" 之類），把匯入的共享 `state` 遮蔽掉，於是 `state.currentLang` 讀的是字串的
+    `.currentLang`——永遠 undefined，於是**中文介面一直拿到英文標籤**。不會拋錯、不會有
+    console 訊息、review 也看不出來，因為那一行單獨看完全正常。同一個檔案裡的
+    `renderCaptureCoverage` 用的就是共享的 `state.currentLang`，可見是不小心遮到。
+
+    這是「一個叫 state 的共享物件」這種設計會招來的錯，所以把整個類別擋掉。
+    """
+    imports_state = re.compile(r'from "(?:\.\./)?(?:\./)?core/state\.js"|from "\./state\.js"')
+    param = re.compile(r"\bfunction\s+\w+\s*\([^)]*\bstate\b")
+    local = re.compile(r"\b(?:const|let|var)\s+state\b")
+    arrow = re.compile(r"\(\s*state\s*\)\s*=>")
+    checked = 0
+    offenders = []
+    for path in JS_FILES:
+        if path.name == "state.js":
+            continue
+        text = _text(path)
+        if not imports_state.search(text):
+            continue
+        checked += 1
+        for number, line in enumerate(text.splitlines(), 1):
+            if param.search(line) or local.search(line) or arrow.search(line):
+                offenders.append(f"{path.relative_to(WEB)}:{number} {line.strip()[:70]}")
+    assert checked >= 10, f"只掃到 {checked} 個檔案——這個測試會變成空轉"
+    assert offenders == [], f"這些地方會遮蔽共享的 state：{offenders}"
+
+
 def test_index_html_loads_the_module_entry_point():
     html = _text(WEB / "index.html")
     assert '<script type="module" src="/static/js/main.js?v=__ASSET_VERSION__"></script>' in html
