@@ -1,5 +1,5 @@
 
-        <div class="panel settings-actionbar">
+        <div class="panel settings-actionbar" hidden="">
           <button class="btn btn-primary" id="btn-save-settings" data-i18n="btn_save_apply">儲存並套用</button>
           <span class="muted small" data-i18n="settings_save_note">寫回 config.yaml 後即時熱更新</span>
           <span class="muted small head-right" data-i18n="settings_nav_hint">左側選擇要檢視的區塊；「儲存並套用」只影響設定類區塊。</span>
@@ -7,7 +7,7 @@
 
         <div class="settings-layout">
         <nav class="settings-nav" id="settings-nav" aria-label="系統設定分區">
-          <button class="settings-nav-item active" data-pane="secretary" data-i18n="snav_secretary">🤖 秘書與自動化</button>
+          <button class="settings-nav-item" data-pane="secretary" data-i18n="snav_secretary">🤖 秘書與自動化</button>
           <button class="settings-nav-item" data-pane="telegram" data-i18n="snav_telegram">✈️ Telegram 通知</button>
           <button class="settings-nav-item" data-pane="line" data-i18n="snav_line">💬 LINE 通知</button>
           <button class="settings-nav-item" data-pane="paths" data-i18n="snav_paths">📁 監控路徑</button>
@@ -16,12 +16,12 @@
           <button class="settings-nav-item" data-pane="usage" data-i18n="snav_usage">⏱️ 使用時間與里程碑</button>
           <button class="settings-nav-item" data-pane="github" data-i18n="snav_github">🐙 GitHub 雲端整合</button>
           <div class="settings-nav-group" data-i18n="snav_group_ops">維運</div>
-          <button class="settings-nav-item" data-pane="feed" data-i18n="snav_feed">📡 即時情報流</button>
+          <button class="settings-nav-item active" data-pane="feed" data-i18n="snav_feed">📡 即時情報流</button>
           <button class="settings-nav-item" data-pane="health" data-i18n="snav_health">🛡️ 系統健康</button>
           <button class="settings-nav-item" data-pane="acceptance" data-i18n="snav_acceptance">🧾 驗收中心</button>
         </nav>
           <div class="settings-panes" id="settings-panes">
-          <section class="settings-pane active" data-pane="secretary">
+          <section class="settings-pane" data-pane="secretary">
         <div class="panel mb-14">
           <div class="panel-head">
             <span class="mono-label accent">01</span><span class="panel-title" data-i18n="settings_executor_title">小秘書執行器（ADR-008）</span>
@@ -356,7 +356,7 @@
         </div>
       
         </section>
-          <section class="settings-pane" data-pane="feed">
+          <section class="settings-pane active" data-pane="feed">
         <div id="stats-strip" class="stats">
     <div class="stat">
       <div class="stat-top">
@@ -395,7 +395,7 @@
         <span class="mono-mini muted">STREAMS</span>
         <span class="stat-dot" style="background:var(--orange)" title="ok"></span>
       </div>
-      <div class="stat-value">0</div>
+      <div class="stat-value">4</div>
       <div class="stat-label">進行中工作</div>
     </div></div>
 
@@ -403,68 +403,20 @@
           <div class="panel-head">
             <span class="mono-label" data-i18n="feed_title">LIVE FEED</span>
             <div class="filters">
-              <button class="chip active" data-filter="all" data-i18n="filter_all">全部</button>
+              <button class="chip" data-filter="all" data-i18n="filter_all">全部</button>
               <button class="chip" data-filter="ai" data-i18n="filter_ai">AI</button>
               <button class="chip" data-filter="file" data-i18n="filter_file">檔案</button>
-              <button class="chip" data-filter="git" data-i18n="filter_git">Git</button>
+              <button class="chip active" data-filter="git" data-i18n="filter_git">Git</button>
               <button class="chip" data-filter="window" data-i18n="filter_window">視窗</button>
             </div>
           </div>
           <div id="feed-list" class="feed">
-      <div class="frow">
-        <span class="ftime">08:12:26</span>
-        <span class="fbadge ai">CLAUDE_CODE</span>
-        <div class="fbody">
-          <span class="ftitle">[CLAUDE_CODE] 繼續做 D11，先補前端行為鎖 "雙引號" &lt;b&gt;粗體&lt;/b&gt; &amp; '單引號' &lt;img src=x onerror=1...</span>
-          <span class="fdetail">繼續做 D11，先補前端行為鎖 "雙引號" &lt;b&gt;粗體&lt;/b&gt; &amp; '單引號' &lt;img src=x onerror=1&gt;</span>
-        </div>
-      </div>
-      <div class="frow">
-        <span class="ftime">08:00:26</span>
-        <span class="fbadge file">.PY</span>
-        <div class="fbody">
-          <span class="ftitle">[MODIFIED] items.py</span>
-          <span class="fdetail">/omni/checkout/core/acceptance/items.py</span>
-        </div>
-      </div>
       <div class="frow">
         <span class="ftime">07:50:26</span>
         <span class="fbadge git">GIT</span>
         <div class="fbody">
           <span class="ftitle">[activityTracker@main] refactor(acceptance): 一個 reading 加一張階梯表 "雙引號" &lt;b&gt;粗體&lt;/b&gt; &amp; '單引號' &lt;img src=x onerror=1&gt;</span>
           <span class="fdetail">Commit: a1b2c3d4e5f6 by dofliu</span>
-        </div>
-      </div>
-      <div class="frow">
-        <span class="ftime">06:20:26</span>
-        <span class="fbadge window">CODING</span>
-        <div class="fbody">
-          <span class="ftitle">[Code] items.py — activityTracker "雙引號" &lt;b&gt;粗體&lt;/b&gt; &amp; '單引號'</span>
-          <span class="fdetail">items.py — activityTracker "雙引號" &lt;b&gt;粗體&lt;/b&gt; &amp; '單引號' &lt;img src=x onerror=1&gt;</span>
-        </div>
-      </div>
-      <div class="frow">
-        <span class="ftime">05:20:26</span>
-        <span class="fbadge ai">CHATGPT</span>
-        <div class="fbody">
-          <span class="ftitle">[CHATGPT] 幫我看一下這段離岸風電的統計...</span>
-          <span class="fdetail">幫我看一下這段離岸風電的統計</span>
-        </div>
-      </div>
-      <div class="frow">
-        <span class="ftime">03:20:26</span>
-        <span class="fbadge file">.TEX</span>
-        <div class="fbody">
-          <span class="ftitle">[MODIFIED] ch3.tex</span>
-          <span class="fdetail">/omni/papers/ch3.tex</span>
-        </div>
-      </div>
-      <div class="frow">
-        <span class="ftime">01:20:26</span>
-        <span class="fbadge window">RESEARCH</span>
-        <div class="fbody">
-          <span class="ftitle">[TeXstudio] ch3.tex</span>
-          <span class="fdetail">ch3.tex</span>
         </div>
       </div>
       <div class="frow">

@@ -1,13 +1,35 @@
 {
   "asset_version": "domlock",
-  "endpoint_count": 35,
-  "frozen_clock": "2026-09-19T10:43:53",
-  "frozen_epoch_ms": 1789814633000,
+  "endpoint_count": 40,
+  "frozen_clock": "2026-09-20T08:20:26",
+  "frozen_epoch_ms": 1789892426000,
   "langs": [
     "zh-TW",
     "en"
   ],
   "locale": "zh-TW",
+  "scenes": [
+    {
+      "name": "projects-expand",
+      "tab": "tab-projects"
+    },
+    {
+      "name": "summaries-week",
+      "tab": "tab-summaries"
+    },
+    {
+      "name": "settings-feed-git",
+      "tab": "tab-settings"
+    },
+    {
+      "name": "settings-pane-llm",
+      "tab": "tab-settings"
+    },
+    {
+      "name": "knowledge-session",
+      "tab": "tab-knowledge"
+    }
+  ],
   "tabs": [
     "tab-assistant",
     "tab-knowledge",

@@ -71,6 +71,28 @@ LOCALE = "zh-TW"
 LANGS = ("zh-TW", "en")
 TABS = ("tab-assistant", "tab-knowledge", "tab-projects", "tab-repos", "tab-summaries", "tab-settings")
 
+# 互動場景：開機之後再做幾個動作，拍第二張。
+#
+# 為什麼要有：ADR-029 明說那把鎖「只釘開機後的第一畫面，不釘互動」，並且寫下如果重構會動到
+# 互動路徑就得先把互動加進來。D13（`state.js` 改注入）正是那種重構——共享值大多是被**互動**
+# 讀寫的，只鎖第一畫面等於把最該證明的那部分放生。
+#
+# 挑的五個都是**唯讀**的（不 POST、不改資料庫），而且每一個都會讀寫至少一個共享值：
+#   expandedProject／showAllProjects、summaryView、activeFilter＋recentEvents、
+#   currentConfig 的設定分頁、currentRagSessionId＋ragChatHistory。
+SCENES = (
+    ("projects-expand", "tab-projects",
+     (("click", "#projects-list .pitem .prow"),)),
+    ("summaries-week", "tab-summaries",
+     (("click", '.viewswitch .chip[data-view="week"]'),)),
+    ("settings-feed-git", "tab-settings",
+     (("click", '.settings-nav-item[data-pane="feed"]'), ("click", '.filters .chip[data-filter="git"]'))),
+    ("settings-pane-llm", "tab-settings",
+     (("click", '.settings-nav-item[data-pane="llm"]'),)),
+    ("knowledge-session", "tab-knowledge",
+     (("select-index", "#select-rag-session", 1),)),
+)
+
 # 錄製時把機器相關的路徑換掉，快照才不會綁在某一台機器上。
 HOME_PLACEHOLDER = "/omni/home"
 REPO_PLACEHOLDER = "/omni/checkout"
@@ -138,7 +160,30 @@ def new_page(browser, lang: str, frozen_epoch_ms: int):
     return page
 
 
-def capture_pane(page, tab: str) -> str:
+def apply_step(page, step) -> None:
+    """做一個動作。找不到目標就**吵**——靜靜地跳過會讓場景快照退化成第一畫面的複本。"""
+    kind, selector = step[0], step[1]
+    if kind == "click":
+        locator = page.locator(selector).first
+        if locator.count() == 0:
+            raise RuntimeError(f"場景步驟找不到目標：{selector}。這個場景現在是空轉，先修它再說。")
+        locator.click()
+    elif kind == "select-index":
+        index = step[2]
+        options = page.locator(f"{selector} option")
+        if options.count() <= index:
+            raise RuntimeError(f"{selector} 只有 {options.count()} 個選項，選不到第 {index} 個——場景空轉。")
+        page.select_option(selector, index=index)
+    else:
+        raise AssertionError(f"不認得的場景步驟：{kind}")
+    try:
+        page.wait_for_load_state("networkidle", timeout=10000)
+    except Exception:
+        pass
+    page.wait_for_timeout(_SETTLE_MS)
+
+
+def capture_pane(page, tab: str, steps: tuple = ()) -> str:
     """一次開機只拍一個分頁。
 
     一開始的寫法是「開一次、依序點六個分頁、各拍一張」，結果穩定性檢查當場抓到 tab-assistant
@@ -154,6 +199,8 @@ def capture_pane(page, tab: str) -> str:
     except Exception:
         pass
     page.wait_for_timeout(_SETTLE_MS)
+    for step in steps:
+        apply_step(page, step)
 
     html = page.evaluate(f'document.getElementById({tab!r}).innerHTML')
     page.wait_for_timeout(_STABILITY_MS)
@@ -404,6 +451,11 @@ def cmd_record() -> int:
                     page.route("**/*", handler)
                     capture_pane(page, tab)
                     page.close()
+                for _name, tab, steps in SCENES:
+                    page = new_page(browser, lang, frozen_ms)
+                    page.route("**/*", handler)
+                    capture_pane(page, tab, steps)
+                    page.close()
             browser.close()
 
         if non_get:
@@ -428,6 +480,7 @@ def cmd_record() -> int:
             "viewport": VIEWPORT,
             "langs": list(LANGS),
             "tabs": list(TABS),
+            "scenes": [{"name": name, "tab": tab} for name, tab, _steps in SCENES],
             "asset_version": ASSET_VERSION,
             "endpoint_count": len(recorded),
         }, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -497,6 +550,11 @@ def replay(meta: dict, fixtures: dict[str, dict]) -> tuple[dict[str, str], list[
                 page.route("**/*", handler)
                 panes[f"{tab}.{lang}"] = capture_pane(page, tab)
                 page.close()
+            for name, tab, steps in SCENES:
+                page = new_page(browser, lang, meta["frozen_epoch_ms"])
+                page.route("**/*", handler)
+                panes[f"{name}.{lang}"] = capture_pane(page, tab, steps)
+                page.close()
         browser.close()
     return panes, missing
 
@@ -533,7 +591,10 @@ def cmd_update() -> int:
 
 def cmd_check() -> int:
     meta = load_meta()
-    expected_keys = sorted(f"{tab}.{lang}" for tab in meta["tabs"] for lang in meta["langs"])
+    expected_keys = sorted(
+        [f"{tab}.{lang}" for tab in meta["tabs"] for lang in meta["langs"]]
+        + [f"{scene['name']}.{lang}" for scene in meta.get("scenes", []) for lang in meta["langs"]]
+    )
     stored = sorted(p.name[: -len(".html")] for p in PANE_DIR.glob("*.html")) if PANE_DIR.is_dir() else []
     if stored != expected_keys:
         print(f"快照檔不齊：預期 {expected_keys}，實際 {stored}。先跑 `update`。", file=sys.stderr)
