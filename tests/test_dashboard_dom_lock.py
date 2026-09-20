@@ -153,7 +153,8 @@ def test_api_fixtures_are_complete_and_parse():
 
 def test_fixtures_carry_no_machine_specific_paths():
     """錄製時的臨時 home 與 checkout 路徑要被換掉，語料才不綁在某一台機器上。"""
-    forbidden = ("/home/user", "/tmp/omni-dom-lock-", "/root/", "C:\\\\Users")
+    # Windows 路徑在 HTML 快照裡是 `C:\\Users`，在 JSON 罐頭裡會被跳脫成 `C:\\\\Users`，兩種都要擋。
+    forbidden = ("/home/user", "/tmp/omni-dom-lock-", "/root/", "C:\\Users", "C:\\\\Users")
     offenders = []
     for path in sorted(API_DIR.glob("*.json")) + pane_files():
         text = path.read_text(encoding="utf-8")

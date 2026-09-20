@@ -148,7 +148,9 @@ def test_create_app_state_really_makes_independent_copies():
       default_untouched: m.state.rag.history.length === 0,
     }));
     """
-    result = subprocess.run(["node", "--input-type=module", "-e", script, str(STATE_JS)],
+    # 傳 file:// URL，不要傳裸路徑：Windows 上 `import("D:\\a\\…")` 會被 node 擋下
+    # （ERR_UNSUPPORTED_ESM_URL_SCHEME: Received protocol 'd:'），這在 Linux 上看不出來。
+    result = subprocess.run(["node", "--input-type=module", "-e", script, STATE_JS.as_uri()],
                             capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stderr
     report = json.loads(result.stdout)
