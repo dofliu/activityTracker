@@ -60,19 +60,19 @@ export function acceptanceStatusLabel(status) {
 
 export async function loadAcceptance() {
   try {
-    state.acceptanceCache = await getJSON("/api/v1/acceptance/checklist");
+    state.health.acceptance = await getJSON("/api/v1/acceptance/checklist");
     renderAcceptance();
   } catch (e) {
     console.error("loadAcceptance error:", e);
     const box = $("acceptance-items");
-    if (box) box.innerHTML = `<div class="placeholder">${state.currentLang === "zh-TW" ? "無法讀取驗收現況。" : "Acceptance status is unavailable."}</div>`;
+    if (box) box.innerHTML = `<div class="placeholder">${state.ui.currentLang === "zh-TW" ? "無法讀取驗收現況。" : "Acceptance status is unavailable."}</div>`;
   }
 }
 
 export function renderAcceptance() {
-  const data = state.acceptanceCache;
+  const data = state.health.acceptance;
   if (!data) return;
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const summary = data.summary || {};
   const settled = (summary.passed || 0) + (summary.attested || 0);
 

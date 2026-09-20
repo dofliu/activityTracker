@@ -26,7 +26,7 @@ export async function loadDictionaries() {
 }
 
 export function t(key, vars = {}) {
-  const dict = I18N[state.currentLang] || I18N["zh-TW"];
+  const dict = I18N[state.ui.currentLang] || I18N["zh-TW"];
   let str = dict[key] || (I18N["zh-TW"] && I18N["zh-TW"][key]) || key;
   for (const [k, v] of Object.entries(vars)) {
     str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
@@ -35,14 +35,14 @@ export function t(key, vars = {}) {
 }
 
 export function applyLanguage(lang) {
-  state.currentLang = lang;
+  state.ui.currentLang = lang;
   localStorage.setItem("omni-lang", lang);
   document.documentElement.lang = lang === "zh-TW" ? "zh-TW" : "en";
 
   // 更新所有 data-i18n 節點文字
   document.querySelectorAll("[data-i18n]").forEach(el => {
     const k = el.dataset.i18n;
-    if (k && I18N[state.currentLang][k]) {
+    if (k && I18N[state.ui.currentLang][k]) {
       el.textContent = t(k);
     }
   });
@@ -50,7 +50,7 @@ export function applyLanguage(lang) {
   // 更新所有 placeholder
   document.querySelectorAll("[data-i18n-ph]").forEach(el => {
     const k = el.dataset.i18nPh;
-    if (k && I18N[state.currentLang][k]) {
+    if (k && I18N[state.ui.currentLang][k]) {
       el.placeholder = t(k);
     }
   });
@@ -67,10 +67,10 @@ export function applyLanguage(lang) {
   renderContextSessions();
   renderSecretaryProposals();
   renderRepositorySyncStatus();
-  if (state.relatedContextCache) renderRelatedContext(state.relatedContextCache);
-  if (state.acceptanceCache) renderAcceptance();
-  if (state.memoryCache) renderMemoryList();   // 記憶區清單與個人檔案列的字串也要跟著切換
-  if (state.homeCache) renderHome();
+  if (state.projects.relatedContext) renderRelatedContext(state.projects.relatedContext);
+  if (state.health.acceptance) renderAcceptance();
+  if (state.memory.notes) renderMemoryList();   // 記憶區清單與個人檔案列的字串也要跟著切換
+  if (state.secretary.home) renderHome();
   if ($("llm-key-status-badge")) renderLLMStatus();
 }
 
@@ -78,9 +78,9 @@ export function initLanguage() {
   const langBtn = $("btn-lang");
   if (langBtn) {
     langBtn.addEventListener("click", () => {
-      const nextLang = state.currentLang === "zh-TW" ? "en" : "zh-TW";
+      const nextLang = state.ui.currentLang === "zh-TW" ? "en" : "zh-TW";
       applyLanguage(nextLang);
     });
   }
-  applyLanguage(state.currentLang);
+  applyLanguage(state.ui.currentLang);
 }

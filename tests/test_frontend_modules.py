@@ -152,7 +152,8 @@ def test_dictionaries_are_data_not_code():
 def test_shared_mutable_state_lives_only_in_state_js():
     """模組層 `let` 一旦跨檔就不能再被重新賦值；D10 把它們收進一個具名物件。
 
-    這不是終點——改成注入是 D11 的事；這裡只保證它們沒有再散回各個模組。
+    這裡只保證它們沒有再散回各個模組。分成具名 store 與工廠是 D13 的事（ADR-030），
+    那部分的契約在 `tests/test_frontend_state_stores.py`。
     """
     offenders = [f"{p.relative_to(WEB)}:{i}" for p in JS_FILES
                  if p.name != "state.js"
@@ -160,7 +161,8 @@ def test_shared_mutable_state_lives_only_in_state_js():
                  if re.match(r"^let\s+\w+", line)]
     assert offenders == [], offenders
     state = _text(JS / "core" / "state.js")
-    assert "export const state = {" in state
+    assert "export function createAppState()" in state
+    assert "export const state = createAppState();" in state
 
 
 def test_nothing_shadows_the_shared_state():

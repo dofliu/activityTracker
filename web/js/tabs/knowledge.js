@@ -239,11 +239,11 @@ export function initRAGTab() {
   if (sessionSelect) {
     sessionSelect.addEventListener("change", (e) => {
       const sId = e.target.value;
-      state.currentRagSessionId = sId;
+      state.rag.sessionId = sId;
       if (sId) {
         loadRAGMessages(sId);
       } else {
-        state.ragChatHistory = [];
+        state.rag.history = [];
         renderRAGMessages();
       }
     });
@@ -253,9 +253,9 @@ export function initRAGTab() {
   const newChatBtn = $("btn-rag-new-chat");
   if (newChatBtn) {
     newChatBtn.addEventListener("click", () => {
-      state.currentRagSessionId = "";
+      state.rag.sessionId = "";
       if (sessionSelect) sessionSelect.value = "";
-      state.ragChatHistory = [];
+      state.rag.history = [];
       renderRAGMessages();
       $("input-rag-prompt").focus();
     });
@@ -265,12 +265,12 @@ export function initRAGTab() {
   const delChatBtn = $("btn-rag-del-chat");
   if (delChatBtn) {
     delChatBtn.addEventListener("click", async () => {
-      if (!state.currentRagSessionId) return;
+      if (!state.rag.sessionId) return;
       if (!confirm("確定要刪除此對話紀錄嗎？")) return;
       try {
-        await request(`/api/v1/rag/chat/sessions/${encodeURIComponent(state.currentRagSessionId)}`, { method: "DELETE" });
-        state.currentRagSessionId = "";
-        state.ragChatHistory = [];
+        await request(`/api/v1/rag/chat/sessions/${encodeURIComponent(state.rag.sessionId)}`, { method: "DELETE" });
+        state.rag.sessionId = "";
+        state.rag.history = [];
         renderRAGMessages();
         loadRAGSessions();
       } catch (e) {
@@ -304,7 +304,7 @@ export function initRAGTab() {
   const clearBtn = $("btn-rag-clear");
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
-      state.ragChatHistory = [];
+      state.rag.history = [];
       renderRAGMessages();
     });
   }
@@ -366,30 +366,30 @@ export function renderBackgroundTaskPanel(data) {
   const completed = Number(data.completed_task_count || 0);
   const awaiting = Number(data.awaiting_final_count || 0);
   const untrusted = Number(data.untrusted_duration_count || 0);
-  $("background-tasks-meta").textContent = state.currentLang === "zh-TW"
+  $("background-tasks-meta").textContent = state.ui.currentLang === "zh-TW"
     ? `已完成 ${completed} 件 · 等待 final receipt ${awaiting} 件${untrusted ? ` · 異常時長未計入 ${untrusted} 件` : ""}`
     : `${completed} completed · ${awaiting} awaiting final receipt${untrusted ? ` · ${untrusted} excluded duration` : ""}`;
-  $("background-tasks-boundary").textContent = state.currentLang === "zh-TW"
+  $("background-tasks-boundary").textContent = state.ui.currentLang === "zh-TW"
     ? "只納入本機來源可確認的 prompt 開始與明確 final completion；與前景使用時間完全分開，不代表生產力、一般 Terminal 或全部工作。"
     : "Only local prompt-start and explicit final-completion receipts are included. It is separate from foreground time, productivity, generic terminal time, and all work.";
 
   const rows = (data.recent_tasks || []).slice(0, 6);
   $("background-tasks-list").innerHTML = rows.length ? rows.map(item => {
     const completedAt = item.completed_at ? new Date(item.completed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
-    const project = item.project_tag || (state.currentLang === "zh-TW" ? "未歸戶專案" : "Unassigned project");
+    const project = item.project_tag || (state.ui.currentLang === "zh-TW" ? "未歸戶專案" : "Unassigned project");
     return `<div class="background-task-row">
       <span class="background-task-platform">${esc(item.label)}</span>
       <span class="background-task-project" title="${esc(project)}">${esc(project)}</span>
       <span class="background-task-duration">${formatUsageDuration(item.duration_seconds)}</span>
       <span class="background-task-completed">${completedAt}</span>
     </div>`;
-  }).join("") : `<div class="placeholder">${state.currentLang === "zh-TW" ? "今日尚無可由開始與 final receipt 成對驗證的背景任務。" : "No background task has paired start and final receipts today."}</div>`;
+  }).join("") : `<div class="placeholder">${state.ui.currentLang === "zh-TW" ? "今日尚無可由開始與 final receipt 成對驗證的背景任務。" : "No background task has paired start and final receipts today."}</div>`;
 }
 
 export function renderBackgroundTaskPanelError() {
   $("background-tasks-evidence").className = "trust broken";
   $("background-tasks-evidence").textContent = "UNAVAILABLE";
-  $("background-tasks-list").innerHTML = `<div class="placeholder">${state.currentLang === "zh-TW" ? "無法載入背景任務收據。" : "Unable to load background task receipts."}</div>`;
+  $("background-tasks-list").innerHTML = `<div class="placeholder">${state.ui.currentLang === "zh-TW" ? "無法載入背景任務收據。" : "Unable to load background task receipts."}</div>`;
 }
 
 export function formatRAGBytes(bytes) {
@@ -539,12 +539,12 @@ export async function refreshRAGRetrieval() {
 }
 
 export function startRAGRetrievalPolling() {
-  if (state.ragRetrievalPollTimer) clearInterval(state.ragRetrievalPollTimer);
-  state.ragRetrievalPollTimer = setInterval(async () => {
+  if (state.rag.retrievalTimer) clearInterval(state.rag.retrievalTimer);
+  state.rag.retrievalTimer = setInterval(async () => {
     const data = await refreshRAGRetrieval();
     if (!data || !["starting", "warming", "loading"].includes(data.state)) {
-      clearInterval(state.ragRetrievalPollTimer);
-      state.ragRetrievalPollTimer = null;
+      clearInterval(state.rag.retrievalTimer);
+      state.rag.retrievalTimer = null;
     }
   }, 2000);
 }
@@ -553,8 +553,8 @@ export async function pollRAGProgress() {
   const data = await getJSON("/api/v1/rag/progress");
   const isActive = renderRAGJob(data);
   if (!isActive) {
-    if (state.ragProgressPollTimer) clearInterval(state.ragProgressPollTimer);
-    state.ragProgressPollTimer = null;
+    if (state.rag.progressTimer) clearInterval(state.rag.progressTimer);
+    state.rag.progressTimer = null;
     loadRAGFolders();
     loadRAGFiles();
     refreshRAGStorage();
@@ -562,9 +562,9 @@ export async function pollRAGProgress() {
 }
 
 export function startRAGProgressPolling() {
-  if (state.ragProgressPollTimer) clearInterval(state.ragProgressPollTimer);
+  if (state.rag.progressTimer) clearInterval(state.rag.progressTimer);
   pollRAGProgress().catch(() => {});
-  state.ragProgressPollTimer = setInterval(() => pollRAGProgress().catch(() => {}), 1000);
+  state.rag.progressTimer = setInterval(() => pollRAGProgress().catch(() => {}), 1000);
 }
 
 export async function loadRAGProgress() {
@@ -618,17 +618,17 @@ export async function openRAGFileInExplorer(path) {
 export async function loadRAGSessions() {
   try {
     const sessions = await getJSON("/api/v1/rag/chat/sessions");
-    state.ragSessionsCache = Array.isArray(sessions) ? sessions : [];
+    state.rag.sessions = Array.isArray(sessions) ? sessions : [];
     const select = $("select-rag-session");
     if (!select) return;
 
-    select.innerHTML = '<option value="">➕ 建立新對話</option>' + state.ragSessionsCache.map(s => {
+    select.innerHTML = '<option value="">➕ 建立新對話</option>' + state.rag.sessions.map(s => {
       const title = (s.title || "").trim();
-      const displayTitle = title && title !== "新對話" ? title : (state.currentLang === "zh-TW" ? "對話紀錄" : "Chat");
-      return `<option value="${esc(s.id)}" ${s.id === state.currentRagSessionId ? "selected" : ""}>💬 ${esc(displayTitle)}</option>`;
+      const displayTitle = title && title !== "新對話" ? title : (state.ui.currentLang === "zh-TW" ? "對話紀錄" : "Chat");
+      return `<option value="${esc(s.id)}" ${s.id === state.rag.sessionId ? "selected" : ""}>💬 ${esc(displayTitle)}</option>`;
     }).join("");
-    if (state.currentRagSessionId) {
-      select.value = state.currentRagSessionId;
+    if (state.rag.sessionId) {
+      select.value = state.rag.sessionId;
     }
   } catch (e) {}
 }
@@ -647,7 +647,7 @@ export async function loadRAGStrategies() {
 export async function loadRAGMessages(sessionId) {
   try {
     const messages = await getJSON(`/api/v1/rag/chat/messages/${encodeURIComponent(sessionId)}`);
-    state.ragChatHistory = messages.map(m => ({
+    state.rag.history = messages.map(m => ({
       role: m.role,
       content: m.content,
       citations: m.citations || [],
@@ -666,7 +666,7 @@ export function renderRAGMessages() {
   const container = $("rag-chat-messages");
   if (!container) return;
 
-  if (!state.ragChatHistory.length) {
+  if (!state.rag.history.length) {
     container.innerHTML = `
       <div class="placeholder" style="margin: auto; text-align: center;">
         <div style="font-size: 28px; margin-bottom: 8px;">📚</div>
@@ -677,7 +677,7 @@ export function renderRAGMessages() {
     return;
   }
 
-  container.innerHTML = state.ragChatHistory.map((msg, idx) => {
+  container.innerHTML = state.rag.history.map((msg, idx) => {
     const isUser = msg.role === "user";
     const renderedContent = isUser
       ? esc(msg.content).replace(/\n/g, "<br>")
@@ -722,7 +722,7 @@ export function renderRAGMessages() {
 }
 
 export async function sendRAGChatMessage(fromInput) {
-  if (state.isRagStreaming) return;
+  if (state.rag.streaming) return;
   // 小秘書首頁與 RAG 分頁共用同一條對話流（同 session、同歷史）。
   const promptInput = fromInput || $("input-rag-prompt");
   const prompt = (promptInput.value || "").trim();
@@ -744,14 +744,14 @@ export async function sendRAGChatMessage(fromInput) {
   const enableRag = $("toggle-enable-rag") ? $("toggle-enable-rag").checked : true;
 
   // 1. 建立或確保 Session
-  if (!state.currentRagSessionId) {
+  if (!state.rag.sessionId) {
     try {
       const sTitle = prompt.slice(0, 24);
       const sRes = await postJSON("/api/v1/rag/chat/sessions", { title: sTitle });
-      state.currentRagSessionId = sRes.session_id;
+      state.rag.sessionId = sRes.session_id;
       loadRAGSessions();
     } catch (e) {
-      state.currentRagSessionId = "session_" + Date.now();
+      state.rag.sessionId = "session_" + Date.now();
     }
   }
 
@@ -763,11 +763,11 @@ export async function sendRAGChatMessage(fromInput) {
     model,
     time: new Date().toLocaleTimeString()
   };
-  state.ragChatHistory.push(userMsg);
+  state.rag.history.push(userMsg);
 
   // 儲存 User Message 到後端
   postJSON("/api/v1/rag/chat/messages", {
-    session_id: state.currentRagSessionId,
+    session_id: state.rag.sessionId,
     role: "user",
     content: prompt,
     provider,
@@ -783,11 +783,11 @@ export async function sendRAGChatMessage(fromInput) {
     model,
     time: new Date().toLocaleTimeString()
   };
-  state.ragChatHistory.push(assistantMsg);
+  state.rag.history.push(assistantMsg);
   renderRAGMessages();
 
   // 4. 開始 SSE 串流
-  state.isRagStreaming = true;
+  state.rag.streaming = true;
   const sendBtn = $("btn-rag-send");
   if (sendBtn) {
     sendBtn.disabled = true;
@@ -796,30 +796,30 @@ export async function sendRAGChatMessage(fromInput) {
   const assistantBtn = $("btn-assistant-send");
   if (assistantBtn) {
     assistantBtn.disabled = true;
-    assistantBtn.textContent = state.currentLang === "zh-TW" ? "回覆中…" : "Streaming…";
+    assistantBtn.textContent = state.ui.currentLang === "zh-TW" ? "回覆中…" : "Streaming…";
   }
 
   try {
-    const apiMessages = state.ragChatHistory.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
+    const apiMessages = state.rag.history.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
     // 安全網：後端若完全沒回應（網路卡住、程序被砍），介面也不能永遠停在
     // 「回覆中」。閒置逾時只在「一段時間沒有任何新位元組」時才觸發，
     // 正常的長回答會不斷刷新它。
-    state.streamAbort = new AbortController();
+    state.rag.abort = new AbortController();
     let idleTimer = null;
     const resetIdleTimer = () => {
       if (idleTimer) clearTimeout(idleTimer);
       idleTimer = setTimeout(() => {
-        state.streamTimedOut = true;
-        state.streamAbort.abort();
+        state.rag.timedOut = true;
+        state.rag.abort.abort();
       }, RAG_STREAM_IDLE_TIMEOUT_MS);
     };
     resetIdleTimer();
     // 串流：需要原始 Response 的 body reader，所以走 request() 而不是 postJSON()
     const response = await request("/api/v1/rag/chat", {
-      signal: state.streamAbort.signal,
+      signal: state.rag.abort.signal,
       method: "POST",
       body: ({
-        session_id: state.currentRagSessionId,
+        session_id: state.rag.sessionId,
         messages: apiMessages,
         provider,
         model,
@@ -881,7 +881,7 @@ export async function sendRAGChatMessage(fromInput) {
 
     // 儲存 Assistant Message 到後端
     postJSON("/api/v1/rag/chat/messages", {
-      session_id: state.currentRagSessionId,
+      session_id: state.rag.sessionId,
       role: "assistant",
       content: assistantMsg.content,
       citations: assistantMsg.citations,
@@ -890,17 +890,17 @@ export async function sendRAGChatMessage(fromInput) {
     }).then(() => loadRAGSessions()).catch(() => {});
 
   } catch (e) {
-    const zh = state.currentLang === "zh-TW";
-    assistantMsg.content += state.streamTimedOut
+    const zh = state.ui.currentLang === "zh-TW";
+    assistantMsg.content += state.rag.timedOut
       ? (zh
         ? `\n\n[逾時：${RAG_STREAM_IDLE_TIMEOUT_MS / 1000} 秒內沒有收到任何回應。請確認所選 provider 的 API key 與網路，或改用本機 Ollama。]`
         : `\n\n[Timed out: no response for ${RAG_STREAM_IDLE_TIMEOUT_MS / 1000}s. Check the selected provider's API key and network, or switch to local Ollama.]`)
       : `\n\n[串流發生錯誤: ${e.message}]`;
     renderRAGMessages();
   } finally {
-    if (state.streamAbort) state.streamAbort = null;
-    state.streamTimedOut = false;
-    state.isRagStreaming = false;
+    if (state.rag.abort) state.rag.abort = null;
+    state.rag.timedOut = false;
+    state.rag.streaming = false;
     if (sendBtn) {
       sendBtn.disabled = false;
       sendBtn.textContent = "發送 ⚡";
