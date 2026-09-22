@@ -12,17 +12,17 @@ import { loadProjects, renderFocusCarousel, renderProjects } from "../tabs/proje
 export async function loadContextSessions() {
   const box = $("context-sessions-list");
   try {
-    state.contextSessionsCache = await getJSON("/api/v1/context/sessions");
+    state.projects.contextSessions = await getJSON("/api/v1/context/sessions");
     renderContextSessions();
   } catch (e) {
-    if (box) box.innerHTML = `<div class="placeholder">${state.currentLang === "zh-TW" ? "近期工作階段暫時無法讀取。" : "Recent work sessions are temporarily unavailable."}</div>`;
+    if (box) box.innerHTML = `<div class="placeholder">${state.ui.currentLang === "zh-TW" ? "近期工作階段暫時無法讀取。" : "Recent work sessions are temporarily unavailable."}</div>`;
   }
 }
 
 export function formatContextTime(value) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "—";
-  return parsed.toLocaleString(state.currentLang === "zh-TW" ? "zh-TW" : "en", {
+  return parsed.toLocaleString(state.ui.currentLang === "zh-TW" ? "zh-TW" : "en", {
     month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"
   });
 }
@@ -31,15 +31,15 @@ export function renderContextSessions() {
   const box = $("context-sessions-list");
   const badge = $("context-sessions-badge");
   if (!box || !badge) return;
-  if (!state.contextSessionsCache) {
+  if (!state.projects.contextSessions) {
     badge.textContent = "LOADING";
     return;
   }
-  const sessions = state.contextSessionsCache.sessions || [];
+  const sessions = state.projects.contextSessions.sessions || [];
   badge.textContent = `${sessions.length} SESSIONS`;
   badge.className = `trust ${sessions.length ? "ok" : "noisy"}`;
   if (!sessions.length) {
-    box.innerHTML = `<div class="placeholder">${state.currentLang === "zh-TW" ? "近 72 小時沒有可歸戶的 AI、Git 或檔案事件。" : "No canonical AI, Git, or file events in the last 72 hours."}</div>`;
+    box.innerHTML = `<div class="placeholder">${state.ui.currentLang === "zh-TW" ? "近 72 小時沒有可歸戶的 AI、Git 或檔案事件。" : "No canonical AI, Git, or file events in the last 72 hours."}</div>`;
     return;
   }
   box.innerHTML = sessions.map(session => {
@@ -68,21 +68,21 @@ export async function searchRelatedContext() {
   const box = $("related-memory-results");
   const question = (input.value || "").trim();
   if (question.length < 2) {
-    showToast(state.currentLang === "zh-TW" ? "請先輸入至少兩個字。" : "Enter at least two characters.");
+    showToast(state.ui.currentLang === "zh-TW" ? "請先輸入至少兩個字。" : "Enter at least two characters.");
     return;
   }
   button.disabled = true;
-  button.textContent = state.currentLang === "zh-TW" ? "查詢中…" : "Searching…";
-  box.innerHTML = `<div class="placeholder">${state.currentLang === "zh-TW" ? "正在查詢本機 semantic index…" : "Searching the local semantic index…"}</div>`;
+  button.textContent = state.ui.currentLang === "zh-TW" ? "查詢中…" : "Searching…";
+  box.innerHTML = `<div class="placeholder">${state.ui.currentLang === "zh-TW" ? "正在查詢本機 semantic index…" : "Searching the local semantic index…"}</div>`;
   try {
-    state.relatedContextCache = await postJSON("/api/v1/context/related", {
+    state.projects.relatedContext = await postJSON("/api/v1/context/related", {
       question,
       top_k: 8
     });
-    renderRelatedContext(state.relatedContextCache);
+    renderRelatedContext(state.projects.relatedContext);
   } catch (e) {
-    state.relatedContextCache = null;
-    box.innerHTML = `<div class="placeholder">${state.currentLang === "zh-TW" ? "本機 Ollama 或 semantic index 目前不可用；查詢內容未保存。" : "Local Ollama or the semantic index is unavailable; the query was not stored."}</div>`;
+    state.projects.relatedContext = null;
+    box.innerHTML = `<div class="placeholder">${state.ui.currentLang === "zh-TW" ? "本機 Ollama 或 semantic index 目前不可用；查詢內容未保存。" : "Local Ollama or the semantic index is unavailable; the query was not stored."}</div>`;
   } finally {
     button.disabled = false;
     button.textContent = t("btn_related_search");
@@ -93,7 +93,7 @@ export function renderRelatedContext(data) {
   const box = $("related-memory-results");
   if (!box || !data) return;
   const matches = data.matches || [];
-  const advisory = state.currentLang === "zh-TW"
+  const advisory = state.ui.currentLang === "zh-TW"
     ? (matches.length ? "找到語意相近的歷史紀錄；請檢視來源後再決定是否可沿用。" : "沒有超過門檻的相似紀錄，但不代表歷史中一定沒有相關工作。")
     : (matches.length ? "Semantically related history found. Review each source before reuse." : "No match crossed the threshold; related history may still exist outside current coverage.");
   const rows = matches.map(item => `
@@ -108,11 +108,11 @@ export function renderRelatedContext(data) {
 export async function loadSecretaryProposals() {
   const box = $("secretary-proposals-list");
   try {
-    state.secretaryProposalsCache = await getJSON("/api/v1/secretary/proposals?limit=6");
+    state.secretary.proposals = await getJSON("/api/v1/secretary/proposals?limit=6");
     renderSecretaryProposals();
-    if (state.projectsCache.length) renderProjects();  // 專案卡的 💡 建議 chip 依提案快取更新
+    if (state.projects.cache.length) renderProjects();  // 專案卡的 💡 建議 chip 依提案快取更新
   } catch (e) {
-    if (box) box.innerHTML = `<div class="placeholder">${state.currentLang === "zh-TW" ? "建議暫時無法讀取。" : "Suggestions are temporarily unavailable."}</div>`;
+    if (box) box.innerHTML = `<div class="placeholder">${state.ui.currentLang === "zh-TW" ? "建議暫時無法讀取。" : "Suggestions are temporarily unavailable."}</div>`;
   }
 }
 
@@ -120,12 +120,12 @@ export function renderSecretaryProposals() {
   const box = $("secretary-proposals-list");
   const badge = $("secretary-proposals-badge");
   if (!box || !badge) return;
-  if (!state.secretaryProposalsCache) return;
+  if (!state.secretary.proposals) return;
   renderFocusCarousel();
   // 小秘書首頁的 advisor 徽章：LLM 註解啟用且成功時顯示 provider，否則 RULES
   const advisorBadge = $("assistant-advisor-badge");
   if (advisorBadge) {
-    const adv = state.secretaryProposalsCache.advisor || null;
+    const adv = state.secretary.proposals.advisor || null;
     if (adv && (adv.status === "annotated" || adv.status === "cached")) {
       advisorBadge.textContent = `LLM · ${String(adv.provider || "").toUpperCase()}`;
       advisorBadge.className = "trust ok";
@@ -134,15 +134,15 @@ export function renderSecretaryProposals() {
       advisorBadge.className = "trust noisy";
     }
   }
-  const proposals = state.secretaryProposalsCache.proposals || [];
-  badge.textContent = `${proposals.length} ${state.currentLang === "zh-TW" ? "項" : "ITEMS"}`;
+  const proposals = state.secretary.proposals.proposals || [];
+  badge.textContent = `${proposals.length} ${state.ui.currentLang === "zh-TW" ? "項" : "ITEMS"}`;
   badge.className = `trust ${proposals.length ? "noisy" : "ok"}`;
   // 太舊而沒列入的 PR／issue 要說出來，不能悄悄消失（ADR-007 Addendum 2026-09-08）
   const staleNote = $("secretary-stale-note");
   if (staleNote) {
-    const stale = (state.secretaryProposalsCache.inputs || {}).github_stale_excluded || null;
+    const stale = (state.secretary.proposals.inputs || {}).github_stale_excluded || null;
     if (stale && stale.total > 0) {
-      staleNote.textContent = state.currentLang === "zh-TW"
+      staleNote.textContent = state.ui.currentLang === "zh-TW"
         ? `另有 ${stale.total} 件超過 ${stale.threshold_days} 天沒更新的 PR／issue 不列入考量（PR ${stale.prs}、issue ${stale.issues}）；要看的話調 proactive_secretary.github_stale_after_days。`
         : `${stale.total} PR/issue item(s) idle for more than ${stale.threshold_days} days are left out (${stale.prs} PR, ${stale.issues} issue); adjust proactive_secretary.github_stale_after_days to include them.`;
       staleNote.title = (stale.subjects || []).map(x => `${x.subject_ref} · ${Math.round(x.age_days)}d`).join("\n");
@@ -152,12 +152,12 @@ export function renderSecretaryProposals() {
     }
   }
   if (!proposals.length) {
-    box.innerHTML = `<div class="placeholder">${state.currentLang === "zh-TW" ? "目前沒有超過規則門檻的建議；不代表所有工作都已完成。" : "No suggestion crossed the current rule threshold; this does not prove all work is complete."}</div>`;
+    box.innerHTML = `<div class="placeholder">${state.ui.currentLang === "zh-TW" ? "目前沒有超過規則門檻的建議；不代表所有工作都已完成。" : "No suggestion crossed the current rule threshold; this does not prove all work is complete."}</div>`;
     return;
   }
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   // P5-R1 advisory：LLM 只能註解，不能增刪或執行；fallback 時完全不顯示
-  const advisor = state.secretaryProposalsCache.advisor || null;
+  const advisor = state.secretary.proposals.advisor || null;
   const advisorActive = advisor && (advisor.status === "annotated" || advisor.status === "cached");
   const advisorBanner = advisorActive
     ? `<div class="advisor-summary">
@@ -199,7 +199,7 @@ export function renderSecretaryProposals() {
       ? `<a class="proposal-link" href="${esc(item.url)}" target="_blank" rel="noopener">${zh ? "在 GitHub 開啟 →" : "Open on GitHub →"}</a>`
       : "";
     // 更主動：停滯／未收尾事項若尚無 L2 起草動作，直接告訴使用者開啟 L2 就能請小秘書先起草計畫
-    const executorInfo = state.secretaryProposalsCache.executor || {};
+    const executorInfo = state.secretary.proposals.executor || {};
     const stalledType = item.proposal_type === "stalled_open_loop" || item.proposal_type === "unfinished_recent";
     const hasDraft = actions.some(act => act.template_id === "agent_draft_plan");
     const l2Hint = stalledType && !hasDraft
@@ -256,7 +256,7 @@ export function renderSecretaryProposals() {
 
 // ADR-022：候選待辦→未結事項。這是唯一會寫 open_loops 的路徑；忽略只改觀察正文。
 export async function resolveMeetingFollowup(noteId, index, action, projectKey) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   try {
     const res = await request("/api/v1/secretary/meetings/followups", {
       method: "POST",
@@ -276,7 +276,7 @@ export async function resolveMeetingFollowup(noteId, index, action, projectKey) 
 
 // 回饋迴路：使用者說「這個先不用提醒」。沒有這個，分流清單永遠不會變準。
 export async function snoozeProposal(proposalType, projectKey, subjectRef, days) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const permanent = days === null;
   const label = permanent
     ? (zh ? "確定不再提醒這一項？" : "Dismiss this suggestion permanently?")
@@ -303,8 +303,8 @@ export async function snoozeProposal(proposalType, projectKey, subjectRef, days)
 // P5-R2：批准執行白名單動作。前端只送 proposal_id + execution token；
 // 執行什麼由 server 端 template 決定，token 只留在 sessionStorage（關分頁即失效）。
 export async function executeProposal(proposalId, templateId = null, confirmCode = null) {
-  const zh = state.currentLang === "zh-TW";
-  const item = ((state.secretaryProposalsCache || {}).proposals || [])
+  const zh = state.ui.currentLang === "zh-TW";
+  const item = ((state.secretary.proposals || {}).proposals || [])
     .find(p => p.proposal_id === proposalId);
   const acts = item ? (item.actions && item.actions.length ? item.actions : (item.action ? [item.action] : [])) : [];
   const act = templateId ? acts.find(a => a.template_id === templateId) : acts[0];
@@ -453,12 +453,12 @@ export function initAssistantHome() {
 export function renderAssistantChatMirror() {
   const box = $("assistant-chat-messages");
   if (!box) return;
-  const zh = state.currentLang === "zh-TW";
-  if (!state.ragChatHistory.length) {
+  const zh = state.ui.currentLang === "zh-TW";
+  if (!state.rag.history.length) {
     box.innerHTML = `<div class="placeholder">${esc(t("assistant_chat_empty"))}</div>`;
     return;
   }
-  const recent = state.ragChatHistory.slice(-12);
+  const recent = state.rag.history.slice(-12);
   box.innerHTML = recent.map(msg => {
     const isUser = msg.role === "user";
     const cites = !isUser && Array.isArray(msg.citations) && msg.citations.length
@@ -487,7 +487,7 @@ export function assistantChip(label, value, tone) {
 export async function loadAssistantStrip() {
   const box = $("assistant-strip");
   if (!box) return;
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const [usage, background] = await Promise.all([
     getJSON("/api/v1/usage/today").catch(() => null),
     getJSON("/api/v1/background-tasks/today").catch(() => null),
@@ -512,8 +512,8 @@ export async function loadAssistantStrip() {
       ""
     ));
   }
-  const proposals = state.secretaryProposalsCache && Array.isArray(state.secretaryProposalsCache.proposals)
-    ? state.secretaryProposalsCache.proposals.length
+  const proposals = state.secretary.proposals && Array.isArray(state.secretary.proposals.proposals)
+    ? state.secretary.proposals.proposals.length
     : null;
   if (proposals !== null) {
     chips.push(assistantChip(zh ? "待判斷建議" : "SUGGESTIONS", String(proposals), proposals ? "" : "ok"));
@@ -526,17 +526,17 @@ export async function loadTodayView() {
   const pack = $("today-pack");
   const presetBtn = $("btn-create-presets");
   try {
-    state.todayViewCache = await getJSON("/api/v1/secretary/today");
+    state.secretary.today = await getJSON("/api/v1/secretary/today");
   } catch (e) {
-    state.todayViewCache = null;
+    state.secretary.today = null;
     if (pack) pack.hidden = true;
     return;
   }
-  const zh = state.currentLang === "zh-TW";
-  const sched = state.todayViewCache.schedules || {};
+  const zh = state.ui.currentLang === "zh-TW";
+  const sched = state.secretary.today.schedules || {};
   const calBox = $("today-calendar");
   if (calBox) {
-    const cal = state.todayViewCache.calendar || {};
+    const cal = state.secretary.today.calendar || {};
     if (cal.enabled && cal.line) {
       calBox.textContent = `📅 ${cal.line}`;
       calBox.title = cal.claim_boundary || "";
@@ -546,9 +546,9 @@ export async function loadTodayView() {
     }
   }
   if (pack) {
-    if (state.todayViewCache.pack_line) {
-      const when = String((state.todayViewCache.pack || {}).finished_at || "").slice(5, 16).replace("T", " ");
-      pack.innerHTML = `<strong>${esc(state.todayViewCache.pack_line)}</strong> · ${esc(when)}`;
+    if (state.secretary.today.pack_line) {
+      const when = String((state.secretary.today.pack || {}).finished_at || "").slice(5, 16).replace("T", " ");
+      pack.innerHTML = `<strong>${esc(state.secretary.today.pack_line)}</strong> · ${esc(when)}`;
       pack.hidden = false;
     } else if (sched.scheduled_tasks_enabled && !sched.all_present) {
       pack.textContent = zh
@@ -582,7 +582,7 @@ export async function loadTodayView() {
 }
 
 export async function createSchedulePresets() {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   if (!confirm(zh
     ? "建立兩個每日排程？\n• 07:30 早晨包：Repo 同步報告＋STATUS 草稿＋活躍專案 Handoff\n• 21:30 晚間：今天有活動的專案各產一份 Handoff\n全部是 L0 唯讀動作，不會 fetch、不改任何 repo。"
     : "Create two daily schedules?\n• 07:30 morning pack (repo sync report, STATUS draft, active-project handoffs)\n• 21:30 evening handoffs for today's active projects\nAll L0 read-only.")) return;
@@ -615,22 +615,22 @@ export async function loadGreeting() {
   const textBox = $("greeting-text");
   if (!textBox) return;
   try {
-    state.greetingCache = await getJSON(`/api/v1/secretary/greeting?window=${encodeURIComponent(state.greetingWindow)}`);
+    state.secretary.greeting = await getJSON(`/api/v1/secretary/greeting?window=${encodeURIComponent(state.secretary.greetingWindow)}`);
   } catch (e) {
-    textBox.innerHTML = `<span class="placeholder">${state.currentLang === "zh-TW" ? "問候卡暫時讀不到。" : "Greeting unavailable."}</span>`;
+    textBox.innerHTML = `<span class="placeholder">${state.ui.currentLang === "zh-TW" ? "問候卡暫時讀不到。" : "Greeting unavailable."}</span>`;
     return;
   }
   renderGreeting();
 }
 
 export function renderGreeting() {
-  const g = state.greetingCache;
+  const g = state.secretary.greeting;
   const textBox = $("greeting-text");
   const statsBox = $("greeting-stats");
   const source = $("greeting-source");
   const boundary = $("greeting-boundary");
   if (!g || !textBox) return;
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const stats = g.stats || {};
   if (g.source === "llm" && g.text) {
     textBox.innerHTML = `<p class="greeting-line">${esc(g.text)}</p>`;
@@ -666,12 +666,12 @@ export function renderGreeting() {
     statsBox.hidden = chips.length === 0;
   }
   if (boundary) boundary.textContent = g.claim_boundary || "";
-  document.querySelectorAll(".greeting-tools .chip").forEach(c => c.classList.toggle("active", c.dataset.window === state.greetingWindow));
+  document.querySelectorAll(".greeting-tools .chip").forEach(c => c.classList.toggle("active", c.dataset.window === state.secretary.greetingWindow));
 }
 
 export function initGreetingCard() {
   document.querySelectorAll(".greeting-tools .chip").forEach(chip => {
-    chip.addEventListener("click", () => { state.greetingWindow = chip.dataset.window || "today"; loadGreeting(); });
+    chip.addEventListener("click", () => { state.secretary.greetingWindow = chip.dataset.window || "today"; loadGreeting(); });
   });
   const refresh = $("btn-greeting-refresh");
   if (refresh) refresh.addEventListener("click", loadGreeting);
@@ -713,9 +713,9 @@ export async function loadHome() {
   const slots = $("home-desk-slots");
   if (!slots) return;
   try {
-    state.homeCache = await getJSON("/api/v1/secretary/home");
+    state.secretary.home = await getJSON("/api/v1/secretary/home");
   } catch (e) {
-    state.homeCache = null;
+    state.secretary.home = null;
     slots.innerHTML = `<div class="placeholder">${esc(t("home_unavailable"))}</div>`;
     return;
   }
@@ -723,7 +723,7 @@ export async function loadHome() {
 }
 
 export function homeActionButtons(item) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const actions = item.execution_available
     ? (item.actions && item.actions.length ? item.actions : (item.action ? [item.action] : []))
     : [];
@@ -734,10 +734,10 @@ export function homeActionButtons(item) {
 }
 
 export function renderHome() {
-  const h = state.homeCache;
+  const h = state.secretary.home;
   const slots = $("home-desk-slots");
   if (!h || !slots) return;
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const errors = Object.entries(h.sections || {}).filter(([, v]) => String(v).startsWith("error"));
   const badge = $("home-desk-badge");
   if (badge) {

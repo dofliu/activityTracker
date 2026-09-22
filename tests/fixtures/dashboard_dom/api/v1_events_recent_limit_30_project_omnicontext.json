@@ -1,0 +1,6 @@
+{
+  "body": "[{\"id\":\"ai_1\",\"type\":\"ai\",\"timestamp\":\"2026-09-20 08:12:26\",\"title\":\"[CLAUDE_CODE] 繼續做 D11，先補前端行為鎖 \\\"雙引號\\\" <b>粗體</b> & '單引號' <img src=x onerror=1...\",\"detail\":\"繼續做 D11，先補前端行為鎖 \\\"雙引號\\\" <b>粗體</b> & '單引號' <img src=x onerror=1>\",\"response\":\"好，先把鎖做出來。\\\"雙引號\\\" <b>粗體</b> & '單引號' <img src=x onerror=1>\",\"response_status\":\"final_candidate\",\"source_path\":null,\"source_position\":null,\"badge\":\"claude_code\",\"project\":\"omnicontext\"},{\"id\":\"file_1\",\"type\":\"file\",\"timestamp\":\"2026-09-20 08:00:26\",\"title\":\"[MODIFIED] items.py\",\"detail\":\"/omni/checkout/core/acceptance/items.py\",\"response\":\"+120 −38\",\"badge\":\".py\",\"project\":\"omnicontext\"}]",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/events/recent?limit=30&project=omnicontext"
+}

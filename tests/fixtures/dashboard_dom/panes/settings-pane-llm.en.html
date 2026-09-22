@@ -1,41 +1,41 @@
 
         <div class="panel settings-actionbar">
-          <button class="btn btn-primary" id="btn-save-settings" data-i18n="btn_save_apply">儲存並套用</button>
-          <span class="muted small" data-i18n="settings_save_note">寫回 config.yaml 後即時熱更新</span>
-          <span class="muted small head-right" data-i18n="settings_nav_hint">左側選擇要檢視的區塊；「儲存並套用」只影響設定類區塊。</span>
+          <button class="btn btn-primary" id="btn-save-settings" data-i18n="btn_save_apply">Save &amp; Apply</button>
+          <span class="muted small" data-i18n="settings_save_note">Hot reloaded directly into config.yaml</span>
+          <span class="muted small head-right" data-i18n="settings_nav_hint">Pick a section on the left; “Save &amp; Apply” only affects configuration sections.</span>
         </div>
 
         <div class="settings-layout">
         <nav class="settings-nav" id="settings-nav" aria-label="系統設定分區">
-          <button class="settings-nav-item active" data-pane="secretary" data-i18n="snav_secretary">🤖 秘書與自動化</button>
-          <button class="settings-nav-item" data-pane="telegram" data-i18n="snav_telegram">✈️ Telegram 通知</button>
-          <button class="settings-nav-item" data-pane="line" data-i18n="snav_line">💬 LINE 通知</button>
-          <button class="settings-nav-item" data-pane="paths" data-i18n="snav_paths">📁 監控路徑</button>
-          <button class="settings-nav-item" data-pane="sources" data-i18n="snav_sources">🧲 採集來源</button>
-          <button class="settings-nav-item" data-pane="llm" data-i18n="snav_llm">🧠 摘要與 LLM</button>
-          <button class="settings-nav-item" data-pane="usage" data-i18n="snav_usage">⏱️ 使用時間與里程碑</button>
-          <button class="settings-nav-item" data-pane="github" data-i18n="snav_github">🐙 GitHub 雲端整合</button>
-          <div class="settings-nav-group" data-i18n="snav_group_ops">維運</div>
-          <button class="settings-nav-item" data-pane="feed" data-i18n="snav_feed">📡 即時情報流</button>
-          <button class="settings-nav-item" data-pane="health" data-i18n="snav_health">🛡️ 系統健康</button>
-          <button class="settings-nav-item" data-pane="acceptance" data-i18n="snav_acceptance">🧾 驗收中心</button>
+          <button class="settings-nav-item" data-pane="secretary" data-i18n="snav_secretary">🤖 Secretary &amp; Automation</button>
+          <button class="settings-nav-item" data-pane="telegram" data-i18n="snav_telegram">✈️ Telegram</button>
+          <button class="settings-nav-item" data-pane="line" data-i18n="snav_line">💬 LINE</button>
+          <button class="settings-nav-item" data-pane="paths" data-i18n="snav_paths">📁 Monitored Paths</button>
+          <button class="settings-nav-item" data-pane="sources" data-i18n="snav_sources">🧲 Collector Sources</button>
+          <button class="settings-nav-item active" data-pane="llm" data-i18n="snav_llm">🧠 Synthesis &amp; LLM</button>
+          <button class="settings-nav-item" data-pane="usage" data-i18n="snav_usage">⏱️ Usage &amp; Milestones</button>
+          <button class="settings-nav-item" data-pane="github" data-i18n="snav_github">🐙 GitHub Integration</button>
+          <div class="settings-nav-group" data-i18n="snav_group_ops">Operations</div>
+          <button class="settings-nav-item" data-pane="feed" data-i18n="snav_feed">📡 Live Feed</button>
+          <button class="settings-nav-item" data-pane="health" data-i18n="snav_health">🛡️ System Health</button>
+          <button class="settings-nav-item" data-pane="acceptance" data-i18n="snav_acceptance">🧾 Acceptance</button>
         </nav>
           <div class="settings-panes" id="settings-panes">
-          <section class="settings-pane active" data-pane="secretary">
+          <section class="settings-pane" data-pane="secretary">
         <div class="panel mb-14">
           <div class="panel-head">
-            <span class="mono-label accent">01</span><span class="panel-title" data-i18n="settings_executor_title">小秘書執行器（ADR-008）</span>
-            <span class="muted small" data-i18n="settings_executor_note">預設關閉；每次執行仍需 execution token 與逐項批准</span>
+            <span class="mono-label accent">01</span><span class="panel-title" data-i18n="settings_executor_title">Secretary Executor (ADR-008)</span>
+            <span class="muted small" data-i18n="settings_executor_note">Off by default; every run still needs the execution token and per-item approval</span>
           </div>
           <div class="usage-settings-body">
             <div class="usage-toggle-row">
-              <label class="setting-check"><input type="checkbox" id="toggle-executor-enabled"><span data-i18n="executor_enabled_label">啟用執行器（L0/L1 白名單動作）</span></label>
-              <label class="setting-check"><input type="checkbox" id="toggle-executor-l2"><span data-i18n="executor_l2_label">啟用 L2：調度本機 agent CLI（需一次性確認碼）</span></label>
-              <label class="setting-check"><input type="checkbox" id="toggle-executor-l2-write"><span data-i18n="executor_l2_write_label">允許 L2 依已批准計畫修改檔案（不 commit）</span></label>
+              <label class="setting-check"><input type="checkbox" id="toggle-executor-enabled"><span data-i18n="executor_enabled_label">Enable executor (L0/L1 whitelist actions)</span></label>
+              <label class="setting-check"><input type="checkbox" id="toggle-executor-l2"><span data-i18n="executor_l2_label">Enable L2: dispatch local agent CLI (one-time confirm code)</span></label>
+              <label class="setting-check"><input type="checkbox" id="toggle-executor-l2-write"><span data-i18n="executor_l2_write_label">Allow L2 to edit files per an approved plan (never commits)</span></label>
             </div>
             <div class="fields usage-settings-fields">
-              <div><div class="mono-mini muted mb-6" data-i18n="greeting_name_label">問候卡稱呼</div>
-                <input type="text" id="input-greeting-name" maxlength="40" data-i18n-ph="greeting_name_ph" placeholder="例如 Dof（留空就不帶名字）">
+              <div><div class="mono-mini muted mb-6" data-i18n="greeting_name_label">Greeting name</div>
+                <input type="text" id="input-greeting-name" maxlength="40" data-i18n-ph="greeting_name_ph" placeholder="e.g. Dof (leave empty for no name)">
               </div>
               <div><div class="mono-mini muted mb-6" data-i18n="executor_cli_label">AGENT CLI</div>
                 <select id="select-agent-cli">
@@ -44,16 +44,16 @@
                 </select>
               </div>
             </div>
-            <div class="usage-boundary" data-i18n="executor_boundary">L2 會用您本機已登入的 CLI 消耗訂閱／API 額度；子行程禁 shell、僅限白名單動作與該專案 repo 目錄，不會拿到任何 API key。執行前仍需 execution token（python main.py init --show-token）＋單鍵批准＋回填一次性確認碼。</div>
+            <div class="usage-boundary" data-i18n="executor_boundary">L2 spends your locally signed-in CLI quota; subprocesses are shell-free, restricted to whitelist actions and the project's repo directory, and never receive any API key. Runs still require the execution token (python main.py init --show-token), one-click approval, and a one-time confirm code.</div>
             <details class="sub-collapsible" id="panel-sched-tasks">
-              <summary class="mono-mini muted" data-i18n="sched_tasks_title">自訂排程任務（P5-R5）</summary>
+              <summary class="mono-mini muted" data-i18n="sched_tasks_title">Custom Scheduled Tasks (P5-R5)</summary>
               <div id="scheduled-tasks-block" style="padding: 8px 14px 14px;">
               <div id="sched-task-list" class="mb-6"><div class="tag" style="justify-content: space-between; width: 100%; margin-bottom: 4px;">
       <span>🟢 <b>daily_brief</b>
-        · 每日 08:30 · <span class="muted small">上次 2026-09-19 22:20:26 → succeeded</span> <span class="trust broken">TEMPLATE 已下架</span></span>
+        · Daily 08:30 · <span class="muted small">last 2026-09-19 22:20:26 → succeeded</span> <span class="trust broken">TEMPLATE UNREGISTERED</span></span>
       <span>
-        <button class="btn btn-ghost btn-sm" data-action="run-scheduled-task" data-task-id="1">立即執行</button>
-        <button class="btn btn-ghost btn-sm" data-action="toggle-scheduled-task" data-task-id="1" data-enabled="false">停用</button>
+        <button class="btn btn-ghost btn-sm" data-action="run-scheduled-task" data-task-id="1">Run now</button>
+        <button class="btn btn-ghost btn-sm" data-action="toggle-scheduled-task" data-task-id="1" data-enabled="false">Disable</button>
         <button class="btn btn-ghost btn-sm" data-action="delete-scheduled-task" data-task-id="1">✕</button>
       </span>
     </div></div>
@@ -66,9 +66,9 @@
                 </div>
                 <div><div class="mono-mini muted mb-6" data-i18n="sched_kind_label">SCHEDULE</div>
                   <select id="select-sched-kind">
-                    <option value="daily" data-i18n="sched_kind_daily">每日</option>
-                    <option value="weekly" data-i18n="sched_kind_weekly">每週</option>
-                    <option value="monthly" data-i18n="sched_kind_monthly">每月</option>
+                    <option value="daily" data-i18n="sched_kind_daily">Daily</option>
+                    <option value="weekly" data-i18n="sched_kind_weekly">Weekly</option>
+                    <option value="monthly" data-i18n="sched_kind_monthly">Monthly</option>
                   </select>
                 </div>
                 <div id="sched-weekday-field" hidden=""><div class="mono-mini muted mb-6" data-i18n="sched_weekday_label">WEEKDAY</div>
@@ -85,10 +85,10 @@
                   <input type="time" id="input-sched-time" value="08:30" class="mono">
                 </div>
                 <div style="display:flex; align-items:flex-end;">
-                  <button class="btn btn-ghost" id="btn-add-sched-task" data-i18n="btn_add_sched_task">＋ 新增排程</button>
+                  <button class="btn btn-ghost" id="btn-add-sched-task" data-i18n="btn_add_sched_task">＋ Add schedule</button>
                 </div>
               </div>
-              <div class="muted small mt-2" data-i18n="sched_tasks_boundary">排程只會自動執行 L0 唯讀白名單動作（Handoff／週報／月報／STATUS 草稿）並寫 audit receipt；L1/L2 永不可排程。管理排程需 execution token。</div>
+              <div class="muted small mt-2" data-i18n="sched_tasks_boundary">Schedules only auto-run L0 read-only whitelist actions (Handoff / weekly / monthly rollup / STATUS draft) and always leave an audit receipt; L1/L2 can never be scheduled. Managing schedules requires the execution token.</div>
               </div>
             </details>
           </div>
@@ -97,14 +97,14 @@
           <section class="settings-pane" data-pane="telegram">
         <div class="panel mb-14">
           <div class="panel-head">
-            <span class="mono-label accent">02</span><span class="panel-title" data-i18n="settings_telegram_title">Telegram 通知（遠端推播）</span>
-            <span id="tg-status-badge" class="trust broken">未設定</span>
+            <span class="mono-label accent">02</span><span class="panel-title" data-i18n="settings_telegram_title">Telegram Notifications (Remote Push)</span>
+            <span id="tg-status-badge" class="trust broken">NOT SET</span>
           </div>
           <div style="padding: 14px;">
             <details class="sub-collapsible" id="panel-tg-setup" open="">
-              <summary class="mono-mini muted" data-i18n="tg_setup_summary">連線設定（bot token／chat id／測試）</summary>
+              <summary class="mono-mini muted" data-i18n="tg_setup_summary">Connection setup (bot token / chat id / test)</summary>
               <div style="padding-top: 8px;">
-            <div class="muted small mb-6" data-i18n="tg_step1_help">① 在 Telegram 搜尋 @BotFather → /newbot 建立機器人 → 複製 API Token 貼到下方。</div>
+            <div class="muted small mb-6" data-i18n="tg_step1_help">① In Telegram, find @BotFather → /newbot to create a bot → paste its API token below.</div>
             <div class="fields usage-settings-fields mb-6">
               <div style="grid-column: span 2;"><div class="mono-mini muted mb-6" data-i18n="tg_token_label">BOT TOKEN</div>
                 <input type="password" id="input-tg-token" class="mono" placeholder="123456789:AA..." autocomplete="off">
@@ -113,85 +113,85 @@
                 <input type="text" id="input-tg-chat" class="mono" placeholder="—">
               </div>
               <div style="display:flex; align-items:flex-end;">
-                <button class="btn btn-ghost" id="btn-tg-detect" data-i18n="btn_tg_detect">🔍 偵測 CHAT ID</button>
+                <button class="btn btn-ghost" id="btn-tg-detect" data-i18n="btn_tg_detect">🔍 Detect CHAT ID</button>
               </div>
             </div>
-            <div class="muted small mb-6" data-i18n="tg_step2_help">② 先在 Telegram 對您的 bot 送出任意訊息（如 /start），再按「偵測 CHAT ID」選擇對話。</div>
+            <div class="muted small mb-6" data-i18n="tg_step2_help">② Send any message (e.g. /start) to your bot in Telegram first, then press Detect CHAT ID and pick the chat.</div>
             <div id="tg-chat-candidates" class="mb-6" hidden=""></div>
             <div class="fields usage-settings-fields mb-6">
-              <div><div class="mono-mini muted mb-6" data-i18n="tg_morning_label">晨報時間</div>
+              <div><div class="mono-mini muted mb-6" data-i18n="tg_morning_label">MORNING</div>
                 <input type="time" id="input-tg-morning" value="09:00" class="mono">
               </div>
-              <div><div class="mono-mini muted mb-6" data-i18n="tg_evening_label">晚報時間</div>
+              <div><div class="mono-mini muted mb-6" data-i18n="tg_evening_label">EVENING</div>
                 <input type="time" id="input-tg-evening" value="23:30" class="mono">
               </div>
               <div style="display:flex; align-items:flex-end; gap: 8px;">
-                <button class="btn btn-ghost" id="btn-tg-test" data-i18n="btn_tg_test">📡 測試連線</button>
-                <button class="btn btn-primary" id="btn-tg-connect" data-i18n="btn_tg_connect">✅ 測試並儲存啟用</button>
-                <button class="btn btn-ghost" id="btn-tg-disconnect" data-i18n="btn_tg_disconnect">解除</button>
+                <button class="btn btn-ghost" id="btn-tg-test" data-i18n="btn_tg_test">📡 Test connection</button>
+                <button class="btn btn-primary" id="btn-tg-connect" data-i18n="btn_tg_connect">✅ Test, save &amp; enable</button>
+                <button class="btn btn-ghost" id="btn-tg-disconnect" data-i18n="btn_tg_disconnect">Disconnect</button>
               </div>
             </div>
             <div id="tg-test-result" class="muted small mb-6"></div>
               </div>
             </details>
             <div class="usage-toggle-row mb-6">
-              <label class="setting-check"><input type="checkbox" id="toggle-tg-approvals"><span data-i18n="tg_approvals_label">啟用 inline 批准（晨報／晚報附「✅ 批准」按鈕，僅 L0/L1）</span></label>
+              <label class="setting-check"><input type="checkbox" id="toggle-tg-approvals"><span data-i18n="tg_approvals_label">Enable inline approvals (✅ buttons on morning/evening pushes, L0/L1 only)</span></label>
             </div>
             <div class="usage-toggle-row mb-6">
-              <label class="setting-check"><input type="checkbox" id="toggle-tg-chat"><span data-i18n="tg_secretary_chat_label">啟用小秘書對話（手機上直接提問／記筆記；提問與回答會經過 Telegram）</span></label>
+              <label class="setting-check"><input type="checkbox" id="toggle-tg-chat"><span data-i18n="tg_secretary_chat_label">Enable secretary chat (ask and take notes from your phone; questions and answers pass through Telegram)</span></label>
             </div>
             <div class="fields usage-settings-fields mb-6">
               <div style="display:flex; align-items:flex-end; gap: 8px;">
-                <button class="btn btn-ghost" id="btn-tg-arm" data-i18n="btn_tg_arm">🔓 解鎖遠端批准（需 execution token）</button>
-                <button class="btn btn-ghost" id="btn-tg-arm-code" data-i18n="btn_tg_arm_code" title="簽發一次性 6 位數解鎖碼；在手機送 /arm &lt;碼&gt; 即可解鎖，手機不必持有 execution token">🔑 產生解鎖碼</button>
-                <button class="btn btn-ghost" id="btn-tg-disarm" data-i18n="btn_tg_disarm">🔒 上鎖</button>
+                <button class="btn btn-ghost" id="btn-tg-arm" data-i18n="btn_tg_arm">🔓 Unlock remote approvals (execution token)</button>
+                <button class="btn btn-ghost" id="btn-tg-arm-code" data-i18n="btn_tg_arm_code" title="簽發一次性 6 位數解鎖碼；在手機送 /arm &lt;碼&gt; 即可解鎖，手機不必持有 execution token">🔑 Issue unlock code</button>
+                <button class="btn btn-ghost" id="btn-tg-disarm" data-i18n="btn_tg_disarm">🔒 Lock</button>
               </div>
-              <div style="display:flex; align-items:flex-end;"><span id="tg-approvals-status" class="muted small">批准通道：未啟用（勾選上方選項並儲存設定） · 輪詢器：未運行（啟用後重載設定） · 對話：關</span></div>
+              <div style="display:flex; align-items:flex-end;"><span id="tg-approvals-status" class="muted small">Approvals: disabled (tick the option above and save settings) · poller: not running · chat: off</span></div>
               <div id="tg-arm-code-box" class="arm-code-box" hidden=""></div>
             </div>
-            <div class="usage-boundary" data-i18n="tg_chat_boundary">小秘書對話：手機上直接打字即可提問（會帶今日狀態、建議與記憶區筆記），「記下來：…」直接寫進記憶區不送 LLM，/today /notes /status /proposals 為指令。這是本專案唯一會把「你的提問與秘書的回答」送出本機的通道——內容會經過 Telegram 伺服器（引用只送檔名，不送文件內容）；若對話 provider 選雲端供應商，內容另會送往該供應商。預設關閉。</div>
-            <div class="usage-boundary" data-i18n="tg_boundary">③ 「測試連線」會即時呼叫 getMe 驗證 token，並向所選對話實發一則固定內容的測試訊息；全部通過才會寫入本機 config.yaml 並啟用晨報／晚報推播。token 與 chat id 只存在本機，瀏覽器永遠拿不回明文（顯示為 ***REDACTED***）；若已設定環境變數 TELEGRAM_BOT_TOKEN／TELEGRAM_CHAT_ID 則優先使用且不會複製進檔案。inline 批准只處理綁定 chat 的按鈕、只能執行 L0/L1 白名單動作（L2 一律回儀表板）；批准通道需以 execution token 解鎖，重啟服務即自動上鎖。</div>
+            <div class="usage-boundary" data-i18n="tg_chat_boundary">Secretary chat: type in the bound chat to ask (today's status, proposals and your notes are included); “remember: …” writes straight to memory without calling the LLM; /today /notes /status /proposals are commands. This is the only channel that sends your questions and the secretary's answers off this machine — content passes through Telegram's servers (citations send filenames only, never document content), and a cloud chat provider also receives the content. Off by default.</div>
+            <div class="usage-boundary" data-i18n="tg_boundary">③ Test connection calls getMe live to validate the token and sends one fixed test message to the selected chat; only when everything passes are the settings written to local config.yaml and the morning/evening pushes enabled. Token and chat id stay on this machine — the browser never gets the plaintext back (shown as ***REDACTED***). If TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID env vars exist they take precedence and are never copied into the file. Inline approvals only accept buttons from the bound chat and only run L0/L1 whitelist actions (L2 always goes back to the dashboard); the approval channel must be unlocked with the execution token and re-locks on every service restart.</div>
           </div>
         </div>
         </section>
           <section class="settings-pane" data-pane="line">
         <div class="panel mb-14">
           <div class="panel-head">
-            <span class="mono-label accent">03</span><span class="panel-title" data-i18n="settings_line_title">LINE 通知（只能推播）</span>
-            <span id="line-status-badge" class="trust broken">未設定</span>
+            <span class="mono-label accent">03</span><span class="panel-title" data-i18n="settings_line_title">LINE notifications (push only)</span>
+            <span id="line-status-badge" class="trust broken">NOT SET</span>
           </div>
           <div style="padding: 14px;">
-            <div class="muted small mb-6" data-i18n="line_step1_help">① 在 LINE Developers Console 建立 Messaging API channel → 發行「Channel access token（long-lived）」貼到下方。</div>
+            <div class="muted small mb-6" data-i18n="line_step1_help">① In the LINE Developers Console create a Messaging API channel, then issue a long-lived channel access token and paste it below.</div>
             <div class="fields usage-settings-fields mb-6">
               <div style="grid-column: span 2;"><div class="mono-mini muted mb-6" data-i18n="line_token_label">CHANNEL ACCESS TOKEN</div>
                 <input type="password" id="input-line-token" class="mono" placeholder="長期 token…" autocomplete="off">
               </div>
-              <div><div class="mono-mini muted mb-6" data-i18n="line_to_label">收件 USER ID</div>
+              <div><div class="mono-mini muted mb-6" data-i18n="line_to_label">RECIPIENT USER ID</div>
                 <input type="text" id="input-line-to" class="mono" placeholder="U0123456789abcdef…">
               </div>
               <div style="display:flex; align-items:flex-end; gap: 8px;">
-                <button class="btn btn-ghost" id="btn-line-test" data-i18n="btn_line_test">📡 測試連線</button>
-                <button class="btn btn-primary" id="btn-line-connect" data-i18n="btn_line_connect">✅ 測試並儲存啟用</button>
-                <button class="btn btn-ghost" id="btn-line-disconnect" data-i18n="btn_line_disconnect">解除</button>
+                <button class="btn btn-ghost" id="btn-line-test" data-i18n="btn_line_test">📡 Test connection</button>
+                <button class="btn btn-primary" id="btn-line-connect" data-i18n="btn_line_connect">✅ Test and save</button>
+                <button class="btn btn-ghost" id="btn-line-disconnect" data-i18n="btn_line_disconnect">Disconnect</button>
               </div>
             </div>
-            <div class="muted small mb-6" data-i18n="line_step2_help">② 用手機把這個官方帳號加為好友，再從 Console 的「Basic settings → Your user ID」複製 userId（U 開頭）貼上——那不是 LINE ID（@xxxx）。</div>
+            <div class="muted small mb-6" data-i18n="line_step2_help">② Add the official account as a friend on your phone, then copy the userId (starts with U) from Basic settings → Your user ID — that is not the LINE ID (@xxxx).</div>
             <div id="line-test-result" class="muted small mb-6"></div>
-            <div class="usage-boundary" data-i18n="line_boundary">LINE 只做推播（晨報／晚報／日報／停滯提醒）：LINE Messaging API 沒有輪詢介面，要接收你的訊息必須由 LINE 平台 webhook 連到一個公開網址，那會打破本專案「只在 127.0.0.1」的邊界——所以提問、記筆記與批准仍走 Telegram。另請注意 LINE 官方帳號免費方案有每月推播則數上限。token 與 userId 只存本機，瀏覽器永遠拿不回明文。</div>
+            <div class="usage-boundary" data-i18n="line_boundary">LINE is push-only (morning/evening briefings, daily report, stagnation alerts). The LINE Messaging API has no polling endpoint: receiving your messages would require LINE to reach a public webhook, which would break this project's 127.0.0.1-only boundary — so asking, note-taking and approvals stay on Telegram. Note also that the free LINE official account plan caps monthly push messages. Token and userId stay on this machine; the browser never gets the plaintext back.</div>
           </div>
         </div>
         </section>
           <section class="settings-pane" data-pane="paths">
         <div class="panel mb-14" id="panel-watch-paths">
-          <div class="panel-head"><span class="mono-label accent">04</span><span class="panel-title" data-i18n="settings_p1_title">監控路徑</span></div>
+          <div class="panel-head"><span class="mono-label accent">04</span><span class="panel-title" data-i18n="settings_p1_title">Monitored Paths</span></div>
           <div class="split">
             <div class="split-col">
-              <div class="mono-mini muted mb-8" data-i18n="label_file_dirs">FILE DIRS (檔案目錄)</div>
+              <div class="mono-mini muted mb-8" data-i18n="label_file_dirs">FILE DIRS</div>
               <div id="dir-list" class="taglist"><div class="muted small">尚未設定</div></div>
               <div class="input-row">
-                <input type="text" id="input-new-dir" placeholder="絕對路徑…" data-i18n-ph="ph_abs_path">
-                <button class="btn btn-ghost" id="btn-browse-dir" title="瀏覽選取本機資料夾" data-i18n="btn_browse">📁 瀏覽…</button>
-                <button class="btn btn-ghost" id="btn-add-dir" data-i18n="btn_add">新增</button>
+                <input type="text" id="input-new-dir" placeholder="Absolute path…" data-i18n-ph="ph_abs_path">
+                <button class="btn btn-ghost" id="btn-browse-dir" title="瀏覽選取本機資料夾" data-i18n="btn_browse">📁 Browse…</button>
+                <button class="btn btn-ghost" id="btn-add-dir" data-i18n="btn_add">Add</button>
               </div>
               <div id="ext-checkboxes" class="extchips">
                 <label><input type="checkbox" value=".tex" checked="">.tex</label>
@@ -203,14 +203,14 @@
               </div>
             </div>
             <div class="split-col">
-              <div class="mono-mini muted mb-8" data-i18n="label_git_roots">GIT ROOTS (Git 倉庫根目錄)</div>
+              <div class="mono-mini muted mb-8" data-i18n="label_git_roots">GIT ROOTS</div>
               <div id="repo-list" class="taglist"><div class="muted small">尚未設定</div></div>
               <div class="input-row">
-                <input type="text" id="input-new-repo" placeholder="Git 專案根目錄…" data-i18n-ph="ph_git_path">
-                <button class="btn btn-ghost" id="btn-browse-repo" title="瀏覽選取 Git 倉庫目錄" data-i18n="btn_browse">📁 瀏覽…</button>
-                <button class="btn btn-ghost" id="btn-add-repo" data-i18n="btn_add">新增</button>
+                <input type="text" id="input-new-repo" placeholder="Git root path…" data-i18n-ph="ph_git_path">
+                <button class="btn btn-ghost" id="btn-browse-repo" title="瀏覽選取 Git 倉庫目錄" data-i18n="btn_browse">📁 Browse…</button>
+                <button class="btn btn-ghost" id="btn-add-repo" data-i18n="btn_add">Add</button>
               </div>
-              <div class="note" data-i18n="git_recursive_note">已啟用遞迴探索模式，根目錄下所有子倉庫均會自動納入掃描。</div>
+              <div class="note" data-i18n="git_recursive_note">Recursive scanning enabled: all nested repositories under root will be indexed.</div>
             </div>
           </div>
         </div>
@@ -218,8 +218,8 @@
           <section class="settings-pane" data-pane="sources">
         <div class="panel mb-14" id="panel-capture-sources">
           <div class="panel-head">
-            <span class="mono-label accent">05</span><span class="panel-title" data-i18n="settings_p2_title">採集來源</span>
-            <span class="muted small" data-i18n="settings_p2_note">右欄標示目前可信度</span>
+            <span class="mono-label accent">05</span><span class="panel-title" data-i18n="settings_p2_title">Collector Sources</span>
+            <span class="muted small" data-i18n="settings_p2_note">Right column indicates current validation status</span>
           </div>
           <div class="sources">
             <label class="source"><input type="checkbox" id="toggle-claude-code" checked=""><span class="mono">~/.claude</span><span class="trust ok">OK</span></label>
@@ -232,27 +232,27 @@
             <label class="source"><input type="checkbox" id="toggle-window-focus" checked=""><span class="mono">window focus</span><span class="trust ok">OK</span></label>
           </div>
           <div class="calendar-source" id="calendar-source-block">
-            <div class="mono-mini muted mb-6" data-i18n="cal_title">📅 本機行事曆（.ics，唯讀，ADR-015）</div>
-            <label class="setting-check"><input type="checkbox" id="toggle-calendar" checked=""><span data-i18n="cal_enabled_label">啟用行事曆採集（沒有路徑時等於停用）</span></label>
-            <div class="mono-mini muted mb-6" style="margin-top:10px;" data-i18n="cal_paths_label">ICS 檔或含 .ics 的資料夾</div>
+            <div class="mono-mini muted mb-6" data-i18n="cal_title">📅 Local calendar (.ics, read-only, ADR-015)</div>
+            <label class="setting-check"><input type="checkbox" id="toggle-calendar" checked=""><span data-i18n="cal_enabled_label">Collect calendar events (no paths = off)</span></label>
+            <div class="mono-mini muted mb-6" style="margin-top:10px;" data-i18n="cal_paths_label">ICS files or folders containing .ics</div>
             <div id="calendar-path-list" class="taglist"><div class="muted small">尚未設定</div></div>
             <div class="input-row">
-              <input type="text" id="input-new-calendar-path" placeholder="例如 C:/Users/you/Calendars/work.ics 或整個資料夾" data-i18n-ph="ph_ics_path">
-              <button class="btn btn-ghost" id="btn-browse-calendar" title="瀏覽選取本機資料夾" data-i18n="btn_browse">📁 瀏覽…</button>
-              <button class="btn btn-ghost" id="btn-add-calendar-path" data-i18n="btn_add">新增</button>
+              <input type="text" id="input-new-calendar-path" placeholder="e.g. C:/Users/you/Calendars/work.ics or a folder" data-i18n-ph="ph_ics_path">
+              <button class="btn btn-ghost" id="btn-browse-calendar" title="瀏覽選取本機資料夾" data-i18n="btn_browse">📁 Browse…</button>
+              <button class="btn btn-ghost" id="btn-add-calendar-path" data-i18n="btn_add">Add</button>
             </div>
             <div class="fields usage-settings-fields">
-              <div><div class="mono-mini muted mb-6" data-i18n="cal_horizon_label">重複行程展開未來天數</div>
+              <div><div class="mono-mini muted mb-6" data-i18n="cal_horizon_label">Expand recurring events (days ahead)</div>
                 <input type="number" id="input-calendar-horizon" min="1" max="366" value="30" class="mono"></div>
-              <label class="setting-check" style="align-self:end;"><input type="checkbox" id="toggle-calendar-titles" checked=""><span data-i18n="cal_store_titles_label">保存標題與地點（關閉則只留時間）</span></label>
+              <label class="setting-check" style="align-self:end;"><input type="checkbox" id="toggle-calendar-titles" checked=""><span data-i18n="cal_store_titles_label">Store titles and locations (off = times only)</span></label>
             </div>
-            <div class="usage-boundary" data-i18n="cal_note">只讀本機 .ics 的時間／標題／地點／狀態；描述、與會者、連結一律不落地，不連任何雲端 API、不寫回檔案。把 Outlook／Google／Apple 匯出或同步的 .ics 放到本機資料夾即可；晨報與問候卡會如實帶入今天的行程。</div>
+            <div class="usage-boundary" data-i18n="cal_note">Reads only time, title, location and status from local .ics files; descriptions, attendees and links are never stored, no cloud API is called and nothing is written back. Export or sync your Outlook/Google/Apple calendar to a local folder; the briefing and greeting card will reflect today's schedule.</div>
           </div>
         </div>
         </section>
-          <section class="settings-pane" data-pane="llm">
+          <section class="settings-pane active" data-pane="llm">
         <div class="panel mb-14" id="panel-llm">
-          <div class="panel-head"><span class="mono-label accent">06</span><span class="panel-title" data-i18n="settings_p3_title">摘要與 LLM</span></div>
+          <div class="panel-head"><span class="mono-label accent">06</span><span class="panel-title" data-i18n="settings_p3_title">Synthesis &amp; Schedules</span></div>
           <div class="fields">
             <div><div class="mono-mini muted mb-6">DAILY AT</div><input type="text" id="input-schedule-time" value="23:30" class="mono"></div>
             <div><div class="mono-mini muted mb-6">CHECKPOINT / H</div><input type="number" id="input-checkpoint-interval" value="2" min="1" max="12" class="mono"></div>
@@ -268,31 +268,31 @@
           </div>
           <div class="llm-key-card">
             <div class="llm-key-head">
-              <span class="mono-mini" data-i18n="llm_key_status_title">API KEY 狀態</span>
+              <span class="mono-mini" data-i18n="llm_key_status_title">API KEY STATUS</span>
               <span id="llm-key-status-badge" class="trust broken">MISSING</span>
-              <button class="btn btn-ghost btn-sm head-right" id="btn-recheck-llm-key" data-i18n="btn_recheck_llm_key">重新檢查</button>
+              <button class="btn btn-ghost btn-sm head-right" id="btn-recheck-llm-key" data-i18n="btn_recheck_llm_key">Recheck</button>
             </div>
             <div class="llm-key-grid">
               <div>
-                <div class="mono-mini muted mb-6" data-i18n="llm_key_env_label">環境變數名稱</div>
+                <div class="mono-mini muted mb-6" data-i18n="llm_key_env_label">ENVIRONMENT VARIABLE</div>
                 <input type="text" id="input-llm-key-env" value="GEMINI_API_KEY" class="mono" autocomplete="off" spellcheck="false">
               </div>
-              <div id="llm-key-status-text" class="small muted">尚未偵測 GEMINI_API_KEY。請在作業系統使用者環境變數設定後按「重新檢查」。</div>
+              <div id="llm-key-status-text" class="small muted">GEMINI_API_KEY was not detected. Set it in the OS user environment, then select Recheck.</div>
             </div>
-            <div class="usage-boundary llm-key-boundary" data-i18n="llm_key_boundary">金鑰只由 OmniContext 本機後端讀取；瀏覽器不會取得、顯示或寫入金鑰內容。建議保存在作業系統的使用者環境變數。</div>
+            <div class="usage-boundary llm-key-boundary" data-i18n="llm_key_boundary">Keys are read only by the local OmniContext backend. The browser never receives, displays, or writes secret values. Store them in the OS user environment.</div>
           </div>
         </div>
         </section>
           <section class="settings-pane" data-pane="usage">
         <div class="panel mb-14" id="panel-usage-settings">
           <div class="panel-head">
-            <span class="mono-label accent">07</span><span class="panel-title" data-i18n="settings_usage_title">每日使用時間與里程碑</span>
-            <span class="muted small" data-i18n="settings_usage_note">前景時間，不代表生產力或實際工時</span>
+            <span class="mono-label accent">07</span><span class="panel-title" data-i18n="settings_usage_title">Daily Usage &amp; Milestones</span>
+            <span class="muted small" data-i18n="settings_usage_note">Foreground time, not productivity or actual work hours</span>
           </div>
           <div class="usage-settings-body">
             <div class="usage-toggle-row">
-              <label class="setting-check"><input type="checkbox" id="toggle-usage-tracking"><span data-i18n="usage_tracking_enabled">啟用使用時間統計</span></label>
-              <label class="setting-check"><input type="checkbox" id="toggle-usage-notifications"><span data-i18n="usage_notifications_enabled">啟用里程碑通知</span></label>
+              <label class="setting-check"><input type="checkbox" id="toggle-usage-tracking"><span data-i18n="usage_tracking_enabled">Enable usage analytics</span></label>
+              <label class="setting-check"><input type="checkbox" id="toggle-usage-notifications"><span data-i18n="usage_notifications_enabled">Enable milestone notifications</span></label>
             </div>
             <div class="fields usage-settings-fields">
               <div><div class="mono-mini muted mb-6" data-i18n="usage_daily_goal">DAILY GOAL / MIN</div><input type="number" id="input-usage-daily-goal" min="15" max="1440" value="360" class="mono"></div>
@@ -310,14 +310,14 @@
             </div>
           </div>
           <div class="panel-foot">
-            <span class="muted small" data-i18n="usage_local_note">預設只在本機聚合，不呼叫 cloud LLM；介面分類規則可在 config.yaml 調整。</span>
+            <span class="muted small" data-i18n="usage_local_note">Aggregated locally without a cloud LLM; interface rules remain configurable in config.yaml.</span>
           </div>
         </div>
         </section>
           <section class="settings-pane" data-pane="github">
         <div class="panel mb-14" id="panel-github">
           <div class="panel-head">
-            <span class="mono-label accent">08</span><span class="panel-title" data-i18n="settings_p4_title">GitHub 雲端整合 (全專案與 PR 追蹤)</span>
+            <span class="mono-label accent">08</span><span class="panel-title" data-i18n="settings_p4_title">GitHub Cloud Integration (Public &amp; Private Repos + PRs)</span>
             <span id="gh-auth-badge" class="trust ok">CONNECTED</span>
           </div>
           <div style="padding: 14px;">
@@ -334,22 +334,22 @@
         </div></div>
             <div class="split" style="gap: 12px; margin-bottom: 14px;">
               <div class="split-col">
-                <div class="mono-mini muted mb-6" data-i18n="gh_opt1_title">快捷方式 1 (推薦)：本機 GITHUB CLI</div>
-                <button class="btn btn-primary" id="btn-gh-auto-connect" style="width: 100%;" data-i18n="btn_gh_auto_connect">🔑 一鍵從本機 gh CLI 同步認證</button>
-                <div class="muted small mt-2" data-i18n="gh_opt1_sub">免手動輸入 Token，自動讀取本機登入之 GitHub 帳號</div>
+                <div class="mono-mini muted mb-6" data-i18n="gh_opt1_title">Option 1 (Recommended): Local GITHUB CLI</div>
+                <button class="btn btn-primary" id="btn-gh-auto-connect" style="width: 100%;" data-i18n="btn_gh_auto_connect">🔑 1-Click Auth via Local gh CLI</button>
+                <div class="muted small mt-2" data-i18n="gh_opt1_sub">No manual PAT needed, automatically reads local logged-in GitHub account</div>
               </div>
               <div class="split-col">
-                <div class="mono-mini muted mb-6" data-i18n="gh_opt2_title">快捷方式 2：PERSONAL ACCESS TOKEN (PAT)</div>
+                <div class="mono-mini muted mb-6" data-i18n="gh_opt2_title">Option 2: PERSONAL ACCESS TOKEN (PAT)</div>
                 <div class="input-row">
-                  <input type="password" id="input-gh-token" placeholder="ghp_xxxxxxxxxxxx (需勾選 repo 權限)" data-i18n-ph="ph_gh_token">
-                  <button class="btn btn-ghost" id="btn-gh-token-connect" data-i18n="btn_connect">連線</button>
+                  <input type="password" id="input-gh-token" placeholder="ghp_xxxxxxxxxxxx (with repo scope)" data-i18n-ph="ph_gh_token">
+                  <button class="btn btn-ghost" id="btn-gh-token-connect" data-i18n="btn_connect">Connect</button>
                 </div>
-                <div class="muted small mt-2" data-i18n="gh_opt2_sub">支援 Fine-Grained 或 Classic PAT (讀取 Public &amp; Private Repos/PRs)</div>
+                <div class="muted small mt-2" data-i18n="gh_opt2_sub">Supports Fine-Grained or Classic PAT (fetches Public &amp; Private Repos/PRs)</div>
               </div>
             </div>
             <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-              <button class="btn btn-ghost btn-sm" id="btn-gh-sync" data-i18n="btn_gh_sync">🔄 立即同步 GitHub 專案與 PR 狀態</button>
-              <button class="btn btn-ghost btn-sm" id="btn-gh-disconnect" style="color: var(--danger);" data-i18n="btn_gh_disconnect">解除連線</button>
+              <button class="btn btn-ghost btn-sm" id="btn-gh-sync" data-i18n="btn_gh_sync">🔄 Sync GitHub Repos &amp; PRs Now</button>
+              <button class="btn btn-ghost btn-sm" id="btn-gh-disconnect" style="color: var(--danger);" data-i18n="btn_gh_disconnect">Disconnect</button>
               <span id="gh-sync-result" class="mono-mini muted"></span>
             </div>
           </div>
@@ -372,7 +372,7 @@
         <span class="stat-dot" style="background:var(--orange)" title="ok"></span>
       </div>
       <div class="stat-value">2</div>
-      <div class="stat-label">論文與檔案異動</div>
+      <div class="stat-label">Paper &amp; File Events</div>
     </div>
     <div class="stat">
       <div class="stat-top">
@@ -380,7 +380,7 @@
         <span class="stat-dot" style="background:var(--orange)" title="ok"></span>
       </div>
       <div class="stat-value">2</div>
-      <div class="stat-label">Git commits 提交</div>
+      <div class="stat-label">Git Commits</div>
     </div>
     <div class="stat">
       <div class="stat-top">
@@ -388,7 +388,7 @@
         <span class="stat-dot" style="background:var(--orange)" title="ok"></span>
       </div>
       <div class="stat-value">2</div>
-      <div class="stat-label">視窗焦點切換</div>
+      <div class="stat-label">Window Focus</div>
     </div>
     <div class="stat">
       <div class="stat-top">
@@ -396,18 +396,18 @@
         <span class="stat-dot" style="background:var(--orange)" title="ok"></span>
       </div>
       <div class="stat-value">0</div>
-      <div class="stat-label">進行中工作</div>
+      <div class="stat-label">Active Workstreams</div>
     </div></div>
 
         <div class="panel mb-14">
           <div class="panel-head">
             <span class="mono-label" data-i18n="feed_title">LIVE FEED</span>
             <div class="filters">
-              <button class="chip active" data-filter="all" data-i18n="filter_all">全部</button>
+              <button class="chip active" data-filter="all" data-i18n="filter_all">ALL</button>
               <button class="chip" data-filter="ai" data-i18n="filter_ai">AI</button>
-              <button class="chip" data-filter="file" data-i18n="filter_file">檔案</button>
-              <button class="chip" data-filter="git" data-i18n="filter_git">Git</button>
-              <button class="chip" data-filter="window" data-i18n="filter_window">視窗</button>
+              <button class="chip" data-filter="file" data-i18n="filter_file">FILE</button>
+              <button class="chip" data-filter="git" data-i18n="filter_git">GIT</button>
+              <button class="chip" data-filter="window" data-i18n="filter_window">WINDOW</button>
             </div>
           </div>
           <div id="feed-list" class="feed">
@@ -486,65 +486,65 @@
     <div class="collector">
       <div class="collector-name" style="display:flex; align-items:center; gap:6px;">
         <span style="width:7px; height:7px; border-radius:50%; background:var(--danger, #ef4444); display:inline-block;"></span>
-        檔案監控
+        File Watcher
       </div>
       <div class="collector-state" style="color:var(--danger, #ef4444)">
-        已停止
-        <span class="mono-mini" style="font-size:10px; opacity:0.85; display:block; margin-top:2px; color:var(--text-dim);">最後寫入: 08:00:26</span>
+        Stopped
+        <span class="mono-mini" style="font-size:10px; opacity:0.85; display:block; margin-top:2px; color:var(--text-dim);">Last: 08:00:26</span>
         
       </div>
     </div>
     <div class="collector">
       <div class="collector-name" style="display:flex; align-items:center; gap:6px;">
         <span style="width:7px; height:7px; border-radius:50%; background:var(--danger, #ef4444); display:inline-block;"></span>
-        Git 掃描
+        Git Scanner
       </div>
       <div class="collector-state" style="color:var(--danger, #ef4444)">
-        已停止
-        <span class="mono-mini" style="font-size:10px; opacity:0.85; display:block; margin-top:2px; color:var(--text-dim);">最後寫入: 07:50:26</span>
+        Stopped
+        <span class="mono-mini" style="font-size:10px; opacity:0.85; display:block; margin-top:2px; color:var(--text-dim);">Last: 07:50:26</span>
         
       </div>
     </div>
     <div class="collector">
       <div class="collector-name" style="display:flex; align-items:center; gap:6px;">
         <span style="width:7px; height:7px; border-radius:50%; background:var(--mu, #888); display:inline-block;"></span>
-        視窗焦點
+        Window Focus
       </div>
       <div class="collector-state" style="color:var(--mu, #888)">
-        已停用
-        <span class="mono-mini" style="font-size:10px; opacity:0.85; display:block; margin-top:2px; color:var(--text-dim);">最後寫入: 07:10:26</span>
+        Disabled
+        <span class="mono-mini" style="font-size:10px; opacity:0.85; display:block; margin-top:2px; color:var(--text-dim);">Last: 07:10:26</span>
         
       </div>
     </div>
     <div class="collector">
       <div class="collector-name" style="display:flex; align-items:center; gap:6px;">
         <span style="width:7px; height:7px; border-radius:50%; background:var(--danger, #ef4444); display:inline-block;"></span>
-        Agent 日誌
+        Agent Logs
       </div>
       <div class="collector-state" style="color:var(--danger, #ef4444)">
-        已停止
-        <span class="mono-mini" style="font-size:10px; opacity:0.85; display:block; margin-top:2px; color:var(--text-dim);">最後寫入: 08:12:26</span>
+        Stopped
+        <span class="mono-mini" style="font-size:10px; opacity:0.85; display:block; margin-top:2px; color:var(--text-dim);">Last: 08:12:26</span>
         
       </div>
     </div>
     <div class="collector">
       <div class="collector-name" style="display:flex; align-items:center; gap:6px;">
         <span style="width:7px; height:7px; border-radius:50%; background:var(--mu, #888); display:inline-block;"></span>
-        行事曆（.ics）
+        Calendar (.ics)
       </div>
       <div class="collector-state" style="color:var(--mu, #888)">
-        已停用
+        Disabled
         
-        <span class="collector-diagnostic">尚未設定 .ics 路徑（系統設定 → 採集來源）</span>
+        <span class="collector-diagnostic">No .ics paths configured (Settings → Sources)</span>
       </div>
     </div>
     <div class="collector">
       <div class="collector-name" style="display:flex; align-items:center; gap:6px;">
         <span style="width:7px; height:7px; border-radius:50%; background:var(--danger, #ef4444); display:inline-block;"></span>
-        定時排程
+        Scheduler
       </div>
       <div class="collector-state" style="color:var(--danger, #ef4444)">
-        已停止
+        Stopped
         
         
       </div>
@@ -560,16 +560,16 @@
           <span id="data-trust-runtime-badge" class="mono-mini runtime-trust-badge runtime-stopped">8/8 CONTRACT · STOPPED ▾</span>
         </summary>
         <div style="padding: 10px 14px 14px; border-top: 1px solid var(--bd);">
-          <div class="trust-note" data-i18n="data_trust_desc" style="color: var(--mu); padding: 0 0 10px 0; border-bottom: 1px solid var(--bd);">8 項 contract gates 已通過；runtime 仍以 collector probes 判定，coverage 不完整時不得升格。</div>
+          <div class="trust-note" data-i18n="data_trust_desc" style="color: var(--mu); padding: 0 0 10px 0; border-bottom: 1px solid var(--bd);">Eight contract gates passed; runtime still depends on collector probes and incomplete coverage is never promoted.</div>
           <div class="defects">
-            <div class="defect"><span data-i18n="trust_d1">統一時區 (Local Timezone)</span><span class="code ok">PASS</span></div>
-            <div class="defect"><span data-i18n="trust_d2">檔案防手震與噪音過濾 (Debounce)</span><span class="code ok">PASS</span></div>
-            <div class="defect"><span data-i18n="trust_d3">Git 遞迴多倉庫掃描 (64 Repos)</span><span class="code ok">PASS</span></div>
-            <div class="defect"><span data-i18n="trust_d4">Claude / Codex / Antigravity 日誌</span><span class="code ok">PASS</span></div>
-            <div class="defect"><span data-i18n="trust_d5">AI 提問與完整回應解析</span><span class="code ok">PASS</span></div>
-            <div class="defect"><span data-i18n="trust_d6">設定熱套用與開關聯動</span><span class="code ok">PASS</span></div>
-            <div class="defect"><span data-i18n="trust_d7">GitHub 雲端倉庫與 PR 狀態整合</span><span class="code ok">PASS</span></div>
-            <div class="defect"><span data-i18n="trust_d8">中英文多語言 i18n 與專案智能歸戶</span><span class="code ok">PASS</span></div>
+            <div class="defect"><span data-i18n="trust_d1">Unified Timezone (Local TZ)</span><span class="code ok">PASS</span></div>
+            <div class="defect"><span data-i18n="trust_d2">File Debounce &amp; Noise Filter</span><span class="code ok">PASS</span></div>
+            <div class="defect"><span data-i18n="trust_d3">Git Recursive Multi-Repo Scan (64 Repos)</span><span class="code ok">PASS</span></div>
+            <div class="defect"><span data-i18n="trust_d4">Claude / Codex / Antigravity Logs</span><span class="code ok">PASS</span></div>
+            <div class="defect"><span data-i18n="trust_d5">AI Prompts &amp; Full Assistant Responses</span><span class="code ok">PASS</span></div>
+            <div class="defect"><span data-i18n="trust_d6">Settings Hot Reload &amp; Sync</span><span class="code ok">PASS</span></div>
+            <div class="defect"><span data-i18n="trust_d7">GitHub Cloud Integration &amp; PR Tracking</span><span class="code ok">PASS</span></div>
+            <div class="defect"><span data-i18n="trust_d8">Bilingual i18n &amp; Canonical Hierarchy</span><span class="code ok">PASS</span></div>
           </div>
         </div>
       </details>
@@ -577,9 +577,9 @@
         <div class="panel mb-14">
           <div class="panel-head">
             <span class="mono-label accent">01</span>
-            <span class="panel-title" data-i18n="system_health_p1_title">系統運行總覽與生命週期控制</span>
+            <span class="panel-title" data-i18n="system_health_p1_title">System Runtime &amp; Lifecycle Control</span>
             <span id="system-overall-badge" class="trust broken">STOPPED</span>
-            <button id="btn-refresh-system-health" class="btn btn-ghost btn-sm head-right" data-i18n="btn_refresh_health">重新整理</button>
+            <button id="btn-refresh-system-health" class="btn btn-ghost btn-sm head-right" data-i18n="btn_refresh_health">Refresh</button>
           </div>
           <div class="system-overview-grid">
             <div class="system-stat-card">
@@ -606,13 +606,13 @@
 
           <div class="system-actions-bar">
             <button id="btn-trigger-heal-ui" class="btn btn-primary" title="主動巡檢 5 大採集器與排程器，自動重啟掛掉的線程">
-              🩺 <span data-i18n="btn_trigger_heal">一鍵自我修復 (Self-Heal)</span>
+              🩺 <span data-i18n="btn_trigger_heal">Trigger Self-Heal</span>
             </button>
             <button id="btn-trigger-wal-ui" class="btn btn-ghost" title="手動將 WAL 日誌截斷同步回 SQLite 主庫 (TRUNCATE)">
-              📦 <span data-i18n="btn_trigger_wal">執行 WAL Checkpoint</span>
+              📦 <span data-i18n="btn_trigger_wal">WAL Checkpoint</span>
             </button>
             <button id="btn-trigger-maintain-ui" class="btn btn-ghost" title="執行完整健康檢查、90天事件修剪、線上驗證備份與滾動輪替 (保留7份)">
-              🔧 <span data-i18n="btn_trigger_maintain">執行資料庫完整維護</span>
+              🔧 <span data-i18n="btn_trigger_maintain">Full DB Maintenance</span>
             </button>
           </div>
         </div>
@@ -621,8 +621,8 @@
         <div class="panel mb-14">
           <div class="panel-head">
             <span class="mono-label accent">02</span>
-            <span class="panel-title" data-i18n="system_health_p2_title">採集器容錯隔離與健康矩陣</span>
-            <span class="muted small" data-i18n="system_health_p2_note">各採集器獨立隔離，單一損壞不中斷全域監控</span>
+            <span class="panel-title" data-i18n="system_health_p2_title">Collector Fault Isolation &amp; Diagnostics Matrix</span>
+            <span class="muted small" data-i18n="system_health_p2_note">Isolated collectors; single failure never halts overall monitoring</span>
           </div>
           <div id="collectors-diagnostics-grid" class="diagnostics-matrix-grid">
       <div class="collector-diag-card stopped">
@@ -722,7 +722,7 @@
         <div class="panel mb-14">
           <div class="panel-head">
             <span class="mono-label accent">03</span>
-            <span class="panel-title" data-i18n="system_health_p3_title">最近維護收據與備份保險庫</span>
+            <span class="panel-title" data-i18n="system_health_p3_title">Latest Maintenance Receipt &amp; Backup Vault</span>
             <span id="maintenance-integrity-badge" class="trust noisy">NO RECEIPT</span>
           </div>
           <div id="maintenance-receipt-container" class="receipt-card-body"><div class="placeholder">尚未產生維護收據。可點擊上方「執行資料庫完整維護」立即建立。</div></div>
@@ -732,8 +732,8 @@
         <div class="panel">
           <div class="panel-head">
             <span class="mono-label accent">04</span>
-            <span class="panel-title" data-i18n="system_health_p4_title">維護操作即時終端 (Action Console)</span>
-            <button id="btn-clear-system-console" class="btn btn-ghost btn-sm head-right" data-i18n="btn_clear_console">清空輸出</button>
+            <span class="panel-title" data-i18n="system_health_p4_title">Action Console &amp; Live Output</span>
+            <button id="btn-clear-system-console" class="btn btn-ghost btn-sm head-right" data-i18n="btn_clear_console">Clear Output</button>
           </div>
           <div class="system-console-wrapper">
             <pre id="system-action-console" class="system-console-output">// 系統維護終端就緒。點擊上方按鈕執行自我修復、WAL Checkpoint 或完整維護時，即時 JSON 回饋將輸出於此。</pre>
@@ -747,24 +747,24 @@
         <div class="panel mb-14">
           <div class="panel-head">
             <span class="mono-label accent">01</span>
-            <span class="panel-title" data-i18n="acceptance_p1_title">實機收據總覽與發佈收斂條件</span>
+            <span class="panel-title" data-i18n="acceptance_p1_title">Live receipts and release convergence</span>
             <span id="acceptance-summary-badge" class="trust">—</span>
-            <button id="btn-refresh-acceptance" class="btn btn-ghost btn-sm head-right" data-i18n="btn_refresh_acceptance">重新檢查</button>
+            <button id="btn-refresh-acceptance" class="btn btn-ghost btn-sm head-right" data-i18n="btn_refresh_acceptance">Re-check</button>
           </div>
-          <div class="trust-note" data-i18n="acceptance_intro">這裡只讀本機已經存在的收據：SQLite 紀錄、設定值與檔案是否存在。它不會替你執行任何驗收動作，也不跑 git、不連網、不載入索引。「已取得收據」代表找到了符合判準的證據，不代表功能在所有情境下都正確。</div>
+          <div class="trust-note" data-i18n="acceptance_intro">This only reads receipts that already exist on this machine: SQLite rows, config values, and whether files are there. It runs no acceptance step for you, and it never shells out to git, goes online, or loads an index. "Receipt found" means matching evidence exists — not that the feature is correct in every situation.</div>
           <div id="acceptance-gates" class="acceptance-gates">
-            <div class="placeholder" data-i18n="acceptance_loading">正在檢查本機收據…</div>
+            <div class="placeholder" data-i18n="acceptance_loading">Checking local receipts…</div>
           </div>
         </div>
 
         <div class="panel mb-14">
           <div class="panel-head">
             <span class="mono-label accent">02</span>
-            <span class="panel-title" data-i18n="acceptance_p2_title">逐項收據（docs/TODO.md A 段）</span>
+            <span class="panel-title" data-i18n="acceptance_p2_title">Item by item (docs/TODO.md section A)</span>
             <span id="acceptance-generated-at" class="mono-mini muted head-right"></span>
           </div>
           <div id="acceptance-items">
-            <div class="placeholder" data-i18n="acceptance_loading">正在檢查本機收據…</div>
+            <div class="placeholder" data-i18n="acceptance_loading">Checking local receipts…</div>
           </div>
         </div>
           </section>

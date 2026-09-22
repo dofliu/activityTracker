@@ -7,7 +7,7 @@ import { registerActions } from "../core/ui.js";
 import { loadProjects } from "../tabs/projects.js";
 
 export function repoSyncLabels() {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   return zh ? {
     noRepo: "尚未在監控設定中加入 Git repository root。",
     cached: "ahead / behind 比較的是本機已保存的 remote-tracking refs；按 Fetch 才會更新遠端參照。",
@@ -100,11 +100,11 @@ export function repoSyncLabels() {
 }
 
 export function repoSyncStateText(repo, labels) {
-  const state = repo.sync_state || "unknown";
-  const base = labels[state] || labels.unknown;
-  if (state === "ahead" && Number.isInteger(repo.ahead)) return `${base} ↑${repo.ahead}`;
-  if (state === "behind" && Number.isInteger(repo.behind)) return `${base} ↓${repo.behind}`;
-  if (state === "diverged") return `${base} ↑${repo.ahead ?? "?"} ↓${repo.behind ?? "?"}`;
+  const syncState = repo.sync_state || "unknown";
+  const base = labels[syncState] || labels.unknown;
+  if (syncState === "ahead" && Number.isInteger(repo.ahead)) return `${base} ↑${repo.ahead}`;
+  if (syncState === "behind" && Number.isInteger(repo.behind)) return `${base} ↓${repo.behind}`;
+  if (syncState === "diverged") return `${base} ↑${repo.ahead ?? "?"} ↓${repo.behind ?? "?"}`;
   return base;
 }
 
@@ -112,12 +112,12 @@ export function repoSyncStateText(repo, labels) {
 // （使用者回報：repo 明明落後遠端卻沒得按 pull，灰按鈕沒有任何可見說明。）
 export function repoBlockedReason(repo) {
   const actions = repo.actions || {};
-  const state = repo.sync_state;
+  const syncState = repo.sync_state;
   const pull = actions.pull_ff_only || {};
   const push = actions.push || {};
-  if (state === "behind" || state === "diverged") return pull.allowed ? "" : (pull.reason || "");
-  if (state === "ahead") return push.allowed ? "" : (push.reason || "");
-  if (state === "no_upstream" || state === "detached_head" || state === "upstream_unavailable") {
+  if (syncState === "behind" || syncState === "diverged") return pull.allowed ? "" : (pull.reason || "");
+  if (syncState === "ahead") return push.allowed ? "" : (push.reason || "");
+  if (syncState === "no_upstream" || syncState === "detached_head" || syncState === "upstream_unavailable") {
     return pull.reason || "";
   }
   return "";
@@ -137,17 +137,17 @@ export function renderRepositorySyncStatus() {
   const summary = $("repo-sync-summary");
   if (!list || !summary) return;
   const labels = repoSyncLabels();
-  if (!state.repositorySyncCache.length) {
+  if (!state.repos.syncCache.length) {
     summary.textContent = labels.noRepo;
     list.innerHTML = "";
     return;
   }
 
-  const needsAttention = state.repositorySyncCache.filter(repo =>
+  const needsAttention = state.repos.syncCache.filter(repo =>
     repo.sync_state !== "synced" || !repo.clean
   ).length;
-  summary.innerHTML = `<strong>${state.repositorySyncCache.length}</strong> repositories · <strong>${needsAttention}</strong> ${state.currentLang === "zh-TW" ? "項需要處理" : "need attention"}<br><span>${esc(labels.cached)}</span>`;
-  list.innerHTML = state.repositorySyncCache.map(repo => {
+  summary.innerHTML = `<strong>${state.repos.syncCache.length}</strong> repositories · <strong>${needsAttention}</strong> ${state.ui.currentLang === "zh-TW" ? "項需要處理" : "need attention"}<br><span>${esc(labels.cached)}</span>`;
+  list.innerHTML = state.repos.syncCache.map(repo => {
     const worktree = repo.worktree || {};
     const counts = [
       worktree.staged_files ? `${worktree.staged_files} ${labels.staged}` : "",
@@ -182,13 +182,13 @@ export async function loadRepositorySyncStatus() {
   const summary = $("repo-sync-summary");
   try {
     const data = await getJSON("/api/v1/repos/sync-status");
-    state.repositorySyncCache = Array.isArray(data.repositories) ? data.repositories : [];
+    state.repos.syncCache = Array.isArray(data.repositories) ? data.repositories : [];
     renderRepositorySyncStatus();
     if (data.truncated && summary) {
       summary.insertAdjacentHTML("beforeend", `<br><span class="repo-sync-warning">${esc(repoSyncLabels().truncated)}</span>`);
     }
   } catch (e) {
-    if (summary) summary.textContent = state.currentLang === "zh-TW" ? "無法讀取本機 Git 狀態。" : "Unable to read local Git status.";
+    if (summary) summary.textContent = state.ui.currentLang === "zh-TW" ? "無法讀取本機 Git 狀態。" : "Unable to read local Git status.";
   }
 }
 
@@ -247,19 +247,19 @@ export function formatFetchTime(value, labels) {
 export function renderRepoOverview() {
   const table = $("repo-overview-table");
   const filters = $("repo-overview-filters");
-  if (!table || !filters || state.repoOverviewCache === null) return;
+  if (!table || !filters || state.repos.overview === null) return;
   const labels = repoSyncLabels();
   const pushBtn = $("btn-repo-batch-push");
   if (pushBtn) {
-    pushBtn.disabled = !state.repoOverviewBatch.push;
-    pushBtn.title = state.repoOverviewBatch.push ? "" : labels.pushDisabled;
+    pushBtn.disabled = !state.repos.overviewBatch.push;
+    pushBtn.title = state.repos.overviewBatch.push ? "" : labels.pushDisabled;
   }
   filters.hidden = false;
   filters.innerHTML = Object.entries(labels.ovFilters).map(([key, text]) => {
-    const count = state.repoOverviewCache.filter(r => repoOverviewMatches(r, key)).length;
-    return `<button type="button" class="repo-overview-chip ${key === state.repoOverviewFilter ? "is-active" : ""}" data-filter="${key}">${esc(text)} ${count}</button>`;
+    const count = state.repos.overview.filter(r => repoOverviewMatches(r, key)).length;
+    return `<button type="button" class="repo-overview-chip ${key === state.repos.overviewFilter ? "is-active" : ""}" data-filter="${key}">${esc(text)} ${count}</button>`;
   }).join("");
-  const rows = state.repoOverviewCache.filter(r => repoOverviewMatches(r, state.repoOverviewFilter));
+  const rows = state.repos.overview.filter(r => repoOverviewMatches(r, state.repos.overviewFilter));
   if (!rows.length) {
     table.innerHTML = `<div class="placeholder" style="padding:10px;">${esc(labels.ovEmpty)}</div>`;
     return;
@@ -296,8 +296,8 @@ export async function loadRepoOverview() {
   if (table) table.innerHTML = `<div class="placeholder" style="padding:10px;">${esc(labels.ovLoading)}</div>`;
   try {
     const data = await getJSON("/api/v1/repos/sync-status?scope=all");
-    state.repoOverviewCache = Array.isArray(data.repositories) ? data.repositories : [];
-    state.repoOverviewBatch = data.batch || state.repoOverviewBatch;
+    state.repos.overview = Array.isArray(data.repositories) ? data.repositories : [];
+    state.repos.overviewBatch = data.batch || state.repos.overviewBatch;
     renderRepoOverview();
     if (result) {
       const s = data.summary || {};
@@ -389,7 +389,7 @@ export function initRepositorySyncSection() {
   if (filters) filters.addEventListener("click", (event) => {
     const chip = event.target.closest(".repo-overview-chip");
     if (!chip) return;
-    state.repoOverviewFilter = chip.dataset.filter || "all";
+    state.repos.overviewFilter = chip.dataset.filter || "all";
     renderRepoOverview();
   });
   const load = $("btn-repo-overview-load");
@@ -407,12 +407,12 @@ export function initRepositorySyncSection() {
 // ------------------------------------------------ P4.3 repo onboarding
 
 export async function loadOnboardingReport() {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const box = $("onboarding-report");
   if (!box) return;
   box.innerHTML = `<span class="muted small">${zh ? "掃描中…" : "Scanning…"}</span>`;
   try {
-    state.onboardingReportCache = await getJSON("/api/v1/repos/onboarding-report");
+    state.repos.onboardingReport = await getJSON("/api/v1/repos/onboarding-report");
     renderOnboardingReport();
   } catch (e) {
     box.innerHTML = `<span class="muted small">${esc(String(e.message || e))}</span>`;
@@ -420,9 +420,9 @@ export async function loadOnboardingReport() {
 }
 
 export function renderOnboardingReport() {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const box = $("onboarding-report");
-  const report = state.onboardingReportCache;
+  const report = state.repos.onboardingReport;
   if (!box || !report) return;
   const roots = report.roots || [];
   const rootOptions = roots.map(r => `<option value="${esc(r.root_id)}">${esc(r.path)}</option>`).join("");
@@ -469,7 +469,7 @@ export function renderOnboardingReport() {
 }
 
 export async function onboardingAction(payload, confirmText) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   if (!confirm(confirmText)) return;
   const result = $("onboarding-result");
   result.textContent = zh ? "執行中…" : "Running…";
@@ -484,7 +484,7 @@ export async function onboardingAction(payload, confirmText) {
 }
 
 export function onboardingInit(folderId, name) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   onboardingAction(
     { action: "init_folder", folder_id: folderId },
     zh ? `對「${name}」執行 git init？只建立空的 .git，不 commit、不設 remote、不發布。` : `Run git init on "${name}"? Creates an empty .git only.`
@@ -492,7 +492,7 @@ export function onboardingInit(folderId, name) {
 };
 
 export function onboardingAttach(repoId, name) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const select = $(`ob-attach-${repoId}`);
   const fullName = select ? select.value : "";
   if (!fullName) { alert(zh ? "沒有可選的 GitHub repo；請先同步 GitHub 整合。" : "No GitHub repos to pick; sync the GitHub integration first."); return; }
@@ -503,7 +503,7 @@ export function onboardingAttach(repoId, name) {
 };
 
 export function onboardingCreate(repoId, name) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   onboardingAction(
     { action: "create_remote", repo_id: repoId, name: name, private: true },
     zh ? `在 GitHub 建立 private repo「${name}」並設為 origin？遠端為空 repo，本機不會推送任何內容；首次發布由您自行 git push -u。` : `Create private GitHub repo "${name}" and set it as origin? Nothing is pushed; you do the first push yourself.`
@@ -511,7 +511,7 @@ export function onboardingCreate(repoId, name) {
 };
 
 export function onboardingClone(fullName) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const select = document.getElementById(`ob-clone-${fullName}`);
   const rootId = select ? select.value : "";
   if (!rootId) { alert(zh ? "請先在監控設定加入 Git root。" : "Add a Git root in settings first."); return; }

@@ -84,7 +84,7 @@ export function initGitHubSection() {
 export async function loadGitHubStatus() {
   try {
     const data = await getJSON("/api/v1/github/status");
-    state.githubStatus = data;
+    state.settings.githubStatus = data;
     const pill = $("github-pill");
     const pillText = $("github-status-text");
     const badge = $("gh-auth-badge");

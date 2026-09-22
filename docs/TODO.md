@@ -90,11 +90,11 @@
 > 來源：[REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) §4–5。
 > 每一項結束時 `pytest` 必須全綠、`python main.py verify` 結果不得變化（整頓不改行為）。R2 的項目要先有 ADR。
 > **R0 已於 2026-09-16 完成**（B5–B9 ＋ D1）、**R1 全部於同日完成**（D2 一個 LLM client、D3 一份活動來源定義、D4 `server.py` 切成 9 個 router、D5 桌面通知併入 `ChannelAdapter`、D6 旗標六層收三層），收據見 ROADMAP §11.2；**R2 也全部完成**（D7 一份活動記憶 ADR-023、D8 秘書四層化 ADR-024、D9 transcript parser 分拆與漂移警示 ADR-025、D10 前端模組化 ADR-026、D11 程序內狀態改注入 ADR-027、D12 驗收中心宣告式 ADR-028）。**這張減法清單到此結束**；下一輪要做什麼要先決定，不要自動往下找事做。
-> **2026-09-19 決定**：把 D11 欠的前端那一半補完，分兩步走。第一步（安全網）已完成（[ADR-029](ADR-029-frontend-dom-lock.md)，收據見 ROADMAP §11.2）；第二步是下面的 D13。
+> **2026-09-19 決定**：把 D11 欠的前端那一半補完，分兩步走。**兩步都已於 2026-09-20 完成**——第一步安全網（[ADR-029](ADR-029-frontend-dom-lock.md)，後續補上五個互動場景）、第二步 `state.js` 分成具名 store ＋ 工廠（[ADR-030](ADR-030-frontend-state-stores.md)），收據見 ROADMAP §11.2。
+> **還沒做、也沒有排**：完全的參數注入（共用的那一份還在）。要做的前提是先把行為鎖的互動覆蓋擴到那幾百個 `addEventListener` 路徑；理由與陷阱寫在 ADR-030 的 Consequences。在那之前不要動它。
 
 | # | 項目 | 內容 | 完成判準（收據） | 階段 |
 | :-- | :--- | :--- | :--- | :--- |
-| D13 | 前端 `state.js` 改成注入 | `web/js/core/state.js` 的 49 個共享值目前由十個分頁模組的渲染函式經閉包直接讀寫（ADR-026 承諾在 D11 改掉、ADR-027 明說沒兌現）。改成由進入點建一份狀態、往下傳，與後端 `core/runtime_state.py` 同一個形狀。 | 改動**前**跑 `python scripts/dashboard_dom_lock.py update`、改動**後**跑 `check`，**12 張快照逐字元相同**（ADR-029）；`pytest` 全綠；`scripts/dashboard_smoke.py` `ok: true`。**鎖的邊界要先看 ADR-029「它不鎖什麼」**：它只釘開機後的第一畫面，不釘互動與輪詢——若重構會動到互動路徑，得先把對應互動加進 `capture_pane`，否則那部分等於沒有證據。 | R2 續 |
 
 ## 維護這頁的規則
 

@@ -1,0 +1,6 @@
+{
+  "body": "[{\"id\":\"git_1\",\"type\":\"git\",\"timestamp\":\"2026-09-20 07:50:26\",\"title\":\"[activityTracker@main] refactor(acceptance): 一個 reading 加一張階梯表 \\\"雙引號\\\" <b>粗體</b> & '單引號' <img src=x onerror=1>\",\"detail\":\"Commit: a1b2c3d4e5f6 by dofliu\",\"response\":\"變更: +1505 / -1560 行 (9 檔案)\",\"badge\":\"git\",\"project\":\"activityTracker\"},{\"id\":\"git_2\",\"type\":\"git\",\"timestamp\":\"2026-09-18 08:20:26\",\"title\":\"[activityTracker@main] refactor(core): 程序內狀態收成可注入的 store\",\"detail\":\"Commit: f6e5d4c3b2a1 by dofliu\",\"response\":\"變更: +820 / -410 行 (14 檔案)\",\"badge\":\"git\",\"project\":\"activityTracker\"}]",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/events/recent?limit=60&event_type=git"
+}

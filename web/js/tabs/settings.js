@@ -15,16 +15,16 @@ export function initSettingsForm() {
   $("btn-add-dir").addEventListener("click", () => {
     const input = $("input-new-dir");
     const v = input.value.trim();
-    if (v && !state.configDirs.includes(v)) { state.configDirs.push(v); renderTagList("dir-list", state.configDirs, removeDir); input.value = ""; }
+    if (v && !state.settings.dirs.includes(v)) { state.settings.dirs.push(v); renderTagList("dir-list", state.settings.dirs, removeDir); input.value = ""; }
   });
   $("btn-browse-dir").addEventListener("click", async () => {
     try {
       const res = await postJSON("/api/v1/utils/browse-folder");
       if (res && res.status === "success" && res.path) {
         $("input-new-dir").value = res.path;
-        if (!state.configDirs.includes(res.path)) {
-          state.configDirs.push(res.path);
-          renderTagList("dir-list", state.configDirs, removeDir);
+        if (!state.settings.dirs.includes(res.path)) {
+          state.settings.dirs.push(res.path);
+          renderTagList("dir-list", state.settings.dirs, removeDir);
         }
       }
     } catch (e) { console.error("Browse dir error", e); }
@@ -33,16 +33,16 @@ export function initSettingsForm() {
   $("btn-add-calendar-path").addEventListener("click", () => {
     const input = $("input-new-calendar-path");
     const v = input.value.trim();
-    if (v && !state.configCalendarPaths.includes(v)) { state.configCalendarPaths.push(v); renderTagList("calendar-path-list", state.configCalendarPaths, removeCalendarPath); input.value = ""; }
+    if (v && !state.settings.calendarPaths.includes(v)) { state.settings.calendarPaths.push(v); renderTagList("calendar-path-list", state.settings.calendarPaths, removeCalendarPath); input.value = ""; }
   });
   $("btn-browse-calendar").addEventListener("click", async () => {
     try {
       const res = await postJSON("/api/v1/utils/browse-folder");
       if (res && res.status === "success" && res.path) {
         $("input-new-calendar-path").value = res.path;
-        if (!state.configCalendarPaths.includes(res.path)) {
-          state.configCalendarPaths.push(res.path);
-          renderTagList("calendar-path-list", state.configCalendarPaths, removeCalendarPath);
+        if (!state.settings.calendarPaths.includes(res.path)) {
+          state.settings.calendarPaths.push(res.path);
+          renderTagList("calendar-path-list", state.settings.calendarPaths, removeCalendarPath);
         }
       }
     } catch (e) { console.error("Browse calendar error", e); }
@@ -51,16 +51,16 @@ export function initSettingsForm() {
   $("btn-add-repo").addEventListener("click", () => {
     const input = $("input-new-repo");
     const v = input.value.trim();
-    if (v && !state.configRepos.includes(v)) { state.configRepos.push(v); renderTagList("repo-list", state.configRepos, removeRepo); input.value = ""; }
+    if (v && !state.settings.repos.includes(v)) { state.settings.repos.push(v); renderTagList("repo-list", state.settings.repos, removeRepo); input.value = ""; }
   });
   $("btn-browse-repo").addEventListener("click", async () => {
     try {
       const res = await postJSON("/api/v1/utils/browse-folder");
       if (res && res.status === "success" && res.path) {
         $("input-new-repo").value = res.path;
-        if (!state.configRepos.includes(res.path)) {
-          state.configRepos.push(res.path);
-          renderTagList("repo-list", state.configRepos, removeRepo);
+        if (!state.settings.repos.includes(res.path)) {
+          state.settings.repos.push(res.path);
+          renderTagList("repo-list", state.settings.repos, removeRepo);
         }
       }
     } catch (e) { console.error("Browse repo error", e); }
@@ -72,8 +72,8 @@ export function initSettingsForm() {
     const p = e.target.value;
     const defaults = { gemini: "gemini-3.7-flash", anthropic: "claude-3-5-sonnet-20241022", openai: "gpt-4o", ollama: "llama3.1:8b" };
     const envDefaults = { gemini: "GEMINI_API_KEY", anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", ollama: "" };
-    $("input-model-name").value = (state.currentConfig && state.currentConfig.synthesizer && state.currentConfig.synthesizer[p] && state.currentConfig.synthesizer[p].model) || defaults[p] || "";
-    $("input-llm-key-env").value = (state.currentConfig && state.currentConfig.synthesizer && state.currentConfig.synthesizer[p] && state.currentConfig.synthesizer[p].api_key_env) || envDefaults[p] || "";
+    $("input-model-name").value = (state.settings.config && state.settings.config.synthesizer && state.settings.config.synthesizer[p] && state.settings.config.synthesizer[p].model) || defaults[p] || "";
+    $("input-llm-key-env").value = (state.settings.config && state.settings.config.synthesizer && state.settings.config.synthesizer[p] && state.settings.config.synthesizer[p].api_key_env) || envDefaults[p] || "";
     $("input-llm-key-env").disabled = p === "ollama";
     renderLLMStatus();
   });
@@ -109,21 +109,21 @@ export function renderTagList(id, list, onRemove) {
   box.innerHTML = list.map((v, i) => `<div class="tag"><span>${esc(v)}</span><span class="tag-x" data-i="${i}">✕</span></div>`).join("");
   box.querySelectorAll(".tag-x").forEach(x => x.addEventListener("click", () => onRemove(Number(x.dataset.i))));
 }
-export function removeDir(i) { state.configDirs.splice(i, 1); renderTagList("dir-list", state.configDirs, removeDir); }
-export function removeRepo(i) { state.configRepos.splice(i, 1); renderTagList("repo-list", state.configRepos, removeRepo); }
-export function removeCalendarPath(i) { state.configCalendarPaths.splice(i, 1); renderTagList("calendar-path-list", state.configCalendarPaths, removeCalendarPath); }
+export function removeDir(i) { state.settings.dirs.splice(i, 1); renderTagList("dir-list", state.settings.dirs, removeDir); }
+export function removeRepo(i) { state.settings.repos.splice(i, 1); renderTagList("repo-list", state.settings.repos, removeRepo); }
+export function removeCalendarPath(i) { state.settings.calendarPaths.splice(i, 1); renderTagList("calendar-path-list", state.settings.calendarPaths, removeCalendarPath); }
 
 export async function loadConfig() {
   try {
-    state.currentConfig = await getJSON("/api/v1/config");
-    const w = state.currentConfig.watchers || {};
-    const s = state.currentConfig.synthesizer || {};
-    const usage = state.currentConfig.usage_tracking || {};
+    state.settings.config = await getJSON("/api/v1/config");
+    const w = state.settings.config.watchers || {};
+    const s = state.settings.config.synthesizer || {};
+    const usage = state.settings.config.usage_tracking || {};
 
-    state.configDirs = (w.file_watcher && w.file_watcher.watch_directories) || [];
-    state.configRepos = (w.git_watcher && w.git_watcher.repositories) || [];
-    renderTagList("dir-list", state.configDirs, removeDir);
-    renderTagList("repo-list", state.configRepos, removeRepo);
+    state.settings.dirs = (w.file_watcher && w.file_watcher.watch_directories) || [];
+    state.settings.repos = (w.git_watcher && w.git_watcher.repositories) || [];
+    renderTagList("dir-list", state.settings.dirs, removeDir);
+    renderTagList("repo-list", state.settings.repos, removeRepo);
 
     $("input-schedule-time").value = (s.schedule && s.schedule.time) || "23:30";
     $("input-checkpoint-interval").value = (s.periodic_checkpoint && s.periodic_checkpoint.interval_hours) || 2;
@@ -149,18 +149,18 @@ export async function loadConfig() {
     $("toggle-window-focus").checked = !(w.window_watcher && w.window_watcher.enabled === false);
     const calendar = w.calendar_watcher || {};
     $("toggle-calendar").checked = calendar.enabled !== false;
-    state.configCalendarPaths = Array.isArray(calendar.paths) ? calendar.paths.slice() : [];
-    renderTagList("calendar-path-list", state.configCalendarPaths, removeCalendarPath);
+    state.settings.calendarPaths = Array.isArray(calendar.paths) ? calendar.paths.slice() : [];
+    renderTagList("calendar-path-list", state.settings.calendarPaths, removeCalendarPath);
     $("input-calendar-horizon").value = Number(calendar.horizon_days || 30);
     $("toggle-calendar-titles").checked = calendar.store_titles !== false;
-    const executor = (state.currentConfig.proactive_secretary || {}).executor || {};
+    const executor = (state.settings.config.proactive_secretary || {}).executor || {};
     $("toggle-executor-enabled").checked = executor.enabled === true;
-    $("input-greeting-name").value = ((state.currentConfig.proactive_secretary || {}).greeting || {}).display_name || "";
+    $("input-greeting-name").value = ((state.settings.config.proactive_secretary || {}).greeting || {}).display_name || "";
     $("toggle-executor-l2").checked = !!(executor.l2 && executor.l2.enabled === true);
     $("toggle-executor-l2-write").checked = !!(executor.l2 && executor.l2.allow_write === true);
     $("select-agent-cli").value = (executor.agent_cli && executor.agent_cli.binary) === "codex" ? "codex" : "claude";
     $("toggle-tg-approvals").checked = !!(executor.telegram_approvals && executor.telegram_approvals.enabled === true);
-    const tgChat = ((state.currentConfig.notifiers || {}).telegram || {}).chat || {};
+    const tgChat = ((state.settings.config.notifiers || {}).telegram || {}).chat || {};
     $("toggle-tg-chat").checked = tgChat.enabled === true;
     loadScheduledTasks();
     loadTelegramStatus();
@@ -184,24 +184,24 @@ export async function loadLLMStatus() {
   badge.className = "trust noisy";
   badge.textContent = "CHECKING";
   try {
-    state.llmStatusCache = await getJSON("/api/v1/llm/status");
+    state.settings.llmStatus = await getJSON("/api/v1/llm/status");
     renderLLMStatus();
   } catch (e) {
-    state.llmStatusCache = null;
+    state.settings.llmStatus = null;
     badge.className = "trust broken";
     badge.textContent = "UNAVAILABLE";
-    $("llm-key-status-text").textContent = state.currentLang === "zh-TW"
+    $("llm-key-status-text").textContent = state.ui.currentLang === "zh-TW"
       ? "目前無法取得 API key 偵測狀態。"
       : "API key detection status is unavailable.";
   }
 }
 
 export function renderLLMStatus() {
-  if (!state.llmStatusCache) return;
+  if (!state.settings.llmStatus) return;
   const provider = $("select-llm-provider").value;
-  const item = (state.llmStatusCache.providers || {})[provider] || {};
+  const item = (state.settings.llmStatus.providers || {})[provider] || {};
   const badge = $("llm-key-status-badge");
-  const sourceLabels = state.currentLang === "zh-TW" ? {
+  const sourceLabels = state.ui.currentLang === "zh-TW" ? {
     process: "目前執行程序環境",
     windows_user: "Windows 使用者環境變數",
     windows_machine: "Windows 系統環境變數",
@@ -219,27 +219,27 @@ export function renderLLMStatus() {
   const envName = item.env_var || $("input-llm-key-env").value.trim() || "—";
   const source = sourceLabels[item.source] || item.source || sourceLabels.missing;
   $("llm-key-status-text").textContent = item.configured
-    ? (state.currentLang === "zh-TW"
+    ? (state.ui.currentLang === "zh-TW"
       ? `已偵測 ${envName}，來源：${source}。金鑰內容不會傳到瀏覽器。`
       : `${envName} detected from the ${source}. The secret value is not sent to the browser.`)
-    : (state.currentLang === "zh-TW"
+    : (state.ui.currentLang === "zh-TW"
       ? `尚未偵測 ${envName}。請在作業系統使用者環境變數設定後按「重新檢查」。`
       : `${envName} was not detected. Set it in the OS user environment, then select Recheck.`);
 }
 
 export async function saveSettings() {
-  if (!state.currentConfig) state.currentConfig = {};
-  const cfg = state.currentConfig;
+  if (!state.settings.config) state.settings.config = {};
+  const cfg = state.settings.config;
   const exts = Array.from(document.querySelectorAll("#ext-checkboxes input:checked")).map(cb => cb.value);
   const provider = $("select-llm-provider").value;
 
   cfg.watchers = cfg.watchers || {};
   cfg.watchers.file_watcher = cfg.watchers.file_watcher || { enabled: true };
-  cfg.watchers.file_watcher.watch_directories = state.configDirs;
+  cfg.watchers.file_watcher.watch_directories = state.settings.dirs;
   cfg.watchers.file_watcher.extensions = exts;
 
   cfg.watchers.git_watcher = cfg.watchers.git_watcher || { enabled: true };
-  cfg.watchers.git_watcher.repositories = state.configRepos;
+  cfg.watchers.git_watcher.repositories = state.settings.repos;
 
   cfg.watchers.agent_log_watcher = cfg.watchers.agent_log_watcher || { enabled: true };
   cfg.watchers.agent_log_watcher.claude_code = $("toggle-claude-code").checked;
@@ -257,7 +257,7 @@ export async function saveSettings() {
 
   cfg.watchers.calendar_watcher = cfg.watchers.calendar_watcher || { enabled: true, scan_interval_seconds: 900 };
   cfg.watchers.calendar_watcher.enabled = $("toggle-calendar").checked;
-  cfg.watchers.calendar_watcher.paths = state.configCalendarPaths;
+  cfg.watchers.calendar_watcher.paths = state.settings.calendarPaths;
   cfg.watchers.calendar_watcher.horizon_days = Math.max(1, Math.min(366, Number($("input-calendar-horizon").value) || 30));
   cfg.watchers.calendar_watcher.store_titles = $("toggle-calendar-titles").checked;
 
@@ -333,7 +333,7 @@ export async function saveSettings() {
 // ------------------------------------------------------ P5-R5 scheduled tasks
 
 export function requireExecutionToken() {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   let token = sessionStorage.getItem("omni_execution_token") || "";
   if (!token) {
     token = (prompt(zh
@@ -346,7 +346,7 @@ export function requireExecutionToken() {
 }
 
 export async function schedRequest(url, method, body) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const token = requireExecutionToken();
   if (!token) return null;
   const res = await request(url, {
@@ -368,7 +368,7 @@ export async function schedRequest(url, method, body) {
 }
 
 export function schedScheduleLabel(task) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const weekdays = zh
     ? ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
     : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -385,10 +385,10 @@ export async function loadScheduledTasks() {
   const box = $("sched-task-list");
   if (!box) return;
   try {
-    state.scheduledTasksCache = await getJSON("/api/v1/secretary/scheduled-tasks");
+    state.secretary.scheduledTasks = await getJSON("/api/v1/secretary/scheduled-tasks");
     renderScheduledTasks();
     const select = $("select-sched-template");
-    const templates = state.scheduledTasksCache.templates || [];
+    const templates = state.secretary.scheduledTasks.templates || [];
     select.innerHTML = templates
       .map(item => `<option value="${esc(item.template_id)}">${esc(item.label)}</option>`)
       .join("");
@@ -399,10 +399,10 @@ export async function loadScheduledTasks() {
 }
 
 export function renderScheduledTasks() {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const box = $("sched-task-list");
-  if (!box || !state.scheduledTasksCache) return;
-  const tasks = state.scheduledTasksCache.tasks || [];
+  if (!box || !state.secretary.scheduledTasks) return;
+  const tasks = state.secretary.scheduledTasks.tasks || [];
   if (!tasks.length) {
     box.innerHTML = `<span class="muted small">${zh ? "尚未建立任何排程任務。" : "No scheduled tasks yet."}</span>`;
     return;
@@ -429,7 +429,7 @@ export function renderScheduledTasks() {
 }
 
 export async function runScheduledTaskNow(taskId) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const data = await schedRequest(`/api/v1/secretary/scheduled-tasks/${taskId}/run`, "POST");
   if (data) {
     alert((zh ? "已執行：" : "Executed: ") + (data.status || "?")
@@ -444,7 +444,7 @@ export async function toggleScheduledTask(taskId, enabled) {
 };
 
 export async function deleteScheduledTask(taskId) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   if (!confirm(zh ? "刪除此排程任務？" : "Delete this scheduled task?")) return;
   const data = await schedRequest(`/api/v1/secretary/scheduled-tasks/${taskId}`, "DELETE");
   if (data) loadScheduledTasks();
@@ -472,10 +472,10 @@ export async function addScheduledTask() {
 export async function loadTelegramStatus() {
   const badge = $("tg-status-badge");
   if (!badge) return;
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   try {
-    state.telegramStatusCache = await getJSON("/api/v1/telegram/status");
-    const st = state.telegramStatusCache;
+    state.settings.telegramStatus = await getJSON("/api/v1/telegram/status");
+    const st = state.settings.telegramStatus;
     const sourceLabel = (source) => ({
       env: zh ? "環境變數" : "env var",
       config: "config.yaml",
@@ -516,7 +516,7 @@ export async function loadTelegramStatus() {
 }
 
 export function tgRenderResult(receipt) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const box = $("tg-test-result");
   if (!box) return;
   if (!receipt) { box.textContent = ""; return; }
@@ -549,7 +549,7 @@ export function tgPayload() {
 }
 
 export async function tgDetectChat() {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const box = $("tg-chat-candidates");
   box.hidden = false;
   box.innerHTML = `<span class="muted small">${zh ? "偵測中…" : "Detecting…"}</span>`;
@@ -574,7 +574,7 @@ export async function tgDetectChat() {
 }
 
 export async function tgTest() {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   $("tg-test-result").textContent = zh ? "測試中…" : "Testing…";
   try {
     tgRenderResult(await postJSON("/api/v1/telegram/test", tgPayload()));
@@ -584,7 +584,7 @@ export async function tgTest() {
 }
 
 export async function tgConnect() {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   $("tg-test-result").textContent = zh ? "驗證並儲存中…" : "Validating & saving…";
   try {
     const payload = tgPayload();
@@ -606,7 +606,7 @@ export async function tgConnect() {
 export async function loadTelegramApprovalsStatus() {
   const box = $("tg-approvals-status");
   if (!box) return;
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   try {
     const st = await getJSON("/api/v1/telegram/approvals/status");
     const parts = [];
@@ -633,7 +633,7 @@ export async function loadTelegramApprovalsStatus() {
 }
 
 export async function tgIssueArmCode() {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const box = $("tg-arm-code-box");
   const data = await schedRequest("/api/v1/telegram/approvals/arm-code", "POST");
   if (!data) return;
@@ -652,7 +652,7 @@ export async function tgIssueArmCode() {
 export async function loadLineStatus() {
   const badge = $("line-status-badge");
   if (!badge) return;
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   try {
     const st = await getJSON("/api/v1/line/status");
     if (st.enabled && st.token_configured && st.to_configured) {
@@ -677,7 +677,7 @@ export async function loadLineStatus() {
 export function lineRenderResult(receipt) {
   const box = $("line-test-result");
   if (!box) return;
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   if (receipt.ok) {
     const name = receipt.bot_display_name || receipt.bot_basic_id || "";
     box.textContent = (receipt.message_sent
@@ -690,7 +690,7 @@ export function lineRenderResult(receipt) {
 }
 
 export async function lineTest(save) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const box = $("line-test-result");
   if (box) box.textContent = zh ? "測試中…" : "Testing…";
   const body = {
@@ -711,7 +711,7 @@ export async function lineTest(save) {
 }
 
 export async function lineDisconnect() {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   if (!confirm(zh ? "停用 LINE 推播並清除本機儲存的 token 與收件 ID？" : "Disable LINE push and clear the stored token and recipient id?")) return;
   try {
     const receipt = await postJSON("/api/v1/line/disconnect", {});
@@ -744,7 +744,7 @@ export async function tgDisarm() {
 }
 
 export async function tgDisconnect() {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   if (!confirm(zh ? "停用 Telegram 推播並清除本機保存的 token／chat id？" : "Disable Telegram push and clear the locally stored token / chat id?")) return;
   try {
     tgRenderResult(await postJSON("/api/v1/telegram/disconnect"));

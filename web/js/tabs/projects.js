@@ -10,8 +10,8 @@ import { triggerCheckpoint } from "../tabs/summaries.js";
 
 export async function refreshFeed() {
   try {
-    const events = await getJSON(`/api/v1/events/recent?limit=60&event_type=${state.activeFilter}`);
-    if (state.activeFilter === "all") state.recentEvents = events;
+    const events = await getJSON(`/api/v1/events/recent?limit=60&event_type=${state.feed.activeFilter}`);
+    if (state.feed.activeFilter === "all") state.feed.recentEvents = events;
     const box = $("feed-list");
     if (!events.length) { box.innerHTML = `<div class="placeholder">${t("ph_no_feed")}</div>`; return; }
     box.innerHTML = events.map(e => `
@@ -29,13 +29,13 @@ export async function refreshFeed() {
 // ---------------------------------------------------------------- projects
 export async function loadProjects(force) {
   try {
-    state.projectsCache = await getJSON("/api/v1/projects/active");
-    if (force || !state.recentEvents.length) {
-      try { state.recentEvents = await getJSON("/api/v1/events/recent?limit=200&event_type=all"); } catch (e) {}
+    state.projects.cache = await getJSON("/api/v1/projects/active");
+    if (force || !state.feed.recentEvents.length) {
+      try { state.feed.recentEvents = await getJSON("/api/v1/events/recent?limit=200&event_type=all"); } catch (e) {}
     }
     renderResume();
     renderProjects();
-    $("projects-count").textContent = `${t("active_workstreams")} · ${state.projectsCache.length}`;
+    $("projects-count").textContent = `${t("active_workstreams")} · ${state.projects.cache.length}`;
   } catch (e) {
     $("projects-list").innerHTML = `<div class="placeholder">${t("ph_loading_projects")}</div>`;
   }
@@ -68,16 +68,16 @@ export function renderActionGroup(p) {
   const folderUri = path ? "openfolder:///" + encodeURI(path.replace(/\\/g, "/")) : "";
 
   const folderBtn = path
-    ? `<a class="action-btn" href="${esc(folderUri)}" data-act="folder" data-path="${esc(path)}" title="${state.currentLang === 'zh-TW' ? '開啟本機資料夾 (' + esc(path) + ')' : 'Open Folder (' + esc(path) + ')'}">📁</a>`
-    : `<button class="action-btn disabled" title="${state.currentLang === 'zh-TW' ? '尚未定位到本機路徑' : 'No local path'}">📁</button>`;
+    ? `<a class="action-btn" href="${esc(folderUri)}" data-act="folder" data-path="${esc(path)}" title="${state.ui.currentLang === 'zh-TW' ? '開啟本機資料夾 (' + esc(path) + ')' : 'Open Folder (' + esc(path) + ')'}">📁</a>`
+    : `<button class="action-btn disabled" title="${state.ui.currentLang === 'zh-TW' ? '尚未定位到本機路徑' : 'No local path'}">📁</button>`;
 
   const vsCodeBtn = path
-    ? `<a class="action-btn" href="${esc(vsCodeUri)}" title="${state.currentLang === 'zh-TW' ? '在 VS Code 中開啟專案' : 'Open in VS Code'}">💻</a>`
-    : `<button class="action-btn disabled" title="${state.currentLang === 'zh-TW' ? '尚未定位到本機路徑' : 'No local path'}">💻</button>`;
+    ? `<a class="action-btn" href="${esc(vsCodeUri)}" title="${state.ui.currentLang === 'zh-TW' ? '在 VS Code 中開啟專案' : 'Open in VS Code'}">💻</a>`
+    : `<button class="action-btn disabled" title="${state.ui.currentLang === 'zh-TW' ? '尚未定位到本機路徑' : 'No local path'}">💻</button>`;
 
   const ghBtn = ghUrl
-    ? `<a class="action-btn" href="${esc(ghUrl)}" target="_blank" rel="noopener noreferrer" title="${state.currentLang === 'zh-TW' ? '前往 GitHub 專案頁面' : 'Open on GitHub'}">🐙</a>`
-    : `<button class="action-btn disabled" title="${state.currentLang === 'zh-TW' ? '未綁定 GitHub 倉庫' : 'No GitHub repo'}">🐙</button>`;
+    ? `<a class="action-btn" href="${esc(ghUrl)}" target="_blank" rel="noopener noreferrer" title="${state.ui.currentLang === 'zh-TW' ? '前往 GitHub 專案頁面' : 'Open on GitHub'}">🐙</a>`
+    : `<button class="action-btn disabled" title="${state.ui.currentLang === 'zh-TW' ? '未綁定 GitHub 倉庫' : 'No GitHub repo'}">🐙</button>`;
 
   return `
     <div class="action-group" data-stop-propagation>
@@ -111,12 +111,12 @@ export function attachActionGroupListeners(parentEl) {
 
 export async function copyProjectHandoff(projectKey, displayName) {
   try {
-    showToast(state.currentLang === "zh-TW" ? "⏳ 正在提煉專案接續記憶..." : "⏳ Building context handoff...");
+    showToast(state.ui.currentLang === "zh-TW" ? "⏳ 正在提煉專案接續記憶..." : "⏳ Building context handoff...");
     const res = await getJSON(`/api/v1/projects/${encodeURIComponent(projectKey)}/handoff?turns=5`);
     if (res && res.markdown) {
       await navigator.clipboard.writeText(res.markdown);
       const name = displayName || res.display_name || projectKey;
-      showToast(state.currentLang === "zh-TW" ? `⚡ 已複製 [${name}] 接續 Prompt！可直接貼入任何 AI 開工` : `⚡ Copied [${name}] handoff prompt to clipboard!`);
+      showToast(state.ui.currentLang === "zh-TW" ? `⚡ 已複製 [${name}] 接續 Prompt！可直接貼入任何 AI 開工` : `⚡ Copied [${name}] handoff prompt to clipboard!`);
     } else {
       showToast("⚠️ 無法生成接續 Prompt");
     }
@@ -129,7 +129,7 @@ export function renderResume() {
   // 「上次做到哪」現在住在 01 今日行動清單最上方（02 只留專案卡）。
   const box = $("today-resume");
   if (!box) return;
-  const p = state.projectsCache[0];
+  const p = state.projects.cache[0];
   if (!p) {
     box.innerHTML = `<div class="placeholder">${t("ph_no_projects")}</div>`;
     return;
@@ -143,8 +143,8 @@ export function renderResume() {
     </div>
     <div class="today-resume-buttons">
       ${renderActionGroup(p)}
-      <button class="btn" data-copy-handoff="${esc(p.project_key)}" data-name="${esc(p.display_name)}" style="background:var(--s2); border:1px solid var(--bd); color:var(--tx); font-weight:600; font-size:12px; padding:6px 12px; cursor:pointer;" title="${state.currentLang === 'zh-TW' ? '一鍵複製結構化接續 Prompt 貼入 AI 開工' : 'Copy structured handoff prompt for AI'}">${t("btn_copy_handoff")}</button>
-      <button class="btn btn-primary" data-resume="${esc(p.project_key)}">${state.currentLang === "zh-TW" ? "接續 →" : "Resume →"}</button>
+      <button class="btn" data-copy-handoff="${esc(p.project_key)}" data-name="${esc(p.display_name)}" style="background:var(--s2); border:1px solid var(--bd); color:var(--tx); font-weight:600; font-size:12px; padding:6px 12px; cursor:pointer;" title="${state.ui.currentLang === 'zh-TW' ? '一鍵複製結構化接續 Prompt 貼入 AI 開工' : 'Copy structured handoff prompt for AI'}">${t("btn_copy_handoff")}</button>
+      <button class="btn btn-primary" data-resume="${esc(p.project_key)}">${state.ui.currentLang === "zh-TW" ? "接續 →" : "Resume →"}</button>
     </div>`;
   attachActionGroupListeners(box);
   const copyBtn = box.querySelector("[data-copy-handoff]");
@@ -166,16 +166,16 @@ export function normalizePathKey(value) {
 
 export async function loadRepoSnapshot() {
   try {
-    state.repoSnapshotCache = await getJSON("/api/v1/repos/sync-snapshot");
+    state.projects.repoSnapshot = await getJSON("/api/v1/repos/sync-snapshot");
   } catch (e) {
-    state.repoSnapshotCache = null;
+    state.projects.repoSnapshot = null;
   }
-  if (state.projectsCache.length) renderProjects();
+  if (state.projects.cache.length) renderProjects();
 }
 
 export function repoSnapshotFor(project) {
-  if (!state.repoSnapshotCache || !state.repoSnapshotCache.available) return null;
-  const repos = state.repoSnapshotCache.repositories || [];
+  if (!state.projects.repoSnapshot || !state.projects.repoSnapshot.available) return null;
+  const repos = state.projects.repoSnapshot.repositories || [];
   const pathKey = normalizePathKey(project.local_path);
   if (pathKey) {
     const byPath = repos.find(r => normalizePathKey(r.path) === pathKey);
@@ -186,7 +186,7 @@ export function repoSnapshotFor(project) {
 }
 
 export function projectChips(p) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const chips = [];
   const repo = repoSnapshotFor(p);
   if (repo) {
@@ -204,7 +204,7 @@ export function projectChips(p) {
       chips.push(`<span class="pchip ${entry[1]}" title="${esc(title)}">${esc(entry[0])}${dirty}</span>`);
     }
   }
-  const proposals = ((state.secretaryProposalsCache || {}).proposals || []).filter(
+  const proposals = ((state.secretary.proposals || {}).proposals || []).filter(
     item => item.project_key === p.project_key || item.project_key === p.display_name
   );
   if (proposals.length) {
@@ -216,19 +216,19 @@ export function projectChips(p) {
 
 export function renderProjects() {
   const box = $("projects-list");
-  if (!state.projectsCache.length) {
+  if (!state.projects.cache.length) {
     box.innerHTML = `<div class="placeholder">${t("ph_no_projects")}</div>`;
     return;
   }
 
-  const activeProjects = state.projectsCache.filter(p => (p.idle_days == null || p.idle_days <= 60));
-  const idleProjects = state.projectsCache.filter(p => (p.idle_days != null && p.idle_days > 60));
+  const activeProjects = state.projects.cache.filter(p => (p.idle_days == null || p.idle_days <= 60));
+  const idleProjects = state.projects.cache.filter(p => (p.idle_days != null && p.idle_days > 60));
 
   // 決定渲染之專案清單
-  let listToRender = state.projectsCache;
-  if (!state.showAllProjects) {
-    if (state.expandedProject && !activeProjects.some(p => p.project_key === state.expandedProject)) {
-      const exp = idleProjects.find(p => p.project_key === state.expandedProject);
+  let listToRender = state.projects.cache;
+  if (!state.projects.showAll) {
+    if (state.projects.expandedKey && !activeProjects.some(p => p.project_key === state.projects.expandedKey)) {
+      const exp = idleProjects.find(p => p.project_key === state.projects.expandedKey);
       listToRender = exp ? [...activeProjects, exp] : activeProjects;
     } else {
       listToRender = activeProjects;
@@ -237,7 +237,7 @@ export function renderProjects() {
 
   const pCountEl = $("projects-count");
   if (pCountEl) {
-    pCountEl.textContent = `${t("active_workstreams")} · ${state.showAllProjects ? state.projectsCache.length : activeProjects.length + ' / ' + state.projectsCache.length}`;
+    pCountEl.textContent = `${t("active_workstreams")} · ${state.projects.showAll ? state.projects.cache.length : activeProjects.length + ' / ' + state.projects.cache.length}`;
   }
 
   let projectsHtml = listToRender.map(p => {
@@ -245,7 +245,7 @@ export function renderProjects() {
       : (p.open_loops_count > 0 ? "var(--warn)" : "var(--bd)");
     const loopColor = p.open_loops_count >= 3 ? "var(--orange)"
       : (p.open_loops_count > 0 ? "var(--tx)" : "var(--mu)");
-    const open = state.expandedProject === p.project_key;
+    const open = state.projects.expandedKey === p.project_key;
 
     let ghBadge = "";
     if (p.github) {
@@ -291,7 +291,7 @@ export function renderProjects() {
     toggleHtml = `
       <div style="text-align:center; padding:12px 0 10px; margin-top:6px; border-top:1px dashed var(--bd);">
         <button id="btn-toggle-idle-projects" class="btn" style="background:var(--s2); border:1px solid var(--bd); color:var(--tx); font-size:11.5px; font-weight:600; padding:6px 16px; cursor:pointer;" title="切換超過 60 天未活躍的專案">
-          ${state.showAllProjects
+          ${state.projects.showAll
             ? t("btn_collapse_projects")
             : t("btn_show_more_projects", { count: idleProjects.length })
           }
@@ -307,7 +307,7 @@ export function renderProjects() {
   if (toggleBtn) {
     toggleBtn.addEventListener("click", (ev) => {
       ev.stopPropagation();
-      state.showAllProjects = !state.showAllProjects;
+      state.projects.showAll = !state.projects.showAll;
       renderProjects();
     });
   }
@@ -315,20 +315,20 @@ export function renderProjects() {
   box.querySelectorAll(".pitem").forEach(item => {
     item.querySelector(".prow").addEventListener("click", () => {
       const key = item.dataset.key;
-      expandProject(state.expandedProject === key ? null : key);
+      expandProject(state.projects.expandedKey === key ? null : key);
     });
   });
 
-  if (state.expandedProject) renderProjectDetail(state.expandedProject);
+  if (state.projects.expandedKey) renderProjectDetail(state.projects.expandedKey);
 }
 
 export function expandProject(key, scroll) {
   if (key) {
     // 若要展開的專案屬於 60 天以上閒置專案，自動切換至顯示全部
-    const isIdle = state.projectsCache.some(p => p.project_key === key && p.idle_days > 60);
-    if (isIdle) state.showAllProjects = true;
+    const isIdle = state.projects.cache.some(p => p.project_key === key && p.idle_days > 60);
+    if (isIdle) state.projects.showAll = true;
   }
-  state.expandedProject = key;
+  state.projects.expandedKey = key;
   renderProjects();
   if (key && scroll) {
     setTimeout(() => {
@@ -344,12 +344,12 @@ export async function renderProjectDetail(key) {
   const slot = item.querySelector(".pdetail-slot");
   slot.innerHTML = `<div class="pdetail"><div class="placeholder">${t("ph_loading_projects")}</div></div>`;
 
-  const proj = state.projectsCache.find(p => p.project_key === key);
+  const proj = state.projects.cache.find(p => p.project_key === key);
   let events = [];
   try {
     events = await getJSON(`/api/v1/events/recent?limit=30&project=${encodeURIComponent(key)}`);
   } catch (e) {
-    events = state.recentEvents.filter(e => (e.project || "") === key || (proj && (e.project || "") === proj.display_name));
+    events = state.feed.recentEvents.filter(e => (e.project || "") === key || (proj && (e.project || "") === proj.display_name));
   }
 
   let loops = [];
@@ -375,7 +375,7 @@ export async function renderProjectDetail(key) {
           <div class="context-session-meta">${chips}</div>
         </article>`;
       }).join("")
-    : `<div class="placeholder" style="padding:0">${state.currentLang === "zh-TW" ? "近 72 小時沒有可歸戶的工作階段。" : "No canonical work session in the last 72 hours."}</div>`;
+    : `<div class="placeholder" style="padding:0">${state.ui.currentLang === "zh-TW" ? "近 72 小時沒有可歸戶的工作階段。" : "No canonical work session in the last 72 hours."}</div>`;
 
   // 提取該專案近期異動的檔案清單
   const fileEvents = events.filter(e => e.type === "file");
@@ -456,7 +456,7 @@ export async function renderProjectDetail(key) {
           <code style="font-size:11.5px; background:transparent; color:var(--tx); word-break:break-all;">${esc(proj.local_path || '尚未定位到本機路徑')}</code>
         </div>
         <div style="display:flex; gap:8px; align-items:center; flex-shrink:0;">
-          <button class="btn" data-detail-handoff="${esc(proj.project_key)}" data-name="${esc(proj.display_name)}" style="background:var(--s2); border:1px solid var(--bd); color:var(--tx); font-weight:600; font-size:11.5px; padding:4px 10px; cursor:pointer;" title="${state.currentLang === 'zh-TW' ? '一鍵複製結構化接續 Prompt 貼入 AI 開工' : 'Copy structured handoff prompt for AI'}">${t("btn_copy_handoff")}</button>
+          <button class="btn" data-detail-handoff="${esc(proj.project_key)}" data-name="${esc(proj.display_name)}" style="background:var(--s2); border:1px solid var(--bd); color:var(--tx); font-weight:600; font-size:11.5px; padding:4px 10px; cursor:pointer;" title="${state.ui.currentLang === 'zh-TW' ? '一鍵複製結構化接續 Prompt 貼入 AI 開工' : 'Copy structured handoff prompt for AI'}">${t("btn_copy_handoff")}</button>
           ${renderActionGroup(proj)}
         </div>
       </div>`;
@@ -483,7 +483,7 @@ export async function renderProjectDetail(key) {
       <div class="pdetail-sessions">
         <span class="mono-label">${t("sec_sessions")}</span>
         ${sessionsHtml}
-        <div class="context-memory-boundary">${state.currentLang === "zh-TW" ? "依專案與事件間隔推定，不代表實際工時。" : "Inferred from event gaps; not actual working time."}</div>
+        <div class="context-memory-boundary">${state.ui.currentLang === "zh-TW" ? "依專案與事件間隔推定，不代表實際工時。" : "Inferred from event gaps; not actual working time."}</div>
       </div>
       ${ghSection}
     </div>`;
@@ -504,9 +504,9 @@ export async function renderProjectDetail(key) {
 // ---------------------------------------------------------------- focus carousel (observed open loops + proposal-only suggestions)
 export async function loadOpenLoops() {
   try {
-    state.loopsCache = await getJSON("/api/v1/open-loops");
+    state.projects.loops = await getJSON("/api/v1/open-loops");
   } catch (e) {
-    state.loopsCache = [];
+    state.projects.loops = [];
   }
   renderOpenLoops();
 }
@@ -520,7 +520,7 @@ export function buildFocusCarouselItems() {
   const now = Date.now();
   const candidates = [];
 
-  for (const loop of state.loopsCache) {
+  for (const loop of state.projects.loops) {
     const lastSeen = focusDateMs(loop.last_seen_at || loop.created_at);
     const ageDays = lastSeen ? Math.max(0, (now - lastSeen) / 86400000) : 30;
     // Open Loop 沒有人工 priority 欄位，因此只用可檢查的來源信心與時間排序，
@@ -539,7 +539,7 @@ export function buildFocusCarouselItems() {
     });
   }
 
-  for (const proposal of state.secretaryProposalsCache?.proposals || []) {
+  for (const proposal of state.secretary.proposals?.proposals || []) {
     candidates.push({
       key: `proposal:${proposal.proposal_id}`,
       kind: "proposal",
@@ -580,22 +580,22 @@ export function renderFocusCarousel() {
   const tally = $("loop-tally");
   if (!box || !tally) return;
 
-  state.focusCarouselItems = buildFocusCarouselItems();
-  tally.textContent = `${state.focusCarouselItems.length}/5 · ${state.loopsCache.length}`;
-  if (!state.focusCarouselItems.length) {
+  state.focus.items = buildFocusCarouselItems();
+  tally.textContent = `${state.focus.items.length}/5 · ${state.projects.loops.length}`;
+  if (!state.focus.items.length) {
     box.innerHTML = `<div class="placeholder">${t("ph_no_loops")}</div>`;
     return;
   }
-  state.focusCarouselIndex = Math.min(state.focusCarouselIndex, state.focusCarouselItems.length - 1);
-  const item = state.focusCarouselItems[state.focusCarouselIndex];
+  state.focus.index = Math.min(state.focus.index, state.focus.items.length - 1);
+  const item = state.focus.items[state.focus.index];
   const observed = item.kind === "open_loop";
   const source = observed ? t("focus_observed") : t("focus_proposal");
   const priority = observed ? source : String(item.priority || "medium").toUpperCase();
   const action = observed
     ? `<button class="focus-action focus-resolve-btn" data-resolve="${item.loop_id}">${t("focus_resolve")}</button>`
     : `<button class="focus-action focus-secondary-action" data-focus-snooze="1">${t("focus_snooze")}</button>`;
-  const dots = state.focusCarouselItems.map((candidate, index) => `
-    <button class="focus-dot ${index === state.focusCarouselIndex ? "active" : ""}" data-focus-index="${index}" aria-label="${esc(t("focus_count", {current: index + 1, total: state.focusCarouselItems.length, open: state.loopsCache.length}))}" aria-current="${index === state.focusCarouselIndex ? "true" : "false"}"></button>`
+  const dots = state.focus.items.map((candidate, index) => `
+    <button class="focus-dot ${index === state.focus.index ? "active" : ""}" data-focus-index="${index}" aria-label="${esc(t("focus_count", {current: index + 1, total: state.focus.items.length, open: state.projects.loops.length}))}" aria-current="${index === state.focus.index ? "true" : "false"}"></button>`
   ).join("");
 
   box.innerHTML = `
@@ -606,19 +606,19 @@ export function renderFocusCarousel() {
       </div>
       <div class="focus-project">${esc(item.project_key)}</div>
       <h2 class="focus-title" title="${esc(item.title)}">${esc(item.title)}</h2>
-      <div class="focus-detail">${esc(item.detail || (state.currentLang === "zh-TW" ? "可回到專案查看來源與下一步。" : "Open the project to review its source and next step."))}</div>
+      <div class="focus-detail">${esc(item.detail || (state.ui.currentLang === "zh-TW" ? "可回到專案查看來源與下一步。" : "Open the project to review its source and next step."))}</div>
       <div class="focus-card-bottom">
         <div class="focus-controls">
           <button class="focus-nav" data-focus-prev aria-label="${esc(t("focus_previous"))}">←</button>
           <div class="focus-dots">${dots}</div>
           <button class="focus-nav" data-focus-next aria-label="${esc(t("focus_next"))}">→</button>
-          <button class="focus-nav focus-toggle" data-focus-toggle aria-label="${esc(state.focusCarouselUserPaused ? t("focus_play") : t("focus_pause"))}" aria-pressed="${state.focusCarouselUserPaused}">${state.focusCarouselUserPaused ? "▶" : "Ⅱ"}</button>
+          <button class="focus-nav focus-toggle" data-focus-toggle aria-label="${esc(state.focus.userPaused ? t("focus_play") : t("focus_pause"))}" aria-pressed="${state.focus.userPaused}">${state.focus.userPaused ? "▶" : "Ⅱ"}</button>
         </div>
         <div class="focus-actions">
           <button class="focus-action focus-primary-action" data-focus-project="${esc(item.project_key)}">${t("focus_view_project")}</button>
           ${action}
         </div>
-        <div class="focus-boundary">${t("focus_boundary")} · ${t("focus_count", {current: state.focusCarouselIndex + 1, total: state.focusCarouselItems.length, open: state.loopsCache.length})}</div>
+        <div class="focus-boundary">${t("focus_boundary")} · ${t("focus_count", {current: state.focus.index + 1, total: state.focus.items.length, open: state.projects.loops.length})}</div>
       </div>
     </article>`;
 }
@@ -627,41 +627,41 @@ export function focusProject(projectKey) {
   if (!projectKey) return;
   const tabBtn = document.querySelector('.tabs button[data-tab="tab-projects"]');
   if (tabBtn) tabBtn.click();
-  const isIdle = state.projectsCache.some(project => project.project_key === projectKey && project.idle_days > 60);
-  if (isIdle) state.showAllProjects = true;
+  const isIdle = state.projects.cache.some(project => project.project_key === projectKey && project.idle_days > 60);
+  if (isIdle) state.projects.showAll = true;
   expandProject(projectKey, true);
-  showToast(state.currentLang === "zh-TW" ? `🎯 已定位並展開專案: ${projectKey}` : `🎯 Focused project: ${projectKey}`);
+  showToast(state.ui.currentLang === "zh-TW" ? `🎯 已定位並展開專案: ${projectKey}` : `🎯 Focused project: ${projectKey}`);
 }
 
 export function initFocusCarousel() {
   const box = $("open-loops-list");
   if (!box) return;
 
-  box.addEventListener("mouseenter", () => { state.focusCarouselPointerPaused = true; });
-  box.addEventListener("mouseleave", () => { state.focusCarouselPointerPaused = false; });
-  box.addEventListener("focusin", () => { state.focusCarouselPointerPaused = true; });
-  box.addEventListener("focusout", () => { state.focusCarouselPointerPaused = false; });
+  box.addEventListener("mouseenter", () => { state.focus.pointerPaused = true; });
+  box.addEventListener("mouseleave", () => { state.focus.pointerPaused = false; });
+  box.addEventListener("focusin", () => { state.focus.pointerPaused = true; });
+  box.addEventListener("focusout", () => { state.focus.pointerPaused = false; });
   box.addEventListener("click", event => {
     const target = event.target.closest("button");
     if (!target) return;
     if (target.dataset.focusIndex !== undefined) {
-      state.focusCarouselIndex = Number(target.dataset.focusIndex);
+      state.focus.index = Number(target.dataset.focusIndex);
       renderFocusCarousel();
     } else if (target.hasAttribute("data-focus-prev")) {
-      state.focusCarouselIndex = (state.focusCarouselIndex - 1 + state.focusCarouselItems.length) % state.focusCarouselItems.length;
+      state.focus.index = (state.focus.index - 1 + state.focus.items.length) % state.focus.items.length;
       renderFocusCarousel();
     } else if (target.hasAttribute("data-focus-next")) {
-      state.focusCarouselIndex = (state.focusCarouselIndex + 1) % state.focusCarouselItems.length;
+      state.focus.index = (state.focus.index + 1) % state.focus.items.length;
       renderFocusCarousel();
     } else if (target.hasAttribute("data-focus-toggle")) {
-      state.focusCarouselUserPaused = !state.focusCarouselUserPaused;
+      state.focus.userPaused = !state.focus.userPaused;
       renderFocusCarousel();
     } else if (target.dataset.focusProject) {
       focusProject(target.dataset.focusProject);
     } else if (target.dataset.resolve) {
       resolveLoop(target.closest(".focus-card"));
     } else if (target.dataset.focusSnooze) {
-      const item = state.focusCarouselItems[state.focusCarouselIndex];
+      const item = state.focus.items[state.focus.index];
       if (item) window.snoozeProposal(item.proposal_type, item.project_key, item.subject_ref, 7);
     }
   });
@@ -670,9 +670,9 @@ export function initFocusCarousel() {
     if (!document.hidden) renderFocusCarousel();
   });
   if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    state.focusCarouselTimer = window.setInterval(() => {
-      if (document.hidden || state.focusCarouselUserPaused || state.focusCarouselPointerPaused || state.focusCarouselItems.length < 2) return;
-      state.focusCarouselIndex = (state.focusCarouselIndex + 1) % state.focusCarouselItems.length;
+    state.focus.timer = window.setInterval(() => {
+      if (document.hidden || state.focus.userPaused || state.focus.pointerPaused || state.focus.items.length < 2) return;
+      state.focus.index = (state.focus.index + 1) % state.focus.items.length;
       renderFocusCarousel();
     }, 9000);
   }
@@ -690,8 +690,8 @@ export async function resolveLoop(el) {
   }
   try {
     await postJSON(`/api/v1/open-loops/${id}/resolve`);
-    state.loopsCache = state.loopsCache.filter(loop => String(loop.id) !== String(id));
-    showToast(state.currentLang === "zh-TW" ? "⚡ 未結事項已標記為已結案！" : "⚡ Marked open loop as resolved!");
+    state.projects.loops = state.projects.loops.filter(loop => String(loop.id) !== String(id));
+    showToast(state.ui.currentLang === "zh-TW" ? "⚡ 未結事項已標記為已結案！" : "⚡ Marked open loop as resolved!");
     setTimeout(() => { renderOpenLoops(); loadSecretaryProposals(); loadProjects(); }, 550);
   } catch (e) {
     el.classList.remove("done");

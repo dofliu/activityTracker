@@ -1,0 +1,194 @@
+
+        <div class="panel" id="panel-rag">
+          <div class="panel-head">
+            <span class="mono-label accent">📚</span><span class="panel-title" data-i18n="rag_merged_title">知識庫與 RAG（完整對話、引用與索引管理）</span>
+            <span class="muted small" data-i18n="rag_merged_note">與 01 小秘書交辦框共用同一條對話與歷史</span>
+          </div>
+          <div style="padding: 14px;">
+        <div class="two-col" style="grid-template-columns: 340px 1fr; gap: 14px;">
+          
+          <!-- 左欄：資料夾管理與掃描進度 -->
+          <div class="side" style="display: flex; flex-direction: column; gap: 12px;">
+            <div class="panel" style="padding: 12px;">
+              <div class="panel-head mb-8" style="padding: 0 0 6px 0; border-bottom: 1px solid var(--bd);">
+                <span class="mono-label accent">📂 知識庫目錄</span>
+                <div style="display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end;">
+                  <button class="btn btn-primary btn-sm" id="btn-rag-scan-now" title="以設定上限啟動增量索引">⚡ 掃描索引</button>
+                  <button class="btn btn-ghost btn-sm" id="btn-rag-pause" disabled="">⏸ 暫停</button>
+                  <button class="btn btn-ghost btn-sm" id="btn-rag-resume" disabled="">▶ 恢復</button>
+                  <button class="btn btn-ghost btn-sm" id="btn-rag-cancel" disabled="" style="color:var(--danger);">取消</button>
+                </div>
+              </div>
+              
+              <div class="input-row mb-8" style="flex-direction: column; gap: 6px;">
+                <input type="text" id="input-rag-folder-path" placeholder="輸入要索引的本機目錄路徑…" style="width: 100%; font-size: 11px;">
+                <div style="display: flex; gap: 6px;">
+                  <input type="text" id="input-rag-folder-name" placeholder="目錄別名 (選填)" style="flex: 1; font-size: 11px;">
+                  <button class="btn btn-ghost btn-sm" id="btn-rag-add-folder">+ 加入</button>
+                </div>
+                <div style="display:flex; gap:6px; align-items:center; font-size:10px; color:var(--mu);">
+                  <label style="display:flex; gap:3px; align-items:center;">本次上限
+                    <input id="input-rag-max-files" type="number" min="1" value="500" style="width:58px; font-size:10px; padding:3px;">
+                    檔
+                  </label>
+                  <label style="display:flex; gap:3px; align-items:center;">間隔
+                    <input id="input-rag-throttle-ms" type="number" min="0" value="25" style="width:48px; font-size:10px; padding:3px;">
+                    ms
+                  </label>
+                </div>
+              </div>
+
+              <!-- 即時索引進度條 -->
+              <div id="rag-progress-box" class="rag-progress-card mb-8" style="display: block; padding: 8px; background: var(--bg-hover); border-radius: 4px; border: 1px solid var(--bd);">
+                <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                  <span id="rag-progress-status" class="mono-mini accent">✅ 索引完成</span>
+                  <span id="rag-progress-percent" class="mono-mini">100%</span>
+                </div>
+                <div class="usage-progress" style="height: 6px; margin-bottom: 4px;"><span id="rag-progress-bar" style="width: 100%;"></span></div>
+                 <div id="rag-progress-detail" class="muted small" style="font-size: 10px;">索引完成</div>
+               </div>
+
+               <div id="rag-storage-card" class="rag-storage-card mb-8"><div class="rag-storage-grid">
+      <span>來源檔案 2</span><span>來源大小 200 KB</span>
+      <span>資料庫切片 51</span><span>向量 待驗證</span>
+      <span>索引空間 待驗證</span><span>SQLite 1.1 MB</span>
+      <span>Chroma 目錄 0 B</span><span>可回收 無法判斷</span>
+    </div><div class="rag-storage-alert">尚未以獨立 worker 驗證 Chroma／BM25，請按「驗證索引與空間」。</div><div class="rag-storage-alert">讀不到 chroma.sqlite3 的 segments 表（no_chroma_sqlite），無法分辨哪些片段是刪掉沒回收的；不會刪任何東西。</div></div>
+               <button class="btn btn-ghost btn-sm" id="btn-rag-verify-index" style="width:100%; margin-top:-4px; margin-bottom:8px;">✓ 驗證索引與空間</button>
+               <button class="btn btn-ghost btn-sm" id="btn-rag-rebuild-bm25" style="width:100%; margin-top:-4px; margin-bottom:8px;">↻ 從 Chroma 重建 BM25</button>
+               <button class="btn btn-ghost btn-sm" id="btn-rag-compact-chroma" style="width:100%; margin-top:-4px; margin-bottom:8px;" title="Chroma 刪除 collection 只做邏輯刪除，磁碟不會變小。這裡刪掉不被引用的舊片段目錄並 VACUUM，不動現有索引、來源檔或對話。">🧹 回收 Chroma 空間</button>
+               <button class="btn btn-ghost btn-sm" id="btn-rag-memory-sync" style="width:100%; margin-top:-4px; margin-bottom:8px;" title="把秘書寫出的報告檔（Handoff、同步報告、STATUS 草稿、每日入口）併入知識庫，並清掉舊版重複的活動切片（獨立 worker 執行）。筆記與活動記憶在本機 semantic index，不需要這一步（ADR-023）">📄 併入秘書報告檔</button>
+
+               <div id="rag-retrieval-card" class="rag-storage-card mb-8" title="檢索在常駐子程序執行；主服務不載入 Chroma／BM25。狀態為程序內即時狀態。"><div class="rag-storage-grid"><span>模式 常駐 worker</span><span>狀態 尚未啟動（第一次提問時才載入索引）</span></div><div class="rag-storage-alert">尚無索引，不需預熱。</div></div>
+               <div style="display:flex; gap:6px; margin-top:-4px; margin-bottom:8px;">
+                 <button class="btn btn-ghost btn-sm" id="btn-rag-retrieval-warmup" style="flex:1;">🔥 預熱檢索 worker</button>
+                 <button class="btn btn-ghost btn-sm" id="btn-rag-retrieval-release" style="flex:1;" disabled="">💤 釋放記憶體</button>
+               </div>
+
+               <div id="rag-folders-list" class="taglist" style="max-height: 180px; overflow-y: auto;">
+      <div class="rag-folder-card">
+        <div class="rag-folder-info">
+          <div class="rag-folder-name">研究文件 "雙引號" &lt;b&gt;粗體&lt;/b&gt; &amp; '單引號' &lt;img src=x onerror=1&gt; <span class="mono-mini muted">(2 檔案)</span></div>
+          <div class="rag-folder-path" title="/omni/docs">/omni/docs</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" data-action="delete-rag-folder" data-folder-id="1" title="移除此資料夾的索引，保留原始檔案" style="color:var(--danger); padding:2px 6px;">移除索引</button>
+      </div>
+    </div>
+               <button class="btn btn-ghost btn-sm" id="btn-rag-clear-index" style="color:var(--danger); width:100%; margin-top:8px;">🗑 清空所有 RAG 索引</button>
+             </div>
+
+            <!-- 已索引檔案清單 -->
+            <div class="panel" style="padding: 12px; flex: 1;">
+              <div class="panel-head mb-8" style="padding: 0 0 6px 0; border-bottom: 1px solid var(--bd);">
+                <span class="mono-label">📑 已索引檔案 (<span id="rag-total-files-count">0</span>)</span>
+                <span id="rag-total-chunks-count" class="mono-mini muted">51 切片</span>
+              </div>
+              <input type="text" id="input-rag-file-search" placeholder="搜尋檔案名稱或路徑…" style="width: 100%; font-size: 11px; margin-bottom: 8px;">
+              <div id="rag-files-list" class="sidelist" style="max-height: 240px; overflow-y: auto;">
+                <div class="placeholder">載入已索引檔案…</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右欄：多模型 RAG 對話與引文 -->
+          <article class="panel" style="display: flex; flex-direction: column; height: calc(100vh - 150px); min-height: 540px;">
+            <!-- 對話頂部控制列 -->
+            <div class="panel-head" style="flex-wrap: wrap; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--bd); background: var(--bg-head);">
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <select id="select-rag-session" style="font-size: 12px; padding: 3px 8px; max-width: 160px;"><option value="">➕ 建立新對話</option><option value="lock-chat-1">💬 離岸風電的容量因數 "雙引號" &lt;b&gt;粗體&lt;/b&gt; &amp; '單引號' &lt;img src=x onerror=1&gt;</option></select>
+                <button class="btn btn-ghost btn-sm" id="btn-rag-new-chat" title="開新對話">+ 新對話</button>
+                <button class="btn btn-ghost btn-sm" id="btn-rag-del-chat" title="刪除當前對話" style="color: var(--danger);">🗑</button>
+              </div>
+
+              <div style="display: flex; gap: 8px; align-items: center; margin-left: auto; flex-wrap: wrap;">
+                <!-- 提供者選擇 -->
+                <select id="select-rag-provider" style="font-size: 12px; padding: 3px 8px;">
+                  <option value="ollama">Ollama (本機離線)</option>
+                  <option value="gemini">Google Gemini</option>
+                  <option value="claude">Anthropic Claude</option>
+                  <option value="openai">OpenAI</option>
+                </select>
+
+                <!-- 模型選擇 -->
+                <select id="select-rag-model" style="font-size: 12px; padding: 3px 8px; min-width: 120px;">
+      <option value="llama3.1:8b" selected="">llama3.1:8b (預設)</option>
+    
+      <option value="mistral:7b">mistral:7b</option>
+    
+      <option value="gemma4:e4b">gemma4:e4b</option>
+    
+      <option value="qwen3:4b">qwen3:4b</option>
+    </select>
+
+                <!-- 檢索策略 -->
+                <select id="select-rag-strategy" style="font-size: 12px; padding: 3px 8px;" title="選擇檢索融合演算法">
+      <option value="hybrid_rrf" selected="">Hybrid RRF (向量 + BM25 倒數排名融合)</option>
+    
+      <option value="weighted_fusion">Weighted Linear Fusion (線性加權融合)</option>
+    
+      <option value="vector_only">Dense 向量檢索 (FastEmbed Vector Only)</option>
+    
+      <option value="bm25_only">BM25 關鍵字全文檢索 (Sparse Keyword Only)</option>
+    </select>
+
+                <label class="setting-check" style="font-size: 12px;" title="開啟文件檢索增強生成">
+                  <input type="checkbox" id="toggle-enable-rag" checked="">
+                  <span>啟用 RAG</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- 對話歷史訊息流 -->
+            <div id="rag-chat-messages" class="rag-chat-stream" style="flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px;">
+      <div class="rag-msg user">
+        <div class="rag-msg-bubble markdown">容量因數怎麼算？</div>
+        <div class="rag-msg-meta">
+          <span>YOU</span>
+          <span>2026-09-19T23:20:26</span>
+        </div>
+      </div>
+    
+      <div class="rag-msg assistant">
+        <div class="rag-msg-bubble markdown"><p>容量因數＝實際發電量 ÷ 額定容量 × 時間。"雙引號" <b>粗體</b> &amp; '單引號' <img src="x" onerror="1"></p>
+
+        <div class="rag-citations-box">
+          <div class="rag-citations-title">📌 參考文檔來源 (1 個切片)：</div>
+          
+            <div class="rag-citation-card">
+              <div class="rag-citation-head">
+                <div class="rag-citation-filename">《文件》</div>
+                <div class="rag-citation-tags">
+                  <span class="rag-citation-tag">第 12 頁</span>
+                  
+                  
+                  <span class="rag-citation-tag score">相關度 undefined</span>
+                  <button class="rag-btn-open" data-action="open-rag-file" data-path="" title="在 Windows 總管開啟並選中">📂 在總管開啟</button>
+                </div>
+              </div>
+              <div class="rag-citation-content"></div>
+            </div>
+          
+        </div>
+      </div>
+        <div class="rag-msg-meta">
+          <span>AI (gemini · lock-model-1)</span>
+          <span>2026-09-20T00:20:26</span>
+        </div>
+      </div>
+    </div>
+
+            <!-- 對話輸入列 -->
+            <div class="rag-input-box" style="padding: 10px 14px; border-top: 1px solid var(--bd); background: var(--bg-head);">
+              <div style="display: flex; gap: 8px; align-items: flex-end;">
+                <textarea id="input-rag-prompt" rows="2" placeholder="問問你的本機文件與專案程式碼… (Ctrl + Enter 發送)" style="flex: 1; resize: none; font-size: 13px; padding: 8px 10px; border-radius: 6px;"></textarea>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <button class="btn btn-primary" id="btn-rag-send" style="padding: 8px 16px;">發送 ⚡</button>
+                  <button class="btn btn-ghost btn-sm" id="btn-rag-clear" title="清空對話視窗">清空</button>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+          </div>
+        </div>
+      

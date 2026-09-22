@@ -52,9 +52,40 @@ def pane_files() -> list[Path]:
 
 def test_meta_matches_the_panes_on_disk():
     data = meta()
-    expected = sorted(f"{tab}.{lang}.html" for tab in data["tabs"] for lang in data["langs"])
+    expected = sorted(
+        [f"{tab}.{lang}.html" for tab in data["tabs"] for lang in data["langs"]]
+        + [f"{scene['name']}.{lang}.html" for scene in data["scenes"] for lang in data["langs"]]
+    )
     assert [p.name for p in pane_files()] == expected
-    assert len(expected) == 12, f"預期 6 分頁 × 2 語言，實際 {len(expected)}"
+    assert len(expected) == 22, f"預期 (6 分頁 ＋ 5 場景) × 2 語言，實際 {len(expected)}"
+
+
+def test_every_scene_actually_changed_something():
+    """場景快照和它那一頁的第一畫面必須不同。
+
+    一樣就代表那個互動什麼都沒做——選擇器失效、按鈕改名、面板被移走都會長這樣，而且
+    `check` 依然全綠（兩邊都退化成同一張第一畫面）。這是場景最容易爛掉的方式。
+    """
+    data = meta()
+    idle = []
+    for scene in data["scenes"]:
+        for lang in data["langs"]:
+            after = (PANE_DIR / f"{scene['name']}.{lang}.html").read_text(encoding="utf-8")
+            before = (PANE_DIR / f"{scene['tab']}.{lang}.html").read_text(encoding="utf-8")
+            if after == before:
+                idle.append(f"{scene['name']}.{lang}")
+    assert idle == [], f"這些場景和第一畫面一模一樣，等於沒做互動：{idle}"
+
+
+def test_scenes_cover_the_shared_values_the_refactor_will_touch():
+    """場景挑的不是隨便五個動作，而是五組會讀寫共享值的動作。少一組就是少一份證據。"""
+    assert sorted(s["name"] for s in meta()["scenes"]) == [
+        "knowledge-session",    # currentRagSessionId / ragChatHistory
+        "projects-expand",      # expandedProject / showAllProjects / projectsCache
+        "settings-feed-git",    # activeFilter / recentEvents
+        "settings-pane-llm",    # currentConfig
+        "summaries-week",       # summaryView / summariesCache
+    ]
 
 
 def test_meta_pins_everything_that_would_otherwise_drift():
@@ -111,7 +142,7 @@ def test_quote_escaping_is_visible_in_the_corpus():
 
 def test_api_fixtures_are_complete_and_parse():
     files = sorted(API_DIR.glob("*.json"))
-    assert len(files) >= 30, f"API 罐頭只有 {len(files)} 個，開機時問的端點不只這些"
+    assert len(files) >= 35, f"API 罐頭只有 {len(files)} 個，開機與互動問的端點不只這些"
     for path in files:
         payload = json.loads(path.read_text(encoding="utf-8"))
         for key in ("url", "status", "content_type", "body"):
@@ -122,7 +153,8 @@ def test_api_fixtures_are_complete_and_parse():
 
 def test_fixtures_carry_no_machine_specific_paths():
     """錄製時的臨時 home 與 checkout 路徑要被換掉，語料才不綁在某一台機器上。"""
-    forbidden = ("/home/user", "/tmp/omni-dom-lock-", "/root/", "C:\\\\Users")
+    # Windows 路徑在 HTML 快照裡是 `C:\\Users`，在 JSON 罐頭裡會被跳脫成 `C:\\\\Users`，兩種都要擋。
+    forbidden = ("/home/user", "/tmp/omni-dom-lock-", "/root/", "C:\\Users", "C:\\\\Users")
     offenders = []
     for path in sorted(API_DIR.glob("*.json")) + pane_files():
         text = path.read_text(encoding="utf-8")

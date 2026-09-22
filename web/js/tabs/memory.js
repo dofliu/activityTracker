@@ -32,7 +32,7 @@ export function parseMemoryCommand(text) {
 }
 
 export function memoryKindLabel(kind) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   return ({
     user_note: zh ? "筆記" : "note",
     preference: zh ? "偏好" : "preference",
@@ -42,8 +42,8 @@ export function memoryKindLabel(kind) {
 }
 
 export async function rememberFromChat(cmd, rawPrompt) {
-  const zh = state.currentLang === "zh-TW";
-  state.ragChatHistory.push({ role: "user", content: rawPrompt, time: new Date().toLocaleTimeString() });
+  const zh = state.ui.currentLang === "zh-TW";
+  state.rag.history.push({ role: "user", content: rawPrompt, time: new Date().toLocaleTimeString() });
   let reply;
   try {
     const note = await postJSON("/api/v1/secretary/memory", { ...cmd, source: "chat" });
@@ -54,7 +54,7 @@ export async function rememberFromChat(cmd, rawPrompt) {
   } catch (e) {
     reply = (zh ? "沒有記下：" : "Not saved: ") + e.message;
   }
-  state.ragChatHistory.push({ role: "assistant", content: reply, citations: [], time: new Date().toLocaleTimeString() });
+  state.rag.history.push({ role: "assistant", content: reply, citations: [], time: new Date().toLocaleTimeString() });
   renderRAGMessages();
 }
 
@@ -63,11 +63,11 @@ export async function loadMemoryPanel() {
   const badge = $("memory-badge");
   if (!list) return;
   try {
-    state.memoryCache = await getJSON("/api/v1/secretary/memory?limit=60");
-    try { state.memoryProfileCache = await getJSON("/api/v1/secretary/profile"); } catch (_) { state.memoryProfileCache = null; }
+    state.memory.notes = await getJSON("/api/v1/secretary/memory?limit=60");
+    try { state.memory.profile = await getJSON("/api/v1/secretary/profile"); } catch (_) { state.memory.profile = null; }
   } catch (e) {
-    state.memoryCache = null;
-    list.innerHTML = `<div class="placeholder">${state.currentLang === "zh-TW" ? "記憶區暫時讀不到。" : "Memory unavailable."}</div>`;
+    state.memory.notes = null;
+    list.innerHTML = `<div class="placeholder">${state.ui.currentLang === "zh-TW" ? "記憶區暫時讀不到。" : "Memory unavailable."}</div>`;
     if (badge) { badge.textContent = "—"; badge.className = "trust noisy"; }
     return;
   }
@@ -78,17 +78,17 @@ export function renderMemoryList() {
   const list = $("memory-list");
   const badge = $("memory-badge");
   const clearBtn = $("btn-memory-clear-obs");
-  if (!list || !state.memoryCache) return;
-  const zh = state.currentLang === "zh-TW";
-  const notes = state.memoryCache.notes || [];
-  const counts = state.memoryCache.counts || {};
+  if (!list || !state.memory.notes) return;
+  const zh = state.ui.currentLang === "zh-TW";
+  const notes = state.memory.notes.notes || [];
+  const counts = state.memory.notes.counts || {};
   if (badge) {
-    badge.textContent = `${state.memoryCache.total || 0} ${zh ? "筆" : "NOTES"}`;
-    badge.className = `trust ${state.memoryCache.total ? "ok" : "noisy"}`;
+    badge.textContent = `${state.memory.notes.total || 0} ${zh ? "筆" : "NOTES"}`;
+    badge.className = `trust ${state.memory.notes.total ? "ok" : "noisy"}`;
   }
   if (clearBtn) clearBtn.disabled = !(counts.observation > 0);
   // ADR-018：偏好筆記裡宣告的「本期優先」「語氣」——只是偏好的一種讀法，不是另一套資料。
-  const prof = state.memoryProfileCache;
+  const prof = state.memory.profile;
   const profileStrip = prof && prof.declared
     ? `<div class="memory-profile" title="${esc(t("memory_profile_hint"))}">
          ${(prof.priorities || []).length ? `<span class="mono-mini muted">${esc(t("memory_profile_priorities"))}</span> ${prof.priorities.map(p => `<span class="pchip">${esc(p)}</span>`).join(" ")}` : ""}
@@ -119,7 +119,7 @@ export function renderMemoryList() {
 }
 
 export async function deleteMemoryNote(noteId) {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   try {
     await sendJSON(`/api/v1/secretary/memory/${noteId}`, "DELETE");
     showToast(zh ? "已刪除" : "Deleted");
@@ -131,7 +131,7 @@ export async function deleteMemoryNote(noteId) {
 }
 
 export async function addMemoryNote() {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   const bodyInput = $("input-memory-body");
   const projectInput = $("input-memory-project");
   const kindSelect = $("select-memory-kind");
@@ -154,7 +154,7 @@ export async function addMemoryNote() {
 }
 
 export async function clearMemoryObservations() {
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   if (!confirm(zh ? "刪除秘書自己寫的所有觀察？您的筆記、偏好與決定不受影響。" : "Delete every secretary observation? Your notes, preferences and decisions are untouched.")) return;
   try {
     const data = await sendJSON("/api/v1/secretary/memory?kind=observation", "DELETE");
@@ -169,7 +169,7 @@ export async function toggleMemoryContext() {
   const box = $("memory-context-box");
   if (!box) return;
   if (!box.hidden) { box.hidden = true; return; }
-  const zh = state.currentLang === "zh-TW";
+  const zh = state.ui.currentLang === "zh-TW";
   box.textContent = zh ? "整理中…" : "Loading…";
   box.hidden = false;
   try {

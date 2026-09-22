@@ -7,12 +7,12 @@
 
         <div class="settings-layout">
         <nav class="settings-nav" id="settings-nav" aria-label="系統設定分區">
-          <button class="settings-nav-item active" data-pane="secretary" data-i18n="snav_secretary">🤖 秘書與自動化</button>
+          <button class="settings-nav-item" data-pane="secretary" data-i18n="snav_secretary">🤖 秘書與自動化</button>
           <button class="settings-nav-item" data-pane="telegram" data-i18n="snav_telegram">✈️ Telegram 通知</button>
           <button class="settings-nav-item" data-pane="line" data-i18n="snav_line">💬 LINE 通知</button>
           <button class="settings-nav-item" data-pane="paths" data-i18n="snav_paths">📁 監控路徑</button>
           <button class="settings-nav-item" data-pane="sources" data-i18n="snav_sources">🧲 採集來源</button>
-          <button class="settings-nav-item" data-pane="llm" data-i18n="snav_llm">🧠 摘要與 LLM</button>
+          <button class="settings-nav-item active" data-pane="llm" data-i18n="snav_llm">🧠 摘要與 LLM</button>
           <button class="settings-nav-item" data-pane="usage" data-i18n="snav_usage">⏱️ 使用時間與里程碑</button>
           <button class="settings-nav-item" data-pane="github" data-i18n="snav_github">🐙 GitHub 雲端整合</button>
           <div class="settings-nav-group" data-i18n="snav_group_ops">維運</div>
@@ -21,7 +21,7 @@
           <button class="settings-nav-item" data-pane="acceptance" data-i18n="snav_acceptance">🧾 驗收中心</button>
         </nav>
           <div class="settings-panes" id="settings-panes">
-          <section class="settings-pane active" data-pane="secretary">
+          <section class="settings-pane" data-pane="secretary">
         <div class="panel mb-14">
           <div class="panel-head">
             <span class="mono-label accent">01</span><span class="panel-title" data-i18n="settings_executor_title">小秘書執行器（ADR-008）</span>
@@ -250,7 +250,7 @@
           </div>
         </div>
         </section>
-          <section class="settings-pane" data-pane="llm">
+          <section class="settings-pane active" data-pane="llm">
         <div class="panel mb-14" id="panel-llm">
           <div class="panel-head"><span class="mono-label accent">06</span><span class="panel-title" data-i18n="settings_p3_title">摘要與 LLM</span></div>
           <div class="fields">
