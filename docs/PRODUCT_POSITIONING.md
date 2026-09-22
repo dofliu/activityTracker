@@ -65,6 +65,13 @@ AI provider 正逐步強化各自產品內的 continuity：
 
 > 本節 2026-08-25 的原文（先關 Browser bridge／milestone Toast／release matrix 的 evidence gates，再建 P3-2／P3-3）**均已完成**，成果見 [ROADMAP §11.2](../ROADMAP.md)。
 
-**2026-09-16 更新**：定位本身不變，但檢視後確認——上表五個護城河方向裡，真正沒有替代品的是第 1／2 項的**來源**：本機 AI agent transcript。
+**2026-09-22 更新**：2026-09-16 那句「真正沒有替代品的是**來源**（本機 AI agent transcript）」**要收回一半**——
+外部檢視（[REVIEW-2026-09-22](REVIEW-2026-09-22-competitive-landscape-and-P9.md) §2.4／§2.5）指出讀本機 transcript
+與跨 agent 交接都已有他人在做。護城河因此改記在第 3 項（**Evidence-aware memory**）：
+不是「只有我們讀得到這些檔案」，而是「讀完之後的每個結論都指得回一筆 SQLite row」。
+**不宣稱**：不宣稱是唯一或第一個讀本機 AI agent transcript 的工具；本專案沒有安裝比對過任何同類工具，
+§2 的競品資料一律是未經本機驗證的外部快照。
+
+**2026-09-16 更新**：定位本身不變，但檢視後確認——上表五個護城河方向裡，最沒有替代品的是第 1／2 項的**來源**：本機 AI agent transcript。
 下一階段不是加功能，而是把這個核心從大系統裡抽出來、讓預設安裝不帶 RAG 依賴鏈（[ROADMAP §13](../ROADMAP.md)）。
 價值評估（用處／學術／教學）與障礙排序見 [REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) §3。

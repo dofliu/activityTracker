@@ -1,6 +1,6 @@
 # 下一個 Session 接手指南
 
-> 最後更新：2026-09-22（ROADMAP §13 的架構整頓三階段 R0～R2 已於 2026-09-20 全部完成，最後一項是 D13 前端共享狀態分成具名 store ＋ 工廠——[ADR-030](ADR-030-frontend-state-stores.md)；接著新增 §14「推廣路線」與 TODO E 段，**E1 `omni demo` 的示範資料邊界已定稿為 [ADR-031](ADR-031-omni-demo-dataset.md)，`omni demo` CLI 與資料集本身留給下一輪**）。
+> 最後更新：2026-09-22（收到外部競品檢視 [REVIEW-2026-09-22](REVIEW-2026-09-22-competitive-landscape-and-P9.md)：四處過期的差異化宣稱**已改寫**，TODO E 段**已重排為 E1→E6**，唯讀 MCP server 插進 `agent-transcripts` 之前。ROADMAP §13 的 R0～R2 已於 2026-09-20 全部完成，最後一項是 D13——[ADR-030](ADR-030-frontend-state-stores.md)）。
 > 上一輪程式變更是 2026-09-20 的**前端共享狀態分成具名 store**（D13，[ADR-030](ADR-030-frontend-state-stores.md)）。
 > **完整的功能歷程不在這裡**：一路做了什麼一律看 [ROADMAP.md](../ROADMAP.md) §11.2（依日期排序的單一清單）。
 >
@@ -26,7 +26,7 @@
 | 導覽 | 6 分頁，**沒有右欄**（2026-09-06 依實機回饋移除；今日統計與 Focus Now 在 05 最上方、DATA TRUST 在 06 系統健康）：01 小秘書＝兩塊一屏（左：秘書桌面，問候併入、全部提案收合在底部；右：交辦與提問，記憶區收合在裡面）／02 知識庫／03 進行中工作／04 Git 同步中心／05 摘要與統計／06 系統設定（左欄 11 區塊，末項為**驗收中心**）。桌面與 494px 皆無水平溢出（Playwright 實測）。 |
 | 外觀 | 兩個獨立軸：`data-theme`（dark/light）× `data-accent`（naruto/forest/ocean），CSS 全走 `var(--accent)`；新配色只需加一組變數區塊。偏好存 localStorage（`omni-theme`／`omni-palette`／`omni-settings-pane`）。 |
 | 危險能力 | 執行器（含只排 L0 的自訂排程）、L2、L2 寫入、Telegram 對話、Telegram inline 批准（含 `/arm`）、LINE、問候卡 LLM 潤飾——**全部預設關閉**；行事曆預設開但沒設路徑就等於停用。 |
-| **方向（2026-09-22 起）** | **架構整頓（ROADMAP §13，R0～R2）已全部完成**（2026-09-20，D13 為最後一項）；功能候選 C5／C6／C3 維持暫停。**下一步是 §14 推廣路線**（docs/TODO.md E 段，依 E1 → E2 → E3）：**E1 `omni demo` 示範資料集**——邊界已定稿為 [ADR-031](ADR-031-omni-demo-dataset.md)（只能寫進另開的 `OMNICONTEXT_HOME`、示範旗標一路標到 API、驗收中心與問候卡不得把示範數字當實機收據），**`omni demo` CLI 與資料集本身留給下一輪實作**；接著 E2 `agent-transcripts` 獨立套件（前置條件 D9／ADR-025 已完成）、E3 `omni init` 自動偵測。乾淨容器實測：核心安裝 **176 MB**（含 `[rag]` 約 720 MB）。 |
+| **方向（2026-09-22 重排）** | **架構整頓（ROADMAP §13，R0～R2）已全部完成**（2026-09-20，D13 為最後一項）；功能候選 C5／C6／C3 維持暫停。**下一步是 §14 推廣路線**（docs/TODO.md E 段，依 **E1 → E6**）：**E1 `omni demo` 示範資料集實作**（邊界已定稿為 [ADR-031](ADR-031-omni-demo-dataset.md)：只能寫進另開的 `OMNICONTEXT_HOME`、示範旗標一路標到 API、驗收中心與問候卡不得把示範數字當實機收據）→ **E2 ADR-032 唯讀 MCP Context Server**（先寫 ADR，且必須回答：模組**不得**叫 top-level `mcp/`——會與 PyPI 官方 MCP SDK 撞名；stdio 傳輸要不要吃 SDK 相依，要的話只能是 optional extra）→ E3／E4 MCP 第一版分兩片實作 → E5 `agent-transcripts` 獨立套件（前置 D9／ADR-025 已完成）→ E6 `omni init` 自動偵測。**E1 排第一是相依關係不是偏好**：沒有示範資料，MCP 的 tool 在容器裡只能回空陣列，selftest 就只證明得了「schema 對」。乾淨容器實測：核心安裝 **176 MB**（含 `[rag]` 約 720 MB）。 |
 
 ## 功能地圖（要改哪裡就看這張表）
 
@@ -70,6 +70,7 @@
 - **SSE 一定要送 `done`**：瀏覽器只靠它解除「回覆中」狀態，`event_generator` 全程 try/finally。
 - **`display` 會蓋掉 `hidden` 屬性**：專案已加全域 `[hidden] { display: none !important; }`，新元件不要再用行內 `style="display:flex"` 對抗它。
 - **migration 測試會鎖版本清單**：加 migration 要同步改 `test_database_migration.py` 的 `[1..N]` 與「未知的更新版本」那筆（用 N+1）。
+- **ADR 編號動筆前先 `ls docs/ADR-*`**：2026-09-22 有兩個平行 session 各寫了一份 ADR-031（`omni demo` 邊界那份先進 main），同一天的外部檢視又把唯讀 MCP server 也指派成 ADR-031。**MCP 的號已定為 ADR-032**；平行分支同時開新 ADR 時，取號前先看 `docs/` 現況，不要憑手上文件寫的號。
 - **`pkill -f` 的 pattern 會殺到自己的 shell**（exit 144）：寫成 `main[.]py` 這種形式，且與啟動指令分開兩次呼叫。
 - **要讓秘書「記得」，資料得進 `secretary_notes`**：採集到 ≠ 秘書知道。`memory_context()` 注入的是筆記與觀察，不是原始事件表——新的「秘書應該知道 X」需求，通常是缺一個把既有資料 reduce 成觀察的 L0 動作，而不是缺採集。
 - **「clean worktree」不等於「沒有 untracked 檔案」**：pull/push 的門檻只看**已追蹤**檔案的未提交變更；把 untracked 算進去會讓幾乎每個真實專案（有 `.lock`、`build/`）永遠不能 pull，而且沒有多保護到任何東西——Git 自己對「untracked 會被覆蓋」已 fail-closed（ADR-011 Addendum C）。
@@ -100,6 +101,7 @@
   **A 段的現況直接跑 `python main.py verify` 查**（[ADR-016](ADR-016-acceptance-center.md)）；改 A 段的判準時要同步改 `core/acceptance/items.py` 的 `ITEMS`。
 - **方向與取捨看 [ROADMAP.md](../ROADMAP.md) §13「架構整頓」（R0～R2 已全部完成，2026-09-20）＋ §14「推廣路線」**（2026-09-22）：§12 的三條功能候選路線（C5／C6／C3）**維持暫停**。接手時從 TODO E 段的 **E1 `omni demo`** 開始——邊界已定稿為 [ADR-031](ADR-031-omni-demo-dataset.md)，這一輪只寫了 ADR，`omni demo` CLI 與示範資料本身還沒實作。
 - **想先了解「為什麼要整頓」**：讀 [REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) §4（每項附檔案：行號，已逐項核對原始碼）。
+- **想先了解「為什麼插進 MCP」**：讀 [REVIEW-2026-09-22-competitive-landscape-and-P9.md](REVIEW-2026-09-22-competitive-landscape-and-P9.md)，**但先讀它開頭的「校訂註記」**——§2 的競品資料全部未經本機驗證、§7 的條目沒有採用、§5 的 P9-C 有事實錯誤。可以用來排序工作，**不可以拿來寫對外宣稱**。
 - **個性化三步（2026-09-05 檢視後的方向）**：(1) 模式感知提案 [ADR-017](ADR-017-pattern-aware-proposals.md) ✅、(2) 宣告式個人檔案 [ADR-018](ADR-018-declared-profile.md) ✅、(3) 秘書桌面 [ADR-019](ADR-019-secretary-desk-home.md) ✅（01 分頁成為真正的首頁）。三步都已落地；刻意不走的路：用 LLM 推斷個性或優先、再多採集來源、C5 遠端存取。
 - **會議秘書**（[ADR-022](ADR-022-meeting-secretary.md)）：第一層（會後逐字稿→觀察＋候選待辦）**已於 2026-09-08 實作**，實機收據待取得（TODO A22）。**第二層（即時字幕／翻譯＝錄下其他人的聲音）刻意沒做**——要做得先過 ADR-022 D6 的五道門並另寫 ADR。
 - 新增待辦請寫進 TODO.md、成果寫進 ROADMAP §11，**不要在本頁另開清單**——這頁保持一分鐘讀完。

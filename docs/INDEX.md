@@ -15,8 +15,9 @@
 | 快速了解專案是什麼、能做什麼 | [README.md](../README.md)（繁中）/ [README_en.md](../README_en.md)（English） |
 | 安裝、Extension 配對、日常操作、備份與故障排查 | [USAGE.md](USAGE.md) —— **使用手冊** |
 | 了解目前開發到哪 | [ROADMAP.md](../ROADMAP.md) §11.2 成果紀錄（依日期一條）+ [STATUS.yaml](../STATUS.yaml) |
-| 了解下一階段方向與取捨 | [ROADMAP.md](../ROADMAP.md) §13「架構整頓」（R0～R2 已全部完成）＋ §14「推廣路線」（E1 → E2 → E3，§12 的功能候選已暫停） |
+| 了解下一階段方向與取捨 | [ROADMAP.md](../ROADMAP.md) §13「架構整頓」（R0～R2 已全部完成）＋ §14「推廣路線」（E1 → E7，§12 的功能候選已暫停） |
 | **想知道這個專案值不值得推廣、架構哪裡該刪該併** | [REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) —— 現況數字、用處／學術／教學價值評估、架構體檢（附檔案：行號） |
+| **想知道同類工具在做什麼、我們的宣稱還成不成立** | [REVIEW-2026-09-22-competitive-landscape-and-P9.md](REVIEW-2026-09-22-competitive-landscape-and-P9.md) —— 外部競品快照與差異化重評估。**§2 未經本機驗證**，收錄時的逐項校訂見文件開頭的「校訂註記」 |
 | 了解產品定位與「不宣稱什麼」的證據邊界 | [PRODUCT_POSITIONING.md](PRODUCT_POSITIONING.md) |
 | 修改架構前先看相關決策 | 下方 ADR 一覽 |
 | 發佈前檢查 | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) |
@@ -87,6 +88,7 @@
 | [RELEASE_NOTES-v1.3.0a5.md](RELEASE_NOTES-v1.3.0a5.md) | v1.3.0a5 release notes（每個版本一份 `RELEASE_NOTES-v*.md`，release workflow 會自動取用） |
 | [VERIFICATION-2026-08-25-next-stage.md](VERIFICATION-2026-08-25-next-stage.md) | 2026-08-25 下一階段驗證紀錄 |
 | [REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) | 2026-09-16 專案檢視快照：現況、推廣／學術／教學價值、架構體檢與該刪該併的判斷 |
+| [REVIEW-2026-09-22-competitive-landscape-and-P9.md](REVIEW-2026-09-22-competitive-landscape-and-P9.md) | 2026-09-22 外部競品快照與差異化重評估（五層競品、宣稱重寫、唯讀 MCP server 提案）。**§2 全部是未經本機驗證的網路資料**；ADR 編號衝突等逐項校訂寫在文件開頭的「校訂註記」，待辦以 TODO E 段為準 |
 
 ## 歸檔工作文件（docs/archive/）
 
