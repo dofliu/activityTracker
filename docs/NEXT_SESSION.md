@@ -1,8 +1,7 @@
 # 下一個 Session 接手指南
 
-> 最後更新：2026-09-22（最近一輪：ROADMAP §13 的 R0～R2 整頓已於 2026-09-20 全部完成，TODO 新增 **E 段：推廣路線**——E1 `omni demo` 示範資料集設計定案（[ADR-031](ADR-031-omni-demo-dataset.md)，實作待下一輪）、E2 `agent-transcripts` 獨立套件、E3 `omni init` 自動偵測皆未開始）。
-> 上一輪文件整理是 2026-09-20（隨 D13 一起更新）。
-> 上一輪程式變更是 2026-09-20 的 **D13：前端共享狀態分成具名 store**（[ADR-030](ADR-030-frontend-state-stores.md)）；本輪（2026-09-22）只有 ADR-031 設計文件，沒有程式變更。
+> 最後更新：2026-09-22（ROADMAP §13 的架構整頓三階段 R0～R2 已於 2026-09-20 全部完成，最後一項是 D13 前端共享狀態分成具名 store ＋ 工廠——[ADR-030](ADR-030-frontend-state-stores.md)；接著新增 §14「推廣路線」與 TODO E 段，**E1 `omni demo` 的示範資料邊界已定稿為 [ADR-031](ADR-031-omni-demo-dataset.md)，`omni demo` CLI 與資料集本身留給下一輪**）。
+> 上一輪程式變更是 2026-09-20 的**前端共享狀態分成具名 store**（D13，[ADR-030](ADR-030-frontend-state-stores.md)）。
 > **完整的功能歷程不在這裡**：一路做了什麼一律看 [ROADMAP.md](../ROADMAP.md) §11.2（依日期排序的單一清單）。
 >
 > 這頁是給「下一個開發 session（人或 AI）」的**最短接手路徑**，只放現況、地圖與環境備忘。
@@ -16,7 +15,7 @@
 | 版本 | v1.3.0a5 已發佈為 GitHub pre-release（release workflow 自動 build → verify → release，SHA-256 receipt 交叉驗證）。`release_ready: false`，唯一**能力型**缺口是全天 coverage ledger 實測（TODO A1）。 |
 | 還缺什麼 | 別憑記憶：跑 `python main.py verify`（或看「06 系統設定 → 驗收中心」）就會列出 A1–A22 每一項現在有沒有收據，以及 ROADMAP §12.3 四個 gate 缺什麼。 |
 | Schema | migration **18/18**（append-only + checksum；**新表一律進 registry，不得靠 `create_all` 繞過**）。017 = `secretary_notes`、018 = `calendar_events`。 |
-| 測試 | **75 個 contract test 模組、831 項**（829 passed + 2 conditional skip；不裝 `[rag]` extra 時 816 passed + 14 skipped，CI 有一個 job 專跑這個）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
+| 測試 | **75 個 contract test 模組、831 項**（829 passed + 2 conditional skip；**不裝 `[rag]` extra 時 816 passed + 14 skipped**，CI 有一個 job 專跑這個）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
 | API 路由 | `core/server.py` **只做組裝**（134 行）；端點在 `core/api/*.py` 依領域分 9 個 router，請求結構在 `core/schemas.py`，AI ingest 規則在 `core/ingest.py`，execution token 閘門在 `core/api/deps.py`。**改動端點前先看 `tests/test_api_route_snapshot.py`**——133 條路由的（路徑、方法、handler 名稱）鎖在那裡，新增端點要在清單多一行（D4，2026-09-16）。 |
 | 活動來源 | **只有一份**：`core/activity_sources.py`（`EVENT_SOURCES` 決定哪三張表算活動與專案欄位在哪、`normalize_project` 空白＝沒歸戶不猜、`day_bounds` 一律半開區間）。每週回顧／模式提案／每日工作誌／問候卡都吃它；**要增減活動來源就只改 `EVENT_SOURCES`**，有契約測試禁止使用端自己查三張事件表的專案欄位（D3，2026-09-16）。 |
 | LLM client | **只有一份**：`core/llm_client.py`（`LLMClient.generate` 同步回字串、`stream_chat` 非同步逐 token；`DEFAULT_MODELS`／`KEY_ENVS` 單一定義；Ollama 一律 `/api/chat`）。失敗抬頭字面（`[本機備援模式]`、`[OpenAI API 錯誤]`、`【尚未偵測到`…）是下游事實閘與驗收中心的辨識依據，**不得改字**；有契約測試掃全 repo 禁止在別處寫死模型名（D2，2026-09-16）。 |
@@ -27,7 +26,7 @@
 | 導覽 | 6 分頁，**沒有右欄**（2026-09-06 依實機回饋移除；今日統計與 Focus Now 在 05 最上方、DATA TRUST 在 06 系統健康）：01 小秘書＝兩塊一屏（左：秘書桌面，問候併入、全部提案收合在底部；右：交辦與提問，記憶區收合在裡面）／02 知識庫／03 進行中工作／04 Git 同步中心／05 摘要與統計／06 系統設定（左欄 11 區塊，末項為**驗收中心**）。桌面與 494px 皆無水平溢出（Playwright 實測）。 |
 | 外觀 | 兩個獨立軸：`data-theme`（dark/light）× `data-accent`（naruto/forest/ocean），CSS 全走 `var(--accent)`；新配色只需加一組變數區塊。偏好存 localStorage（`omni-theme`／`omni-palette`／`omni-settings-pane`）。 |
 | 危險能力 | 執行器（含只排 L0 的自訂排程）、L2、L2 寫入、Telegram 對話、Telegram inline 批准（含 `/arm`）、LINE、問候卡 LLM 潤飾——**全部預設關閉**；行事曆預設開但沒設路徑就等於停用。 |
-| **方向（2026-09-22 起）** | ROADMAP §13 的 **R0～R2 減法與合併已全部完成**（2026-09-20）。下一段是**推廣路線**（[ROADMAP §13.3](../ROADMAP.md#133-推廣路線r0-之後才啟動)、[TODO E 段](TODO.md)）：E1 `omni demo` 示範資料集設計已定案（[ADR-031](ADR-031-omni-demo-dataset.md)），**下一輪從實作 `demo` 子指令開始**；E2 `agent-transcripts` 獨立套件、E3 `omni init` 自動偵測尚未開始，三項互不阻塞。乾淨容器實測：核心安裝 **176 MB**（含 `[rag]` 約 720 MB；R0 前 797 MB）。 |
+| **方向（2026-09-22 起）** | **架構整頓（ROADMAP §13，R0～R2）已全部完成**（2026-09-20，D13 為最後一項）；功能候選 C5／C6／C3 維持暫停。**下一步是 §14 推廣路線**（docs/TODO.md E 段，依 E1 → E2 → E3）：**E1 `omni demo` 示範資料集**——邊界已定稿為 [ADR-031](ADR-031-omni-demo-dataset.md)（只能寫進另開的 `OMNICONTEXT_HOME`、示範旗標一路標到 API、驗收中心與問候卡不得把示範數字當實機收據），**`omni demo` CLI 與資料集本身留給下一輪實作**；接著 E2 `agent-transcripts` 獨立套件（前置條件 D9／ADR-025 已完成）、E3 `omni init` 自動偵測。乾淨容器實測：核心安裝 **176 MB**（含 `[rag]` 約 720 MB）。 |
 
 ## 功能地圖（要改哪裡就看這張表）
 
@@ -39,27 +38,27 @@
 | Semantic index／omni ask | `core/semantic_index.py` | `test_semantic_index.py` | [ADR-005](ADR-005-local-semantic-index-and-ask.md) |
 | RAG 對話與檢索 worker | `rag/router.py`、`rag/retrieval_worker.py`、`rag/retrieval_client.py` | `test_rag_chat_stream.py`（10）、`test_rag_retrieval_worker.py`（21） | [ADR-009](ADR-009-deskrag-worker-index-lifecycle.md) ＋ Addendum A/B |
 | Chroma 容量與空間回收 | `rag/storage.py`（`chroma_report`／`compact_chroma`，讀 `segments` 表判活片段）；job type `compact_chroma` | `test_rag_storage_compaction.py`（9） | [ADR-009 Addendum C](ADR-009-deskrag-worker-index-lifecycle.md) |
-| 跨專案分流訊號（PR／issue） | `core/triage_signals.py`（`split_stale_github_signals`，預設 60 天上限） | `test_triage_signals.py`（11） | [ADR-007 Addendum](ADR-007-proposal-only-secretary.md) |
-| 秘書提案（proposal-only） | `core/proactive_secretary.py`、`core/secretary_advisor.py` | `test_proactive_secretary.py`、`test_secretary_advisor.py` | [ADR-007](ADR-007-proposal-only-secretary.md) |
+| 跨專案分流訊號（PR／issue） | `core/secretary/signals.py`（`split_stale_github_signals`，預設 60 天上限；ADR-024 前是 `core/triage_signals.py`） | `test_triage_signals.py`（11） | [ADR-007 Addendum](ADR-007-proposal-only-secretary.md) |
+| 秘書提案（proposal-only） | `core/secretary/aggregate.py`（`build_action_proposals`／`annotate_action_proposals`；ADR-024 前是 `core/proactive_secretary.py`＋`core/secretary_advisor.py`） | `test_proactive_secretary.py`、`test_secretary_advisor.py` | [ADR-007](ADR-007-proposal-only-secretary.md)、[ADR-024](ADR-024-secretary-layers.md) |
 | 分級執行器 L0/L1/L2 | `core/agent_executor.py`、`core/agent_dispatch.py`、`core/scheduled_tasks.py` | `test_agent_executor.py`、`test_agent_dispatch_l2.py`、`test_scheduled_tasks.py` | [ADR-008](ADR-008-gated-agent-executor.md) |
-| 秘書記憶區（大腦） | `core/secretary_memory.py` | `test_secretary_memory.py`（20） | [ADR-012](ADR-012-secretary-memory.md) |
+| 秘書記憶區（大腦） | `core/secretary/memory.py`（`add_note`／`memory_context`；ADR-024 前是 `core/secretary_memory.py`） | `test_secretary_memory.py`（20） | [ADR-012](ADR-012-secretary-memory.md)、[ADR-024](ADR-024-secretary-layers.md) |
 | 每日工作誌（你做了什麼） | `core/activity_digest.py`（L0 template `daily_digest`，也是早晨包第四步） | `test_activity_digest.py`（17） | [ADR-012 Addendum A](ADR-012-secretary-memory.md) |
-| 模式感知提案（秘書用它記得的東西） | `core/activity_patterns.py`（活動矩陣、`no_daily_routine`／`neglected_active_project`、習慣加權）；接在 `proactive_secretary.build_action_proposals` | `test_activity_patterns.py`（21） | [ADR-017](ADR-017-pattern-aware-proposals.md) |
-| 宣告式個人檔案（優先／語氣） | `core/secretary_profile.py`（`優先：`／`語氣：` 指令解析、優先加分、語氣）；接在 `build_action_proposals`、`memory_context`、`build_greeting`；`GET /api/v1/secretary/profile` 唯讀 | `test_secretary_profile.py`（27） | [ADR-018](ADR-018-declared-profile.md) |
-| 秘書桌面（01 首頁） | `core/secretary_home.py`（焦點＝第一張關於你的工作的提案、記得＝四級順序挑一則、詳情計數）；`GET /api/v1/secretary/home` 唯讀；前端 `renderHome`／`recordHomeLeave` | `test_secretary_home.py`（14） | [ADR-019](ADR-019-secretary-desk-home.md) |
+| 模式感知提案（秘書用它記得的東西） | `core/activity_patterns.py`（活動矩陣、`no_daily_routine`／`neglected_active_project`、習慣加權）；接在 `core/secretary/aggregate.build_action_proposals` | `test_activity_patterns.py`（21） | [ADR-017](ADR-017-pattern-aware-proposals.md) |
+| 宣告式個人檔案（優先／語氣） | `core/secretary/memory.py`（`優先：`／`語氣：` 指令解析、優先加分、語氣；ADR-024 前是 `core/secretary_profile.py`）；接在 `build_action_proposals`、`memory_context`、`build_greeting`；`GET /api/v1/secretary/profile` 唯讀 | `test_secretary_profile.py`（27） | [ADR-018](ADR-018-declared-profile.md)、[ADR-024](ADR-024-secretary-layers.md) |
+| 秘書桌面（01 首頁） | `core/secretary/present.py`（`build_home`：焦點＝第一張關於你的工作的提案、記得＝四級順序挑一則、詳情計數；ADR-024 前是 `core/secretary_home.py`）；`GET /api/v1/secretary/home` 唯讀；前端 `renderHome`／`recordHomeLeave` | `test_secretary_home.py`（14） | [ADR-019](ADR-019-secretary-desk-home.md)、[ADR-024](ADR-024-secretary-layers.md) |
 | 每週回顧（說的 vs 做的） | `core/weekly_review.py`（已結束的 ISO 週、活躍天數對照宣告優先、回顧觀察、`priority_drift` 訊號）；接在 `build_action_proposals`、`build_morning_pack` 第五步、L0 template `weekly_review` | `test_weekly_review.py`（20） | [ADR-020](ADR-020-weekly-review-said-vs-done.md) |
 | 文件落後程式（那句常打的指令） | `core/docs_freshness.py`（文件檔最後異動 vs 之後的 commit 數）；接既有兩段式 L2（`_DRAFT_PLAN_TYPES` ＋ 文件專用 draft prompt） | `test_docs_freshness.py`（25） | [ADR-021](ADR-021-docs-behind-code.md) |
 | 會議秘書（會後逐字稿） | `core/meeting_transcripts.py`（WebVTT parser、時間配對、摘要＋事實閘、候選待辦、`meeting_context`／`collect_meeting_signals`）；L0 template `meeting_notes`、`POST /api/v1/secretary/meetings/followups`（**唯一會寫 open_loops 的路徑**）、桌面 `#home-desk-meeting` | `test_meeting_transcripts.py`（19）＋A22 1 | [ADR-022](ADR-022-meeting-secretary.md) |
-| 每日包與今日視圖 | `core/secretary_packs.py` | `test_secretary_packs.py`（9） | [ADR-008](ADR-008-gated-agent-executor.md) L0 |
-| 問候卡（01 首頁＋晨報開頭） | `core/secretary_greeting.py` | `test_secretary_greeting.py`（23）＋晨報三項 | ROADMAP §11（2026-09-04） |
+| 每日包與今日視圖 | `core/secretary/packs.py`（`build_morning_pack`；ADR-024 前是 `core/secretary_packs.py`） | `test_secretary_packs.py`（9） | [ADR-008](ADR-008-gated-agent-executor.md) L0、[ADR-024](ADR-024-secretary-layers.md) |
+| 問候卡（01 首頁＋晨報開頭） | `core/secretary/greeting.py`（`build_greeting`；ADR-024 前是 `core/secretary_greeting.py`） | `test_secretary_greeting.py`（23）＋晨報三項 | ROADMAP §11（2026-09-04）、[ADR-024](ADR-024-secretary-layers.md) |
 | 活動來源與（專案 × 日）聚合 | `core/activity_sources.py` | `test_activity_sources_single_source.py`（12） | ROADMAP §13 D3 |
 | API 路由表 | `core/server.py`（組裝）＋ `core/api/*.py`（9 個領域 router）＋ `core/schemas.py`＋`core/ingest.py` | `test_api_route_snapshot.py`（3，鎖 133 條）、`test_api_boundary.py`（18） | ROADMAP §13 D4 |
 | LLM client（同步＋串流） | `core/llm_client.py`；知識庫對話的 provider／model 預設在呼叫端 `rag/router._chat_target` | `test_llm_client_single_source.py`（9）、`test_rag_chat_stream.py`、`test_summary_prompt_limits.py` | ROADMAP §13 D2 |
 | 推播組裝與通道 | `notifiers/messages.py`、`notifiers/channels.py`、`notifiers/secretary_push.py` | `test_notification_channels.py`（32） | [ADR-014](ADR-014-multi-channel-push-and-arm-code.md) |
-| Telegram 對話與批准 | `notifiers/telegram_chat.py`、`notifiers/telegram_approvals.py`、`core/secretary_ask.py` | `test_telegram_chat.py`（29） | [ADR-013](ADR-013-telegram-secretary-chat.md) |
+| Telegram 對話與批准 | `notifiers/telegram_chat.py`、`notifiers/telegram_approvals.py`、`core/secretary/present.py`（`ask_secretary`；ADR-024 前是 `core/secretary_ask.py`） | `test_telegram_chat.py`（29） | [ADR-013](ADR-013-telegram-secretary-chat.md)、[ADR-024](ADR-024-secretary-layers.md) |
 | Git 同步中心與對帳 | `core/repo_sync.py`（`_sync_blocker` 產生逐 repo 的具體拒絕理由）、`core/repo_onboarding.py`、`core/repo_sync_report.py` | `test_repo_sync*.py`、`test_repo_onboarding.py` | [ADR-011](ADR-011-safe-local-repository-sync.md) ＋ Addendum A/B/C |
 | Schema migration | `core/migrations.py`（`MIGRATIONS` registry） | `test_database_migration.py` | [ADR-003](ADR-003-versioned-sqlite-migrations.md) |
-| 驗收中心（A 段收據） | `core/acceptance.py`（`_ITEMS` 是 TODO A 段的可執行副本）、`main.py cmd_verify` | `test_acceptance_center.py`（36） | [ADR-016](ADR-016-acceptance-center.md) |
+| 驗收中心（A 段收據） | `core/acceptance/`（`readings.py`／`items.py` 階梯表／`rules.py`／`report.py`；ADR-028 前是單一 `core/acceptance.py`）、`main.py cmd_verify` | `test_acceptance_center.py`（36） | [ADR-016](ADR-016-acceptance-center.md)、[ADR-028](ADR-028-declarative-acceptance.md) |
 | API 邊界與 secret | `core/security.py`、`core/secret_resolver.py` | `test_api_boundary.py`（18） | [ADR-001](ADR-001-p2-5-trust-boundary.md) |
 
 前端是 `web/index.html`（結構與 `data-i18n`）＋ `web/style.css`（`var(--accent)` 為主）＋ `web/js/` 的 ES module 樹（ADR-026：`main.js` 進入點、`core/` 五個共用模組、`tabs/` 一個分頁一個檔）＋ `web/i18n/{zh-TW,en}.json` 兩份字典。新增字串要**同時**補兩份——`tests/test_frontend_modules.py` 會擋下只補一邊；新的點擊動作用 `data-action` ＋ `registerActions`，不要寫行內 handler。
@@ -98,8 +97,8 @@
 ## 待辦與下一步
 
 - **待辦一律看 [TODO.md](TODO.md)**：A 段是等待使用者側 live 收據（👤 需在 Windows 實機操作，不是程式工作，A1 是唯一還擋 `release_ready` 的能力缺口）、B 段是已知問題與技術債、C 段是功能候選。
-  **A 段的現況直接跑 `python main.py verify` 查**（[ADR-016](ADR-016-acceptance-center.md)）；改 A 段的判準時要同步改 `core/acceptance.py` 的 `_ITEMS`。
-- **方向與取捨看 [ROADMAP.md](../ROADMAP.md) §13「架構整頓與推廣方向」**：§12 的三條功能候選路線（C5／C6／C3）**暫停**；**R0～R2 的減法與合併已於 2026-09-20 全部完成**（TODO D 段收據見 ROADMAP §11.2）。**接手時做 [TODO.md](TODO.md) E 段**（§13.3 推廣路線）：E1 `omni demo` 示範資料集設計已定案（[ADR-031](ADR-031-omni-demo-dataset.md)），下一輪照 ADR 實作 `demo` 子指令與示範語料；E2 `agent-transcripts` 獨立套件、E3 `omni init` 自動偵測尚未開始。
+  **A 段的現況直接跑 `python main.py verify` 查**（[ADR-016](ADR-016-acceptance-center.md)）；改 A 段的判準時要同步改 `core/acceptance/items.py` 的 `ITEMS`。
+- **方向與取捨看 [ROADMAP.md](../ROADMAP.md) §13「架構整頓」（R0～R2 已全部完成，2026-09-20）＋ §14「推廣路線」**（2026-09-22）：§12 的三條功能候選路線（C5／C6／C3）**維持暫停**。接手時從 TODO E 段的 **E1 `omni demo`** 開始——邊界已定稿為 [ADR-031](ADR-031-omni-demo-dataset.md)，這一輪只寫了 ADR，`omni demo` CLI 與示範資料本身還沒實作。
 - **想先了解「為什麼要整頓」**：讀 [REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) §4（每項附檔案：行號，已逐項核對原始碼）。
 - **個性化三步（2026-09-05 檢視後的方向）**：(1) 模式感知提案 [ADR-017](ADR-017-pattern-aware-proposals.md) ✅、(2) 宣告式個人檔案 [ADR-018](ADR-018-declared-profile.md) ✅、(3) 秘書桌面 [ADR-019](ADR-019-secretary-desk-home.md) ✅（01 分頁成為真正的首頁）。三步都已落地；刻意不走的路：用 LLM 推斷個性或優先、再多採集來源、C5 遠端存取。
 - **會議秘書**（[ADR-022](ADR-022-meeting-secretary.md)）：第一層（會後逐字稿→觀察＋候選待辦）**已於 2026-09-08 實作**，實機收據待取得（TODO A22）。**第二層（即時字幕／翻譯＝錄下其他人的聲音）刻意沒做**——要做得先過 ADR-022 D6 的五道門並另寫 ADR。
@@ -123,7 +122,7 @@
   | `docs/NEXT_SESSION.md` | 接手路徑（一分鐘讀完） | 其他頁已有的內容 |
   | `config.example.yaml` | **設定項目的唯一權威**（行內註解寫邊界） | — |
 
-  新增 ADR 時同步更新 [INDEX.md](INDEX.md) 的一覽表；改 TODO A 段的判準時同步改 `core/acceptance.py` 的 `_ITEMS`。
+  新增 ADR 時同步更新 [INDEX.md](INDEX.md) 的一覽表；改 TODO A 段的判準時同步改 `core/acceptance/items.py` 的 `ITEMS`。
 
 ## 遠端容器環境備忘（在 Claude Code 雲端 session 內開發時）
 

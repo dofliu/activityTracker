@@ -794,3 +794,53 @@ P2.5-S1 API 安全邊界
 - R0 完成前不加任何採集來源、通道或 L2 template。
 - 不為了「更像人」引入 LLM 推斷個性或優先（ADR-018 的立場不變）。
 - 不動 ADR-001 的 loopback 邊界（C5／C6 連帶暫停）。
+
+---
+
+## 14. 下一階段：推廣路線（2026-09-22 檢視）
+
+> §13 的減法清單（R0～R2）**已全部完成**，最後一條是 2026-09-20 的 D13（[ADR-030](docs/ADR-030-frontend-state-stores.md)）。
+> 這一節接著 §13.3 往下走；**待辦條目與完成判準一律以 [docs/TODO.md](docs/TODO.md) E 段為準**，這裡只寫「為什麼是這三件事、為什麼不是別的」。
+
+### 14.1 這一輪的判斷
+
+檢視當天的實測（乾淨容器、Python 3.11）：`pytest` **831 項全綠**（829 passed ＋ 2 conditional skip，
+75 個 contract test 模組；不裝 `[rag]` extra 時 816 passed + 14 skipped）、`python main.py verify`
+22 項全部有判定、migration 18/18。**程式面沒有壞掉的東西，也沒有還沒寫的東西**——`release_ready`
+卡的仍然是使用者實機收據（A 段），而 A 段只能在 Windows 實機產生，不是任何開發 session 做得完的事。
+
+所以「下一步」不是再整頓一次，也不是等收據，而是回答 §13.1 留下的那句話：
+**這個專案唯一沒有替代品的能力，是讀本機 AI agent transcript 並還原成有 provenance 的工作脈絡**——
+但它目前只存在於這個 repo 裡，安裝要 176 MB、設定要填、資料要自己累積幾天才看得到東西。
+第二個人拿不到它，第二台機器上也證明不了它。這一輪就是去把這件事變成可能。
+
+### 14.2 順序與理由（E1 → E2 → E3）
+
+1. **E1 `omni demo` 示範資料集**（先做，因為它是後面兩項的前置）
+   - 現況：任何新環境（包含每一個雲端開發 session）打開儀表板都是空的——首頁沒有提案、沒有記憶、沒有 Handoff。
+     這不只影響展示，也代表**大部分功能在容器裡只能靠契約測試證明，沒辦法真的看一眼**。
+   - 目標：一份匿名化、可公開的假 transcript ＋ Git ＋ 檔案事件，`omni demo` 一個指令灌進**另開的** `OMNICONTEXT_HOME`，五分鐘看到首頁、提案與 Handoff。
+   - 邊界（2026-09-22 已定稿，[ADR-031](docs/ADR-031-omni-demo-dataset.md)）：示範資料**一律標成示範**、**只能寫進另開的家目錄**（沿用 `core/runtime_paths.py` 既有的 `OMNICONTEXT_HOME` 覆寫，不新開一套）、絕不與真實資料同庫，
+     且驗收中心與問候卡對示範資料的數字不得宣稱成實機收據——否則就是這個專案最不能犯的錯：拿假資料當證據。**ADR 已定稿，實作留給下一輪**。
+
+2. **E2 `agent-transcripts` 獨立套件**（真正要對外的東西）
+   - 現況：[ADR-025](docs/ADR-025-transcript-parsers-and-drift.md) 已經把四個平台的 parser 切成 `watchers/transcripts/` 的獨立模組，
+     共同介面只有 `discover`／`parse` 兩個函式，parser 不碰資料庫——**抽出去的前置條件在 D9 就做完了**。
+   - 目標：四種格式 → 統一 turn 模型 ＋ provenance ＋ drift 偵測，成為一個能單獨 `pip install` 的套件；本 repo 改成它的第一個使用端。
+   - 判準的關鍵在**行為不變**：抽走之後 `tests/test_transcript_parsers_and_drift.py` 與 `test_transcript_contracts.py` 必須一字不改地全綠。
+
+3. **E3 `omni init` 自動偵測**（降低第二個人的門檻）
+   - 現況：`config.example.yaml` 已經從 449 行收到 344 行（D6），但要跑起來仍得自己填路徑。
+   - 目標：`omni init` 偵測 `~/.claude`／`~/.codex`／Antigravity 的既有路徑並**詢問**要不要匯入（不自動匯入、不自動開採集）。
+
+### 14.3 刻意不做的事
+
+- **功能候選 C5／C6／C3 維持暫停**（理由同 §13.1，不重複）。
+- **不為了填滿 A 段而在容器裡偽造收據**：A 段就是要實機，容器跑出來的東西一律只能標成容器 E2E；
+  `omni demo`（E1）也不例外——ADR-031 明文禁止示範資料的數字被驗收中心或問候卡當成實機收據。
+
+### 14.4 每一項的共同鐵律（照舊）
+
+- 結束時 `pytest` 全綠、`python main.py verify` 的判定不因重構而改變。
+- 動到邊界的先寫 ADR（E1 的示範資料邊界已於本輪定稿為 ADR-031，E2 的套件邊界待動工時再寫）。
+- 成果寫進 §11.2 一條、待辦從 [TODO.md](docs/TODO.md) 刪掉——**不要在兩個地方各留一份**。

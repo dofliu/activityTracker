@@ -1,6 +1,6 @@
 # 📚 OmniContext 文件總覽（Documentation Index）
 
-> 最後整理：2026-09-16。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
+> 最後整理：2026-09-22。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
 >
 > **每份文件只有一個職責**——同一件事不在第二個地方再寫一次。職責分工見
 > [NEXT_SESSION.md → 工程慣例 → 文件同步](NEXT_SESSION.md#工程慣例照舊)。
@@ -15,7 +15,7 @@
 | 快速了解專案是什麼、能做什麼 | [README.md](../README.md)（繁中）/ [README_en.md](../README_en.md)（English） |
 | 安裝、Extension 配對、日常操作、備份與故障排查 | [USAGE.md](USAGE.md) —— **使用手冊** |
 | 了解目前開發到哪 | [ROADMAP.md](../ROADMAP.md) §11.2 成果紀錄（依日期一條）+ [STATUS.yaml](../STATUS.yaml) |
-| 了解下一階段方向與取捨 | [ROADMAP.md](../ROADMAP.md) §13「架構整頓與推廣方向」（§12 的功能候選已暫停） |
+| 了解下一階段方向與取捨 | [ROADMAP.md](../ROADMAP.md) §13「架構整頓」（R0～R2 已全部完成）＋ §14「推廣路線」（E1 → E2 → E3，§12 的功能候選已暫停） |
 | **想知道這個專案值不值得推廣、架構哪裡該刪該併** | [REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) —— 現況數字、用處／學術／教學價值評估、架構體檢（附檔案：行號） |
 | 了解產品定位與「不宣稱什麼」的證據邊界 | [PRODUCT_POSITIONING.md](PRODUCT_POSITIONING.md) |
 | 修改架構前先看相關決策 | 下方 ADR 一覽 |
@@ -34,8 +34,8 @@
 
 | 文件 | 說明 |
 | :--- | :--- |
-| [../ROADMAP.md](../ROADMAP.md) | P0–P8 開發規劃與**成果紀錄**（已完成的事寫在 §11.2，依日期排序的單一清單）；§13 為 2026-09-16 起的架構整頓三階段與推廣路線 |
-| [TODO.md](TODO.md) | **待辦清單**：等待中的使用者側收據（A）、已知問題與技術債（B）、功能候選（C，暫停）、架構整頓（D）；每項都有完成判準 |
+| [../ROADMAP.md](../ROADMAP.md) | P0–P8 開發規劃與**成果紀錄**（已完成的事寫在 §11.2，依日期排序的單一清單）；§13 為 2026-09-16 起的架構整頓三階段（已全部完成）；§14 為 2026-09-22 起的推廣路線（E1 → E2 → E3） |
+| [TODO.md](TODO.md) | **待辦清單**：等待中的使用者側收據（A）、已知問題與技術債（B）、功能候選（C，暫停）、架構整頓（D，已全部完成）、推廣路線（E）；每項都有完成判準 |
 | [../STATUS.yaml](../STATUS.yaml) | 機器可讀的現況快照：feature 清單、evidence receipts、quality gates、**真正還擋著的** known_blockers 與 capability_boundaries（已完成的歷史在 ROADMAP §11.2，不在這裡重複） |
 | [PRODUCT_POSITIONING.md](PRODUCT_POSITIONING.md) | 產品定位：跨 AI、應用與 Repository 的個人工作脈絡層，以及能力／證據邊界 |
 
@@ -75,7 +75,7 @@
 | [ADR-030](ADR-030-frontend-state-stores.md) | 前端共享狀態分成具名 store ＋ 工廠 | 49 個攤平欄位分成 11 個 store、`createAppState()` 造得出第二份、「哪個模組碰哪個 store」是一張要維護的宣告表（新的跨模組存取會紅）、打錯欄位名從靜默 undefined 變成測試紅字；**共用的那一份還在**——買到的是可另造一份與有歸屬，不是沒有全域，理由（listener 陷阱）寫在 ADR 裡 |
 | [ADR-027](ADR-027-injected-runtime-state.md) | 程序內可變狀態收成可注入的 store | 狀態有名字、有把手，重設＝換一份新的而不是呼叫鉤子；鎖跟著它保護的資料走；只存在記憶體、一次性碼只留雜湊（安全性質一個都沒放寬）；CORS 允許清單每個請求看當下設定，改設定不必重啟；行程預設仍是單例（買到的是「可注入」不是「無全域」）|
 | [ADR-026](ADR-026-frontend-modules.md) | 前端拆成 ES module：一個分頁一個檔 | 沒有打包步驟（本機工具，少一層是一層）、字典是資料且兩份 key 集合由測試把關、`fetch` 只准出現在 `core/api.js`、點擊動作走 `data-action` 委派而不是字串裡的 handler、`state.js` 是過渡形狀（改成注入是 D11） |
-| [ADR-031](ADR-031-omni-demo-dataset.md) | `omni demo` 示範資料集（設計定案，實作待下一輪） | 獨立子指令＋固定隔離 home（`OMNICONTEXT_HOME` 覆寫，不共用真實資料庫）、示範資料走既有 parser／watcher 不直寫 DB、時間相對回填讓「已結束的週／日」邏輯吃得到資料、`demo-` 前綴避免誤認真實資料、不自動開啟危險能力或連網 |
+| [ADR-031](ADR-031-omni-demo-dataset.md) | `omni demo` 示範資料集的邊界（TODO E1，ADR 已定稿、實作待下一輪） | 只能寫進另開的 `OMNICONTEXT_HOME`、對既有家目錄 fail-closed、每筆資料標示 `demo_mode` 且一路傳到 API、驗收中心與問候卡不得把示範數字當實機收據、匿名化資料一律從頭編造 |
 
 ## 功能規格與驗證
 
