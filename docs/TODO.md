@@ -1,6 +1,6 @@
 # 待辦事項與已知問題（Backlog）
 
-> 最後更新：2026-09-22（ROADMAP §13 的 R0～R2 全部完成並移到 §11.2；新增 E 段推廣路線，E1 `omni demo` 邊界 ADR-031 已定稿）。這頁是**唯一的待辦清單入口**；現況數據以
+> 最後更新：2026-09-22（依 [REVIEW-2026-09-22](REVIEW-2026-09-22-competitive-landscape-and-P9.md) 重排 E 段：唯讀 MCP server 插進 `agent-transcripts` 之前，E1→E6）。這頁是**唯一的待辦清單入口**；現況數據以
 > [STATUS.yaml](../STATUS.yaml) 為準，接手路徑見 [NEXT_SESSION.md](NEXT_SESSION.md)。
 >
 > 每一項都標明**完成判準（收據）**——沒有收據就不算完成，這是本專案的一貫原則。
@@ -98,16 +98,27 @@
 
 ---
 
-## E. 推廣路線（ROADMAP §14；依 E1 → E2 → E3 順序）
+## E. 推廣路線（ROADMAP §14；依 E1 → E6 順序）
 
-> 來源：[ROADMAP.md §14](../ROADMAP.md)（為什麼是這三件事、為什麼不是別的）與 §13.3。
+> 來源：[ROADMAP.md §14](../ROADMAP.md)（為什麼是這六件事、為什麼是這個順序）。
+> **2026-09-22 依外部檢視重排**（[REVIEW-2026-09-22](REVIEW-2026-09-22-competitive-landscape-and-P9.md)）：
+> 唯讀 MCP server 插進 `agent-transcripts` 套件**之前**，理由見 ROADMAP §14.2。
+> 該文件 §7 的 E1～E9 **沒有採用**（ADR 編號衝突、含兩項非開發工作），逐項校訂見該文件開頭的「校訂註記」。
 > 共同鐵律：每一項結束 `pytest` 全綠、`python main.py verify` 的判定不因重構而改變；動到邊界的先寫 ADR。
 
 | # | 項目 | 內容 | 完成判準（收據） | 階段 |
 | :-- | :--- | :--- | :--- | :--- |
-| E1 | `omni demo` 示範資料集 | 一份匿名化、可公開的假 transcript ＋ Git ＋ 檔案事件，一個指令灌進**另開的** `OMNICONTEXT_HOME`，讓任何新環境（含每一個雲端開發 session）五分鐘看到首頁、提案與 Handoff。**邊界已於 2026-09-22 定稿**（[ADR-031](ADR-031-omni-demo-dataset.md)）：示範資料一律標成示範、只能寫進另開的家目錄、不得與真實資料同庫、驗收中心與問候卡不得把示範數字當實機收據。 | ADR-031 已定稿（本輪完成）；**下一輪**：`omni demo` 在乾淨容器跑完後 `GET /api/v1/secretary/home` 有焦點與記憶、`reports/handoffs/` 有檔；對**真實**家目錄執行時 fail-closed 並說明原因；新增契約測試涵蓋「示範資料不得寫進非示範家目錄」與「示範旗標一路標到 API」；`pytest` 全綠 | 推廣（ADR 完成，實作待下一輪） |
-| E2 | `agent-transcripts` 獨立套件 | 把 `watchers/transcripts/` 的四個平台 parser ＋ 統一 turn 模型 ＋ provenance ＋ drift 偵測抽成可單獨 `pip install` 的套件，本 repo 改成它的第一個使用端。前置條件在 D9（[ADR-025](ADR-025-transcript-parsers-and-drift.md)）已完成：共同介面只有 `discover`／`parse`，parser 不碰資料庫。**先寫 ADR**：套件邊界、版本相依與本 repo 的消費方式。 | ADR 定稿；套件可在**沒有本專案**的乾淨 venv 裡安裝並解析四種格式（附一份離線樣本的解析輸出當收據）；本 repo 改成使用端後 `tests/test_transcript_parsers_and_drift.py` 與 `tests/test_transcript_contracts.py` **一字不改**全綠；`python -m build` ＋ `verify_release_artifacts.py` 通過；`verify` 輸出與基底相同 | 推廣 |
-| E3 | `omni init` 自動偵測 | `omni init` 偵測 `~/.claude`／`~/.codex`／Antigravity 的既有路徑並**詢問**要不要納入採集——不自動匯入、不自動開啟任何採集器、不碰危險能力開關。 | 偵測結果與實際存在的路徑一致（不存在的不列、列出的點得開）；一律需要明確回答才寫進設定，預設是「不納入」；非互動模式（`--yes` 之類）要能被關掉且預設不存在；新增契約測試涵蓋「偵測不等於啟用」；`pytest` 全綠 | 推廣 |
+| E1 | `omni demo` 示範資料集**實作** | 一份匿名化、可公開的假 transcript ＋ Git ＋ 檔案事件，一個指令灌進**另開的** `OMNICONTEXT_HOME`，讓任何新環境（含每一個雲端開發 session）五分鐘看到首頁、提案與 Handoff。邊界已於 2026-09-22 定稿（[ADR-031](ADR-031-omni-demo-dataset.md)）：示範資料一律標成示範、只能寫進另開的家目錄、不得與真實資料同庫、驗收中心與問候卡不得把示範數字當實機收據。**排第一不是因為好做，是因為 E3／E4 沒有它就只能證明「schema 對」、證明不了「查得到東西」**。 | `omni demo` 在乾淨容器跑完後 `GET /api/v1/secretary/home` 有焦點與記憶、`reports/handoffs/` 有檔；對**真實**家目錄執行時 fail-closed 並說明原因；新增契約測試涵蓋「示範資料不得寫進非示範家目錄」與「示範旗標一路標到 API」；`pytest` 全綠 | 推廣 |
+| E2 | **ADR-032 唯讀 MCP Context Server（先寫 ADR，Accepted 才動工）** | 以獨立、**預設關閉**、**唯讀**的 stdio MCP server 暴露 canonical context，讓 Claude Code／Codex 這類 agent 直接讀得到，不必開瀏覽器或貼剪貼簿。安全契約沿用 [REVIEW-2026-09-22](REVIEW-2026-09-22-competitive-landscape-and-P9.md) §A.4 的 D1–D6：唯讀／預設關閉／不轉發金鑰／輸出無 secret 與絕對路徑／與執行器零耦合／每次 tool call 留 receipt 但不記 query 原文。 | ADR 定稿，且**必須回答該文件沒回答的兩件事**：①模組路徑——**不得**用 top-level `mcp/`（會與 PyPI 官方 MCP SDK 的 `mcp` package 撞名，且 `pyproject.toml` 的 `packages.find.include` 是白名單）；②stdio 傳輸要不要引入官方 SDK 當相依——若要，必須比照 `[rag]` 做成 optional extra，不得進預設安裝（核心安裝 721 MB → 176 MB 是 R0 買來的）。另含六個 tool 的 schema、D1–D6、隱私邊界三處（ADR／config 註解／USAGE）、不做清單（不做任何 write tool、不做 HTTP／SSE transport、不暴露 RAG 文件切片） | 推廣 |
+| E3 | MCP 第一版（切片一）：骨架 ＋ 兩個 tool | `omni mcp` 子指令 ＋ `omni_project_state`、`omni_handoff` 兩個 tool（直接讀 SQLite，**不要求主服務在跑**）。先做這兩個，是因為它們只接既有的 `core/project_engine`／`core/handoff_engine`，不碰檢索層。 | `omni mcp --selftest` 兩個 tool 各回一次、每筆帶 `source_ref` 且回查得到 SQLite row；**唯讀證明**：selftest 前後所有資料表列數不變（真 tmp DB）；契約測試守門「MCP 模組不得 import `core.agent_executor`／`core.agent_dispatch`／`core.secretary.scheduled_tasks`」與「原始碼零寫入關鍵字」；`mcp.enabled: false` 時拒絕啟動並說出原因；輸出不含 token／secret／絕對路徑（正則掃描）；`pytest` 全綠且不裝 `[rag]` 亦全綠 | 推廣 |
+| E4 | MCP 第一版（切片二）：其餘四個 tool ＋ 驗收 | `omni_search_history`（**retrieval-only，不做 LLM 合成**——合成交給呼叫端 agent，server 只負責「找得到、指得回」）、`omni_open_loops`、`omni_work_sessions`、`omni_recent_digest`；並把驗收中心加到 A23–A26。 | 四個 tool 的回傳 schema 逐鍵比對（比照 [ADR-024](ADR-024-secretary-layers.md) `to_dict()` 的做法）；Ollama 不可用時 `omni_search_history` 回明確 `unavailable`，**不** fallback 到雲端、也不用空陣列冒充「沒發生」；`omni_recent_digest` 對沒有觀察的日期回「無觀察」而非即時產生；tool call receipt 存在且不含 query 原文；A23／A25／A26 機器可查、A24 標 `needs_human`，四項同步進 `core/acceptance/items.py` 的 `ITEMS` 與本頁 A 段；`python -m build` ＋ `verify_release_artifacts.py` `status: passed` 且 wheel 含 MCP 模組 | 推廣 |
+| E5 | `agent-transcripts` 獨立套件 | 把 `watchers/transcripts/` 的四個平台 parser ＋ 統一 turn 模型 ＋ provenance ＋ drift 偵測抽成可單獨 `pip install` 的套件，本 repo 改成它的第一個使用端。前置條件在 D9（[ADR-025](ADR-025-transcript-parsers-and-drift.md)）已完成：共同介面只有 `discover`／`parse`，parser 不碰資料庫。**先寫 ADR**：套件邊界、版本相依與本 repo 的消費方式。 | ADR 定稿；套件可在**沒有本專案**的乾淨 venv 裡安裝並解析四種格式（附一份離線樣本的解析輸出當收據）；套件自帶的 fixture 不得夾帶任何真實 prompt／路徑／機器名（契約測試守門）；本 repo 改成使用端後 `tests/test_transcript_parsers_and_drift.py` 與 `tests/test_transcript_contracts.py` **一字不改**全綠；`python -m build` ＋ `verify_release_artifacts.py` 通過；`verify` 輸出與基底相同 | 推廣 |
+| E6 | `omni init` 自動偵測 | `omni init` 偵測 `~/.claude`／`~/.codex`／Antigravity 的既有路徑並**詢問**要不要納入採集——不自動匯入、不自動開啟任何採集器、不碰危險能力開關。 | 偵測結果與實際存在的路徑一致（不存在的不列、列出的點得開）；一律需要明確回答才寫進設定，預設是「不納入」；非互動模式（`--yes` 之類）要能被關掉且預設不存在；新增契約測試涵蓋「偵測不等於啟用」；`pytest` 全綠 | 推廣 |
+
+> **刻意不進本段的兩件事**（[REVIEW-2026-09-22](REVIEW-2026-09-22-competitive-landscape-and-P9.md) §5 的 P9-C 與 P9-D-3）：
+> 「關掉 `release_ready`」與「找外部使用者安裝」都**不是開發輪次做得完的工作**——
+> 前者卡在 A1（只能由 Windows 實機跨午夜連續運行一整天產生）、A2，以及 ROADMAP §12.3 的 G2／G3／G4，**已經寫在上面的 A 段**；後者是使用者側的事。
+> 兩者都不在這裡再寫第二次（見下方「維護這頁的規則」）。
 
 ---
 

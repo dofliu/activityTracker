@@ -317,9 +317,15 @@ Telegram 通道經評估後**不採用**（使用者未使用該工具），改�
 市面同類工具（ActivityWatch、RescueTime、Timing）追蹤的是**時間**；
 Rewind、Screenpipe 錄螢幕再 OCR，隱私成本與資源消耗高。
 
-**沒有主流工具在讀本機 AI agent 的 transcript。** `~/.claude/projects/`、
+本專案讀的是**本機 AI agent 的 transcript**：`~/.claude/projects/`、
 `~/.codex/sessions/`、`.gemini/antigravity/brain/` 這些檔案就在硬碟上，
-不需錄螢幕、不需額外權限，而裡面是真正的思考過程。這是本專案的差異化切入點。
+不需錄螢幕、不需額外權限，而裡面是真正的思考過程。
+
+差異化切入點**不是**「只有我們在讀這些檔案」（2026-09-22 檢視確認這句已不成立，
+見 [REVIEW-2026-09-22](docs/REVIEW-2026-09-22-competitive-landscape-and-P9.md) §2.4／§3），
+而是讀完之後把四個平台的 turn 與 Git、檔案、前景時間、行事曆、GitHub PR
+收斂到同一個專案身分，且每個結論都指得回一筆 SQLite row。
+**不宣稱**是唯一或第一個讀本機 transcript 的工具——沒有安裝比對過，就不做這種宣稱。
 
 ### 3.4 讓他人可用的五個障礙
 
@@ -683,6 +689,7 @@ P2.5-S1 API 安全邊界
   **收據**：`scripts/dashboard_dom_lock.py check` **22 張逐字元相同**（437 處改動、12 個檔案，輸出一個字元沒變）；`pytest` 829 passed ＋ 2 skipped（新增 `tests/test_frontend_state_stores.py` 6 項：11 store／49 欄位、每條 `state.<store>.<field>` 都必須存在、不准再有攤平存取、歸屬表對得上、用 `node` 真的載進來證明兩份互不相干；另加 `test_nothing_shadows_the_shared_state`）；不裝 `[rag]`（八個套件真的解除安裝）816 passed ＋ 14 skipped；`python main.py verify` 與改動前**逐位元組相同**；`python -m build` ＋ `verify_release_artifacts.py` `status: passed`。四支新測試都做過負面驗證：打錯欄位名、加一處沒宣告的跨模組存取、把遮蔽改回去、把場景步驟換成沒作用的點擊，各自都紅。
   **如實記下的代價**：**`export const state` 還在，整個程式還是共用它**——買到的是「可以另外造一份」與「欄位有歸屬」，不是「沒有全域」，和後端 D11 停在同一個地方。**沒有做完全的參數注入是刻意的**：119 個函式碰狀態，其中大量直接掛給 `addEventListener`，加一個有預設值的 `state` 參數會讓瀏覽器把 `MouseEvent` 當成狀態傳進去，而鎖只涵蓋第一畫面與五個場景，涵蓋不了那幾百個 listener 路徑——沒有證據就不做。存取也變長了（`state.currentLang` → `state.ui.currentLang` 光這個就 125 處）。**未涵蓋面**：表單送出、對話框、會 POST 的動作、輪詢之後的更新、樣式——那些路徑上的改動只有「語法正確 ＋ 路徑存在」兩層保證，沒有渲染層面的證據。
 - ✅ 2026-09-16（第五輪）：**R1 D4——`core/server.py` 依領域切成 9 個 router**。動刀前先做安全網：`tests/test_api_route_snapshot.py` 從執行中的 app 抓下**全部 133 條路由**（98 條主服務 ＋ 31 條 DeskRAG）的（路徑、方法、handler 名稱）快照並鎖住——少一條、多一條、改名都會失敗。搬家用 AST 逐個頂層定義切出來，每個模組的 import 由「這個模組實際用到哪些名稱」自動推導，再用 pyflakes 確認零未定義、零未使用。結果：`core/server.py` **1,995 行 → 134 行**，只做四件事（建 app ＋ 安全邊界 middleware、掛 `/static`、掛 9 個 router ＋ RAG、為既有呼叫端保留 `asset_version`／`render_index_html`／`WEB_DIR` 的名稱）。新增 `core/api/{pages,system,events,activity,secretary,projects,repos,integrations,settings}.py`（每個 66～334 行）＋ `core/api/deps.py`（execution token 閘門，秘書與排程兩個 router 共用，只有一份）；33 個 Pydantic model 集中到 `core/schemas.py`；AI 事件的 `turn_key` 與 `response_status` 判定移到 `core/ingest.py`（那是 ADR-001 的 provenance 規則，不是 web 層的事）。**行為不變**：路由表、middleware 順序、403／401 的 detail 字面全部原封不動。測試只改 patch 目標的 import 路徑（14 個 `core.server.X` → 對應的 `core.api.X`，斷言一字未改）。**收據**：`pytest` 662 passed ＋ 1 skipped（新增路由快照 3 項）；不裝 `[rag]` 650 passed ＋ 12 skipped；`verify` 輸出與基底相同；`python -m build` ＋ `verify_release_artifacts.py` 通過且 wheel 含 `core/api/` 全部模組。
+- ✅ 2026-09-22：**外部競品檢視收錄、差異化宣稱改寫、E 段重排**（[REVIEW-2026-09-22](docs/REVIEW-2026-09-22-competitive-landscape-and-P9.md)，本輪未動任何產品程式碼）。收到一份外部檢視，主張三件事，逐項對照 `main` 之後：**②「差異化宣稱已過期」成立**——「沒有主流工具在讀本機 AI agent 的 transcript」這句絕對否定句確認存在於 `README.md`、`README_en.md`、`ROADMAP.md` §3.3、`docs/PRODUCT_POSITIONING.md` 四處，**已全部改寫**：只陳述本專案讀完之後做什麼（收斂到同一個專案身分、每個結論指得回一筆 SQLite row），並加上明文 non-claim「不宣稱是唯一或第一個讀本機 transcript 的工具——沒有安裝比對過就不做這種宣稱」；**③「最大的落差是介面，本專案沒有 MCP server」成立**——全 repo 搜 `mcp` 只有 ROADMAP 兩處提及（外部 Calendar MCP、`MCP/LabPagesCowork/` 目錄名），零實作、零相依。據此把 TODO E 段從三項擴為六項，**唯讀 MCP server 插進 `agent-transcripts` 套件之前**（理由：套件是做給還不存在的第二個使用者，MCP 是做給現在這一個使用者——他的工作流是 Claude Code／Codex 不是瀏覽器）。**該文件的條目沒有照抄**，校訂寫在文件開頭的「校訂註記」：它把 MCP 的 ADR 編號指派為 ADR-031，但那個編號當天已被 `omni demo` 邊界佔用（Accepted），照抄會覆蓋一份已定稿的 ADR，**改為 ADR-032**；它提議的模組路徑 top-level `mcp/` 會與 PyPI 官方 MCP SDK 的 `mcp` package 撞名（`pyproject.toml` 的 `packages.find.include` 是白名單），且它沒有回答 stdio 傳輸要不要吃 SDK 相依——兩題都留給 ADR-032；它的 P9-C「兩週關掉 `release_ready`」不成立（`verify` 當天說擋的是 **A1、A2**，引用 TODO 時掉了「**能力型**缺口」四個字，也沒算 §12.3 的 G2／G3／G4），P9-C 與 P9-D-3 都是使用者側的事，**不進 E 段**，避免同一件事寫兩個地方。**§2 的競品資料全部未經本機驗證**（該文件 §11 自述），因此只用來排序工作、不進入任何對外宣稱——本輪改寫的字句刻意沒有引用其中任何一項競品斷言。**收據**：`pytest` 829 passed ＋ 2 skipped（與改動前相同，本輪未動任何產品程式碼）；`python main.py verify` 在本輪之前與之後各跑一次，22 項判定與四個 release gate 一字不變（`release_ready` 仍卡在 A1、A2）——**claim boundary**：這不是逐位元組比對，而是「驗收中心只讀 `reports/` 底下的產出與資料庫，不讀本輪改動的任何 `.md`」（`core/acceptance/readings.py` 只碰 `RepoSync_*.md` 與 `handoffs/*.md`）。
 
 ---
 
@@ -811,22 +818,51 @@ P2.5-S1 API 安全邊界
 但它目前只存在於這個 repo 裡，安裝要 176 MB、設定要填、資料要自己累積幾天才看得到東西。
 第二個人拿不到它，第二台機器上也證明不了它。這一輪就是去把這件事變成可能。
 
-### 14.2 順序與理由（E1 → E2 → E3）
+### 14.2 順序與理由（E1 → E6，2026-09-22 依外部檢視重排）
 
-1. **E1 `omni demo` 示範資料集**（先做，因為它是後面兩項的前置）
+> 當天收到一份外部檢視（[REVIEW-2026-09-22](docs/REVIEW-2026-09-22-competitive-landscape-and-P9.md)），
+> 主張三件事：①工程紀律是本專案的異常值；②差異化宣稱已過期；③**最大的結構性落差不是功能，是介面——本專案沒有 MCP server**。
+> 對照 repo 後：②確認成立（四處字句已於當天改寫）、③確認成立（全 repo 零 MCP 實作）。
+> 因此 E 段從三項擴為六項，**唯讀 MCP server 插進 `agent-transcripts` 套件之前**。
+> 該文件 §7 的條目沒有照抄（ADR 編號衝突等，校訂寫在文件開頭），待辦以 [docs/TODO.md](docs/TODO.md) E 段為準。
+
+**為什麼 MCP 排在套件抽取之前**：`agent-transcripts` 是做給**還不存在的第二個使用者**的；
+MCP 是做給**現在這一個使用者**的——他的工作流是 Claude Code／Codex，不是瀏覽器，
+而這個專案十五個月累積的 canonical context 目前只有三個出口：另開瀏覽器、CLI、剪貼簿。
+把它開成 agent 讀得到的介面，是唯一一件「今天就有人用」的事。
+**為什麼仍然要唯讀、預設關閉**：MCP client 的輸入不可信，write tool 等於把 [ADR-008](docs/ADR-008-gated-agent-executor.md)
+花三層開關守住的東西從旁邊開一道門。第一版的安全契約（D1–D6）在 ADR-032 定稿後才動工。
+
+**為什麼 `omni demo` 仍然排第一**：不是因為好做，是因為沒有它，MCP 的 tool 在任何非使用者機器上都只能回空陣列——
+`omni mcp --selftest` 會變成只證明「schema 對」，證明不了「查得到東西」。這是相依關係，不是偏好。
+
+1. **E1 `omni demo` 示範資料集**（先做，因為它是後面所有項目的前置）
    - 現況：任何新環境（包含每一個雲端開發 session）打開儀表板都是空的——首頁沒有提案、沒有記憶、沒有 Handoff。
      這不只影響展示，也代表**大部分功能在容器裡只能靠契約測試證明，沒辦法真的看一眼**。
    - 目標：一份匿名化、可公開的假 transcript ＋ Git ＋ 檔案事件，`omni demo` 一個指令灌進**另開的** `OMNICONTEXT_HOME`，五分鐘看到首頁、提案與 Handoff。
    - 邊界（2026-09-22 已定稿，[ADR-031](docs/ADR-031-omni-demo-dataset.md)）：示範資料**一律標成示範**、**只能寫進另開的家目錄**（沿用 `core/runtime_paths.py` 既有的 `OMNICONTEXT_HOME` 覆寫，不新開一套）、絕不與真實資料同庫，
      且驗收中心與問候卡對示範資料的數字不得宣稱成實機收據——否則就是這個專案最不能犯的錯：拿假資料當證據。**ADR 已定稿，實作留給下一輪**。
 
-2. **E2 `agent-transcripts` 獨立套件**（真正要對外的東西）
+2. **E2 ADR-032 唯讀 MCP Context Server**（動工前先定稿）
+   - 現況：全 repo 零 MCP 實作（2026-09-22 確認）。canonical context 只能從瀏覽器、CLI 或剪貼簿拿。
+   - 目標：獨立、**預設關閉**、**唯讀**的 stdio server，六個 tool 全部帶 `source_ref`；stdio 是子程序管線不是網路介面，
+     因此不動 [ADR-001](docs/ADR-001-p2-5-trust-boundary.md) 的 loopback 邊界（HTTP／SSE transport 要另寫一份 ADR）。
+   - ADR 必須回答外部檢視沒回答的兩件事：模組**不得**叫 top-level `mcp/`（與 PyPI 官方 MCP SDK 撞名），
+     以及 stdio 傳輸要不要吃 SDK 相依——要的話只能是比照 `[rag]` 的 optional extra。
+
+3. **E3／E4 MCP 第一版（切成兩片）**
+   - 切片一只做 `omni_project_state` 與 `omni_handoff`（接既有的 `core/project_engine`／`core/handoff_engine`，不碰檢索層）
+     加上 D1–D6 的守門測試；切片二補其餘四個 tool 與驗收 A23–A26。
+   - 切成兩片的理由：六個 tool ＋ 約 20 項契約測試 ＋ 4 項驗收不是一輪做得完的量，
+     而「唯讀證明」（跑完一輪列數不變）與「禁止 import 執行器」這兩道門要在第一行產品程式碼寫下去之前就先立起來。
+
+4. **E5 `agent-transcripts` 獨立套件**（真正要對外的東西）
    - 現況：[ADR-025](docs/ADR-025-transcript-parsers-and-drift.md) 已經把四個平台的 parser 切成 `watchers/transcripts/` 的獨立模組，
      共同介面只有 `discover`／`parse` 兩個函式，parser 不碰資料庫——**抽出去的前置條件在 D9 就做完了**。
    - 目標：四種格式 → 統一 turn 模型 ＋ provenance ＋ drift 偵測，成為一個能單獨 `pip install` 的套件；本 repo 改成它的第一個使用端。
    - 判準的關鍵在**行為不變**：抽走之後 `tests/test_transcript_parsers_and_drift.py` 與 `test_transcript_contracts.py` 必須一字不改地全綠。
 
-3. **E3 `omni init` 自動偵測**（降低第二個人的門檻）
+5. **E6 `omni init` 自動偵測**（降低第二個人的門檻）
    - 現況：`config.example.yaml` 已經從 449 行收到 344 行（D6），但要跑起來仍得自己填路徑。
    - 目標：`omni init` 偵測 `~/.claude`／`~/.codex`／Antigravity 的既有路徑並**詢問**要不要匯入（不自動匯入、不自動開採集）。
 
@@ -835,6 +871,11 @@ P2.5-S1 API 安全邊界
 - **功能候選 C5／C6／C3 維持暫停**（理由同 §13.1，不重複）。
 - **不為了填滿 A 段而在容器裡偽造收據**：A 段就是要實機，容器跑出來的東西一律只能標成容器 E2E；
   `omni demo`（E1）也不例外——ADR-031 明文禁止示範資料的數字被驗收中心或問候卡當成實機收據。
+- **不把「關掉 `release_ready`」與「找外部使用者」排進 E 段**：外部檢視把它們列為 P9-C／P9-D-3，
+  但前者卡在 A1（只能由 Windows 實機跨午夜連續運行一整天產生）、A2 與 §12.3 的 G2／G3／G4，已經在 TODO A 段；
+  後者是使用者側的事。**開發輪次排不進去的東西，不寫進開發待辦**。
+- **不把外部檢視 §2 的競品資料變成對外宣稱**：那一節全部來自公開網路搜尋，本專案沒有安裝比對過任何一項。
+  它可以用來排序工作，不可以用來寫 README——否則只是把一個會過期的宣稱換成另一個。
 
 ### 14.4 每一項的共同鐵律（照舊）
 

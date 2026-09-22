@@ -383,7 +383,11 @@ activityTracker/
 
 市面同類工具（ActivityWatch、RescueTime、Timing）追蹤的是**時間**；Rewind、Screenpipe 錄螢幕再做 OCR，隱私成本與資源消耗都高。
 
-**目前沒有主流工具在讀本機 AI agent 的 transcript。** `~/.claude/projects/`、`~/.codex/sessions/`、`.gemini/antigravity/brain/` 這些檔案就在硬碟上，不需錄螢幕、不需額外權限，而裡面記錄的是真正的思考過程——問了什麼、AI 怎麼答、最後決定怎麼做。
+本專案讀的是**本機 AI agent 的 transcript**：`~/.claude/projects/`、`~/.codex/sessions/`、`.gemini/antigravity/brain/` 這些檔案就在硬碟上，不需錄螢幕、不需額外權限，而裡面記錄的是真正的思考過程——問了什麼、AI 怎麼答、最後決定怎麼做。
+
+差異不在「有沒有別人也在讀這些檔案」，而在讀完之後做什麼：四個平台的 turn 與 Git commit、檔案異動、前景時間、行事曆、GitHub PR **收斂到同一個專案身分**下，而且每個顯示給你的結論都指得回一筆 SQLite row（`source_ref` ＋ trust 狀態，[ADR-016](docs/ADR-016-acceptance-center.md)／[ADR-028](docs/ADR-028-declarative-acceptance.md)）。
+
+> **不宣稱**：不宣稱是唯一或第一個讀本機 AI agent transcript 的工具——沒有安裝比對過同類工具，就不做這種宣稱（[REVIEW-2026-09-22](docs/REVIEW-2026-09-22-competitive-landscape-and-P9.md) §3）。
 
 從「日誌」到「記憶」是這個專案的主線：現階段的重點不是繼續擴大收集，而是讓既有資料**可被檢索、可被秘書使用**。
 

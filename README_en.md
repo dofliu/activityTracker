@@ -348,7 +348,11 @@ activityTracker/
 
 Comparable tools (ActivityWatch, RescueTime, Timing) track **time**; Rewind and Screenpipe record the screen and OCR it, at a high privacy and resource cost.
 
-**No mainstream tool currently reads local AI agent transcripts.** `~/.claude/projects/`, `~/.codex/sessions/` and `.gemini/antigravity/brain/` are already on disk — no screen recording, no extra permissions — and what they contain is the actual reasoning: what was asked, how the AI answered, what was decided.
+This project reads **local AI agent transcripts**: `~/.claude/projects/`, `~/.codex/sessions/` and `.gemini/antigravity/brain/` are already on disk — no screen recording, no extra permissions — and what they contain is the actual reasoning: what was asked, how the AI answered, what was decided.
+
+The difference is not whether anyone else reads those files, but what happens next: turns from four platforms plus Git commits, file changes, foreground time, calendar and GitHub PRs are resolved onto **one project identity**, and every conclusion shown to you points back to a SQLite row (`source_ref` plus trust status, [ADR-016](docs/ADR-016-acceptance-center.md) / [ADR-028](docs/ADR-028-declarative-acceptance.md)).
+
+> **Not claimed**: this is not claimed to be the only or the first tool that reads local AI agent transcripts — no comparable tool has been installed and compared, so no such claim is made ([REVIEW-2026-09-22](docs/REVIEW-2026-09-22-competitive-landscape-and-P9.md) §3, in Traditional Chinese).
 
 Going from *log* to *memory* is the through-line of this project: the point now is not to collect more, but to make what exists **retrievable and usable by the secretary**.
 
