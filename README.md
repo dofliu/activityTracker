@@ -25,8 +25,8 @@
 
 | 面向 | 現況 |
 | :--- | :--- |
-| 程式 | P0–P8 與 ADR-008 執行器全階段已落地；22 份 ADR 記錄每個決策的邊界 |
-| 測試 | **73 個 contract test 模組、811 項**（810 passed + 1 skipped；不裝 `[rag]` extra 時 793 passed + 13 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
+| 程式 | P0–P8 與 ADR-008 執行器全階段已落地；31 份 ADR 記錄每個決策的邊界 |
+| 測試 | **75 個 contract test 模組、831 項**（829 passed + 2 conditional skip；不裝 `[rag]` extra 時 816 passed + 14 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
 | 資料 | SQLite schema migration **18/18**（append-only + checksum，升級前自動備份） |
 | 發佈 | `release_ready: false` |
 
@@ -327,7 +327,7 @@ activityTracker/
 │   ├── docs_freshness.py       # 文件落後程式偵測
 │   ├── ics_parser.py / calendar_agenda.py        # 本機 .ics 行事曆（唯讀）
 │   ├── repo_sync.py / repo_onboarding.py / repo_sync_report.py  # Git 同步中心
-│   ├── acceptance.py           # 驗收中心（TODO A 段的可執行副本）
+│   ├── acceptance/              # 驗收中心（宣告式：readings／items 階梯表／rules／report，ADR-028）
 │   ├── usage_analytics.py / capture_coverage.py / coverage_ledger.py
 │   ├── background_tasks.py / status_draft.py
 │   └── platform_services.py / runtime_paths.py / fs_utils.py / time_utils.py
@@ -372,7 +372,7 @@ activityTracker/
 │   └── i18n/zh-TW.json / en.json   # 語系字典（兩份 key 集合由測試把關）
 │
 ├── scripts/                    # 驗證、清理、autostart 與 E2E 腳本
-├── tests/                      # 73 個 contract test 模組（811 項）
+├── tests/                      # 75 個 contract test 模組（831 項）
 ├── logs/checkpoints/           # 週期性活動快照
 └── reports/                    # 每日／區間 Markdown 報告
 ```

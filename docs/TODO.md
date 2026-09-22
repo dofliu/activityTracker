@@ -1,6 +1,6 @@
 # 待辦事項與已知問題（Backlog）
 
-> 最後更新：2026-09-17（R0 B5–B9／D1、R1 D2–D6 與 R2 D7–D9 已完成並移到 ROADMAP §11.2）。這頁是**唯一的待辦清單入口**；現況數據以
+> 最後更新：2026-09-22（ROADMAP §13 的 R0～R2 全部完成並移到 §11.2；新增 E 段推廣路線，E1 `omni demo` 邊界 ADR-031 已定稿）。這頁是**唯一的待辦清單入口**；現況數據以
 > [STATUS.yaml](../STATUS.yaml) 為準，接手路徑見 [NEXT_SESSION.md](NEXT_SESSION.md)。
 >
 > 每一項都標明**完成判準（收據）**——沒有收據就不算完成，這是本專案的一貫原則。
@@ -23,7 +23,7 @@
 
 > **不必自己一項項翻**：儀表板「06 系統設定 → 驗收中心」或 `python main.py verify` 會直接去本機找下表的收據，
 > 告訴你每一項現在是「已取得收據／部分／尚未取得／未啟用／待你親眼確認」（[ADR-016](ADR-016-acceptance-center.md)）。
-> 它只讀不做：不會替你執行任何驗收動作，也不跑 git、不連網。判準以本表為準——**本表改了，`core/acceptance.py` 的 `_ITEMS` 要跟著改**。
+> 它只讀不做：不會替你執行任何驗收動作，也不跑 git、不連網。判準以本表為準——**本表改了，`core/acceptance/items.py` 的 `ITEMS` 要跟著改**。
 
 | # | 項目 | 怎麼做 | 完成判準（收據） | 優先 |
 | :-- | :--- | :--- | :--- | :--- |
@@ -85,7 +85,7 @@
 
 ---
 
-## D. 架構整頓（ROADMAP §13；R0 已完成，依 R1 → R2 順序）
+## D. 架構整頓（ROADMAP §13；R0～R2 已全部完成）
 
 > 來源：[REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) §4–5。
 > 每一項結束時 `pytest` 必須全綠、`python main.py verify` 結果不得變化（整頓不改行為）。R2 的項目要先有 ADR。
@@ -96,9 +96,24 @@
 | # | 項目 | 內容 | 完成判準（收據） | 階段 |
 | :-- | :--- | :--- | :--- | :--- |
 
+---
+
+## E. 推廣路線（ROADMAP §14；依 E1 → E2 → E3 順序）
+
+> 來源：[ROADMAP.md §14](../ROADMAP.md)（為什麼是這三件事、為什麼不是別的）與 §13.3。
+> 共同鐵律：每一項結束 `pytest` 全綠、`python main.py verify` 的判定不因重構而改變；動到邊界的先寫 ADR。
+
+| # | 項目 | 內容 | 完成判準（收據） | 階段 |
+| :-- | :--- | :--- | :--- | :--- |
+| E1 | `omni demo` 示範資料集 | 一份匿名化、可公開的假 transcript ＋ Git ＋ 檔案事件，一個指令灌進**另開的** `OMNICONTEXT_HOME`，讓任何新環境（含每一個雲端開發 session）五分鐘看到首頁、提案與 Handoff。**邊界已於 2026-09-22 定稿**（[ADR-031](ADR-031-omni-demo-dataset.md)）：示範資料一律標成示範、只能寫進另開的家目錄、不得與真實資料同庫、驗收中心與問候卡不得把示範數字當實機收據。 | ADR-031 已定稿（本輪完成）；**下一輪**：`omni demo` 在乾淨容器跑完後 `GET /api/v1/secretary/home` 有焦點與記憶、`reports/handoffs/` 有檔；對**真實**家目錄執行時 fail-closed 並說明原因；新增契約測試涵蓋「示範資料不得寫進非示範家目錄」與「示範旗標一路標到 API」；`pytest` 全綠 | 推廣（ADR 完成，實作待下一輪） |
+| E2 | `agent-transcripts` 獨立套件 | 把 `watchers/transcripts/` 的四個平台 parser ＋ 統一 turn 模型 ＋ provenance ＋ drift 偵測抽成可單獨 `pip install` 的套件，本 repo 改成它的第一個使用端。前置條件在 D9（[ADR-025](ADR-025-transcript-parsers-and-drift.md)）已完成：共同介面只有 `discover`／`parse`，parser 不碰資料庫。**先寫 ADR**：套件邊界、版本相依與本 repo 的消費方式。 | ADR 定稿；套件可在**沒有本專案**的乾淨 venv 裡安裝並解析四種格式（附一份離線樣本的解析輸出當收據）；本 repo 改成使用端後 `tests/test_transcript_parsers_and_drift.py` 與 `tests/test_transcript_contracts.py` **一字不改**全綠；`python -m build` ＋ `verify_release_artifacts.py` 通過；`verify` 輸出與基底相同 | 推廣 |
+| E3 | `omni init` 自動偵測 | `omni init` 偵測 `~/.claude`／`~/.codex`／Antigravity 的既有路徑並**詢問**要不要納入採集——不自動匯入、不自動開啟任何採集器、不碰危險能力開關。 | 偵測結果與實際存在的路徑一致（不存在的不列、列出的點得開）；一律需要明確回答才寫進設定，預設是「不納入」；非互動模式（`--yes` 之類）要能被關掉且預設不存在；新增契約測試涵蓋「偵測不等於啟用」；`pytest` 全綠 | 推廣 |
+
+---
+
 ## 維護這頁的規則
 
 1. **完成即移除**：項目做完後寫進 ROADMAP §11 的成果紀錄，並從本頁刪除（D 段亦同；階段順序見 ROADMAP §13.2）。
 2. **每項都要有收據**：新增項目時一併寫下「怎樣才算完成」，避免出現無法驗收的待辦。
-   A 段新增或刪除項目時，同步更新 `core/acceptance.py` 的 `_ITEMS`（驗收中心是本表的可執行副本）。
+   A 段新增或刪除項目時，同步更新 `core/acceptance/items.py` 的 `ITEMS`（驗收中心是本表的可執行副本）。
 3. **誠實標記**：環境限制、外部前置（如需要使用者提供的憑證）要標出來，不要混在「還沒做」裡。

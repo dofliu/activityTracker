@@ -25,8 +25,8 @@ It answers three questions at any moment:
 
 | Area | State |
 | :--- | :--- |
-| Code | P0–P8 and all ADR-008 executor stages landed; 22 ADRs record the boundary behind each decision |
-| Tests | **73 contract test modules, 811 tests** (810 passed + 1 skipped; 793 passed + 13 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
+| Code | P0–P8 and all ADR-008 executor stages landed; 31 ADRs record the boundary behind each decision |
+| Tests | **75 contract test modules, 831 tests** (829 passed + 2 conditional skip; 816 passed + 14 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
 | Data | SQLite schema migration **18/18** (append-only + checksum, verified backup before upgrade) |
 | Release | `release_ready: false` |
 
@@ -292,7 +292,7 @@ activityTracker/
 │   ├── docs_freshness.py       # Docs-behind-code detection
 │   ├── ics_parser.py / calendar_agenda.py        # Local read-only .ics calendar
 │   ├── repo_sync.py / repo_onboarding.py / repo_sync_report.py  # Git sync center
-│   ├── acceptance.py           # Acceptance center (executable copy of TODO section A)
+│   ├── acceptance/              # Acceptance center (declarative: readings / items ladder / rules / report, ADR-028)
 │   ├── usage_analytics.py / capture_coverage.py / coverage_ledger.py
 │   ├── background_tasks.py / status_draft.py
 │   └── platform_services.py / runtime_paths.py / fs_utils.py / time_utils.py
@@ -337,7 +337,7 @@ activityTracker/
 │   └── i18n/zh-TW.json / en.json   # Locale dictionaries (key parity enforced by a test)
 │
 ├── scripts/                    # Verification, cleanup, autostart and E2E scripts
-├── tests/                      # 73 contract test modules (811 tests)
+├── tests/                      # 75 contract test modules (831 tests)
 ├── logs/checkpoints/           # Periodic activity snapshots
 └── reports/                    # Daily / range Markdown reports
 ```
