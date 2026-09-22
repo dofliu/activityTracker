@@ -75,6 +75,7 @@
 | [ADR-030](ADR-030-frontend-state-stores.md) | 前端共享狀態分成具名 store ＋ 工廠 | 49 個攤平欄位分成 11 個 store、`createAppState()` 造得出第二份、「哪個模組碰哪個 store」是一張要維護的宣告表（新的跨模組存取會紅）、打錯欄位名從靜默 undefined 變成測試紅字；**共用的那一份還在**——買到的是可另造一份與有歸屬，不是沒有全域，理由（listener 陷阱）寫在 ADR 裡 |
 | [ADR-027](ADR-027-injected-runtime-state.md) | 程序內可變狀態收成可注入的 store | 狀態有名字、有把手，重設＝換一份新的而不是呼叫鉤子；鎖跟著它保護的資料走；只存在記憶體、一次性碼只留雜湊（安全性質一個都沒放寬）；CORS 允許清單每個請求看當下設定，改設定不必重啟；行程預設仍是單例（買到的是「可注入」不是「無全域」）|
 | [ADR-026](ADR-026-frontend-modules.md) | 前端拆成 ES module：一個分頁一個檔 | 沒有打包步驟（本機工具，少一層是一層）、字典是資料且兩份 key 集合由測試把關、`fetch` 只准出現在 `core/api.js`、點擊動作走 `data-action` 委派而不是字串裡的 handler、`state.js` 是過渡形狀（改成注入是 D11） |
+| [ADR-031](ADR-031-omni-demo-dataset.md) | `omni demo` 示範資料集（設計定案，實作待下一輪） | 獨立子指令＋固定隔離 home（`OMNICONTEXT_HOME` 覆寫，不共用真實資料庫）、示範資料走既有 parser／watcher 不直寫 DB、時間相對回填讓「已結束的週／日」邏輯吃得到資料、`demo-` 前綴避免誤認真實資料、不自動開啟危險能力或連網 |
 
 ## 功能規格與驗證
 

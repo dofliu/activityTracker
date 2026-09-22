@@ -1,8 +1,8 @@
 # 下一個 Session 接手指南
 
-> 最後更新：2026-09-16（最近一輪：**專案檢視**——[REVIEW-2026-09-16](REVIEW-2026-09-16-project-assessment.md) 價值評估與架構體檢、ROADMAP §13 整頓三階段、TODO 新增 B5–B9 與 D 段），接著**完成 R0 的 B5–B9**（刪死碼與未用依賴、marked 本機化、CLI 只呈現 API 數字；ROADMAP §11.2 有收據）。
-> 上一輪文件整理是 2026-09-13。
-> 上一輪程式變更是 2026-09-08 的**會議秘書第一層**（[ADR-022](ADR-022-meeting-secretary.md)）。
+> 最後更新：2026-09-22（最近一輪：ROADMAP §13 的 R0～R2 整頓已於 2026-09-20 全部完成，TODO 新增 **E 段：推廣路線**——E1 `omni demo` 示範資料集設計定案（[ADR-031](ADR-031-omni-demo-dataset.md)，實作待下一輪）、E2 `agent-transcripts` 獨立套件、E3 `omni init` 自動偵測皆未開始）。
+> 上一輪文件整理是 2026-09-20（隨 D13 一起更新）。
+> 上一輪程式變更是 2026-09-20 的 **D13：前端共享狀態分成具名 store**（[ADR-030](ADR-030-frontend-state-stores.md)）；本輪（2026-09-22）只有 ADR-031 設計文件，沒有程式變更。
 > **完整的功能歷程不在這裡**：一路做了什麼一律看 [ROADMAP.md](../ROADMAP.md) §11.2（依日期排序的單一清單）。
 >
 > 這頁是給「下一個開發 session（人或 AI）」的**最短接手路徑**，只放現況、地圖與環境備忘。
@@ -16,7 +16,7 @@
 | 版本 | v1.3.0a5 已發佈為 GitHub pre-release（release workflow 自動 build → verify → release，SHA-256 receipt 交叉驗證）。`release_ready: false`，唯一**能力型**缺口是全天 coverage ledger 實測（TODO A1）。 |
 | 還缺什麼 | 別憑記憶：跑 `python main.py verify`（或看「06 系統設定 → 驗收中心」）就會列出 A1–A22 每一項現在有沒有收據，以及 ROADMAP §12.3 四個 gate 缺什麼。 |
 | Schema | migration **18/18**（append-only + checksum；**新表一律進 registry，不得靠 `create_all` 繞過**）。017 = `secretary_notes`、018 = `calendar_events`。 |
-| 測試 | **73 個 contract test 模組、811 項**（810 passed + 1 skipped；**不裝 `[rag]` extra 時 793 passed + 13 skipped**，CI 有一個 job 專跑這個）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
+| 測試 | **75 個 contract test 模組、831 項**（829 passed + 2 conditional skip；不裝 `[rag]` extra 時 816 passed + 14 skipped，CI 有一個 job 專跑這個）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
 | API 路由 | `core/server.py` **只做組裝**（134 行）；端點在 `core/api/*.py` 依領域分 9 個 router，請求結構在 `core/schemas.py`，AI ingest 規則在 `core/ingest.py`，execution token 閘門在 `core/api/deps.py`。**改動端點前先看 `tests/test_api_route_snapshot.py`**——133 條路由的（路徑、方法、handler 名稱）鎖在那裡，新增端點要在清單多一行（D4，2026-09-16）。 |
 | 活動來源 | **只有一份**：`core/activity_sources.py`（`EVENT_SOURCES` 決定哪三張表算活動與專案欄位在哪、`normalize_project` 空白＝沒歸戶不猜、`day_bounds` 一律半開區間）。每週回顧／模式提案／每日工作誌／問候卡都吃它；**要增減活動來源就只改 `EVENT_SOURCES`**，有契約測試禁止使用端自己查三張事件表的專案欄位（D3，2026-09-16）。 |
 | LLM client | **只有一份**：`core/llm_client.py`（`LLMClient.generate` 同步回字串、`stream_chat` 非同步逐 token；`DEFAULT_MODELS`／`KEY_ENVS` 單一定義；Ollama 一律 `/api/chat`）。失敗抬頭字面（`[本機備援模式]`、`[OpenAI API 錯誤]`、`【尚未偵測到`…）是下游事實閘與驗收中心的辨識依據，**不得改字**；有契約測試掃全 repo 禁止在別處寫死模型名（D2，2026-09-16）。 |
@@ -27,7 +27,7 @@
 | 導覽 | 6 分頁，**沒有右欄**（2026-09-06 依實機回饋移除；今日統計與 Focus Now 在 05 最上方、DATA TRUST 在 06 系統健康）：01 小秘書＝兩塊一屏（左：秘書桌面，問候併入、全部提案收合在底部；右：交辦與提問，記憶區收合在裡面）／02 知識庫／03 進行中工作／04 Git 同步中心／05 摘要與統計／06 系統設定（左欄 11 區塊，末項為**驗收中心**）。桌面與 494px 皆無水平溢出（Playwright 實測）。 |
 | 外觀 | 兩個獨立軸：`data-theme`（dark/light）× `data-accent`（naruto/forest/ocean），CSS 全走 `var(--accent)`；新配色只需加一組變數區塊。偏好存 localStorage（`omni-theme`／`omni-palette`／`omni-settings-pane`）。 |
 | 危險能力 | 執行器（含只排 L0 的自訂排程）、L2、L2 寫入、Telegram 對話、Telegram inline 批准（含 `/arm`）、LINE、問候卡 LLM 潤飾——**全部預設關閉**；行事曆預設開但沒設路徑就等於停用。 |
-| **方向（2026-09-16 起）** | **減法優先**：功能候選 C5／C6／C3 暫停；**R0 全部完成**（B5–B9 ＋ D1）、**R1 的 D2／D3／D4 完成**（一個 LLM client、一份活動來源定義、`server.py` 切成 9 個 router）；接下來依 ROADMAP §13.2 的 R1（D5 桌面通知進 adapter、D6 旗標收斂）→ R2（向量記憶二選一、秘書四層化、前端模組化）進行。乾淨容器實測：核心安裝 **176 MB**（含 `[rag]` 約 720 MB；R0 前 797 MB）。 |
+| **方向（2026-09-22 起）** | ROADMAP §13 的 **R0～R2 減法與合併已全部完成**（2026-09-20）。下一段是**推廣路線**（[ROADMAP §13.3](../ROADMAP.md#133-推廣路線r0-之後才啟動)、[TODO E 段](TODO.md)）：E1 `omni demo` 示範資料集設計已定案（[ADR-031](ADR-031-omni-demo-dataset.md)），**下一輪從實作 `demo` 子指令開始**；E2 `agent-transcripts` 獨立套件、E3 `omni init` 自動偵測尚未開始，三項互不阻塞。乾淨容器實測：核心安裝 **176 MB**（含 `[rag]` 約 720 MB；R0 前 797 MB）。 |
 
 ## 功能地圖（要改哪裡就看這張表）
 
@@ -99,7 +99,7 @@
 
 - **待辦一律看 [TODO.md](TODO.md)**：A 段是等待使用者側 live 收據（👤 需在 Windows 實機操作，不是程式工作，A1 是唯一還擋 `release_ready` 的能力缺口）、B 段是已知問題與技術債、C 段是功能候選。
   **A 段的現況直接跑 `python main.py verify` 查**（[ADR-016](ADR-016-acceptance-center.md)）；改 A 段的判準時要同步改 `core/acceptance.py` 的 `_ITEMS`。
-- **方向與取捨看 [ROADMAP.md](../ROADMAP.md) §13「架構整頓與推廣方向」**（2026-09-16）：§12 的三條功能候選路線（C5／C6／C3）**暫停**，先做減法與合併；每個 D 項的完成判準在 TODO D 段。**R0 與 D2／D3／D4 已完成**；接手時從 D5（`notifiers/desktop_notifier.py` 併入 `ChannelAdapter`）開始——它目前自己扇出晨報／交接／停滯／里程碑，與 `secretary_push` 重複一次。
+- **方向與取捨看 [ROADMAP.md](../ROADMAP.md) §13「架構整頓與推廣方向」**：§12 的三條功能候選路線（C5／C6／C3）**暫停**；**R0～R2 的減法與合併已於 2026-09-20 全部完成**（TODO D 段收據見 ROADMAP §11.2）。**接手時做 [TODO.md](TODO.md) E 段**（§13.3 推廣路線）：E1 `omni demo` 示範資料集設計已定案（[ADR-031](ADR-031-omni-demo-dataset.md)），下一輪照 ADR 實作 `demo` 子指令與示範語料；E2 `agent-transcripts` 獨立套件、E3 `omni init` 自動偵測尚未開始。
 - **想先了解「為什麼要整頓」**：讀 [REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) §4（每項附檔案：行號，已逐項核對原始碼）。
 - **個性化三步（2026-09-05 檢視後的方向）**：(1) 模式感知提案 [ADR-017](ADR-017-pattern-aware-proposals.md) ✅、(2) 宣告式個人檔案 [ADR-018](ADR-018-declared-profile.md) ✅、(3) 秘書桌面 [ADR-019](ADR-019-secretary-desk-home.md) ✅（01 分頁成為真正的首頁）。三步都已落地；刻意不走的路：用 LLM 推斷個性或優先、再多採集來源、C5 遠端存取。
 - **會議秘書**（[ADR-022](ADR-022-meeting-secretary.md)）：第一層（會後逐字稿→觀察＋候選待辦）**已於 2026-09-08 實作**，實機收據待取得（TODO A22）。**第二層（即時字幕／翻譯＝錄下其他人的聲音）刻意沒做**——要做得先過 ADR-022 D6 的五道門並另寫 ADR。
