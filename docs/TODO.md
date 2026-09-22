@@ -1,6 +1,6 @@
 # 待辦事項與已知問題（Backlog）
 
-> 最後更新：2026-09-22（依 [REVIEW-2026-09-22](REVIEW-2026-09-22-competitive-landscape-and-P9.md) 重排 E 段：唯讀 MCP server 插進 `agent-transcripts` 之前，E1→E6）。這頁是**唯一的待辦清單入口**；現況數據以
+> 最後更新：2026-09-22（E 段依 [REVIEW-2026-09-22](REVIEW-2026-09-22-competitive-landscape-and-P9.md) 重排為 E1→E6；新增 **F 段** repo 管理強化（[ROADMAP §15](../ROADMAP.md)）與 B5／B6 兩個查證過的缺陷）。這頁是**唯一的待辦清單入口**；現況數據以
 > [STATUS.yaml](../STATUS.yaml) 為準，接手路徑見 [NEXT_SESSION.md](NEXT_SESSION.md)。
 >
 > 每一項都標明**完成判準（收據）**——沒有收據就不算完成，這是本專案的一貫原則。
@@ -66,6 +66,8 @@
 | B2 | **Extension 覆蓋邊界** | 2026-08-31 的 live PASS 只涵蓋 ChatGPT ＋ Claude.ai；**Gemini 未在該輪驗證**，且單輪 PASS 不等於連續／全天 capture coverage | 需要時對 Gemini 補一輪 `scripts/extension_live_acceptance.py` | ⚪ P2 |
 | B3 | **PyPI 發佈不在範圍** | 目前只發 GitHub pre-release（wheel/sdist + SHA-256 receipt） | 待 stable release 條件齊備後再評估 | ⚪ P2 |
 | B4 | **Repo onboarding 動作不留收據** | `init_folder`／`attach_remote`／`clone_repo`／`create_remote` 執行後只回傳結果，不寫任何本機紀錄，因此 A5 只能靠人眼確認（驗收中心對這項永遠回 `needs_human`） | 若要讓 A5 可機器驗，需為 onboarding 動作補一張收據（migration ＋ ADR-011 邊界討論）；在那之前維持誠實空白，不用旁證推測 | ⚪ P2 |
+| B5 | **`git_activity_events` 的去重鍵同時會漏資料與造假重複** | 同一個根因（去重鍵沒正規化長度、也不帶 `repo_name`）造成兩個方向相反的缺陷：**(a) 靜默丟資料**——`watchers/git_watcher.py:160` 把雜湊截成 8 碼，`core/models.py:66` 的 `UNIQUE` 只鎖 `commit_hash` 單欄，`git_watcher.py:163-193` 的去重是 `filter_by(commit_hash=...)` 先查再寫且 `if not existing:` **沒有 else、沒有 log**，所以兩個不同 repo 的 commit 若 8 碼前綴相同，第二筆會完全無聲地消失；**(b) 假重複**——`core/api/events.py:131` 的 HTTP ingest 原樣存客戶端送來的值，`core/schemas.py:72-80` 的 `commit_hash: str` 沒有長度或格式驗證，所以同一個 commit 被 watcher 寫成 8 碼、被 API 寫成 40 碼時字串比不中，會變成兩筆。因為是應用層先查再寫，**`UNIQUE` 約束永遠不會觸發 `IntegrityError`**，兩種情形都不留任何痕跡 | 去重鍵改成 `(repo_name, 正規化後的 commit_hash)`，並在 ingest 邊界統一雜湊長度。**動到唯一鍵就是 migration**（append-only ＋ 進 `core/migrations.py` registry），而且要先決定既有資料怎麼辦——本專案不回填假資料，所以舊列只能標記不可用或原樣保留。**目前沒有實機證據**：本機 `git_activity_events` 0 筆，本項結論全部來自 schema 與程式碼路徑 | 🟡 P1 |
+| B6 | **`GitHubRepoState` 的身分是裸 repo 名且全域唯一，schema 裡沒有 owner** | `core/models.py:346` `repo_name = Column(String(100), unique=True)` 存的是**不帶 owner 的裸名**，而 `integrations/github_client.py:322` 是用 `full_name` 去 upsert。結果：`alice/foo` 與 `bob/foo` 在 schema 層就無法共存（撞 unique），這不是「比對時忘了帶 owner」而是身分定義本身缺一半。另有數處大小寫敏感的裸名等值比對（`core/project_engine.py:393-395` 與 `core/handoff_engine.py:79-81` 是同一段程式複製兩份、`handoff_engine.py:147-148`、`core/agent_executor.py:211-213`），SQLite 預設 BINARY collation，`ActivityTracker` 與 `activityTracker` 配不上。**失效模式是漏接不是誤配**：配不上就回 `None`／降級成 L0 handoff，`agent_executor` 那處遇到同名多個還會 fail-closed——所以是「該顯示的沒顯示」，不是「配到別人的 repo」 | 正確的正規化**已經存在**：`core/repo_onboarding.py:66-83` 的 `canonical_github_slug`（owner/repo 小寫）且有契約測試守著。要修就是讓雲端側身分改用 slug 並把那幾處裸名比對收斂過去——同樣是 migration ＋ 要處理既有資料。**只有一個使用者、repo 名不重複時不會踩到**，所以優先度不高，但寫進來避免日後誤判成「已經有正規化」 | ⚪ P2 |
 
 ---
 
@@ -121,6 +123,23 @@
 > 「關掉 `release_ready`」與「找外部使用者安裝」都**不是開發輪次做得完的工作**——
 > 前者卡在 A1（只能由 Windows 實機跨午夜連續運行一整天產生）、A2，以及 ROADMAP §12.3 的 G2／G3／G4，**已經寫在上面的 A 段**；後者是使用者側的事。
 > 兩者都不在這裡再寫第二次（見下方「維護這頁的規則」）。
+
+---
+
+## F. repo 管理強化（ROADMAP §15；**E 段全部完成後才啟動**）
+
+> 來源：使用者自己的另一個專案 `myGitQuickView`（GitHub 專案總覽網頁）的功能清單，2026-09-22 逐項與本專案比對後的結果。
+> 為什麼是這四項、為什麼其餘的不搬，見 [ROADMAP §15](../ROADMAP.md)。
+> **順序**：本段排在 E 段之後，routine 由上往下取項目時仍以 E 段為先。
+> **證據等級**：下列每一條「我們目前沒有」都經過對抗式查證（每項三個不同視角的懷疑者去找反例），
+> 逐項證據見 ROADMAP §15.2；被推翻的宣稱沒有寫進來。
+
+| # | 項目 | 內容 | 完成判準（收據） | 優先 |
+| :-- | :--- | :--- | :--- | :--- |
+| F1 | **commit 的來源歸因（用證據，不用猜）** | `myGitQuickView` 用 LLM 讀 commit message 去**猜**它出自哪個開發工具；本專案手上有 transcript、檔案事件與 commit 在同一個資料庫、同一個專案身分底下，應該用**指得回一筆 row** 的方式回答。查證確認目前**完全沒有**這條連結：`git_activity_events` 與 `ai_prompt_events` 之間沒有任何欄位、關聯表或查詢（整個 ORM 零 `ForeignKey`、零 `relationship`、全庫零 SQLAlchemy `join`）。**原料已經在了**：`watchers/git_watcher.py:186` 已經把 commit message 全文存進 DB，而本專案自己的 commit 就帶著 `Co-Authored-By:`／`Claude-Session:` trailer——只是沒有任何東西去讀它。AI 側也已經有可定址的身分（`ai_prompt_events.turn_key` 有 unique index），**缺的只有 git 側的指標**。**先寫 ADR**（動到 provenance 語彙就是邊界）；ADR 編號動工時依 `docs/` 現況取下一個未使用號，**ADR-032 已由 E2 預留**。 | ADR 定稿，且必須把三種證據**分開記帳、不得混為一談**：①`trailer` 明證（commit message 帶 session／co-author trailer，可直接指回）②`temporal_only`（[ADR-006](ADR-006-derived-context-sessions-and-related-history.md) 的時間鄰近——該 ADR 第 22 行自己就否認因果，不得升格）③`similarity_only`（拿 commit message 去 `core/semantic_index.py` 撈相似 turn——similarity 明文不作真實性證明）。契約測試必須涵蓋：**沒有 trailer 的 commit 一律不得被標成「AI 產生」**、三個等級的欄位值不可互相污染、`temporal_only` 與 `similarity_only` 的輸出都要帶上既有的 claim boundary 字串。`pytest` 全綠；`verify` 判定不因此改變 | 🟡 P1 |
+| F2 | **跨 repo GitHub 總覽接上畫面（後端已經寫好了）** | `core/api/repos.py:214-236` 與 `:239-267` 兩個跨 repo 端點（已同步 repo 全部 ＋ 跨 repo PR 最多 40 筆）**零前端呼叫者**，路由表快照是目前唯一守著它們的東西；`core/secretary/signals.py:249-256` 算好的 `repo_issue_backlog` 同樣零消費者。這正是 `myGitQuickView` 主畫面的形狀，而我們已經付過後端的錢沒領貨。**精確範圍**：缺的是「一屏看完所有 repo」，**不是**「雲端資料看不到」——查證確認 GitHub 資料已經透過別的路徑進 UI（`/api/v1/projects/active` 的 per-project 內嵌 PR 徽章、`/api/v1/repos/onboarding-report` 的 `github_not_cloned`、assistant 分頁的跨 repo PR／issue 待辦）。寫判準時不要把這件事說成「從零開始做 GitHub 畫面」。 | 兩個既有端點至少各有一個前端呼叫者且畫面顯示其欄位；`repo_issue_backlog` 出現在畫面上；**不新增後端端點**（有就先問為什麼既有的不夠）；`scripts/dashboard_dom_lock.py check` 重錄並在 PR 說明改了哪幾張、為什麼；`pytest` 全綠 | 🟡 P1 |
+| F3 | **採集 repo 主要語言（幾乎免費的一個欄位）** | 查證確認全專案沒有任何地方採集或儲存 repo 語言——現有的 `file_type`／`CODE_TYPES`／`code_cnt` 都只是「是不是程式碼」的二元分桶，不是語言名。而 `integrations/github_client.py:149-175` 的 `fetch_all_repositories` **已經把整包 repo dict 抓進記憶體**，GitHub 回應本來就含 `language`，`sync_all` 只是逐欄位挑選時沒挑它。 | `GitHubRepoState` 多一個 `language` 欄位（append-only migration ＋ 進 `core/migrations.py` registry，不得靠 `create_all` 繞過）；`sync_all` 寫入該欄位；沒有語言的 repo 誠實留空**不猜**；`pytest` 全綠。**刻意不做圓餅圖**——理由見 ROADMAP §15.3 | 🟢 P2 |
+| F4 | **作品集／履歷用的專案摘要**（候選，**先不排程**） | `myGitQuickView` 有「專案精華：AI 生成的摘要，用於履歷或作品集」。查證確認本專案沒有這個輸出目標——產出的 handoff／工作誌／週回顧／rollup／STATUS 草稿全部是自用（`main.py resume` 是接續用的 Context Handoff，**不是**履歷，名字容易誤導；`promo/` 是手寫的產品行銷素材，不從活動資料生成）。 | **啟動前要先回答「能否改變決策」**（[ROADMAP](../ROADMAP.md) §3.2 對新增產出的一貫門檻）：作品集摘要是「我擁有什麼」的鏡頭，本專案的其餘產出都是「我做了什麼」。答不出來就不做，不要因為它容易做就做 | ⚪ P2 |
 
 ---
 
