@@ -5,9 +5,9 @@ progress: 99
 progress_basis: "依 P0-P8 加權里程碑估計；不是 release readiness 百分比"
 status: active_hardening
 release_ready: false
-last_updated: "2026-09-16"
-current_phase: "P0-P8 與 ADR-008 全階段已落地；秘書側 ADR-012~022 十一項功能（記憶區、Telegram 對話、多通道推播、行事曆、驗收中心、模式感知提案、宣告式個人檔案、秘書桌面、每週回顧、文件落後偵測、會議秘書第一層）皆已實作且危險能力預設關閉。2026-09-13 完成一輪文件整理（README／README_en 依實際程式重寫、USAGE 重組並加目錄、ROADMAP 成果紀錄合併為單一依日期清單、本檔的 known_blockers 由歷史紀錄改回真正的阻擋項）。2026-09-16 完成專案檢視（docs/REVIEW-2026-09-16-project-assessment.md）：乾淨容器 pytest 625 passed + 1 skipped、venv 797 MB；確認兩套 LLM client、兩套向量記憶、四份活躍聚合等重複，登記 TODO B5–B9 與 D1–D12；同日完成 R0 全部（B5–B9：死碼與未用依賴移除、marked 本機化、CLI 與 API 同一組狀態數字；D1：知識庫依賴改為 [rag] 選用 extra，核心安裝 721 MB → 176 MB），pytest 638+1（無 extra 626+12）、verify 輸出與基底相同；再完成 R1 的 D2（兩套 LLM client 合為 core/llm_client.py）、D3（活動來源、專案歸戶與日界收進 core/activity_sources.py）與 D4（server.py 1995→134 行，依領域切成 9 個 router，133 條路由由快照測試鎖住），pytest 662+1（無 extra 650+12）。目前階段：等待使用者側 live 收據；功能候選 C5/C6/C3 暫停，改依 ROADMAP §13 做減法與合併。"
-next_milestone: "取得 TODO A1 全天 coverage ledger 實機收據後重評 release_ready；其餘 A 段收據以驗收中心（06 系統設定 → 驗收中心 或 python main.py verify）為準。A22（會議秘書）是目前最容易補齊的一項。功能候選暫停；程式面 R0、R1（D2–D6）與 R2 **全部完成**（D7 一份活動記憶 ADR-023、D8 秘書四層化 ADR-024、D9 transcript parser 分拆與漂移警示 ADR-025、D10 前端模組化 ADR-026、D11 程序內狀態改注入 ADR-027、D12 驗收中心宣告式 ADR-028）；ROADMAP §13 的減法清單（R0～R2）到此結束，下一輪要先決定做什麼。"
+last_updated: "2026-09-22"
+current_phase: "P0-P8 與 ADR-008 全階段已落地；秘書側 ADR-012~022 十一項功能皆已實作且危險能力預設關閉。2026-09-16 完成專案檢視（docs/REVIEW-2026-09-16-project-assessment.md），登記 TODO B5–B9 與 D1–D12；至 2026-09-19 已把 ROADMAP §13 的減法三階段 **全部做完**：R0（B5–B9 死碼與未用依賴、marked 本機化、CLI 與 API 同一組狀態數字；D1 知識庫依賴改為 [rag] 選用 extra，核心安裝 797 MB → 176 MB）、R1（D2 一個 LLM client、D3 一份活動來源定義、D4 server.py 1995→134 行切成 9 個 router、D5 桌面通知併入 ChannelAdapter、D6 六層旗標收三層）、R2（D7 一份活動記憶 ADR-023、D8 秘書叢集收成 core/secretary 四層 ADR-024、D9 transcript parser 一平台一模組＋漂移警示 ADR-025、D10 前端拆 ES module ADR-026、D11 程序內狀態改注入 ADR-027、D12 驗收中心宣告式 ADR-028），外加 2026-09-19 的前端行為鎖（ADR-029，12 張 DOM 快照逐字元比對）。2026-09-22 在乾淨容器（Python 3.11）複測：pytest 822 項（820 passed + 2 conditional skip；不裝 [rag] 807 passed + 14 skipped）、main.py verify 22 項全部有判定、migration 18/18；同日把 README／README_en／NEXT_SESSION／STATUS 追上實況。目前階段：等待使用者側 live 收據；功能候選 C5/C6/C3 維持暫停，下一輪依 ROADMAP §14 走推廣路線（E1 omni demo → E2 agent-transcripts 獨立套件 → E3 omni init 自動偵測）。"
+next_milestone: "取得 TODO A1 全天 coverage ledger 實機收據後重評 release_ready；其餘 A 段收據以驗收中心（06 系統設定 → 驗收中心 或 python main.py verify）為準。A22（會議秘書）是目前最容易補齊的一項。程式面 ROADMAP §13 的減法清單 R0～R2 **已全部完成**；下一輪是 ROADMAP §14 的推廣路線，判準在 docs/TODO.md E 段：E1 omni demo 示範資料集（先寫 ADR 定示範資料邊界）、E2 agent-transcripts 抽成獨立套件（D9 已備好前置）、E3 omni init 自動偵測。D13（前端 state.js 改注入）已評估後降級，理由見 ROADMAP §14.3。"
 planned_features:
   - id: FEATURE-001
     name: "每日主要介面使用時間與里程碑教練"
@@ -467,11 +467,20 @@ quality_gates:
   ingestion_provenance: passed_local_rescan_601_sources
   response_finalization: passed_as_final_candidate_contract_not_semantic_correctness
   open_loop_lifecycle: passed_local_db_reconciliation
-  automated_tests: passed_663_contract_tests_66_modules_662_passed_1_conditional_skip_and_650_passed_12_skipped_without_rag_extra
+  automated_tests: passed_822_contract_tests_74_modules_820_passed_2_conditional_skips_and_807_passed_14_skipped_without_rag_extra_re_measured_in_clean_container_2026_09_22
   usage_milestone_alpha: passed_contract_and_windows_dashboard_api_smoke
   background_task_receipts: passed_all_three_platform_live_acceptance_48_completed_on_2026_08_29
   repository_sync: passed_contract_tests_and_localhost_read_only_status_smoke
-  documentation_current: passed_readme_usage_roadmap_status_sync_and_2026_09_16_review_snapshot
+  documentation_current: passed_readme_readme_en_next_session_index_status_reconciled_against_code_on_2026_09_22_stale_module_paths_from_d8_d12_corrected_test_counts_re_measured_roadmap_14_records_next_direction
+  desktop_channel_adapter_d5: passed_desktop_is_a_third_channeladapter_content_assembled_once_in_notifiers_messages_fanout_only_in_secretary_push_bucket_projects_filtered_identically_across_channels_toast_summarises_instead_of_truncating_9_new_contract_tests
+  config_surface_three_gates_d6: passed_six_flags_reduced_to_three_real_gates_scheduled_tasks_and_remote_arm_merged_without_silently_widening_22_engine_params_returned_to_code_constants_config_example_449_to_344_lines_11_contract_tests
+  one_activity_memory_d7_adr_023: passed_activity_memory_is_core_semantic_index_documents_are_deskrag_seven_sources_indexed_once_rag_may_not_read_activity_tables_old_activity_chunks_purged_with_receipt_10_contract_tests
+  secretary_layers_d8_adr_024: passed_eleven_flat_modules_became_core_secretary_four_layers_signal_and_proposal_dataclasses_import_direction_enforced_by_contract_test_deferred_core_imports_116_to_15_api_shapes_unchanged_15_contract_tests
+  transcript_parsers_and_drift_d9_adr_025: passed_one_parser_module_per_platform_service_no_longer_knows_any_format_parse_is_a_generator_that_never_touches_the_db_drift_requires_file_mtime_in_window_and_zero_events_23_contract_tests
+  frontend_es_modules_d10_adr_026: passed_app_js_6096_lines_split_into_main_plus_five_core_and_ten_tab_modules_i18n_became_two_json_dictionaries_fetch_only_in_core_api_js_inline_onclick_replaced_by_data_action_delegation
+  injected_runtime_state_d11_adr_027: passed_five_module_level_globals_became_named_stores_in_core_runtime_state_each_with_its_own_lock_five_reset_for_tests_hooks_deleted_cors_allowlist_read_per_request_state_stays_in_memory_only
+  declarative_acceptance_d12_adr_028: passed_992_lines_of_hand_written_check_functions_became_a_reading_plus_a_ladder_table_order_is_the_semantics_otherwise_enforced_evidence_is_the_public_contract_facts_are_private_five_modules_under_600_lines_each
+  frontend_dom_lock_adr_029: passed_35_canned_api_responses_replayed_across_six_panes_x_two_languages_12_innerhtml_snapshots_compared_character_by_character_clock_timezone_random_and_polling_pinned_one_pane_per_boot_output_not_normalised
   r0_subtraction_b5_b9: passed_dead_code_and_unused_deps_removed_marked_vendored_status_metrics_single_source_verify_output_identical_to_base_venv_797mb_to_721mb
   rag_optional_extra_d1: passed_rag_deps_moved_to_extra_core_install_176mb_availability_single_source_503_machine_readable_worker_never_spawns_chat_degrades_a6_not_configured_ci_job_without_extra_11_contract_tests
   llm_client_single_source_d2: passed_two_clients_merged_into_core_llm_client_default_models_and_key_envs_defined_once_ollama_both_paths_api_chat_error_markers_unchanged_repo_wide_literal_scan_9_contract_tests
@@ -533,7 +542,7 @@ known_blockers:
   - "⚪ B2 · Extension 覆蓋邊界：2026-08-31 的 live PASS 只涵蓋 ChatGPT 與 Claude.ai，Gemini 未在該輪驗證；且單輪 PASS 不等於連續或全天 capture coverage。"
   - "⚪ B3 · PyPI 發佈不在範圍：目前只發 GitHub pre-release（wheel/sdist + SHA-256 receipt）。"
   - "⚪ B4 · Repo onboarding 動作不留收據：init_folder/attach_remote/clone_repo/create_remote 執行後不寫本機紀錄，因此 A5 只能人眼確認，驗收中心對這項永遠回 needs_human。要機器可驗需補一張收據（migration + ADR-011 邊界討論）；在那之前維持誠實空白。"
-  - "⚪ D5-D12 · 架構整頓（ROADMAP §13；R0 與 D2／D3／D4 已完成）：兩套向量記憶待二選一；server.py 2,003 行／app.js 6,055 行待切分；秘書叢集 11 模組無共同型別。整頓不改行為，每項以 pytest 全綠與 verify 結果不變為收據。"
+  - "⚪ D13 · 前端 state.js 改注入：已評估後降級為「暫不做」（ROADMAP §14.3）。它要修的缺陷（49 個散落的模組層 let）D10 已修掉，剩下的「可注入」在前端沒有單元測試環境可以花用；重啟條件是前端出現單元測試環境，或 state.js 再度長成第二個 god object。不是遺漏，是有理由的取捨。"
   - "⚪ autonomous_execution 仍標記 blocked_by_p2_5：ADR-007 的 proposal-only 契約未解除；ADR-008 的分級執行器是有閘門的例外，不是解除。"
 capability_boundaries:
   - "LINE 只能推播：Messaging API 沒有輪詢介面，接收訊息需要公開 webhook，會打破只在 127.0.0.1 的邊界。提問、記筆記與按鈕批准一律走 Telegram（ADR-014）。"
@@ -542,4 +551,4 @@ capability_boundaries:
   - "會議秘書只做會後逐字稿：不錄音、不讀會議軟體視窗內容、不呼叫 Teams/Graph API、不自動下載逐字稿。即時字幕與翻譯是第二層，需另寫 ADR 並過 ADR-022 D6 的五道門。"
   - "一般 Claude Desktop 雲端聊天只偵測 cache 存在，不解析 Chromium LevelDB，也不宣稱已取得對話內容。"
   - "郵件不在採集範圍；行事曆只讀本機 .ics 的時間/標題/地點/狀態，不連任何雲端 API。秘書不會編造沒被採集到的數字。"
-key_metrics: "73 個 contract test 模組、811 項測試（810 passed + 1 skipped；不裝 [rag] extra 時 793 passed + 13 skipped）；核心安裝 176 MB、含 [rag] 約 720 MB；SQLite schema migration 18/18；Windows/Ubuntu/macOS x Python 3.10/3.12 CI 六個 job 全綠。v1.3.0a5 已於 2026-08-31 發佈為 GitHub pre-release（SHA-256 receipt 交叉驗證一致）。Extension live PASS（ChatGPT+Claude.ai，2026-08-31）與 P2.7 三平台背景任務 live 驗收（2026-08-29 共 48 筆 completed、union 28,838.971 秒）皆已取得。2026-09-08 取得 A6（bm25=4,839／vector=4,839 與 source_chunks 一致）與 A21（回收 1,633,386,496 bytes）實機收據。逐項成果紀錄見 ROADMAP.md 第 11.2 節，不在本檔重複。"
+key_metrics: "74 個 contract test 模組、822 項測試（820 passed + 2 conditional skip；不裝 [rag] extra 時 807 passed + 14 skipped），2026-09-22 在乾淨容器（Python 3.11）複測；核心安裝 176 MB、含 [rag] 約 720 MB；SQLite schema migration 18/18；29 份 ADR；Windows/Ubuntu/macOS x Python 3.10/3.12 CI 六個 job ＋ 一個不裝 [rag] 的 job。v1.3.0a5 已於 2026-08-31 發佈為 GitHub pre-release（SHA-256 receipt 交叉驗證一致）。Extension live PASS（ChatGPT+Claude.ai，2026-08-31）與 P2.7 三平台背景任務 live 驗收（2026-08-29 共 48 筆 completed、union 28,838.971 秒）皆已取得。2026-09-08 取得 A6（bm25=4,839／vector=4,839 與 source_chunks 一致）與 A21（回收 1,633,386,496 bytes）實機收據。逐項成果紀錄見 ROADMAP.md 第 11.2 節，不在本檔重複。"

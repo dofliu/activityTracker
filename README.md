@@ -25,8 +25,8 @@
 
 | 面向 | 現況 |
 | :--- | :--- |
-| 程式 | P0–P8 與 ADR-008 執行器全階段已落地；22 份 ADR 記錄每個決策的邊界 |
-| 測試 | **73 個 contract test 模組、811 項**（810 passed + 1 skipped；不裝 `[rag]` extra 時 793 passed + 13 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
+| 程式 | P0–P8 與 ADR-008 執行器全階段已落地；**29 份 ADR** 記錄每個決策的邊界 |
+| 測試 | **74 個 contract test 模組、822 項**（820 passed + 2 conditional skip；不裝 `[rag]` extra 時 807 passed + 14 skipped）；Windows／Ubuntu／macOS × Python 3.10／3.12 CI 六個 job ＋ 一個「不裝 `[rag]`」job 全綠 |
 | 資料 | SQLite schema migration **18/18**（append-only + checksum，升級前自動備份） |
 | 發佈 | `release_ready: false` |
 
@@ -34,7 +34,7 @@
 
 不必憑記憶：跑 `python main.py verify`（或看儀表板「06 系統設定 → 驗收中心」）就會列出每一項現在有沒有收據（[ADR-016](docs/ADR-016-acceptance-center.md)）。
 
-**2026-09-16 專案檢視**：功能已經夠多，接下來是**減法**——刪死碼與未用依賴、RAG 改為選用安裝、合併兩套 LLM client 與兩套向量記憶，再把「讀本機 AI agent transcript」這個唯一無替代品的核心抽成獨立套件對外。功能候選（遠端存取、LINE 雙向、更多採集來源）暫停。**R0 已於同日完成：死碼與未用依賴移除、marked 本機化、CLI／API 同一組數字，以及知識庫依賴改為 `[rag]` 選用安裝（核心安裝 721 MB → 176 MB）；R1 已完成 D2（兩套 LLM client 合為 `core/llm_client.py`）、D3（活動來源收進 `core/activity_sources.py`）、D4（`server.py` 1,995 → 134 行，依領域切成 9 個 router）、D5（桌面通知併入 `ChannelAdapter`）與 D6（六層旗標收三層）；R2 已完成 D7（一份活動記憶，ADR-023）。** 評估全文見 [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md)，三階段計畫見 [ROADMAP §13](ROADMAP.md#13-架構整頓與推廣方向2026-09-16-檢視)。
+**2026-09-16 專案檢視 → 2026-09-22 方向**：功能已經夠多，所以先做了一輪**減法**——刪死碼與未用依賴、RAG 改為選用安裝、合併重複子系統、拆開過大的檔案。**ROADMAP §13 的 R0～R2 已全部完成**（B5–B9 ＋ D1～D12，逐條收據見 [ROADMAP §11.2](ROADMAP.md)；核心安裝 797 MB → **176 MB**，`server.py` 1,995 → 134 行，`app.js` 6,096 行拆成 ES module 樹），最後一條是 2026-09-19 的前端行為鎖（[ADR-029](docs/ADR-029-frontend-dom-lock.md)）。**下一輪走推廣路線**：`omni demo` 示範資料集 → 把「讀本機 AI agent transcript」這個唯一無替代品的核心抽成獨立套件 `agent-transcripts` → `omni init` 自動偵測。功能候選（遠端存取、LINE 雙向、更多採集來源）**維持暫停**。評估全文見 [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md)，方向與理由見 [ROADMAP §14](ROADMAP.md)。
 
 **文件入口：**[📚 文件總覽](docs/INDEX.md) · [使用手冊](docs/USAGE.md) · [開發規劃與成果](ROADMAP.md) · [待辦與判準](docs/TODO.md) · [機器可讀現況](STATUS.yaml) · [專案檢視 2026-09-16](docs/REVIEW-2026-09-16-project-assessment.md)
 
@@ -302,7 +302,7 @@ activityTracker/
 │   ├── USAGE.md                # 使用手冊
 │   ├── TODO.md                 # 待辦與完成判準
 │   ├── NEXT_SESSION.md         # 開發接手指南
-│   ├── ADR-001 ~ ADR-022       # 架構決策紀錄（為什麼這樣設計、邊界在哪）
+│   ├── ADR-001 ~ ADR-029       # 架構決策紀錄（為什麼這樣設計、邊界在哪）
 │   └── archive/                # 已歸檔的一次性規劃書與完成報告
 │
 ├── core/                       # 核心服務
@@ -327,7 +327,7 @@ activityTracker/
 │   ├── docs_freshness.py       # 文件落後程式偵測
 │   ├── ics_parser.py / calendar_agenda.py        # 本機 .ics 行事曆（唯讀）
 │   ├── repo_sync.py / repo_onboarding.py / repo_sync_report.py  # Git 同步中心
-│   ├── acceptance.py           # 驗收中心（TODO A 段的可執行副本）
+│   ├── acceptance/             # 驗收中心（ADR-028）：readings／items 階梯表／rules／report
 │   ├── usage_analytics.py / capture_coverage.py / coverage_ledger.py
 │   ├── background_tasks.py / status_draft.py
 │   └── platform_services.py / runtime_paths.py / fs_utils.py / time_utils.py
@@ -372,7 +372,7 @@ activityTracker/
 │   └── i18n/zh-TW.json / en.json   # 語系字典（兩份 key 集合由測試把關）
 │
 ├── scripts/                    # 驗證、清理、autostart 與 E2E 腳本
-├── tests/                      # 73 個 contract test 模組（811 項）
+├── tests/                      # 74 個 contract test 模組（822 項）
 ├── logs/checkpoints/           # 週期性活動快照
 └── reports/                    # 每日／區間 Markdown 報告
 ```

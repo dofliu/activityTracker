@@ -25,8 +25,8 @@ It answers three questions at any moment:
 
 | Area | State |
 | :--- | :--- |
-| Code | P0–P8 and all ADR-008 executor stages landed; 22 ADRs record the boundary behind each decision |
-| Tests | **73 contract test modules, 811 tests** (810 passed + 1 skipped; 793 passed + 13 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
+| Code | P0–P8 and all ADR-008 executor stages landed; **29 ADRs** record the boundary behind each decision |
+| Tests | **74 contract test modules, 822 tests** (820 passed + 2 conditional skips; 807 passed + 14 skipped without the `[rag]` extra); Windows / Ubuntu / macOS × Python 3.10 / 3.12 CI green across all six jobs, plus a dedicated "no `[rag]` extra" job |
 | Data | SQLite schema migration **18/18** (append-only + checksum, verified backup before upgrade) |
 | Release | `release_ready: false` |
 
@@ -34,7 +34,7 @@ It answers three questions at any moment:
 
 Don't rely on memory: `python main.py verify` (or dashboard "06 Settings → Acceptance Center") reports which receipts exist right now ([ADR-016](docs/ADR-016-acceptance-center.md)).
 
-**2026-09-16 project review**: the feature set is large enough; what comes next is **subtraction** — remove dead code and unused dependencies, make RAG an optional install, merge the two LLM clients and the two vector-memory stacks, then extract the one capability nothing else offers (reading local AI-agent transcripts) into a standalone package. Feature candidates (remote access, two-way LINE, more collectors) are paused. **R0 landed the same day: dead code and unused deps removed, marked vendored, one source of truth for status numbers, and the knowledge-base dependencies moved to an optional `[rag]` extra (core install 721 MB → 176 MB); R1 has landed D2 (one `core/llm_client.py`), D3 (activity sources in `core/activity_sources.py`) and D4 (`server.py` went from 1,995 to 134 lines, split into 9 domain routers).** Full assessment (in Traditional Chinese): [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md); three-phase plan: [ROADMAP §13](ROADMAP.md#13-架構整頓與推廣方向2026-09-16-檢視).
+**2026-09-16 project review → 2026-09-22 direction**: the feature set is large enough, so a round of **subtraction** came first — dead code and unused dependencies removed, RAG made an optional install, duplicate subsystems merged, oversized files split. **ROADMAP §13's R0–R2 are now all complete** (B5–B9 plus D1–D12; per-item receipts in [ROADMAP §11.2](ROADMAP.md) — core install went 797 MB → **176 MB**, `server.py` 1,995 → 134 lines, the 6,096-line `app.js` became an ES module tree), ending with the 2026-09-19 frontend behaviour lock ([ADR-029](docs/ADR-029-frontend-dom-lock.md)). **Next comes the outward route**: an `omni demo` dataset → extracting the one capability nothing else offers (reading local AI-agent transcripts) into a standalone `agent-transcripts` package → `omni init` auto-detection. Feature candidates (remote access, two-way LINE, more collectors) **stay paused**. Full assessment (in Traditional Chinese): [docs/REVIEW-2026-09-16-project-assessment.md](docs/REVIEW-2026-09-16-project-assessment.md); direction and reasoning: [ROADMAP §14](ROADMAP.md).
 
 **Documentation:** [📚 Index](docs/INDEX.md) · [User Guide](docs/USAGE.md) · [Roadmap & Results](ROADMAP.md) · [Backlog](docs/TODO.md) · [Machine-readable status](STATUS.yaml) · [Project review 2026-09-16](docs/REVIEW-2026-09-16-project-assessment.md)
 
@@ -270,7 +270,7 @@ activityTracker/
 │   ├── USAGE.md                # User guide
 │   ├── TODO.md                 # Backlog with completion criteria
 │   ├── NEXT_SESSION.md         # Developer handoff guide
-│   ├── ADR-001 ~ ADR-022       # Architecture decision records
+│   ├── ADR-001 ~ ADR-029       # Architecture decision records
 │   └── archive/                # Archived one-off plans and completion reports
 │
 ├── core/                       # Core services
@@ -292,7 +292,7 @@ activityTracker/
 │   ├── docs_freshness.py       # Docs-behind-code detection
 │   ├── ics_parser.py / calendar_agenda.py        # Local read-only .ics calendar
 │   ├── repo_sync.py / repo_onboarding.py / repo_sync_report.py  # Git sync center
-│   ├── acceptance.py           # Acceptance center (executable copy of TODO section A)
+│   ├── acceptance/             # Acceptance center (ADR-028): readings / items ladder / rules / report
 │   ├── usage_analytics.py / capture_coverage.py / coverage_ledger.py
 │   ├── background_tasks.py / status_draft.py
 │   └── platform_services.py / runtime_paths.py / fs_utils.py / time_utils.py
@@ -337,7 +337,7 @@ activityTracker/
 │   └── i18n/zh-TW.json / en.json   # Locale dictionaries (key parity enforced by a test)
 │
 ├── scripts/                    # Verification, cleanup, autostart and E2E scripts
-├── tests/                      # 73 contract test modules (811 tests)
+├── tests/                      # 74 contract test modules (822 tests)
 ├── logs/checkpoints/           # Periodic activity snapshots
 └── reports/                    # Daily / range Markdown reports
 ```

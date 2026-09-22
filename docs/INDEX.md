@@ -1,6 +1,6 @@
 # 📚 OmniContext 文件總覽（Documentation Index）
 
-> 最後整理：2026-09-16。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
+> 最後整理：2026-09-22。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
 >
 > **每份文件只有一個職責**——同一件事不在第二個地方再寫一次。職責分工見
 > [NEXT_SESSION.md → 工程慣例 → 文件同步](NEXT_SESSION.md#工程慣例照舊)。
@@ -15,7 +15,7 @@
 | 快速了解專案是什麼、能做什麼 | [README.md](../README.md)（繁中）/ [README_en.md](../README_en.md)（English） |
 | 安裝、Extension 配對、日常操作、備份與故障排查 | [USAGE.md](USAGE.md) —— **使用手冊** |
 | 了解目前開發到哪 | [ROADMAP.md](../ROADMAP.md) §11.2 成果紀錄（依日期一條）+ [STATUS.yaml](../STATUS.yaml) |
-| 了解下一階段方向與取捨 | [ROADMAP.md](../ROADMAP.md) §13「架構整頓與推廣方向」（§12 的功能候選已暫停） |
+| 了解下一階段方向與取捨 | [ROADMAP.md](../ROADMAP.md) §14「下一階段：推廣路線」（2026-09-22；§13 的減法 R0～R2 已全部完成、§12 的功能候選維持暫停） |
 | **想知道這個專案值不值得推廣、架構哪裡該刪該併** | [REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) —— 現況數字、用處／學術／教學價值評估、架構體檢（附檔案：行號） |
 | 了解產品定位與「不宣稱什麼」的證據邊界 | [PRODUCT_POSITIONING.md](PRODUCT_POSITIONING.md) |
 | 修改架構前先看相關決策 | 下方 ADR 一覽 |

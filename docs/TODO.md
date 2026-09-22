@@ -85,16 +85,32 @@
 
 ---
 
-## D. 架構整頓（ROADMAP §13；R0 已完成，依 R1 → R2 順序）
+## D. 架構整頓（ROADMAP §13；R0～R2 已全部完成）
 
 > 來源：[REVIEW-2026-09-16-project-assessment.md](REVIEW-2026-09-16-project-assessment.md) §4–5。
 > 每一項結束時 `pytest` 必須全綠、`python main.py verify` 結果不得變化（整頓不改行為）。R2 的項目要先有 ADR。
 > **R0 已於 2026-09-16 完成**（B5–B9 ＋ D1）、**R1 全部於同日完成**（D2 一個 LLM client、D3 一份活動來源定義、D4 `server.py` 切成 9 個 router、D5 桌面通知併入 `ChannelAdapter`、D6 旗標六層收三層），收據見 ROADMAP §11.2；**R2 也全部完成**（D7 一份活動記憶 ADR-023、D8 秘書四層化 ADR-024、D9 transcript parser 分拆與漂移警示 ADR-025、D10 前端模組化 ADR-026、D11 程序內狀態改注入 ADR-027、D12 驗收中心宣告式 ADR-028）。**這張減法清單到此結束**；下一輪要做什麼要先決定，不要自動往下找事做。
 > **2026-09-19 決定**：把 D11 欠的前端那一半補完，分兩步走。第一步（安全網）已完成（[ADR-029](ADR-029-frontend-dom-lock.md)，收據見 ROADMAP §11.2）；第二步是下面的 D13。
+> **2026-09-22 決定**：**D13 降級為「已評估、暫不做」**（維持在表上，不靜默刪除）。它要修的缺陷（49 個散落的模組層 `let`）D10 已經修掉，現在是一個具名 `state` 物件；剩下的「可注入」在後端買到的是測試隔離，前端沒有等價的單元測試環境可以花用它，唯一的安全網（ADR-029）證明的是「改完沒壞」而不是「改完更好測」。完整理由見 [ROADMAP §14.3](../ROADMAP.md)。**重啟條件**：前端出現單元測試環境，或 `state.js` 再度長成第二個 god object。
 
 | # | 項目 | 內容 | 完成判準（收據） | 階段 |
 | :-- | :--- | :--- | :--- | :--- |
-| D13 | 前端 `state.js` 改成注入 | `web/js/core/state.js` 的 49 個共享值目前由十個分頁模組的渲染函式經閉包直接讀寫（ADR-026 承諾在 D11 改掉、ADR-027 明說沒兌現）。改成由進入點建一份狀態、往下傳，與後端 `core/runtime_state.py` 同一個形狀。 | 改動**前**跑 `python scripts/dashboard_dom_lock.py update`、改動**後**跑 `check`，**12 張快照逐字元相同**（ADR-029）；`pytest` 全綠；`scripts/dashboard_smoke.py` `ok: true`。**鎖的邊界要先看 ADR-029「它不鎖什麼」**：它只釘開機後的第一畫面，不釘互動與輪詢——若重構會動到互動路徑，得先把對應互動加進 `capture_pane`，否則那部分等於沒有證據。 | R2 續 |
+| D13 | 前端 `state.js` 改成注入 | `web/js/core/state.js` 的 49 個共享值目前由十個分頁模組的渲染函式經閉包直接讀寫（ADR-026 承諾在 D11 改掉、ADR-027 明說沒兌現）。改成由進入點建一份狀態、往下傳，與後端 `core/runtime_state.py` 同一個形狀。 | 改動**前**跑 `python scripts/dashboard_dom_lock.py update`、改動**後**跑 `check`，**12 張快照逐字元相同**（ADR-029）；`pytest` 全綠；`scripts/dashboard_smoke.py` `ok: true`。**鎖的邊界要先看 ADR-029「它不鎖什麼」**：它只釘開機後的第一畫面，不釘互動與輪詢——若重構會動到互動路徑，得先把對應互動加進 `capture_pane`，否則那部分等於沒有證據。 | ⏸ 已評估，暫不做（見上方 2026-09-22 決定） |
+
+---
+
+## E. 推廣路線（ROADMAP §14；依 E1 → E2 → E3 順序）
+
+> 來源：[ROADMAP.md §14](../ROADMAP.md)（為什麼是這三件事、為什麼不是別的）與 §13.3。
+> 共同鐵律：每一項結束 `pytest` 全綠、`python main.py verify` 的判定不因重構而改變；動到邊界的先寫 ADR。
+
+| # | 項目 | 內容 | 完成判準（收據） | 階段 |
+| :-- | :--- | :--- | :--- | :--- |
+| E1 | `omni demo` 示範資料集 | 一份匿名化、可公開的假 transcript ＋ Git ＋ 檔案事件，一個指令灌進**另開的** `OMNICONTEXT_HOME`，讓任何新環境（含每一個雲端開發 session）五分鐘看到首頁、提案與 Handoff。**先寫 ADR**：示範資料的邊界。 | ADR 定稿（示範資料一律標成示範、只能寫進另開的家目錄、不得與真實資料同庫、驗收中心與問候卡不得把示範數字當實機收據）；`omni demo` 在乾淨容器跑完後 `GET /api/v1/secretary/home` 有焦點與記憶、`reports/handoffs/` 有檔；對**真實**家目錄執行時 fail-closed 並說明原因；新增契約測試涵蓋「示範資料不得寫進非示範家目錄」與「示範旗標一路標到 API」；`pytest` 全綠 | 推廣 |
+| E2 | `agent-transcripts` 獨立套件 | 把 `watchers/transcripts/` 的四個平台 parser ＋ 統一 turn 模型 ＋ provenance ＋ drift 偵測抽成可單獨 `pip install` 的套件，本 repo 改成它的第一個使用端。前置條件在 D9（[ADR-025](ADR-025-transcript-parsers-and-drift.md)）已完成：共同介面只有 `discover`／`parse`，parser 不碰資料庫。**先寫 ADR**：套件邊界、版本相依與本 repo 的消費方式。 | ADR 定稿；套件可在**沒有本專案**的乾淨 venv 裡安裝並解析四種格式（附一份離線樣本的解析輸出當收據）；本 repo 改成使用端後 `tests/test_transcript_parsers_and_drift.py` 與 `tests/test_transcript_contracts.py` **一字不改**全綠；`python -m build` ＋ `verify_release_artifacts.py` 通過；`verify` 輸出與基底相同 | 推廣 |
+| E3 | `omni init` 自動偵測 | `omni init` 偵測 `~/.claude`／`~/.codex`／Antigravity 的既有路徑並**詢問**要不要納入採集——不自動匯入、不自動開啟任何採集器、不碰危險能力開關。 | 偵測結果與實際存在的路徑一致（不存在的不列、列出的點得開）；一律需要明確回答才寫進設定，預設是「不納入」；非互動模式（`--yes` 之類）要能被關掉且預設不存在；新增契約測試涵蓋「偵測不等於啟用」；`pytest` 全綠 | 推廣 |
+
+---
 
 ## 維護這頁的規則
 
