@@ -104,6 +104,8 @@
 > **2026-09-22 依外部檢視重排**（[REVIEW-2026-09-22](REVIEW-2026-09-22-competitive-landscape-and-P9.md)）：
 > 唯讀 MCP server 插進 `agent-transcripts` 套件**之前**，理由見 ROADMAP §14.2。
 > 該文件 §7 的 E1～E9 **沒有採用**（ADR 編號衝突、含兩項非開發工作），逐項校訂見該文件開頭的「校訂註記」。
+> ⚠️ **接手提醒**：若你手上的指令或記憶還寫著舊的三項順序（demo → `agent-transcripts` → `omni init`），**以本表為準**——
+> 中間插了 E2～E4 三項 MCP 工作。另外 **MCP 的 ADR 一律是 ADR-032**，ADR-031 已經是 `omni demo` 的邊界（Accepted），不要覆蓋它。
 > 共同鐵律：每一項結束 `pytest` 全綠、`python main.py verify` 的判定不因重構而改變；動到邊界的先寫 ADR。
 
 | # | 項目 | 內容 | 完成判準（收據） | 階段 |
