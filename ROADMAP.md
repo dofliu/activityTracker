@@ -691,6 +691,7 @@ P2.5-S1 API 安全邊界
 - ✅ 2026-09-16（第五輪）：**R1 D4——`core/server.py` 依領域切成 9 個 router**。動刀前先做安全網：`tests/test_api_route_snapshot.py` 從執行中的 app 抓下**全部 133 條路由**（98 條主服務 ＋ 31 條 DeskRAG）的（路徑、方法、handler 名稱）快照並鎖住——少一條、多一條、改名都會失敗。搬家用 AST 逐個頂層定義切出來，每個模組的 import 由「這個模組實際用到哪些名稱」自動推導，再用 pyflakes 確認零未定義、零未使用。結果：`core/server.py` **1,995 行 → 134 行**，只做四件事（建 app ＋ 安全邊界 middleware、掛 `/static`、掛 9 個 router ＋ RAG、為既有呼叫端保留 `asset_version`／`render_index_html`／`WEB_DIR` 的名稱）。新增 `core/api/{pages,system,events,activity,secretary,projects,repos,integrations,settings}.py`（每個 66～334 行）＋ `core/api/deps.py`（execution token 閘門，秘書與排程兩個 router 共用，只有一份）；33 個 Pydantic model 集中到 `core/schemas.py`；AI 事件的 `turn_key` 與 `response_status` 判定移到 `core/ingest.py`（那是 ADR-001 的 provenance 規則，不是 web 層的事）。**行為不變**：路由表、middleware 順序、403／401 的 detail 字面全部原封不動。測試只改 patch 目標的 import 路徑（14 個 `core.server.X` → 對應的 `core.api.X`，斷言一字未改）。**收據**：`pytest` 662 passed ＋ 1 skipped（新增路由快照 3 項）；不裝 `[rag]` 650 passed ＋ 12 skipped；`verify` 輸出與基底相同；`python -m build` ＋ `verify_release_artifacts.py` 通過且 wheel 含 `core/api/` 全部模組。
 - ✅ 2026-09-22：**推廣路線 E1——`omni demo` 示範資料集設計定案**（[ADR-031](docs/ADR-031-omni-demo-dataset.md) Accepted，設計）。R0～R2 的減法與合併已於 2026-09-20 全部完成，TODO 沒有排下一段方向，於是本輪先把 §13.3 的三項推廣路線目標寫進 `docs/TODO.md` 新的 E 段（E1 demo 資料集／E2 `agent-transcripts` 獨立套件／E3 `omni init` 自動偵測），並先啃掉風險最大的設計決策：demo 資料要放哪裡、以什麼形式進系統。定案的邊界：獨立子指令 `omni demo`、固定隔離 home（`~/OmniContext-Demo`，透過既有 `OMNICONTEXT_HOME` 覆寫機制，不新增第二套家目錄邏輯，也永不共用使用者真實資料庫）；示範資料**走既有的 parser／watcher 進系統**（合成的 Claude Code／Codex transcript、`GIT_AUTHOR_DATE` 回填的假 commit、假檔案事件），不直接寫 DB——理由是本專案已經因 ADR-023／024／025 反覆糾正過「同一件事多寫一份」，demo 產生器沒有理由開第二條 ingestion 路徑；時間相對於執行當下回填，讓依賴「已結束的週／日」的功能（週回顧、模式提案、每日工作誌）吃得到資料而不會隨時間退化。**這一輪只寫決策，沒有新程式碼**：`pytest` 829 passed ＋ 2 skipped、`python main.py verify` 與本輪之前逐位元組相同（本輪未動任何產品程式碼）。**下一輪待辦**：依 ADR-031 實作 `demo` 子指令與示範語料，E2／E3 尚未開始。
 - ✅ 2026-09-22：**外部競品檢視收錄、差異化宣稱改寫、E 段重排**（[REVIEW-2026-09-22](docs/REVIEW-2026-09-22-competitive-landscape-and-P9.md)，本輪未動任何產品程式碼）。收到一份外部檢視，主張三件事，逐項對照 `main` 之後：**②「差異化宣稱已過期」成立**——「沒有主流工具在讀本機 AI agent 的 transcript」這句絕對否定句確認存在於 `README.md`、`README_en.md`、`ROADMAP.md` §3.3、`docs/PRODUCT_POSITIONING.md` 四處，**已全部改寫**：只陳述本專案讀完之後做什麼（收斂到同一個專案身分、每個結論指得回一筆 SQLite row），並加上明文 non-claim「不宣稱是唯一或第一個讀本機 transcript 的工具——沒有安裝比對過就不做這種宣稱」；**③「最大的落差是介面，本專案沒有 MCP server」成立**——全 repo 搜 `mcp` 只有 ROADMAP 兩處提及（外部 Calendar MCP、`MCP/LabPagesCowork/` 目錄名），零實作、零相依。據此把 TODO E 段從三項擴為六項，**唯讀 MCP server 插進 `agent-transcripts` 套件之前**（理由：套件是做給還不存在的第二個使用者，MCP 是做給現在這一個使用者——他的工作流是 Claude Code／Codex 不是瀏覽器）。**該文件的條目沒有照抄**，校訂寫在文件開頭的「校訂註記」：它把 MCP 的 ADR 編號指派為 ADR-031，但那個編號當天已被 `omni demo` 邊界佔用（Accepted），照抄會覆蓋一份已定稿的 ADR，**改為 ADR-032**；它提議的模組路徑 top-level `mcp/` 會與 PyPI 官方 MCP SDK 的 `mcp` package 撞名（`pyproject.toml` 的 `packages.find.include` 是白名單），且它沒有回答 stdio 傳輸要不要吃 SDK 相依——兩題都留給 ADR-032；它的 P9-C「兩週關掉 `release_ready`」不成立（`verify` 當天說擋的是 **A1、A2**，引用 TODO 時掉了「**能力型**缺口」四個字，也沒算 §12.3 的 G2／G3／G4），P9-C 與 P9-D-3 都是使用者側的事，**不進 E 段**，避免同一件事寫兩個地方。**§2 的競品資料全部未經本機驗證**（該文件 §11 自述），因此只用來排序工作、不進入任何對外宣稱——本輪改寫的字句刻意沒有引用其中任何一項競品斷言。**收據**：`pytest` 829 passed ＋ 2 skipped（與改動前相同，本輪未動任何產品程式碼）；`python main.py verify` 在本輪之前與之後各跑一次，22 項判定與四個 release gate 一字不變（`release_ready` 仍卡在 A1、A2）——**claim boundary**：這不是逐位元組比對，而是「驗收中心只讀 `reports/` 底下的產出與資料庫，不讀本輪改動的任何 `.md`」（`core/acceptance/readings.py` 只碰 `RepoSync_*.md` 與 `handoffs/*.md`）。
+- ✅ 2026-09-22：**`myGitQuickView` 借鏡比對，開 TODO F 段（§15）**（本輪未動任何產品程式碼）。使用者另一個自己寫的 GitHub 專案總覽網頁，希望把優點併進來。**沒有讀到該專案原始碼**（開發環境的 GitHub 存取限定在本 repo），比對基礎是使用者提供的功能清單——這條邊界寫進 §15.1。本 repo 這一側做了兩輪查證：六個面向平行盤點現有 repo 管理能力與邊界，再對每一條「我們目前沒有」派**三個不同視角的懷疑者**（搜尋派／閱讀派／測試派）去找反例，**七條宣稱六條零票被推翻、一條被三票推翻**。結果：**F1 commit 的來源歸因**——競品用 LLM 猜 commit 出自哪個工具，本專案手上有 transcript 與 commit 在同一庫同一專案身分底下，應該用指得回一筆 row 的方式回答；查證確認兩張表之間零 FK、零 relationship、全庫零 join，但 commit message 全文已存、AI 側已有 `turn_key`，**缺的只有 git 側的指標**。**F2 跨 repo GitHub 總覽**——`core/api/repos.py:214-267` 與 `core/secretary/signals.py:249-256` 的 `repo_issue_backlog` 都是**已實作但零前端消費者**，等於已經付過後端的錢沒領貨（精確範圍：缺的是一屏總覽，不是「雲端資料看不到」，per-project PR 徽章與 assistant 待辦都已在 UI）。**F3 語言欄位**——`fetch_all_repositories` 已把整包 repo dict 抓進記憶體，GitHub 回應本來就含 `language`，只是沒挑；欄位便宜、圓餅圖不便宜（前端目前零圖表、零 `<canvas>`），兩件事分開決定。**F4 作品集摘要**列為候選但不排程，要先過「能否改變決策」。**刻意不搬** PAT 存瀏覽器直打 GitHub API（與 ADR-001 信任邊界相反；競品沒有後端所以那樣設計是對的）。**被推翻的那條沒有寫進 F 段**：原本主張「identity 有四套認定會判錯」，三個懷疑者一致指出失效模式是**漏接不是誤配**，殘值改寫成 B6（`GitHubRepoState.repo_name` 是裸名且全域 unique、schema 無 owner）。另查證出 **B5**：`git_activity_events` 去重鍵沒正規化長度也不帶 `repo_name`，同一根因造成靜默丟資料與假重複兩個反向缺陷，且因應用層先查再寫，`UNIQUE` 永遠不觸發 `IntegrityError`。**收據**：`pytest` 829 passed ＋ 2 skipped（與改動前相同）；B5／B6 **沒有實機證據**（本機 `git_activity_events` 0 筆），結論全部來自 schema 與程式碼路徑，已在條目裡寫明。
 
 ---
 
@@ -885,5 +886,62 @@ MCP 是做給**現在這一個使用者**的——他的工作流是 Claude Code
 ### 14.4 每一項的共同鐵律（照舊）
 
 - 結束時 `pytest` 全綠、`python main.py verify` 的判定不因重構而改變。
-- 動到邊界的先寫 ADR（E1 的示範資料邊界已於本輪定稿為 ADR-031，E2 的套件邊界待動工時再寫）。
+- 動到邊界的先寫 ADR（E1 的示範資料邊界已定稿為 ADR-031；E2 的 MCP 邊界是 ADR-032，尚未寫；E5 的套件邊界待動工時再取號）。
 - 成果寫進 §11.2 一條、待辦從 [TODO.md](docs/TODO.md) 刪掉——**不要在兩個地方各留一份**。
+
+---
+
+## 15. repo 管理強化：`myGitQuickView` 借鏡（2026-09-22 檢視）
+
+> 待辦條目與完成判準一律以 [docs/TODO.md](docs/TODO.md) **F 段**為準，這裡只寫「為什麼是這四件事、為什麼其餘的不搬」。
+> **F 段排在 E 段之後**：E 段（推廣路線）是把這個專案交得出去，F 段是把既有能力補完，前者先。
+
+### 15.1 這次比對怎麼做的（以及邊界）
+
+使用者另有一個自己寫的專案 `myGitQuickView`（用 PAT 讀 GitHub API 的專案總覽網頁），
+希望把它的優點併進來。**本次比對沒有讀到該專案的原始碼**——這個開發環境的 GitHub 存取被限定在本 repo，
+所以比對的基礎是使用者提供的功能清單，不是程式碼層比對。這一點決定了結論的效力：
+**「我們沒有 X」是對本 repo 查證過的，「它有 Y」只是照著功能清單記下的。**
+
+本 repo 這一側做了兩輪查證：先六個面向平行盤點現有的 repo 管理能力與邊界，
+再對每一條「我們目前沒有」的宣稱派**三個不同視角的懷疑者**（搜尋派／閱讀派／測試派）去找反例。
+七條宣稱裡**六條零票被推翻、一條被三票推翻**——被推翻的那條沒有寫進 F 段，
+它的殘值改寫成 [TODO.md](docs/TODO.md) B6（見 §15.4）。這個做法的理由很單純：
+在這個專案裡，把**已經存在的能力寫成待辦**是最貴的錯，比漏掉一項貴得多。
+
+### 15.2 比對結果
+
+| `myGitQuickView` 的功能 | 本專案現況 | 處置 |
+| :--- | :--- | :--- |
+| AI 分析最新 commit、推斷開發來源 | **沒有任何 commit → AI turn 的連結**（零 FK、零 relationship、全庫零 join）。但 commit message 全文已存、AI 側已有 `turn_key` | **F1**，而且**反過來做**：用證據不用猜 |
+| 全面總覽（專案數、公開／私有、最近更新排序、卡片網格） | 跨 repo 端點 `core/api/repos.py:214-267` **已實作但零前端呼叫者** | **F2**，成本主要在前端 |
+| 語言分佈 | 完全沒採集；但 GitHub 回應本來就含 `language`，`fetch_all_repositories` 已把整包抓進記憶體 | **F3** 只做欄位，**不做圓餅圖**（§15.3） |
+| 專案精華（履歷／作品集摘要） | 沒有這個輸出目標（`main.py resume` 是 Context Handoff 不是履歷） | **F4** 候選，先過「能否改變決策」 |
+| 提交歷史、搜尋篩選、詳細錯誤訊息 | 已有，且本專案的拒絕理由**帶實際數字**並有契約測試釘住字串 | 不做 |
+| AI 對話面板、AI 建議的後續步驟 | 已有（01 小秘書 ＋ 秘書提案的 `ci_failing_pr`／`review_ready_pr`／`aging_pr`／`assigned_issue`／`aging_issue`），且帶記憶區引用 | 不做 |
+| 深淺色主題、載入骨架、空狀態 | 主題已有（`data-theme` × `data-accent` 兩軸） | 不做 |
+
+### 15.3 刻意不搬的，以及理由
+
+- **PAT 只存瀏覽器 session、由瀏覽器直接打 GitHub API**：這與 [ADR-001](docs/ADR-001-p2-5-trust-boundary.md) 的信任邊界相反。
+  本專案的 secret 只存 `api_key_env` 變數名，前端永遠拿不到金鑰。
+  `myGitQuickView` 沒有後端，那個設計在它的脈絡裡是對的；搬進一個有後端的系統就不是了。
+- **Chart.js 圓餅圖**：兩個理由。一是前端目前**一張圖表都沒有**（唯一的視覺化是兩條百分比進度條），
+  引入圖表庫會是第一個第三方圖表依賴，也會是產品前端第一個 `<canvas>`；
+  二是語言分佈要先過 §3.2 的「能否改變決策」檢驗——它是「我擁有什麼」的鏡頭，
+  這個專案其餘的產出都是「我做了什麼」。**欄位便宜、圖表不便宜，兩件事分開決定。**
+- **排程自動 fetch／pull**：`myGitQuickView` 的「即時數據」靠使用者按刷新，這一點與本專案一致；
+  但任何往「背景自動同步」方向的延伸都撞 [ADR-011](docs/ADR-011-safe-local-repository-sync.md) Decision 3，
+  而且不只是文件——`core/scheduled_tasks.py:454-458` 在模組 import 時就會對非 L0 template 直接 raise。
+
+### 15.4 順便撈到的兩個既有缺陷（與借鏡無關）
+
+盤點過程中查證出兩個本來就存在的問題，已寫進 [TODO.md](docs/TODO.md) B 段，不與 F 段混在一起：
+
+- **B5**：`git_activity_events` 的去重鍵沒正規化長度也不帶 `repo_name`，同一個根因造成兩個方向相反的缺陷
+  （跨 repo 8 碼前綴相同 → 靜默丟資料；watcher 8 碼 vs API 40 碼 → 假重複）。
+  因為是應用層先查再寫，`UNIQUE` 永遠不會觸發 `IntegrityError`，兩種情形都不留痕跡。
+- **B6**：`GitHubRepoState.repo_name` 是裸 repo 名且全域 `unique`，schema 裡沒有 owner，
+  所以 `alice/foo` 與 `bob/foo` 無法共存。**失效模式是漏接不是誤配**——這一點很重要，
+  因為最初的宣稱寫的是「會判錯」，被三個懷疑者一致推翻後才修正成現在的說法。
+  正確的正規化其實已經存在（`core/repo_onboarding.py:66-83` 的 `canonical_github_slug`，有契約測試）。
