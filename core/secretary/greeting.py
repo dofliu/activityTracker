@@ -28,6 +28,7 @@ from typing import Any, Callable
 from core.config import get_config
 from core.runtime_state import TtlCache, runtime_state
 from core.database import get_db
+from core.runtime_paths import is_demo_home
 from core.time_utils import get_local_now
 from core.activity_sources import source_for, within_window
 from core.models import ActivityMicroSummary, GitHubPREvent, OpenLoop, ProjectState
@@ -602,6 +603,9 @@ def build_greeting(
     greeting["text"] = plain_text(greeting)
     if use_llm:
         greeting = polish_with_llm(greeting, cfg=cfg, now=now)
+    # ADR-031：示範家目錄裡的每個數字都來自 omni demo 的示範資料，不是實機收據；
+    # 旗標一路標到這裡，呼叫端（畫面、Telegram、晨報）負責顯示成看得出來的樣子。
+    greeting["demo_mode"] = is_demo_home()
     return greeting
 
 

@@ -12,7 +12,7 @@
 
 **安裝與設定**
 
-1. [安裝與初始化](#1-安裝與初始化) — 建立環境、本機設定、Git 同步中心
+1. [安裝與初始化](#1-安裝與初始化) — 建立環境、本機設定、Git 同步中心、示範資料
 2. [啟動與確認服務](#2-啟動與確認服務) — LLM API key、確認採集器、外觀
 3. [Browser Extension 安裝與配對](#3-browser-extension-安裝與配對)
 4. [每日介面使用時間與里程碑](#4-每日介面使用時間與里程碑)
@@ -147,6 +147,27 @@ repository_sync:
   max_repositories: 80
   dashboard_recent_limit: 10
 ```
+
+### 1.4 先看看示範資料長什麼樣子（`omni demo`，ADR-031）
+
+還沒有真實資料，或只是想在乾淨環境看一眼儀表板長怎樣，不必先累積活動：
+
+```bash
+python main.py demo
+```
+
+- 會在 `~/.omnicontext-demo`（可用 `--home` 指定別的路徑）建立一個**完全獨立**的示範家目錄，
+  灌入兩個虛構專案（一個近一週持續在動、一個前一週活躍近一週歸零）的假 Git commit／AI 對話／檔案事件。
+  **不會、也不能**寫進你現有的 `OMNICONTEXT_HOME` 或原始碼 checkout——指到那些路徑會直接拒絕執行並說明原因。
+- 重跑 `python main.py demo`（同一個 `--home`）會先清空再重灌，重跑前會印出即將清空的路徑。
+- 啟動示範儀表板：
+
+  ```bash
+  OMNICONTEXT_HOME=~/.omnicontext-demo python main.py run
+  ```
+
+  `GET /api/v1/health`／驗收中心／問候卡都會回 `demo_mode: true`；驗收中心在示範家目錄下**不會**把任何項目判成 `passed`——這是刻意的，示範資料不能被誤認成實機收據。
+- **目前的已知限制**（TODO E1 還沒做完的一小塊）：秘書桌面的「記得」面板與 `reports/handoffs/` 在灌完資料當下是空的，因為 `omni demo` 只灌原始事件表，沒有連帶跑 `daily_digest`／`handoff_active_projects`。「焦點」提案與各分頁的活動統計已經可以正常看。
 
 ## 2. 啟動與確認服務
 

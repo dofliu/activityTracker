@@ -438,6 +438,25 @@ def cmd_init(
         )
 
 
+def cmd_demo(home: Optional[str] = None):
+    """建立/重灌一份匿名化示範資料到獨立的示範家目錄（ADR-031，TODO E1）。"""
+    from core.demo_dataset import DemoSafetyError, seed_demo_home
+
+    try:
+        result = seed_demo_home(home=home)
+    except DemoSafetyError as exc:
+        print(f"omni demo 拒絕執行：{exc}")
+        raise SystemExit(1)
+
+    counts = result["counts"]
+    print(f"示範家目錄已建立：{result['home']}")
+    print(f"示範專案：{', '.join(result['projects'])}")
+    print(f"事件數：git={counts['git']}、ai={counts['ai']}、file={counts['file']}")
+    print("啟動示範儀表板：")
+    print(f'  OMNICONTEXT_HOME="{result["home"]}" python main.py run')
+    print("這個家目錄與你現有的資料完全分開；示範資料不會、也不能寫進你的實機家目錄。")
+
+
 def cmd_assets_status():
     """檢查 wheel/source 中必要 runtime assets，不輸出任何設定密鑰。"""
     status = runtime_asset_status()
@@ -897,6 +916,13 @@ def main():
     init_parser.add_argument("--show-token", action="store_true", help="顯示既有 browser ingest token")
     init_parser.add_argument("--rotate-token", action="store_true", help="旋轉 browser ingest token")
 
+    demo_parser = subparsers.add_parser(
+        "demo", help="建立/重灌一份匿名化示範資料到獨立的示範家目錄（不動你現有的資料）"
+    )
+    demo_parser.add_argument(
+        "--home", help="示範家目錄路徑（預設 ~/.omnicontext-demo）；不得與實機家目錄相同"
+    )
+
     llm_test_parser = subparsers.add_parser(
         "llm-test", help="診斷 LLM provider 連線與設定（ollama/gemini/anthropic/openai）"
     )
@@ -1038,6 +1064,8 @@ def main():
             getattr(args, "show_token", False),
             getattr(args, "rotate_token", False),
         )
+    elif args.command == "demo":
+        cmd_demo(getattr(args, "home", None))
     elif args.command == "now":
         cmd_now()
     elif args.command == "summary":

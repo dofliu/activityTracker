@@ -13,13 +13,18 @@ from typing import Any
 
 from core.config import get_config
 from core.database import get_db
-from core.runtime_paths import source_checkout_root
+from core.runtime_paths import is_demo_home, source_checkout_root
 from core.time_utils import get_local_now
 
 from .items import ITEM_IDS, ITEMS
 from .rules import (
     ATTESTED, NEEDS_HUMAN, OUTSTANDING, PASSED, PENDING, SETTLED,
     Ctx, reports_dir,
+)
+
+DEMO_MODE_DISCLAIMER = (
+    "示範模式：這是 omni demo 灌入的示範資料，不是實機收據——機器判定已強制降級為 needs_human"
+    "（ADR-031：示範資料不得讓驗收中心的判定變綠）。"
 )
 
 ACCEPTANCE_CLAIM_BOUNDARY = (
@@ -220,6 +225,16 @@ def build_acceptance_report(
                 }
             )
 
+    demo_mode = is_demo_home()
+    if demo_mode:
+        # ADR-031：示範家目錄裡的一切都是示範資料，任何原本會變綠的判定一律
+        # 降級為 needs_human——這是本 ADR 唯一不可退讓的判準，寧可整份報告
+        # 看起來「還沒做」，也不能讓示範資料教會驗收中心說謊。
+        for item in items:
+            if item["status"] in SETTLED:
+                item["status"] = NEEDS_HUMAN
+                item["detail"] = f"{item['detail']} {DEMO_MODE_DISCLAIMER}"
+
     counts: dict[str, int] = {}
     for item in items:
         counts[item["status"]] = counts.get(item["status"], 0) + 1
@@ -246,4 +261,5 @@ def build_acceptance_report(
         ),
         "source": "docs/TODO.md A 段",
         "claim_boundary": ACCEPTANCE_CLAIM_BOUNDARY,
+        "demo_mode": demo_mode,
     }

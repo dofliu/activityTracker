@@ -14,6 +14,7 @@ from core.extension_verification import extension_verification_registry
 from core.manager import get_manager
 from core.platform_services import open_local_path, open_web_url
 from core.project_engine import get_project_state_count
+from core.runtime_paths import is_demo_home
 from core.schemas import AcceptanceConfirmRequest, ExtensionHeartbeatCreate, ExtensionVerificationStart, OpenPathRequest, SystemMaintenanceRequest
 from core.security import extension_ingest_authorized
 from core.time_utils import get_local_now
@@ -30,7 +31,13 @@ router = APIRouter()
 
 @router.get("/api/v1/health")
 def health_check():
-    return {"status": "ok", "service": "OmniContext", "time": get_local_now().isoformat()}
+    return {
+        "status": "ok",
+        "service": "OmniContext",
+        "time": get_local_now().isoformat(),
+        # ADR-031：目前 home 是不是 `omni demo` 建立的示範家目錄——只看旗標檔，不用猜。
+        "demo_mode": is_demo_home(),
+    }
 
 
 @router.get("/api/v1/extension/status")
