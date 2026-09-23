@@ -4,15 +4,20 @@
 
 1. ``seed_demo_home()``——唯一的寫入入口。先做安全檢查（ADR-031 D1：目標路徑
    不得是使用者實機的家目錄），再把完全虛構的 git／AI／檔案事件灌進一個全新的
-   SQLite（沿用既有 migration registry，不繞過），最後寫下 :func:`core.runtime_paths.demo_marker_path`
-   旗標檔——這是 ``demo_mode`` 判定唯一認的依據，不是靠猜資料長什麼樣子。
+   SQLite（沿用既有 migration registry，不繞過），接著在另開的子行程裡依序重算
+   project_states、跑一次 `daily_digest`、跑一次 `handoff_active_projects`
+   （見 :func:`_run_post_seed_steps_in_subprocess`），最後寫下
+   :func:`core.runtime_paths.demo_marker_path` 旗標檔——這是 ``demo_mode`` 判定
+   唯一認的依據，不是靠猜資料長什麼樣子。
 2. ``DEMO_PROJECTS``——固定內容的假資料集，橫跨兩週：一個「近一週持續在動」的專案
    （``aurora-notes``）與一個「前一週活躍、近一週歸零」的專案（``lighthouse-api``），
    讓 ADR-017 模式感知提案、ADR-020 每週回顧、ADR-019 秘書桌面都有東西可挑。
 
-**不做的事**（留給 E1 下一塊或刻意不做，見 docs/TODO.md E1）：
-- 不呼叫 L0 `handoff_active_projects`／`morning_pack`——`reports/handoffs/` 要靠使用者
-  在示範家目錄跑起來的服務上手動觸發一次；這裡只保證「查得到活動」，不假裝已經跑過排程。
+**不做的事**（刻意不做，見 docs/TODO.md E1）：
+- 不呼叫 `morning_pack`（它還會跑 repo 同步報告與 STATUS 過期草稿，那兩項對一個
+  沒有真實 repo 的示範家目錄沒有意義）——只呼叫其中對示範資料有意義的兩個 L0：
+  `daily_digest`（讓「記得」面板有東西）與 `handoff_active_projects`（讓
+  `reports/handoffs/` 有檔）。
 - 不寫 `config.yaml`——留空讓所有危險能力沿用預設關閉，不必在這裡重複一份設定判斷。
 """
 
@@ -286,29 +291,57 @@ def _insert_dataset(session: Any, target: Path, today: date, now: datetime) -> d
     return counts
 
 
-def _refresh_project_states_in_subprocess(target: Path) -> None:
-    """在全新的子行程裡跑 `refresh_project_states`，讓 project_states 沿用正式演算法算一次。
+_POST_SEED_SCRIPT = """
+import json
 
-    `core.project_engine.refresh_project_states` 走的是行程內單例 `get_db()`／`get_config()`，
-    不接受注入——與其在這個行程裡動那兩個單例的私有狀態，不如比照
-    `core.agent_dispatch.run_agent_subprocess` 的作法另開一個全新行程，用
-    `OMNICONTEXT_HOME` 指到示範家目錄，行為與真正啟動服務時完全一致。
+from core.project_engine import refresh_project_states
+from core.activity_digest import build_daily_digest
+from core.secretary.packs import build_active_handoffs
+
+refresh_project_states(force=True)
+digest = build_daily_digest(days_back=1)
+handoffs = build_active_handoffs(hours=24 * 7, max_projects=10)
+print(json.dumps({
+    "digest_date": digest.get("date"),
+    "digest_notes_written": digest.get("notes_written", 0),
+    "handoffs_written": handoffs.get("handoffs_written", 0),
+    "handoffs_projects": handoffs.get("projects", []),
+}))
+"""
+
+
+def _run_post_seed_steps_in_subprocess(target: Path) -> dict[str, Any]:
+    """在全新的子行程裡重算 project_states，並各跑一次 `daily_digest`／`handoff_active_projects`。
+
+    這三步都走行程內單例 `get_db()`／`get_config()`，不接受注入——與其在這個行程裡動
+    那兩個單例的私有狀態，不如比照 `core.agent_dispatch.run_agent_subprocess` 的作法
+    另開一個全新行程，用 `OMNICONTEXT_HOME` 指到示範家目錄，行為與真正啟動服務時完全一致。
+    `daily_digest`／`handoff_active_projects` 都依賴 `refresh_project_states` 先跑過，
+    所以三步同一個子行程依序做，不拆成三次子行程呼叫。
     """
     env = dict(os.environ)
     env["OMNICONTEXT_HOME"] = str(target)
-    script = "from core.project_engine import refresh_project_states; refresh_project_states(force=True)"
     result = subprocess.run(
-        [sys.executable, "-c", script],
+        [sys.executable, "-c", _POST_SEED_SCRIPT],
         env=env,
         capture_output=True,
         text=True,
-        timeout=60,
+        timeout=120,
     )
     if result.returncode != 0:
         raise DemoSafetyError(
-            "示範資料寫入後，重算 project_states 失敗，示範家目錄可能不完整：\n"
+            "示範資料寫入後，重算 project_states／記憶區觀察失敗，示範家目錄可能不完整：\n"
             f"{result.stderr.strip()[-2000:]}"
         )
+    last_line = next((line for line in reversed(result.stdout.splitlines()) if line.strip()), "")
+    try:
+        payload = json.loads(last_line)
+    except (ValueError, TypeError) as exc:
+        raise DemoSafetyError(
+            "示範資料寫入後，記憶區觀察步驟沒有回報可解析的結果：\n"
+            f"{result.stdout.strip()[-2000:]}"
+        ) from exc
+    return payload if isinstance(payload, dict) else {}
 
 
 def seed_demo_home(
@@ -320,7 +353,10 @@ def seed_demo_home(
     """把 :data:`DEMO_PROJECTS` 灌進一個獨立的示範家目錄；回傳摘要供 CLI 印出。
 
     ``refresh_project_states=False`` 只給測試用——契約測試不需要真的另開子行程，
-    只要驗證事件表與旗標檔正確即可。
+    只要驗證事件表與旗標檔正確即可；為 ``True`` 時同一個子行程也會依序跑
+    `daily_digest`／`handoff_active_projects`，回傳摘要的 ``memory`` 欄位帶著寫入
+    的記憶區觀察數與 Handoff 檔案數（``False`` 時 ``memory`` 是 ``None``，代表這兩步
+    沒有跑，不是跑了但沒東西）。
     """
     target = resolve_demo_target(home)
     now = now or get_local_now()
@@ -358,8 +394,9 @@ def seed_demo_home(
     finally:
         engine.dispose()
 
+    memory: dict[str, Any] | None = None
     if refresh_project_states:
-        _refresh_project_states_in_subprocess(target)
+        memory = _run_post_seed_steps_in_subprocess(target)
 
     marker_payload = {
         "is_demo": True,
@@ -379,4 +416,5 @@ def seed_demo_home(
         "counts": counts,
         "marker": marker_payload,
         "projects": [project.key for project in DEMO_PROJECTS],
+        "memory": memory,
     }

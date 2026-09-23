@@ -176,6 +176,10 @@ input, select, button { font-family: inherit; }
 
 .topbar-actions { display: flex; align-items: center; gap: 8px; flex: none; }
 
+/* ADR-031：示範模式橫幅——刻意用跟其他狀態徽章都不同的顏色，不能被誤認成實機收據 */
+.demo-banner { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 12px; background: var(--warn-bg); color: var(--warn); border-bottom: 1px solid var(--warn); font-size: 12px; font-weight: 700; letter-spacing: 0.3px; text-align: center; }
+.demo-banner-icon { font-size: 13px; }
+
 .pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; border: 1px solid; }
 .pill-dot { width: 7px; height: 7px; background: currentColor; }
 .pill-on { background: rgba(242, 106, 15, 0.12); color: var(--accent); border-color: rgba(242, 106, 15, 0.4); }

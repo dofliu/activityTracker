@@ -5,7 +5,7 @@
 
 import { initLanguage, loadDictionaries } from "./core/i18n.js";
 import { POLL_MS } from "./core/state.js";
-import { initActionDelegation, initCollapsiblePanels, initSettingsNav, initTabs, initTheme } from "./core/ui.js";
+import { initActionDelegation, initCollapsiblePanels, initSettingsNav, initTabs, initTheme, loadDemoBanner } from "./core/ui.js";
 import { initAssistantHome, initGreetingCard, initHomeDesk, loadAssistantStrip, loadGreeting, loadHome, loadSecretaryProposals, loadTodayView } from "./tabs/assistant.js";
 import { initGitHubSection, loadGitHubStatus } from "./tabs/github.js";
 import { initSystemHealthTab, loadSystemHealth } from "./tabs/health.js";
@@ -38,6 +38,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   initCollapsiblePanels();
 
+  loadDemoBanner();
   refreshStatus();
   refreshFeed();
   loadProjects();

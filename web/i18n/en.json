@@ -14,6 +14,7 @@
   "palette_ocean": "🔵 Ocean Blue",
   "btn_quick_checkpoint": "⏱️ Checkpoint",
   "btn_quick_summary": "⚡ Today's Summary",
+  "demo_mode_banner": "Demo mode: this is fabricated sample data, not your real data.",
   "tab_assistant": "01 · 🤖 Assistant",
   "tab_knowledge": "02 · 📚 Knowledge Base",
   "tab_projects": "03 · Active Workstreams",
