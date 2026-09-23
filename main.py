@@ -452,6 +452,16 @@ def cmd_demo(home: Optional[str] = None):
     print(f"示範家目錄已建立：{result['home']}")
     print(f"示範專案：{', '.join(result['projects'])}")
     print(f"事件數：git={counts['git']}、ai={counts['ai']}、file={counts['file']}")
+    memory = result.get("memory")
+    if memory:
+        print(
+            f"每日工作誌：{memory.get('digest_date')}"
+            f"（寫入 {memory.get('digest_notes_written', 0)} 則記憶區觀察）"
+        )
+        print(
+            f"Handoff：{memory.get('handoffs_written', 0)} 份 → reports/handoffs/"
+            f"（{', '.join(memory.get('handoffs_projects', [])) or '無'}）"
+        )
     print("啟動示範儀表板：")
     print(f'  OMNICONTEXT_HOME="{result["home"]}" python main.py run')
     print("這個家目錄與你現有的資料完全分開；示範資料不會、也不能寫進你的實機家目錄。")

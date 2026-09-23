@@ -1,6 +1,7 @@
 // web/js/core/ui.js — 跨分頁的介面機制：分頁切換、主題、可收合面板、toast。
 
 import { $ } from "../core/dom.js";
+import { getJSON } from "../core/api.js";
 import { t } from "../core/i18n.js";
 import { loadAssistantStrip, loadGreeting, loadHome, loadSecretaryProposals, loadTodayView, recordHomeLeave, syncAssistantModelControls } from "../tabs/assistant.js";
 import { loadAcceptance, loadSystemHealth } from "../tabs/health.js";
@@ -144,6 +145,20 @@ export function showToast(msg, duration = 3200) {
     el.style.transition = "opacity 0.3s ease";
     setTimeout(() => el.remove(), 300);
   }, duration);
+}
+
+// ---------------------------------------------------------------- ADR-031：示範模式橫幅
+// `demo_mode` 只看 `/api/v1/health` 的旗標判定（core/runtime_paths.is_demo_home），不用猜；
+// 一個 session 開著的家目錄中途不會變成示範／實機，開頁查一次就夠，不需要輪詢。
+export async function loadDemoBanner() {
+  const banner = $("demo-mode-banner");
+  if (!banner) return;
+  try {
+    const data = await getJSON("/api/v1/health");
+    banner.hidden = !data.demo_mode;
+  } catch (_) {
+    // 連不上時維持目前狀態（預設隱藏），不用猜測嚇使用者
+  }
 }
 
 // ---------------------------------------------------------------- 事件委派

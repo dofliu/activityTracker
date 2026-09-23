@@ -1,6 +1,6 @@
 # ADR-031：`omni demo` 示範資料集的邊界
 
-- 狀態：**Accepted**（2026-09-22 起草，TODO E1；實作留待下一輪，本 ADR 只定邊界）
+- 狀態：**Accepted**（2026-09-22 起草；核心實作 2026-09-23、`memory_pick`／`reports/handoffs/`／前端橫幅收尾 2026-09-23 第二輪，TODO E1 全部完成）
 - 關聯：[core/runtime_paths.py](../core/runtime_paths.py)（`OMNICONTEXT_HOME` 覆寫）、[ADR-016](ADR-016-acceptance-center.md) 驗收中心、[ADR-019](ADR-019-secretary-desk-home.md) 秘書桌面、[ADR-001](ADR-001-p2-5-trust-boundary.md) 本機優先與信任邊界
 - 依據：[ROADMAP.md §14](../ROADMAP.md)、[docs/TODO.md](TODO.md) E1
 
@@ -101,9 +101,19 @@ E2E 使用，見 `docs/NEXT_SESSION.md` 遠端容器環境備忘）。`omni demo
 
 ## 完成判準（收據，供 TODO E1 實作那一輪核對）
 
-- 契約測試涵蓋「示範資料不得寫進非示範家目錄」（目標路徑等於一般預設家目錄時 fail-closed）
+- ✅ 契約測試涵蓋「示範資料不得寫進非示範家目錄」（目標路徑等於一般預設家目錄時 fail-closed）
   與「示範旗標一路標到 API」（`demo_mode: true` 且驗收中心／問候卡不把示範數字當實機收據）。
-- 在乾淨容器對**新開的**示範家目錄執行 `omni demo` 後，`GET /api/v1/secretary/home` 有焦點
-  與記憶、`reports/handoffs/` 有檔案；對**真實**家目錄執行時 fail-closed 並印出原因。
-- `pytest` 全綠；`python main.py verify`（指向非示範家目錄時）輸出與這一輪之前相同——
+- ✅ 在乾淨容器對**新開的**示範家目錄執行 `omni demo` 後，`GET /api/v1/secretary/home` 有焦點
+  **與記憶**（`memory_pick`）、`reports/handoffs/` 有檔案（2026-09-23 第二輪：`seed_demo_home()`
+  灌完資料後在同一個子行程依序跑 `daily_digest`／`handoff_active_projects` 補上這兩項）；對
+  **真實**家目錄執行時 fail-closed 並印出原因。
+- ✅ 前端示範模式橫幅（`web/index.html` 的 `#demo-mode-banner` ＋ `web/js/core/ui.js` 的
+  `loadDemoBanner()`，讀 `GET /api/v1/health` 的 `demo_mode`）。
+- ✅ `pytest` 全綠；`python main.py verify`（指向非示範家目錄時）輸出與這一輪之前相同——
   示範功能不改變任何既有判準。
+
+**本 ADR 至此視為實作完成。** 2026-09-23 第二輪的容器 E2E 過程中另外發現一個本 ADR 沒有涵蓋
+的反方向問題——`main.py run` 對示範家目錄一樣會啟動真正的採集器，把使用者當下的真實活動寫進
+示範資料庫（不是「示範資料混進實機」，是「實機活動混進示範」）。這不算本 ADR D1–D6 的違反（D1
+只保護真實家目錄不被示範資料覆寫），但方向上是同一類問題的另一半，需要另外決定；已記在
+[docs/TODO.md](TODO.md) B7，留給下一輪或另一份 ADR Addendum 處理，不修改本 ADR 的 Decision。

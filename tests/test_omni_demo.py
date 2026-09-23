@@ -158,6 +158,30 @@ def test_seed_demo_home_reseed_is_idempotent(tmp_path):
     assert is_demo_home(target) is True
 
 
+def test_seed_demo_home_without_refresh_skips_memory(tmp_path):
+    target = tmp_path / "demo-home"
+    result = seed_demo_home(home=target, refresh_project_states=False)
+    # `memory=None` 代表這兩步沒有跑，不是跑了但沒東西——跟「有跑但沒收據」要能分開判讀。
+    assert result["memory"] is None
+
+
+def test_seed_demo_home_seeds_memory_pick_and_handoffs(tmp_path, monkeypatch):
+    """TODO E1 剩的一小塊：灌完資料後順便跑 daily_digest／handoff_active_projects，
+    讓 `memory_pick` 與 `reports/handoffs/` 都有東西，不必等使用者手動觸發。"""
+    monkeypatch.delenv("OMNICONTEXT_HOME", raising=False)
+    target = tmp_path / "demo-home"
+    result = seed_demo_home(home=target)
+
+    memory = result["memory"]
+    assert memory is not None
+    assert memory["digest_notes_written"] >= 1
+    assert memory["handoffs_written"] >= 1
+    assert "aurora-notes" in memory["handoffs_projects"]
+
+    handoffs_dir = target / "reports" / "handoffs"
+    assert list(handoffs_dir.glob("Handoff_aurora-notes_*.md"))
+
+
 # ---------------------------------------------------------------- demo_mode 傳播
 
 
