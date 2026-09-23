@@ -1,8 +1,9 @@
 # 下一個 Session 接手指南
 
-> 最後更新：2026-09-23 第二輪（**TODO E1 `omni demo` 全部完成**：核心＋`memory_pick`／`reports/handoffs/`／前端示範橫幅都已實作並有容器 E2E 收據；紀錄見 [ROADMAP §11.2](../ROADMAP.md)，已從 [TODO.md](TODO.md) 刪除）。**下一輪從 TODO E 段的 E2（ADR-032 唯讀 MCP Context Server）接手**。這一輪過程中另外發現一個既有缺陷並記進 [TODO B7](TODO.md)：示範家目錄上跑 `main.py run` 會啟動真正的採集器，把使用者真實活動寫進示範資料庫（見下方「踩過的坑」）——**沒有修**，需要先決定設計再動手。
+> 最後更新：2026-09-23 第三輪（**TODO E2 ADR-032（唯讀 MCP Context Server）定稿**：[ADR-032](ADR-032-readonly-mcp-context-server.md) Accepted，回答了模組路徑（`mcp_server/`，不叫 `mcp/`）與 SDK 相依處理（optional extra `[mcp]`）這兩件外部檢視沒回答的事，六個 tool 對應表、D1–D6 判準、不做清單全部定案；本輪**只寫 ADR，沒有新程式碼**，紀錄見 [ROADMAP §11.2](../ROADMAP.md)，已從 [TODO.md](TODO.md) 刪除）。**下一輪從 TODO E 段的 E3（MCP 第一版切片一：`mcp_server/` 骨架 ＋ `omni_project_state`／`omni_handoff` 兩個 tool）接手**。TODO B7（示範家目錄跑 `main.py run` 會啟動真正的採集器）仍未修，與 E 段無關，接手時可視情況一併處理。
+> 2026-09-23 第二輪：**TODO E1 `omni demo` 全部完成**：核心＋`memory_pick`／`reports/handoffs/`／前端示範橫幅都已實作並有容器 E2E 收據；紀錄見 [ROADMAP §11.2](../ROADMAP.md)。過程中發現的既有缺陷記進 [TODO B7](TODO.md)：示範家目錄上跑 `main.py run` 會啟動真正的採集器，把使用者真實活動寫進示範資料庫（見下方「踩過的坑」）——**沒有修**，需要先決定設計再動手。
 > 2026-09-22：收到外部競品檢視 [REVIEW-2026-09-22](REVIEW-2026-09-22-competitive-landscape-and-P9.md)：四處過期的差異化宣稱已改寫，TODO E 段重排為 E1→E6，唯讀 MCP server 插進 `agent-transcripts` 之前。ROADMAP §13 的 R0～R2 已於 2026-09-20 全部完成，最後一項是 D13——[ADR-030](ADR-030-frontend-state-stores.md)）。
-> 上一輪程式變更是 2026-09-23 的 **TODO E1 `omni demo` 核心實作**（`core/demo_dataset.py`，[ADR-031](ADR-031-omni-demo-dataset.md)）。
+> 上一輪程式變更是 2026-09-23 第二輪的 **TODO E1 `omni demo` 收尾**（`memory_pick`／`reports/handoffs/`／前端示範橫幅）；本輪（第三輪）沒有程式變更，只有 ADR-032 與文件同步。
 > **完整的功能歷程不在這裡**：一路做了什麼一律看 [ROADMAP.md](../ROADMAP.md) §11.2（依日期排序的單一清單）。
 >
 > 這頁是給「下一個開發 session（人或 AI）」的**最短接手路徑**，只放現況、地圖與環境備忘。
@@ -27,7 +28,7 @@
 | 導覽 | 6 分頁，**沒有右欄**（2026-09-06 依實機回饋移除；今日統計與 Focus Now 在 05 最上方、DATA TRUST 在 06 系統健康）：01 小秘書＝兩塊一屏（左：秘書桌面，問候併入、全部提案收合在底部；右：交辦與提問，記憶區收合在裡面）／02 知識庫／03 進行中工作／04 Git 同步中心／05 摘要與統計／06 系統設定（左欄 11 區塊，末項為**驗收中心**）。桌面與 494px 皆無水平溢出（Playwright 實測）。 |
 | 外觀 | 兩個獨立軸：`data-theme`（dark/light）× `data-accent`（naruto/forest/ocean），CSS 全走 `var(--accent)`；新配色只需加一組變數區塊。偏好存 localStorage（`omni-theme`／`omni-palette`／`omni-settings-pane`）。 |
 | 危險能力 | 執行器（含只排 L0 的自訂排程）、L2、L2 寫入、Telegram 對話、Telegram inline 批准（含 `/arm`）、LINE、問候卡 LLM 潤飾——**全部預設關閉**；行事曆預設開但沒設路徑就等於停用。 |
-| **方向（2026-09-23 第二輪更新）** | **架構整頓（ROADMAP §13，R0～R2）已全部完成**（2026-09-20）；功能候選 C5／C6／C3 維持暫停。**§14 推廣路線**（docs/TODO.md E 段，依 **E1 → E6**）進度：**E1 `omni demo` 全部完成**（`main.py demo`／`core/demo_dataset.py`，[ADR-031](ADR-031-omni-demo-dataset.md)）——fail-closed、旗標檔判定、`demo_mode` 傳播到 health／驗收中心／問候卡、`memory_pick`、`reports/handoffs/`、前端示範橫幅全部落地並有容器 E2E 收據，已從 TODO 移除見 ROADMAP §11.2。**接手從 E2 開始**（ADR-032 唯讀 MCP Context Server：先寫 ADR，且必須回答模組**不得**叫 top-level `mcp/`——會與 PyPI 官方 MCP SDK 撞名；stdio 傳輸要不要吃 SDK 相依，要的話只能是 optional extra）→ E3／E4 MCP 第一版分兩片實作 → E5 `agent-transcripts` 獨立套件（前置 D9／ADR-025 已完成）→ E6 `omni init` 自動偵測。**E 段做完才輪到 F 段**（[ROADMAP §15](../ROADMAP.md)，repo 管理強化：F1 commit 來源歸因／F2 把已寫好卻零呼叫者的跨 repo GitHub 總覽接上畫面／F3 語言欄位／F4 作品集摘要候選）。乾淨容器實測：核心安裝 **176 MB**（含 `[rag]` 約 720 MB）。**新發現待處理**：TODO B7——示範家目錄上 `main.py run` 會啟動真正的採集器，混進真實活動，尚未修。 |
+| **方向（2026-09-23 第三輪更新）** | **架構整頓（ROADMAP §13，R0～R2）已全部完成**（2026-09-20）；功能候選 C5／C6／C3 維持暫停。**§14 推廣路線**（docs/TODO.md E 段，依 **E1 → E6**）進度：**E1 `omni demo` 全部完成**（[ADR-031](ADR-031-omni-demo-dataset.md)）、**E2 ADR-032（唯讀 MCP Context Server）定稿**（[ADR-032](ADR-032-readonly-mcp-context-server.md)：模組叫 `mcp_server/`、SDK 相依走 optional extra `[mcp]`、六個 tool 對應既有函式的表、D1–D6 判準、不做清單全部定案；本輪只寫 ADR，未動程式碼），兩項都已從 TODO 移除見 ROADMAP §11.2。**接手從 E3 開始**（MCP 第一版切片一：`mcp_server/` 套件骨架 ＋ `omni_project_state`／`omni_handoff` 兩個 tool，依 ADR-032 的判準表實作）→ E4 其餘四個 tool ＋ 驗收 A23–A26 → E5 `agent-transcripts` 獨立套件（前置 D9／ADR-025 已完成）→ E6 `omni init` 自動偵測。**E 段做完才輪到 F 段**（[ROADMAP §15](../ROADMAP.md)，repo 管理強化：F1 commit 來源歸因／F2 把已寫好卻零呼叫者的跨 repo GitHub 總覽接上畫面／F3 語言欄位／F4 作品集摘要候選）。乾淨容器實測：核心安裝 **176 MB**（含 `[rag]` 約 720 MB）。**新發現待處理**：TODO B7——示範家目錄上 `main.py run` 會啟動真正的採集器，混進真實活動，尚未修。 |
 
 ## 功能地圖（要改哪裡就看這張表）
 

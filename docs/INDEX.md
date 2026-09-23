@@ -77,6 +77,7 @@
 | [ADR-027](ADR-027-injected-runtime-state.md) | 程序內可變狀態收成可注入的 store | 狀態有名字、有把手，重設＝換一份新的而不是呼叫鉤子；鎖跟著它保護的資料走；只存在記憶體、一次性碼只留雜湊（安全性質一個都沒放寬）；CORS 允許清單每個請求看當下設定，改設定不必重啟；行程預設仍是單例（買到的是「可注入」不是「無全域」）|
 | [ADR-026](ADR-026-frontend-modules.md) | 前端拆成 ES module：一個分頁一個檔 | 沒有打包步驟（本機工具，少一層是一層）、字典是資料且兩份 key 集合由測試把關、`fetch` 只准出現在 `core/api.js`、點擊動作走 `data-action` 委派而不是字串裡的 handler、`state.js` 是過渡形狀（改成注入是 D11） |
 | [ADR-031](ADR-031-omni-demo-dataset.md) | `omni demo` 示範資料集的邊界（TODO E1，ADR 已定稿、實作待下一輪） | 只能寫進另開的 `OMNICONTEXT_HOME`、對既有家目錄 fail-closed、每筆資料標示 `demo_mode` 且一路傳到 API、驗收中心與問候卡不得把示範數字當實機收據、匿名化資料一律從頭編造 |
+| [ADR-032](ADR-032-readonly-mcp-context-server.md) | 唯讀 MCP Context Server（TODO E2，ADR 已定稿、實作待 E3／E4） | 模組叫 `mcp_server/`（不叫 top-level `mcp/`，避免與官方 MCP SDK 撞名）、stdio SDK 相依比照 `[rag]` 做成 optional extra `[mcp]`、六個 tool 全是既有函式薄封裝且全部帶 `source_ref`、D1–D6 安全契約（唯讀／預設關閉／不轉發金鑰／輸出無 secret 與絕對路徑／與執行器零耦合／receipt 不存 query 原文）、只做 stdio 不做 HTTP／SSE、不做 write tool、不暴露 RAG 文件切片 |
 
 ## 功能規格與驗證
 
