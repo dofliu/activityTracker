@@ -1,7 +1,8 @@
 # 下一個 Session 接手指南
 
-> 最後更新：2026-09-22（收到外部競品檢視 [REVIEW-2026-09-22](REVIEW-2026-09-22-competitive-landscape-and-P9.md)：四處過期的差異化宣稱**已改寫**，TODO E 段**已重排為 E1→E6**，唯讀 MCP server 插進 `agent-transcripts` 之前。ROADMAP §13 的 R0～R2 已於 2026-09-20 全部完成，最後一項是 D13——[ADR-030](ADR-030-frontend-state-stores.md)）。
-> 上一輪程式變更是 2026-09-20 的**前端共享狀態分成具名 store**（D13，[ADR-030](ADR-030-frontend-state-stores.md)）。
+> 最後更新：2026-09-23（**TODO E1 `omni demo` 核心已實作**：`main.py demo` 建立/重灌獨立示範家目錄，fail-closed、`demo_mode` 傳播到 health／驗收中心／問候卡；容器 E2E 實測 focus／resume／verify 皆正確。**剩一小塊**：`memory_pick`＋`reports/handoffs/` 沒東西（沒觸發 `daily_digest`／`handoff_active_projects`）、前端示範橫幅還沒做——下一輪從這裡接）。
+> 2026-09-22：收到外部競品檢視 [REVIEW-2026-09-22](REVIEW-2026-09-22-competitive-landscape-and-P9.md)：四處過期的差異化宣稱已改寫，TODO E 段重排為 E1→E6，唯讀 MCP server 插進 `agent-transcripts` 之前。ROADMAP §13 的 R0～R2 已於 2026-09-20 全部完成，最後一項是 D13——[ADR-030](ADR-030-frontend-state-stores.md)）。
+> 上一輪程式變更是 2026-09-23 的 **TODO E1 `omni demo` 核心實作**（`core/demo_dataset.py`，[ADR-031](ADR-031-omni-demo-dataset.md)）。
 > **完整的功能歷程不在這裡**：一路做了什麼一律看 [ROADMAP.md](../ROADMAP.md) §11.2（依日期排序的單一清單）。
 >
 > 這頁是給「下一個開發 session（人或 AI）」的**最短接手路徑**，只放現況、地圖與環境備忘。
@@ -15,7 +16,7 @@
 | 版本 | v1.3.0a5 已發佈為 GitHub pre-release（release workflow 自動 build → verify → release，SHA-256 receipt 交叉驗證）。`release_ready: false`，唯一**能力型**缺口是全天 coverage ledger 實測（TODO A1）。 |
 | 還缺什麼 | 別憑記憶：跑 `python main.py verify`（或看「06 系統設定 → 驗收中心」）就會列出 A1–A22 每一項現在有沒有收據，以及 ROADMAP §12.3 四個 gate 缺什麼。 |
 | Schema | migration **18/18**（append-only + checksum；**新表一律進 registry，不得靠 `create_all` 繞過**）。017 = `secretary_notes`、018 = `calendar_events`。 |
-| 測試 | **75 個 contract test 模組、831 項**（829 passed + 2 conditional skip；**不裝 `[rag]` extra 時 816 passed + 14 skipped**，CI 有一個 job 專跑這個）。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
+| 測試 | **76 個 contract test 模組、845 項**（843 passed + 2 conditional skip；裝了 `[rag]` extra 的完整跑法，本輪已跑過並確認）。**不裝 `[rag]` extra 的變體本輪沒有另外裝一份 venv 複測**——新增的 `tests/test_omni_demo.py` 沒有 import 任何 `rag.*`，理論上不受影響，但沒有實測收據，下一輪如果要確認就跑一次不裝 `[rag]` 的 `pytest`。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
 | API 路由 | `core/server.py` **只做組裝**（134 行）；端點在 `core/api/*.py` 依領域分 9 個 router，請求結構在 `core/schemas.py`，AI ingest 規則在 `core/ingest.py`，execution token 閘門在 `core/api/deps.py`。**改動端點前先看 `tests/test_api_route_snapshot.py`**——133 條路由的（路徑、方法、handler 名稱）鎖在那裡，新增端點要在清單多一行（D4，2026-09-16）。 |
 | 活動來源 | **只有一份**：`core/activity_sources.py`（`EVENT_SOURCES` 決定哪三張表算活動與專案欄位在哪、`normalize_project` 空白＝沒歸戶不猜、`day_bounds` 一律半開區間）。每週回顧／模式提案／每日工作誌／問候卡都吃它；**要增減活動來源就只改 `EVENT_SOURCES`**，有契約測試禁止使用端自己查三張事件表的專案欄位（D3，2026-09-16）。 |
 | LLM client | **只有一份**：`core/llm_client.py`（`LLMClient.generate` 同步回字串、`stream_chat` 非同步逐 token；`DEFAULT_MODELS`／`KEY_ENVS` 單一定義；Ollama 一律 `/api/chat`）。失敗抬頭字面（`[本機備援模式]`、`[OpenAI API 錯誤]`、`【尚未偵測到`…）是下游事實閘與驗收中心的辨識依據，**不得改字**；有契約測試掃全 repo 禁止在別處寫死模型名（D2，2026-09-16）。 |
@@ -26,7 +27,7 @@
 | 導覽 | 6 分頁，**沒有右欄**（2026-09-06 依實機回饋移除；今日統計與 Focus Now 在 05 最上方、DATA TRUST 在 06 系統健康）：01 小秘書＝兩塊一屏（左：秘書桌面，問候併入、全部提案收合在底部；右：交辦與提問，記憶區收合在裡面）／02 知識庫／03 進行中工作／04 Git 同步中心／05 摘要與統計／06 系統設定（左欄 11 區塊，末項為**驗收中心**）。桌面與 494px 皆無水平溢出（Playwright 實測）。 |
 | 外觀 | 兩個獨立軸：`data-theme`（dark/light）× `data-accent`（naruto/forest/ocean），CSS 全走 `var(--accent)`；新配色只需加一組變數區塊。偏好存 localStorage（`omni-theme`／`omni-palette`／`omni-settings-pane`）。 |
 | 危險能力 | 執行器（含只排 L0 的自訂排程）、L2、L2 寫入、Telegram 對話、Telegram inline 批准（含 `/arm`）、LINE、問候卡 LLM 潤飾——**全部預設關閉**；行事曆預設開但沒設路徑就等於停用。 |
-| **方向（2026-09-22 重排）** | **架構整頓（ROADMAP §13，R0～R2）已全部完成**（2026-09-20，D13 為最後一項）；功能候選 C5／C6／C3 維持暫停。**下一步是 §14 推廣路線**（docs/TODO.md E 段，依 **E1 → E6**）：**E1 `omni demo` 示範資料集實作**（邊界已定稿為 [ADR-031](ADR-031-omni-demo-dataset.md)：只能寫進另開的 `OMNICONTEXT_HOME`、示範旗標一路標到 API、驗收中心與問候卡不得把示範數字當實機收據）→ **E2 ADR-032 唯讀 MCP Context Server**（先寫 ADR，且必須回答：模組**不得**叫 top-level `mcp/`——會與 PyPI 官方 MCP SDK 撞名；stdio 傳輸要不要吃 SDK 相依，要的話只能是 optional extra）→ E3／E4 MCP 第一版分兩片實作 → E5 `agent-transcripts` 獨立套件（前置 D9／ADR-025 已完成）→ E6 `omni init` 自動偵測。**E1 排第一是相依關係不是偏好**：沒有示範資料，MCP 的 tool 在容器裡只能回空陣列，selftest 就只證明得了「schema 對」。**E 段做完才輪到 F 段**（[ROADMAP §15](../ROADMAP.md)，repo 管理強化：F1 commit 來源歸因／F2 把已寫好卻零呼叫者的跨 repo GitHub 總覽接上畫面／F3 語言欄位／F4 作品集摘要候選）。乾淨容器實測：核心安裝 **176 MB**（含 `[rag]` 約 720 MB）。 |
+| **方向（2026-09-23 更新）** | **架構整頓（ROADMAP §13，R0～R2）已全部完成**（2026-09-20）；功能候選 C5／C6／C3 維持暫停。**§14 推廣路線**（docs/TODO.md E 段，依 **E1 → E6**）進度：**E1 `omni demo` 核心已實作**（`main.py demo`／`core/demo_dataset.py`，[ADR-031](ADR-031-omni-demo-dataset.md)）——fail-closed、旗標檔判定、`demo_mode` 傳播到 health／驗收中心／問候卡都已落地並有容器 E2E 收據；**還剩一小塊**：`memory_pick`／`reports/handoffs/` 沒東西（灌資料沒有觸發 `daily_digest`／`handoff_active_projects` 這兩個 L0）、前端示範橫幅還沒做，見 TODO E1 表格的「還沒做的一小塊」。**接手時先把這一小塊做完再往 E2 走**（E2 ADR-032 唯讀 MCP Context Server：先寫 ADR，且必須回答模組**不得**叫 top-level `mcp/`——會與 PyPI 官方 MCP SDK 撞名；stdio 傳輸要不要吃 SDK 相依，要的話只能是 optional extra）→ E3／E4 MCP 第一版分兩片實作 → E5 `agent-transcripts` 獨立套件（前置 D9／ADR-025 已完成）→ E6 `omni init` 自動偵測。**E 段做完才輪到 F 段**（[ROADMAP §15](../ROADMAP.md)，repo 管理強化：F1 commit 來源歸因／F2 把已寫好卻零呼叫者的跨 repo GitHub 總覽接上畫面／F3 語言欄位／F4 作品集摘要候選）。乾淨容器實測：核心安裝 **176 MB**（含 `[rag]` 約 720 MB）。 |
 
 ## 功能地圖（要改哪裡就看這張表）
 
@@ -60,6 +61,7 @@
 | Schema migration | `core/migrations.py`（`MIGRATIONS` registry） | `test_database_migration.py` | [ADR-003](ADR-003-versioned-sqlite-migrations.md) |
 | 驗收中心（A 段收據） | `core/acceptance/`（`readings.py`／`items.py` 階梯表／`rules.py`／`report.py`；ADR-028 前是單一 `core/acceptance.py`）、`main.py cmd_verify` | `test_acceptance_center.py`（36） | [ADR-016](ADR-016-acceptance-center.md)、[ADR-028](ADR-028-declarative-acceptance.md) |
 | API 邊界與 secret | `core/security.py`、`core/secret_resolver.py` | `test_api_boundary.py`（18） | [ADR-001](ADR-001-p2-5-trust-boundary.md) |
+| `omni demo` 示範資料集 | `core/demo_dataset.py`（`seed_demo_home`／fail-closed）、`core/runtime_paths.py`（`is_demo_home`／`demo_marker_path`）、`main.py demo` | `test_omni_demo.py`（14） | [ADR-031](ADR-031-omni-demo-dataset.md)；核心已實作，`memory_pick`／`reports/handoffs`／前端橫幅未完成（TODO E1） |
 
 前端是 `web/index.html`（結構與 `data-i18n`）＋ `web/style.css`（`var(--accent)` 為主）＋ `web/js/` 的 ES module 樹（ADR-026：`main.js` 進入點、`core/` 五個共用模組、`tabs/` 一個分頁一個檔）＋ `web/i18n/{zh-TW,en}.json` 兩份字典。新增字串要**同時**補兩份——`tests/test_frontend_modules.py` 會擋下只補一邊；新的點擊動作用 `data-action` ＋ `registerActions`，不要寫行內 handler。
 
@@ -94,6 +96,7 @@
 - **預設值只能寫一次，而且要有測試去抓第二份**：D2 合併 LLM client 時，兩套實作的 gemini 預設已經漂移成 2.5 與 3.7，`secretary_advisor` 還有第三張私有的模型表。合併後寫了一支掃全 repo 的契約測試（`core/llm_client.py` 以外不得出現模型名字面），**第一次跑就抓到 `semantic_index.py` 漏掉的一處**——靠人眼 grep 會漏，靠測試不會（2026-09-16）。
 - **依賴檢查放在真的會失敗的那一層，不要放外圍**：D1 一開始把「[rag] 裝了沒」的檢查放在 router 的 `_retrieve_citations`／`/retrieval/warmup` 與 `maybe_warmup_on_start` 外圍，結果沒裝套件的環境裡，連注入替身 worker 指令的 13 個測試都被擋下——外圍不知道底下是替身。改成只在 `RetrievalWorkerClient` 用**預設指令**啟動子程序時檢查（`_requires_extra = command is None`），外圍只看 client 回報的 `state == "unavailable"`，測試全綠且行為更誠實（2026-09-16）。
 - **記憶體狀態不能在 CLI 假裝查得到**：檢索 worker 的 `state`／預熱計數只存在主服務程序，另開一個 Python 程序永遠是 cold。驗收中心為此有 `runtime_only` 這一格——把它報成「還沒做」等於說謊。新增任何「查現況」功能時先問：這個數字在哪個程序裡？
+- **`resolve_project_from_path` 認的是「第一層不在黑名單裡的資料夾」，不是「深層那個看起來像專案的資料夾」**：`core/project_engine.py` 幫檔案事件配專案時，`file_activity_events.project_name` 欄位其實**不是**優先依據——只要 `file_path` 非空（它是 `nullable=False`，永遠非空），一律先用路徑往上找 `.git` 資料夾，找不到才退回「從路徑最上層開始，跳過 `CATEGORY_FOLDERS`／`SUBFOLDER_BLACKLIST` 挑第一個資料夾名」。`omni demo`（TODO E1）灌資料時第一版把假檔案路徑寫成 `<示範家目錄>/demo-workspace/<專案>/<檔案>`，結果所有檔案事件全部被歸戶成示範家目錄自己的資料夾名（例如 `omni-demo-e2e`），因為那是路徑裡第一個不在黑名單裡的資料夾——`demo-workspace`／`<專案>` 都還沒被看到就已經回傳了。修法是幫每個假專案資料夾補一個空的 `<repo_path>/.git/`（見 `core/demo_dataset.py` 的 `_insert_dataset`），讓第一步的 `.git` 探測直接命中，不必跟黑名單清單搏鬥。**任何新程式碼只要會產生 `file_activity_events` 卻不是走真正的檔案系統路徑（測試 fixture、灌資料腳本都算），先檢查歸戶對不對，不要假設 `project_name` 欄位說了算。**
 
 ## 待辦與下一步
 

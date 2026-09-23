@@ -73,6 +73,19 @@ def config_template_path() -> Path:
     )
 
 
+DEMO_MARKER_FILENAME = ".omnicontext_demo_marker.json"
+
+
+def demo_marker_path(home: Path | None = None) -> Path:
+    """`omni demo` 標記檔的路徑；預設查目前 home（ADR-031）。"""
+    return (home or application_home()) / DEMO_MARKER_FILENAME
+
+
+def is_demo_home(home: Path | None = None) -> bool:
+    """目前 home 是不是 `omni demo` 建立的示範家目錄——只看旗標檔在不在，不用猜的。"""
+    return demo_marker_path(home).is_file()
+
+
 def web_assets_dir() -> Path:
     return PACKAGE_ROOT / "web"
 
