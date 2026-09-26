@@ -570,7 +570,7 @@ REVIEW §A.4 的六條全部保留，其中 D1 因為 Context 陷阱 3／4 而**
 
 | | 契約 | 怎麼證 |
 | :-- | :--- | :--- |
-| **D1** | **唯讀**：`mcpserver/` 不得出現 `INSERT`／`UPDATE`／`DELETE`／`session.add`／`commit`／`create_all` 的**呼叫**；且不得**呼叫** `get_db()`／`Database()`／`session_scope()`（見下方「寫的是呼叫，不是 import」） | ①寫入關鍵字掃描，但**必須是 AST／token 級，不能是子字串比對**——`core/acceptance` 是通過列數不變測試的唯讀模組，它的繁中 docstring 裡照樣有 `commit` 這個字；連本 ADR 自己那句「不寫資料庫、不 commit」抄進註解都會讓子字串掃描自爆；②AST 掃 import；③**內容指紋**：在真 tmp DB 上跑完一輪 selftest，比對每張表的 `(列數, 全表內容雜湊)` 都不變——**光比列數不夠**，因為 UPSERT 會讓列數不動而內容改變（實測見陷阱 4）；④直接對 `readers.py` 的引擎執行一次 `INSERT`，斷言它拋 `OperationalError`；⑤**最硬的一條**：在子程序跑完一輪 selftest 之後斷言 `core.database.Database._instance is None`（那個單例槽在 [core/database.py:10](../core/database.py)）——`Database.__new__` → `init_db()` → `upgrade_sqlite_database` ＋ `PRAGMA journal_mode=WAL` 是「拿到 handle 就等於寫入」的實際路徑，所以這一條直接證明 migration、自動備份與 WAL PRAGMA 從頭到尾**沒被觸發**，比任何 grep 或 `sys.modules` 斷言都硬 |
+| **D1** | **唯讀**：`mcpserver/` 不得出現 `INSERT`／`UPDATE`／`DELETE`／`session.add`／`commit`／`create_all` 的**呼叫**；且不得**呼叫** `get_db()`／`Database()`／`session_scope()`（見下方「寫的是呼叫，不是 import」） | ①寫入關鍵字掃描，但**必須是 AST／token 級，不能是子字串比對**——最硬的反例不是註解，是**欄位名**：`GitActivityEvent.commit_hash`（[core/models.py:66](../core/models.py)）是 reader 必須讀的欄位，`core/handoff_engine.py:153` 就寫著 `c.commit_hash[:8]`，`core/context_memory.py` 還有 `event_type="git_commit"`。任何一個誠實的唯讀 reader 都**繞不開**寫出 `commit` 這五個字母。（次要的反例：`core/acceptance` 是通過列數不變測試的唯讀模組，它的繁中 docstring 裡照樣有 `commit`；連本 ADR 自己那句「不寫資料庫、不 commit」抄進註解都會讓子字串掃描自爆。）②AST 掃 import；③**內容指紋**：在真 tmp DB 上跑完一輪 selftest，比對每張表的 `(列數, 全表內容雜湊)` 都不變——**光比列數不夠**，因為 UPSERT 會讓列數不動而內容改變（實測見陷阱 4）；④直接對 `readers.py` 的引擎執行一次 `INSERT`，斷言它拋 `OperationalError`；⑤**最硬的一條**：在子程序跑完一輪 selftest 之後斷言 `core.database.Database._instance is None`（那個單例槽在 [core/database.py:10](../core/database.py)）——`Database.__new__` → `init_db()` → `upgrade_sqlite_database` ＋ `PRAGMA journal_mode=WAL` 是「拿到 handle 就等於寫入」的實際路徑，所以這一條直接證明 migration、自動備份與 WAL PRAGMA 從頭到尾**沒被觸發**，比任何 grep 或 `sys.modules` 斷言都硬 |
 | **D2** | **預設關閉**：`mcp.enabled: false`；開啟位置在「06 系統設定 → 秘書與自動化」旁新增一格 | `mcp.enabled: false` 時 `omni mcp` 拒絕啟動並說出原因；設定面測試確認只多了兩個平的鍵 |
 | **D3** | **不轉發金鑰**：MCP 程序不解析任何 secret，也不把環境變數往下傳 | AST 掃門禁：`mcpserver/` 不得 import `core.secret_resolver`、不得 import `core.llm_client`、不得 import `core.agent_dispatch`（**含 `ENV_ALLOWLIST`／`build_subprocess_env`**——D3 說的是「比照做法」，不是 import 那個模組；import 它就把 `run_agent_subprocess` 一起拉進來了，那是 D5 的反例）。MCP 程序只讀兩個環境變數：`OMNICONTEXT_HOME` 與 `OMNICONTEXT_CONFIG`，其餘一律不讀，負向樣本至少涵蓋 `GEMINI_API_KEY`／`GOOGLE_API_KEY`／`ANTHROPIC_API_KEY`／`OPENAI_API_KEY`／`OMNICONTEXT_EXECUTION_TOKEN`。**規則是「不讀」，不是「讀進來再洗乾淨」**——repo 裡沒有任何「就地淨化自己 `os.environ`」的現成函式（`build_subprocess_env()` 只回傳一份新 dict，不寫回 `os.environ`），所以守門的形狀是 AST 掃 `mcpserver/` 裡每一處 `os.environ` 存取，鍵名必須是那兩個字面值之一。**注意方向**：`build_subprocess_env()` 那套 allowlist 是給「我們去開子程序」用的；MCP 剛好相反——**我們是被 client 開出來的子程序**，所以要防的不是轉發，是**回音**：client 的環境可能帶著使用者的金鑰，輸出掃描（D4）要一起擋住它們。附帶一提，那份 `ENV_ALLOWLIST` **不含** `OMNICONTEXT_HOME`／`OMNICONTEXT_CONFIG`（[core/runtime_paths.py:27/37/45/47](../core/runtime_paths.py) 才是用它們的地方），所以「照抄 allowlist 自我淨化」會把 MCP 自己要的家目錄刪掉——這是不照抄的第二個理由 |
 | **D4** | **輸出邊界**：無 token／secret／本機絕對路徑；`source_ref` 是 SQLite row 指標，不是檔案路徑 | 第一道是白名單投影（決策四）；第二道是正規表達式掃描六個 tool 的實際輸出（含 `/Users/`、`/home/`、`C:\Users\`、`sk-`、`ghp_` 等樣式） |
@@ -641,10 +641,13 @@ REVIEW §A.4 的六條全部保留，其中 D1 因為 Context 陷阱 3／4 而**
   （`pyproject.toml`、`rag/availability.py`、5 支測試、`README.md`、`README_en.md`、
   `docs/USAGE.md`、`core/acceptance/readings.py`）。`[mcp]` 會長出同一組。
   另外 `requirements.txt` 開頭的註解目前只提到 `[rag]`，加了 extra 之後會變成過期描述。
-- **`scripts/verify_release_artifacts.py` 的必要檔案清單也是白名單，不會自動涵蓋新模組**：
+- **`scripts/verify_release_artifacts.py` 有**兩份**必要檔案白名單，都不會自動涵蓋新模組**：
+  `WHEEL_REQUIRED_SUFFIXES`（:14）與 `SDIST_REQUIRED_SUFFIXES`（:42），兩份都是硬寫、無萬用字元。
   實測把一個沒被收錄的頂層套件放進 wheel，它照樣回 `status: passed`。
-  所以 E3 的「wheel 含 `mcpserver/`」不是 build 完就成立，要手動加進
-  `WHEEL_REQUIRED_SUFFIXES`（否則這條收據是空的）。
+  而這支腳本是發佈流程的一環（`.github/workflows/release.yml:52`），所以 E3 的
+  「wheel 含 `mcpserver/`」不是 build 完就成立——**兩份清單都要手動加**，否則這條收據是空的。
+  換句話說：「只要改 `pyproject.toml` 一行」這個說法是錯的，打包面實際要動三處
+  （`packages.find.include` ＋ 上面兩份清單），而且四個候選模組路徑沒有一個能免掉後兩處。
 - MCP 回的專案狀態**會比儀表板舊**（不准 refresh），必須靠 `state_recorded_at` 說清楚。
 - tool call receipt 走檔案。**這比早一版寫的樂觀**：檔案收據在本專案本來就上得了 API 與驗收中心
   （`/api/v1/system/maintenance/receipt` 就是直接讀檔案收據回傳，見
@@ -657,7 +660,16 @@ REVIEW §A.4 的六條全部保留，其中 D1 因為 Context 陷阱 3／4 而**
   而**沒有** `AUTOINCREMENT`，所以它們是 rowid 別名：刪掉最大的那一列之後，新插入會**重用同一個數字**。
   而 `file_activity_events` 與 `window_events` 會被保留期硬刪（預設 90 天）。兩件事相加，
   `file_activity_events:<id>` 在剪枝之後不只可能查不到，還可能**查到不同的一列**。
-  `ai_prompt_events` 與 `git_activity_events` 目前不在剪枝清單內，指標相對耐久。
+  **而且不只剪枝會刪**：`secretary_notes` 有兩個**公開的刪除端點**
+  （`DELETE /api/v1/secretary/memory/{note_id}` 與 `DELETE /api/v1/secretary/memory`，
+  [core/api/secretary.py:172/182](../core/api/secretary.py)），所以
+  `omni_recent_digest` 回的 `secretary_notes:<id>` 是使用者按一下就能刪掉的東西——
+  刪完之後那個數字可能被下一筆重用。`project_states` 同理（`refresh_project_states`
+  會 bulk delete 不在 `valid_keys` 裡的列）。
+  `ai_prompt_events` 與 `git_activity_events` 目前不在剪枝清單內，也沒有公開刪除端點，指標相對耐久。
+  另一個獨立的耐久度問題：`omni_search_history` 的 `source_ref` 來自
+  `semantic_documents` 這張**快照表**（[core/semantic_index.py:484](../core/semantic_index.py)
+  取的是 `row.source_ref`，不是即時重算），所以索引沒重建時，它指的是**建索引當下**的那一列。
   E4 可以考慮把 AI turn 的指標加一段既有的 `turn_key` 前綴
   （`ai_prompt_events:<id>#<turn_key 前 12 碼>`，對不上就回「指標已失效」而不是回錯的一列），
   但那會改變 `source_ref` 的字串形狀，屬於 E4 要自己權衡的事，本 ADR 不預先決定。
