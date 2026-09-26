@@ -87,19 +87,26 @@ from mcp.server import Server -> OK
 - **頂層套件沒加進白名單，build 不會報錯，只會無聲丟棄。** 在 repo 複本加一個頂層
   `omni_mcp/__init__.py` 而不動 `pyproject.toml`，`python -m build` 成功、沒有任何警告，
   但 wheel 裡零檔案、`top_level.txt` 也沒有它。加進 `include` 之後 wheel 與 sdist 才都有。
-  所以那「一行」不是可選的，而且它漏掉時的症狀是**安靜的**。
+  所以那「一行」不是可選的，而且它漏掉時的症狀是**安靜的**——更精確地說，失敗會落在使用者身上：
+  `build` → `verify_release_artifacts` → 安裝煙霧測試**全綠**，而每一個
+  `pip install omnicontext` 的人跑 `omni mcp` 都會拿到
+  `ModuleNotFoundError: No module named 'mcpserver'`。這條失敗路徑與選 SDK 或手寫完全無關。
 - **`mcp_server/`（有底線）同樣不能用。** PyPI 上已經有 `mcp-server` 0.1.4，它的 wheel
   頂層目錄就叫 `mcp_server/`。`mcpserver`（無底線）今天在 PyPI 上不存在——但這只是今天，
   真正的保護是我們永遠不會去安裝一個叫 `mcpserver` 的套件。
 
 候選比較：
 
-| 候選 | 需要改 `packages.find.include` | 撞名 | 判斷 |
+| 候選 | 需要改的打包設定 | 撞名 | 判斷 |
 | :--- | :--- | :--- | :--- |
-| `mcp/` | 要（加 `mcp*`） | **會**，且會打包出貨 | ❌ TODO E2 明文禁止，上面的收據也證明了 |
-| `core/mcp/` | 不用（`core*` 已涵蓋） | 不會 | ❌ 放進服務核心，D5「與執行器零耦合」的契約寫在 `core/agent_executor.py` 的兄弟目錄裡，讀起來自相矛盾；且會被 `test_function_level_core_imports_stay_rare` 這類為服務核心寫的規則掃到 |
-| `integrations/mcp/` | 不用（`integrations*` 已涵蓋） | 不會（絕對 import 下 `integrations.mcp` ≠ `mcp`） | ⚠️ 可行且最省事，但 `integrations/` 目前只有 `github_client.py`，語意是**對外呼叫**的第三方 client；MCP server 是**對內被呼叫**，方向相反 |
-| **`mcpserver/`（頂層）** | 要（加 `mcpserver*`，一行） | 不會 | ✅ **採用** |
+| `mcp/` | `pyproject.toml`（加 `mcp*`）＋ 發佈閘門兩份白名單 | **會**，且會打包出貨 | ❌ TODO E2 明文禁止，上面的收據也證明了 |
+| `core/mcp/` | `pyproject.toml` 不用改；**發佈閘門兩份白名單照樣要加** | 不會 | ❌ 放進服務核心，D5「與執行器零耦合」的契約寫在 `core/agent_executor.py` 的兄弟目錄裡，讀起來自相矛盾；且會被 `test_function_level_core_imports_stay_rare` 這類為服務核心寫的規則掃到 |
+| `integrations/mcp/` | 同上 | 不會（絕對 import 下 `integrations.mcp` ≠ `mcp`） | ⚠️ 可行且最省事，但 `integrations/` 目前只有 `github_client.py`，語意是**對外呼叫**的第三方 client；MCP server 是**對內被呼叫**，方向相反 |
+| **`mcpserver/`（頂層）** | `pyproject.toml` 一行 ＋ 發佈閘門兩份白名單 | 不會 | ✅ **採用** |
+
+**這一欄不構成選擇理由**：`scripts/verify_release_artifacts.py` 的兩份白名單四個候選都要改
+（那支腳本從頭到尾沒有一處列舉 wheel 的頂層套件，也沒有萬用字元），差別只在
+`pyproject.toml` 那一行。選 `mcpserver/` 的理由是**撞名與角色邊界**，不是打包比較省。
 
 採用頂層 `mcpserver/`：與 `watchers/`（採集）、`notifiers/`（推播）、`exporters/`（匯出）
 同一個「一個頂層 package 一個角色」的慣例；唯讀邊界指得出一個明確的目錄，契約測試的掃描根
@@ -281,6 +288,21 @@ extra 沒裝是一句「請執行 … 後重試」，協定寫錯是對方 clien
 （[core/data_lifecycle.py:60](../core/data_lifecycle.py)）已經用這條唯讀連線產出
 「schema fingerprint ＋ 每張表 row counts」——A25 要的就是**它再加一層內容雜湊**，
 而不是從零寫一個收據產生器。
+
+**`OMNICONTEXT_HOME` 不是沙箱——D1 的收據不能只看 fixture 目錄。** 實測把
+`OMNICONTEXT_HOME` 指到一個暫存目錄之後：
+
+```
+db_path      -> <暫存目錄>/omni_context.db        ← 在裡面
+backups_dir  -> /root/OmniContext/backups          ← 在外面
+```
+
+原因在 `resolve_runtime_path()`：`~/OmniContext/backups`（`config.example.yaml:15` 的預設值）
+被 `_expanded_path` 展開成絕對路徑之後就**直接回傳**，`OMNICONTEXT_HOME` 管不到它
+（[core/runtime_paths.py:52-57](../core/runtime_paths.py)）。而 `upgrade_sqlite_database()`
+在有 pending migration 時**會往那裡寫一份備份**。所以 D1 的 selftest 必須同時斷言
+「fixture 目錄**以外**沒有新增檔案」，至少涵蓋 `configured_backup_dir()` 的實際展開值——
+只看 fixture 目錄的證明會漏掉逃到真家目錄的那一份。
 
 **唯讀的代價要照實說：MCP 會遇到它不被允許修的資料庫。** 若 schema 落後於程式碼，
 `mcpserver` 不得自己升級，而要用 `inspect_migration_status()`（[core/migrations.py:975](../core/migrations.py)
@@ -570,7 +592,7 @@ REVIEW §A.4 的六條全部保留，其中 D1 因為 Context 陷阱 3／4 而**
 
 | | 契約 | 怎麼證 |
 | :-- | :--- | :--- |
-| **D1** | **唯讀**：`mcpserver/` 不得出現 `INSERT`／`UPDATE`／`DELETE`／`session.add`／`commit`／`create_all` 的**呼叫**；且不得**呼叫** `get_db()`／`Database()`／`session_scope()`（見下方「寫的是呼叫，不是 import」） | ①寫入關鍵字掃描，但**必須是 AST／token 級，不能是子字串比對**——最硬的反例不是註解，是**欄位名**：`GitActivityEvent.commit_hash`（[core/models.py:66](../core/models.py)）是 reader 必須讀的欄位，`core/handoff_engine.py:153` 就寫著 `c.commit_hash[:8]`，`core/context_memory.py` 還有 `event_type="git_commit"`。任何一個誠實的唯讀 reader 都**繞不開**寫出 `commit` 這五個字母。（次要的反例：`core/acceptance` 是通過列數不變測試的唯讀模組，它的繁中 docstring 裡照樣有 `commit`；連本 ADR 自己那句「不寫資料庫、不 commit」抄進註解都會讓子字串掃描自爆。）②AST 掃 import；③**內容指紋**：在真 tmp DB 上跑完一輪 selftest，比對每張表的 `(列數, 全表內容雜湊)` 都不變——**光比列數不夠**，因為 UPSERT 會讓列數不動而內容改變（實測見陷阱 4）；④直接對 `readers.py` 的引擎執行一次 `INSERT`，斷言它拋 `OperationalError`；⑤**最硬的一條**：在子程序跑完一輪 selftest 之後斷言 `core.database.Database._instance is None`（那個單例槽在 [core/database.py:10](../core/database.py)）——`Database.__new__` → `init_db()` → `upgrade_sqlite_database` ＋ `PRAGMA journal_mode=WAL` 是「拿到 handle 就等於寫入」的實際路徑，所以這一條直接證明 migration、自動備份與 WAL PRAGMA 從頭到尾**沒被觸發**，比任何 grep 或 `sys.modules` 斷言都硬 |
+| **D1** | **唯讀**：`mcpserver/` 不得出現 `INSERT`／`UPDATE`／`DELETE`／`session.add`／`commit`／`create_all` 的**呼叫**；且不得**呼叫** `get_db()`／`Database()`／`session_scope()`（見下方「寫的是呼叫，不是 import」） | ①寫入關鍵字掃描，但**必須是 AST／token 級，不能是子字串比對**——最硬的反例不是註解，是**欄位名**：`GitActivityEvent.commit_hash`（[core/models.py:66](../core/models.py)）是 reader 必須讀的欄位，`core/handoff_engine.py:153` 就寫著 `c.commit_hash[:8]`，`core/context_memory.py` 還有 `event_type="git_commit"`。任何一個誠實的唯讀 reader 都**繞不開**寫出 `commit` 這五個字母。（次要的反例：`core/acceptance` 是通過列數不變測試的唯讀模組，它的繁中 docstring 裡照樣有 `commit`；連本 ADR 自己那句「不寫資料庫、不 commit」抄進註解都會讓子字串掃描自爆。）②AST 掃 import；③**內容指紋**：在真 tmp DB 上跑完一輪 selftest，比對每張表的 `(列數, 全表內容雜湊)` 都不變——**光比列數不夠**，因為 UPSERT 會讓列數不動而內容改變（實測見陷阱 4）；④直接對 `readers.py` 的引擎執行一次 `INSERT`，斷言它拋 `OperationalError`；⑤**最硬的一條**：在子程序跑完一輪 selftest 之後斷言 `core.database.Database._instance is None`（那個單例槽在 [core/database.py:10](../core/database.py)）——`Database.__new__` → `init_db()` → `upgrade_sqlite_database` ＋ `PRAGMA journal_mode=WAL` 是「拿到 handle 就等於寫入」的實際路徑，所以這一條直接證明 migration、自動備份與 WAL PRAGMA 從頭到尾**沒被觸發**，比任何 grep 或 `sys.modules` 斷言都硬。**不要把它寫成 `"core.database" not in sys.modules`**——`core/handoff_engine.py:16`／`core/project_engine.py:12`／`core/context_memory.py:14` 都是模組層 `from core.database import get_db`，那樣寫必然紅；⑥表清單取自 **`sqlite_master`** 而不是 `Base.metadata`（ORM 之外建的表才看得到）；⑦**沙箱外也要看**（見下方「`OMNICONTEXT_HOME` 不是沙箱」） |
 | **D2** | **預設關閉**：`mcp.enabled: false`；開啟位置在「06 系統設定 → 秘書與自動化」旁新增一格 | `mcp.enabled: false` 時 `omni mcp` 拒絕啟動並說出原因；設定面測試確認只多了兩個平的鍵 |
 | **D3** | **不轉發金鑰**：MCP 程序不解析任何 secret，也不把環境變數往下傳 | AST 掃門禁：`mcpserver/` 不得 import `core.secret_resolver`、不得 import `core.llm_client`、不得 import `core.agent_dispatch`（**含 `ENV_ALLOWLIST`／`build_subprocess_env`**——D3 說的是「比照做法」，不是 import 那個模組；import 它就把 `run_agent_subprocess` 一起拉進來了，那是 D5 的反例）。MCP 程序只讀兩個環境變數：`OMNICONTEXT_HOME` 與 `OMNICONTEXT_CONFIG`，其餘一律不讀，負向樣本至少涵蓋 `GEMINI_API_KEY`／`GOOGLE_API_KEY`／`ANTHROPIC_API_KEY`／`OPENAI_API_KEY`／`OMNICONTEXT_EXECUTION_TOKEN`。**規則是「不讀」，不是「讀進來再洗乾淨」**——repo 裡沒有任何「就地淨化自己 `os.environ`」的現成函式（`build_subprocess_env()` 只回傳一份新 dict，不寫回 `os.environ`），所以守門的形狀是 AST 掃 `mcpserver/` 裡每一處 `os.environ` 存取，鍵名必須是那兩個字面值之一。**注意方向**：`build_subprocess_env()` 那套 allowlist 是給「我們去開子程序」用的；MCP 剛好相反——**我們是被 client 開出來的子程序**，所以要防的不是轉發，是**回音**：client 的環境可能帶著使用者的金鑰，輸出掃描（D4）要一起擋住它們。附帶一提，那份 `ENV_ALLOWLIST` **不含** `OMNICONTEXT_HOME`／`OMNICONTEXT_CONFIG`（[core/runtime_paths.py:27/37/45/47](../core/runtime_paths.py) 才是用它們的地方），所以「照抄 allowlist 自我淨化」會把 MCP 自己要的家目錄刪掉——這是不照抄的第二個理由 |
 | **D4** | **輸出邊界**：無 token／secret／本機絕對路徑；`source_ref` 是 SQLite row 指標，不是檔案路徑 | 第一道是白名單投影（決策四）；第二道是正規表達式掃描六個 tool 的實際輸出（含 `/Users/`、`/home/`、`C:\Users\`、`sk-`、`ghp_` 等樣式） |
@@ -670,9 +692,15 @@ REVIEW §A.4 的六條全部保留，其中 D1 因為 Context 陷阱 3／4 而**
   另一個獨立的耐久度問題：`omni_search_history` 的 `source_ref` 來自
   `semantic_documents` 這張**快照表**（[core/semantic_index.py:484](../core/semantic_index.py)
   取的是 `row.source_ref`，不是即時重算），所以索引沒重建時，它指的是**建索引當下**的那一列。
-  E4 可以考慮把 AI turn 的指標加一段既有的 `turn_key` 前綴
-  （`ai_prompt_events:<id>#<turn_key 前 12 碼>`，對不上就回「指標已失效」而不是回錯的一列），
-  但那會改變 `source_ref` 的字串形狀，屬於 E4 要自己權衡的事，本 ADR 不預先決定。
+  **關鍵是裸指標分不出「被刪」與「被重用」**：`<table>:<id>` 查無列是一種情況，
+  查得到但那是別人的列是另一種，而回傳長得一模一樣。所以 E4 的 resolver
+  **必須是三態**（`ok`／`stale_gone`／`stale_reused`），不能是有／沒有兩態。
+  要做到三態就得讓指標自證，具體提案是在尾巴加一段身分雜湊
+  （例如 `ai_prompt_events:<id>@<sha256(turn_key)[:8]>`；`turn_key` 本來就 unique，
+  而取雜湊而不是明文，是因為 `file_path`／`body` 這類身分欄位本身就是 D4 要擋的東西）。
+  **代價要先說**：那個形狀與 `core/context_memory.py:103/117/131` 已經寫進資料庫的
+  `source_ref` **不同也不可互換**，而本 ADR 不回頭改已落盤的那些（改它們就是寫入）——
+  所以 repo 裡會同時存在兩種形狀。值不值得，留給 E4 權衡；本 ADR 只把「兩態不夠」這件事釘死。
 - **`build_project_handoff()` 的回傳值裡一個 row id 都沒有**（`recent_ai_turns` 只有
   platform／time／prompt／response／source_path／source_position，commit 只有截成 8 碼的 hash），
   所以 `omni_handoff` 不能「就地把 `source_path` 換成 `source_ref`」——`readers.py` 必須自己重查一次拿 id。
@@ -771,16 +799,23 @@ TODO 既有判準，本 ADR 另外**加嚴／新增**下列幾條：
    （CI 既有的 `test-core-without-rag-extra` job 就是這條的實測環境）。
 4. **撞名守門**：repo 根目錄不得存在 `mcp/` 目錄或 `mcp.py`；
    `pyproject.toml` 的 `packages.find.include` 不得含 `mcp*`。
-5. **輸出無絕對路徑**：六個 tool 的實際輸出經正規表達式掃描，
+5. **打包白名單改成機械對帳，不要靠人記得**：新增一條契約測試，從磁碟推導頂層
+   package（有 `__init__.py` 的頂層目錄）並與 `packages.find.include` 的前綴集合對帳，
+   差集必須為空。**今天就是綠的**（兩邊都是同樣九項，實跑確認），而 `mcpserver/`
+   落地卻忘了改 `pyproject.toml` 時它會紅。這條同時補掉一個既有的洞：
+   今天把 `rag*` 或 `synthesizer*` 從 include 拿掉，全 repo 沒有任何東西會紅。
+6. **輸出無絕對路徑**：六個 tool 的實際輸出經正規表達式掃描，
    含 `/Users/`、`/home/`、`C:\Users\`、`sk-`、`ghp_` 等樣式皆不得命中。
-6. **三處隱私邊界逐字一致**：ADR／`config.example.yaml`／`USAGE.md`。
-7. **A23–A26 進驗收中心**：同步寫進 `core/acceptance/items.py` 的 `ITEMS` 與 TODO A 段
+7. **三處隱私邊界逐字一致**：ADR／`config.example.yaml`／`USAGE.md`。
+8. **A23–A26 進驗收中心**：同步寫進 `core/acceptance/items.py` 的 `ITEMS` 與 TODO A 段
    （A24 標 `needs_human`）。
-8. **parity 測試**：同一份 fixture 資料庫上，`core/` 的函式與 `mcpserver/` 的 reader
+9. **parity 測試**：同一份 fixture 資料庫上，`core/` 的函式與 `mcpserver/` 的 reader
    在重疊欄位上結果相等。理由見 Consequences「最大的風險」——D1–D6 沒有一條在證「答案是對的」。
-9. **`WHEEL_REQUIRED_SUFFIXES` 要手動加**：`scripts/verify_release_artifacts.py` 的清單是白名單，
-   實測不收錄也照樣 `status: passed`——不加就等於沒有這條收據。
-10. 既有標準照舊：`pytest` 全綠且不裝 `[rag]` 亦全綠；`python -m build` ＋
+10. **兩份發佈白名單要手動加**：`WHEEL_REQUIRED_SUFFIXES` 與 `SDIST_REQUIRED_SUFFIXES`
+   都是硬寫白名單，實測不收錄也照樣 `status: passed`——不加就等於沒有這條收據。
+   這支腳本有兩個呼叫點（`.github/workflows/release.yml:52` 與
+   `.github/workflows/platform-matrix.yml:48`），兩邊都會因此變成空轉。
+11. 既有標準照舊：`pytest` 全綠且不裝 `[rag]` 亦全綠；`python -m build` ＋
    `verify_release_artifacts.py` `status: passed` 且 wheel 含 `mcpserver/` 全部模組；
    `python main.py verify` 輸出與基底相同；動到設定 UI 才需要重錄 DOM lock。
 
