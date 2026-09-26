@@ -307,8 +307,11 @@ def test_build_greeting_reads_display_name_from_config():
 
 
 def test_greeting_endpoint(monkeypatch):
+    # 補在 `core.api.secretary`：路由在 import 時就把 `build_greeting` 取值綁死，
+    # 補來源模組補不到它。補錯地方時這個測試仍然全綠——但綠的原因是它改去打**真正的**
+    # build_greeting（實測補丁的 headline 從來沒出現在回應裡），等於什麼都沒驗。
     monkeypatch.setattr(
-        "core.secretary.greeting.build_greeting",
+        "core.api.secretary.build_greeting",
         lambda window="today": {"window": window, "headline": "Dof，早安。", "achievements": [], "source": "rules", "claim_boundary": "x"},
     )
     client = TestClient(app)
@@ -318,7 +321,7 @@ def test_greeting_endpoint(monkeypatch):
     def reject(window="today"):
         raise GreetingRejected("invalid_window", "bad")
 
-    monkeypatch.setattr("core.secretary.greeting.build_greeting", reject)
+    monkeypatch.setattr("core.api.secretary.build_greeting", reject)
     assert client.get("/api/v1/secretary/greeting?window=week", headers={"Origin": _LOCAL_ORIGIN}).status_code == 422
 
 

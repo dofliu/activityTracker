@@ -1,6 +1,6 @@
 # 📚 OmniContext 文件總覽（Documentation Index）
 
-> 最後整理：2026-09-22。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
+> 最後整理：2026-09-26。本頁是整個專案文件的入口地圖；新增文件時請同步更新此頁。
 >
 > **每份文件只有一個職責**——同一件事不在第二個地方再寫一次。職責分工見
 > [NEXT_SESSION.md → 工程慣例 → 文件同步](NEXT_SESSION.md#工程慣例照舊)。
@@ -76,8 +76,9 @@
 | [ADR-030](ADR-030-frontend-state-stores.md) | 前端共享狀態分成具名 store ＋ 工廠 | 49 個攤平欄位分成 11 個 store、`createAppState()` 造得出第二份、「哪個模組碰哪個 store」是一張要維護的宣告表（新的跨模組存取會紅）、打錯欄位名從靜默 undefined 變成測試紅字；**共用的那一份還在**——買到的是可另造一份與有歸屬，不是沒有全域，理由（listener 陷阱）寫在 ADR 裡 |
 | [ADR-027](ADR-027-injected-runtime-state.md) | 程序內可變狀態收成可注入的 store | 狀態有名字、有把手，重設＝換一份新的而不是呼叫鉤子；鎖跟著它保護的資料走；只存在記憶體、一次性碼只留雜湊（安全性質一個都沒放寬）；CORS 允許清單每個請求看當下設定，改設定不必重啟；行程預設仍是單例（買到的是「可注入」不是「無全域」）|
 | [ADR-026](ADR-026-frontend-modules.md) | 前端拆成 ES module：一個分頁一個檔 | 沒有打包步驟（本機工具，少一層是一層）、字典是資料且兩份 key 集合由測試把關、`fetch` 只准出現在 `core/api.js`、點擊動作走 `data-action` 委派而不是字串裡的 handler、`state.js` 是過渡形狀（改成注入是 D11） |
-| [ADR-031](ADR-031-omni-demo-dataset.md) | `omni demo` 示範資料集的邊界（TODO E1，ADR 已定稿、實作待下一輪） | 只能寫進另開的 `OMNICONTEXT_HOME`、對既有家目錄 fail-closed、每筆資料標示 `demo_mode` 且一路傳到 API、驗收中心與問候卡不得把示範數字當實機收據、匿名化資料一律從頭編造 |
+| [ADR-031](ADR-031-omni-demo-dataset.md) | `omni demo` 示範資料集的邊界（TODO E1 已於 2026-09-23 全部完成） | 只能寫進另開的 `OMNICONTEXT_HOME`、對既有家目錄 fail-closed、每筆資料標示 `demo_mode` 且一路傳到 API、驗收中心與問候卡不得把示範數字當實機收據、匿名化資料一律從頭編造 |
 
+| [ADR-032](ADR-032-readonly-mcp-context-server.md) | 唯讀 MCP Context Server 的邊界（TODO E2，ADR 已定稿、實作是 E3／E4） | 模組叫頂層 `mcpserver/` 不叫 `mcp/`（會遮掉官方 SDK，附實測收據）、官方 MCP SDK 以 `[mcp]` optional extra 進場（核心安裝 176 MB 一個位元組不動，量到的代價是 11 個套件／8.8 MB）、MCP 程序自己開唯讀連線不碰 `get_db()`（`get_db()` 本身會跑 migration 與寫備份）、不轉送 core 既有產物一律 allowlist 投影（既有 handoff 帶絕對路徑與 AI 原文）、receipt 寫檔案不寫資料庫（這樣 D1 才不必開例外）、唯讀證明從「列數不變」加嚴成「內容雜湊不變」 |
 ## 功能規格與驗證
 
 | 文件 | 說明 |
