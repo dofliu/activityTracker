@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import Any
 
 from . import readings as r
+from . import readings_mcp as rm
 from .rules import (
     NEEDS_HUMAN, NOT_CONFIGURED, OTHERWISE, PARTIAL, PASSED, PENDING, RUNTIME_ONLY,
     Ladder, all_of, fact, has, missing, no_fact, not_,
@@ -392,6 +393,98 @@ ITEMS: tuple[dict[str, Any], ...] = (
              lambda x: f"已整理 {x.facts['notes']} 場會議（{x.facts['files']} 份逐字稿在資料夾裡）；"
                        f"候選待辦已加入 {x.evidence['followups_accepted']} 條、還有 {x.evidence['followups_pending']} 條沒處理。"
                        "摘要有沒有編造、配對到的會議對不對，要你親眼看過。"),
+        )),
+    },
+    {
+        "id": "A23",
+        "title": "MCP selftest 七個 tool 各回一次",
+        "priority": "P1",
+        "blocks_release": False,
+        "how": "設定檔把 mcp.enabled 設為 true → 跑一次 `python main.py mcp --selftest`",
+        "criterion": "七個 tool 都答得出來（Ollama 沒開時 omni_search_history 算 skipped，不是 passed），每一筆結果都帶 source_ref 且回查得到",
+        "probe": Ladder(rm.a23_mcp_selftest, (
+            (fact("never_ran"), PENDING,
+             lambda x: f"還沒跑過 `python main.py mcp --selftest`——{x.evidence['dir']} 裡沒有 selftest 收據。"
+                       "跑一次，這一項就有機器證據。"),
+            (has("source_refs_unresolved"), PARTIAL,
+             lambda x: f"有 {x.facts['unresolved']} 個 source_ref 回查不到 SQLite row——指標是這套設計的骨幹，"
+                       "回查不到就等於引用不成立。"),
+            (fact("missing"), PARTIAL,
+             lambda x: f"還有 {len(x.facts['missing'])} 個 tool 沒答出來：{'、'.join(x.facts['missing'])}。"),
+            (fact("skipped"), PARTIAL,
+             lambda x: f"{len(x.facts['skipped'])} 個 tool 被跳過（{'、'.join(x.facts['skipped'])}）"
+                       "——多半是本機 Ollama 沒開（打不到就明說打不到，不會改用雲端）。"
+                       f"其餘 {x.facts['answered']} 個都答出來了，{x.facts['refs']} 筆結果的 source_ref 全部回查得到。"),
+            (OTHERWISE, PASSED,
+             lambda x: f"七個 tool 各回一次（{x.evidence['ran_at']}），"
+                       f"{x.facts['refs']} 筆結果的 source_ref 全部回查得到。"),
+        )),
+    },
+    {
+        "id": "A24",
+        "title": "實機掛上 MCP client 的引用可回查",
+        "priority": "P1",
+        "blocks_release": False,
+        "how": "把 `omni mcp` 設成 Claude Code／Codex 的 MCP server → 問「我上次在 X 做到哪」",
+        "criterion": "agent 給的答案裡每個引用都能用 omni_resolve_ref 展開成同一列（帶 source_ref_token 時 verified 為 true），且答案沒有把相似度說成已證實的事實（人眼確認）",
+        "probe": Ladder(rm.a24_mcp_live_client, (
+            (fact("never_ran"), PENDING,
+             "reports/mcp/ 底下沒有任何 tool call 收據——連本機 selftest 都還沒跑過，"
+             "先把 A23 弄綠再談實機。"),
+            (fact("selftest_only"), PENDING,
+             lambda x: f"目前 {x.evidence['call_receipt_files']} 份收據全部來自 selftest"
+                       "（收據檔名的 pid 都對得上一份 selftest 收據），還沒有真的 client 連上來過。"
+                       "把 `omni mcp` 設成 Claude Code／Codex 的 MCP server 問一題，這一項才有實機證據。"),
+            (OTHERWISE, NEEDS_HUMAN,
+             lambda x: f"有 {x.facts['live']} 份收據不是 selftest 留下的"
+                       f"（最近一次：{(x.evidence['latest_live_session'] or {}).get('modified_at')}），"
+                       "看起來有東西把 tool 叫起來過。**這只是前置條件**：收據分不出那是 MCP client "
+                       "還是別的程序在呼叫，更分不出 agent 說出來的話對不對、引用展開後是不是同一件事"
+                       "——那些要你自己讀過。"),
+        )),
+    },
+    {
+        "id": "A25",
+        "title": "MCP 唯讀證明（內容雜湊，不是只比列數）",
+        # **不是 P0／blocks_release。** 唯讀證明本身當然是硬要求，但它在每次 CI 由
+        # tests/test_mcp_server.py 跑（而且是在真 tmp DB 上比內容雜湊）。這一項是
+        # 「使用者自己那台機器上的收據」，而 MCP 預設關閉——把它設成 release gate，
+        # 等於要求每個不用 MCP 的人也得跑一次才發得了版。一個對合法設定永遠關不起來的
+        # 閘門是壞掉的閘門，不是嚴格。
+        "priority": "P1",
+        "blocks_release": False,
+        "how": "跑一次 `python main.py mcp --selftest`（A23 的同一次就夠）",
+        "criterion": "selftest 前後每張表的 (列數, 全表內容雜湊) 都相同；輸出經正規表達式掃描沒有絕對路徑或金鑰",
+        "probe": Ladder(rm.a25_mcp_read_only, (
+            (fact("never_ran"), PENDING,
+             "還沒跑過 `python main.py mcp --selftest`，沒有唯讀證明可查。"),
+            (has("forbidden_output_hits"), PARTIAL,
+             lambda x: f"唯讀成立，但輸出掃描命中 {x.facts['leaks']} 個禁用樣式"
+                       f"（{'、'.join(x.evidence['forbidden_output_hits'])}）——白名單投影漏了東西。"),
+            (not_(fact("unchanged")), PARTIAL,
+             lambda x: f"selftest 前後有資料表的內容雜湊變了（檢查了 {x.facts['tables']} 張表）。"
+                       "唯讀失守，先別接上任何 agent。"),
+            (OTHERWISE, PASSED,
+             lambda x: f"跑完一輪之後 {x.facts['tables']} 張表的 (列數, 內容雜湊) 逐一相同"
+                       f"（{x.evidence['ran_at']}）——只比列數會放行 UPSERT，所以判準是雜湊。"),
+        )),
+    },
+    {
+        "id": "A26",
+        "title": "MCP tool call 收據不含 query 原文",
+        "priority": "P1",
+        "blocks_release": False,
+        "how": "跑過任何一個 tool（selftest 也算）之後看 reports/mcp/mcp-receipts-*.jsonl",
+        "criterion": "收據存在，且每一筆只有 ts／tool／ok／result_count／elapsed_ms／error_code 六個鍵——白名單之外一個都沒有",
+        "probe": Ladder(rm.a26_mcp_receipts, (
+            (fact("never_ran"), PENDING,
+             "reports/mcp/ 底下還沒有 tool call 收據。跑一次 `python main.py mcp --selftest` 就會有。"),
+            (fact("offenders"), PARTIAL,
+             lambda x: f"有 {x.facts['offenders']} 筆收據帶了白名單之外的鍵"
+                       f"（{x.evidence['records_with_extra_fields']}）——收據不得記參數值。"),
+            (OTHERWISE, PASSED,
+             lambda x: f"掃了 {x.facts['records']} 筆收據（{'、'.join(x.evidence['tools_seen'])}），"
+                       "每一筆都只有白名單上的六個鍵，沒有 query 原文也沒有參數值。"),
         )),
     },
 )

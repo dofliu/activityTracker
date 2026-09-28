@@ -905,6 +905,41 @@ def cmd_verify(
     print("=" * 62 + "\n")
 
 
+def cmd_mcp(selftest: bool = False) -> int:
+    """`omni mcp`——唯讀 MCP Context Server（ADR-032）。
+
+    兩道閘門，順序有意義：`--selftest` **不需要**官方 SDK（它只跑 readers 與投影），
+    所以在沒裝 `[mcp]` 的核心安裝裡也證得出唯讀；真的要起 server 才需要 extra。
+    """
+    import json as _json
+
+    from mcpserver import availability, tools
+
+    if selftest:
+        from mcpserver import receipts
+
+        report = tools.selftest(enforce_gate=False)
+        # 落一份檔案收據：驗收中心（A23／A25／A26）只讀本機便宜證據，不會替你跑 tool。
+        # 沒有這一步，那三項就只能永遠掛 needs_human。
+        written = receipts.write_selftest_receipt(report)
+        print(_json.dumps(report, ensure_ascii=False, indent=2, default=str))
+        if written is not None:
+            print(f"[MCP] 收據：{written.name}（{written.parent}）", file=sys.stderr)
+        return 0 if report.get("status") == "passed" else 1
+
+    if not availability.mcp_enabled():
+        print(f"[MCP] {tools.ERRORS['mcp_disabled']}", file=sys.stderr)
+        return 2
+    missing = availability.missing_sdk_packages()
+    if missing:
+        print(f"[MCP] {tools.ERRORS['mcp_extra_not_installed']}", file=sys.stderr)
+        return 3
+
+    from mcpserver.server import run_stdio
+
+    return run_stdio()
+
+
 def main():
     parser = argparse.ArgumentParser(description="OmniContext - 個人全景上下文與進行中專案智慧中樞")
     subparsers = parser.add_subparsers(dest="command", help="子指令")
@@ -1046,6 +1081,15 @@ def main():
     wal_parser = subparsers.add_parser("wal-checkpoint", help="手動執行 SQLite WAL Checkpoint")
     wal_parser.add_argument("--mode", default="TRUNCATE", choices=["PASSIVE", "FULL", "RESTART", "TRUNCATE"])
 
+    mcp_parser = subparsers.add_parser(
+        "mcp", help="啟動唯讀 MCP Context Server（stdio；預設關閉，見 ADR-032）"
+    )
+    mcp_parser.add_argument(
+        "--selftest",
+        action="store_true",
+        help="不啟動 server，改跑一輪自我檢查（兩個 tool 各回一次＋唯讀證明），輸出 JSON",
+    )
+
     verify_parser = subparsers.add_parser(
         "verify", help="驗收中心：檢查 docs/TODO.md A 段每一項的本機收據（唯讀）"
     )
@@ -1161,6 +1205,8 @@ def main():
         cmd_heal()
     elif args.command == "wal-checkpoint":
         cmd_wal_checkpoint(getattr(args, "mode", "TRUNCATE"))
+    elif args.command == "mcp":
+        sys.exit(cmd_mcp(getattr(args, "selftest", False)))
     elif args.command == "verify":
         cmd_verify(
             getattr(args, "item", None),
