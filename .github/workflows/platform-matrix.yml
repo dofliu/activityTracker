@@ -8,6 +8,18 @@ on:
 permissions:
   contents: read
 
+# pip 預設 `--timeout 15 --retries 5`。2026-09-28 連兩輪（run 154／155）有 job 在
+# `Install ...` 掛掉，日誌一模一樣：pypi.org 的 simple index 讀取逾時重試五次後
+#   ERROR: No matching distribution found for python-dateutil>=2.8.2
+# 每次中槍的 os／python 組合都不同，而且同一顆 commit 在其他 job 裝得起來——
+# 那不是依賴解得出解不出的問題，是「索引頁那一次回得慢」。把等待拉長、重試加多，
+# 是這裡唯一治得到的地方（pypi.org 不是我們能修的服務）。
+# 名字對不對是量過的：`PIP_TIMEOUT=notanumber pip download ...` 會回
+# `option timeout: invalid floating-point value`，`pip config debug` 也把兩個都列在 env_var。
+env:
+  PIP_TIMEOUT: "60"
+  PIP_RETRIES: "10"
+
 jobs:
   test-build-install:
     name: ${{ matrix.os }} / Python ${{ matrix.python }}
