@@ -27,6 +27,12 @@ dependencies = [
   "python-dateutil>=2.8.2",
   "tzdata>=2024.1; sys_platform == 'win32'",
   "apscheduler>=3.10.4",
+  # 四個 transcript parser 已抽成獨立套件（ADR-033）。**上限鎖大版本**：格式漂移的風險
+  # 屬於套件，所以要拿得到 patch；但四種格式都是別家私有格式，套件有權在大版本裡改介面，
+  # 那時候本 repo 要有一次明確的升級動作，不是被動吃下。
+  # 原始碼在 packages/coding-agent-transcripts/；尚未發佈到 PyPI，所以 CI 與開發環境
+  # 都先裝本地路徑（見 .github/workflows/platform-matrix.yml）。**發佈時它要先上**。
+  "coding-agent-transcripts>=0.1,<1.0",
   "pywin32>=306; sys_platform == 'win32'",
 ]
 

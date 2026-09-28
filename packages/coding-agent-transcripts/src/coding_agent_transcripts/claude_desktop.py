@@ -14,23 +14,25 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterator, List
 
-from core.desktop_sources import (
+from coding_agent_transcripts.desktop import (
     default_claude_desktop_logs_dir,
     iter_claude_desktop_project_logs,
 )
-from core.time_utils import get_local_now
-from watchers.transcripts.base import TranscriptTurn
-from watchers.transcripts.claude_code import parse_claude_jsonl
+from coding_agent_transcripts._clock import get_local_now
+from coding_agent_transcripts.config import EMPTY_CONFIG
+from coding_agent_transcripts.base import TranscriptTurn
+from coding_agent_transcripts.claude_code import parse_claude_jsonl
 
 PLATFORM = "claude_desktop"
 DEFAULT_LOOKBACK_DAYS = 7
 
 
-def discover(cfg, *, full_history: bool = False, now=get_local_now) -> List[Path]:
+def discover(cfg=None, *, full_history: bool = False, now=get_local_now) -> List[Path]:
     """首次啟用只回補近期資料，避免啟動時一次讀取多年、數 GB 的 session 複本。
 
     `full_history` 仍提供明確、可稽核的全量回補途徑。
     """
+    cfg = cfg or EMPTY_CONFIG
     logs_dir = cfg.get_path(
         "watchers.agent_log_watcher.claude_desktop_logs_path",
         default_claude_desktop_logs_dir(),

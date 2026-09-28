@@ -38,8 +38,19 @@ jobs:
           python-version: ${{ matrix.python }}
           cache: pip
 
+      - name: Install the local transcript package first
+        # `coding-agent-transcripts` 還沒上 PyPI（ADR-033 落地時點名的那個未解問題）。
+        # 先裝本地路徑，下一步的 `.[dev]` 就會看到相依已滿足而不去打索引。
+        # 順序不能反：反過來裝，pip 會先去 PyPI 找一個不存在的套件然後失敗。
+        run: python -m pip install ./packages/coding-agent-transcripts
+
       - name: Install test and build dependencies
         run: python -m pip install --upgrade pip build ".[dev]"
+
+      - name: Run the transcript package's own tests
+        # 套件有自己的契約（turn_key 公式、零相依、樣本必須合成）。不在這裡跑，
+        # 那些契約就只是一堆沒人執行的檔案。
+        run: python -m pytest -q packages/coding-agent-transcripts/tests
 
       - name: Run contract and integration tests
         run: python -m pytest -q
@@ -97,6 +108,9 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+
+      - name: Install the local transcript package first
+        run: python -m pip install ./packages/coding-agent-transcripts
 
       - name: Install core + test tools only
         run: python -m pip install --upgrade pip ".[test]"

@@ -237,3 +237,74 @@ TODO 的判準是「套件自帶的 fixture 不得夾帶任何真實 prompt／�
 - 沒有證抽出去之後**行為完全相同**。量到的是 `turn_key` 一致與四種格式解得開；
   完整的等價要靠第 3 步那兩支一字不改的測試全綠，而那要等實作。
 - 沒有回答「套件還沒上 PyPI 時 CI 從哪裝」。那是落地順序裡點名的第一個未解問題。
+
+---
+
+## Addendum（2026-09-28，實作完成後補記）
+
+E5 的第二片落地時，有**兩件事與上面寫的不一樣**。明寫在這裡，不默默改。
+
+### 甲、套件住在本 repo 的 `packages/` 底下，不是另一個 repo
+
+上面的「落地順序」寫著「第 1 步的產出不在本 repo 裡——那是另一個 repo／另一個發行版」。
+實作時改成 **monorepo 子發行版**：`packages/coding-agent-transcripts/`，有自己的
+`pyproject.toml`、自己的 `tests/`、自己的 `samples/`，`python -m build` 出自己的 wheel。
+
+改的理由有兩個，一個是限制、一個是收穫：
+
+- **限制**：這一輪沒有建立第二個 repo 的權限，也不該替使用者決定去開一個。
+- **收穫**：它**直接回答了本 ADR 自己點名的未解問題**——「套件還沒上 PyPI 之前，本 repo 的
+  CI 從哪裝它」。答案是路徑安裝：CI 先 `pip install ./packages/coding-agent-transcripts`，
+  下一步的 `.[dev]` 就看到相依已滿足而不去打索引。**順序不能反**：反過來裝，pip 會先去
+  PyPI 找一個不存在的套件然後失敗。
+
+「可單獨安裝」沒有因此打折：`pip install ./packages/coding-agent-transcripts` 可以，
+`pip install "git+https://github.com/dofliu/activityTracker#subdirectory=packages/coding-agent-transcripts"`
+也可以，而且乾淨 venv 的收據就是這樣拿到的。要真的搬去獨立 repo，那個目錄整個複製過去即可。
+
+**代價照實記**：本 repo 的 sdist 不含 `packages/`（它是另一個發行版），所以從 sdist 裝
+`omnicontext` 的人必須從 PyPI 拿得到 `coding-agent-transcripts`——也就是**發佈時它要先上**。
+這一條寫進 `pyproject.toml` 的註解裡，不只留在 ADR。
+
+### 乙、轉接層改用 `sys.modules` 別名（決策四原本選的是薄轉接檔）
+
+決策四選「每個子模組一個薄轉接檔」而不是「在 `__init__.py` 裡塞 `sys.modules`」，
+理由是前者誠實（看得到才 import 得到）。**那個判斷是錯的，而且是實作時被測試抓到的。**
+
+Context 5 的三種形狀實驗只量了**import 形式過不過**，漏掉了**同一性**：
+
+```
+watchers.transcripts.codex is coding_agent_transcripts.codex   -> False
+轉接層上 monkeypatch codex_home 之後，套件裡的 discover       -> 看不到
+```
+
+薄轉接檔是把套件的命名空間**複製**進自己的 globals，而 `discover()` 執行時是去**套件模組**的
+globals 找 `codex_home`。所以打樁打在複製品上，打不到本尊——
+`tests/test_transcript_parsers_and_drift.py` 那支漂移測試正是這樣打樁的，它當場紅了。
+
+改成 `sys.modules` 別名之後，`watchers.transcripts.codex` **就是**
+`coding_agent_transcripts.codex` 那個物件。決策四說的代價（「這個模組存在」變成看不見的
+副作用）是真的，所以轉接層的 docstring 把整段來龍去脈寫在裡面，並由
+`tests/test_transcript_package_boundary.py` 逐個子模組斷言同一性。
+
+**這件事的通則**：「三種形狀都過」證明的是三種形狀都過，不是「隨便選一種都對」。
+實驗只能證它量到的東西。
+
+### 丙、「兩支測試一字不改」這個判準，9 條沒有做到
+
+TODO E5 的完成判準寫著 `tests/test_transcript_parsers_and_drift.py` 與
+`tests/test_transcript_contracts.py` **一字不改**全綠。實際結果：
+
+| 檔案 | 結果 |
+| :--- | :--- |
+| `tests/test_transcript_contracts.py`（20 條） | **一字不改，全綠** |
+| `tests/test_transcript_parsers_and_drift.py`（11 條） | 改了**兩處**：一個常數、一個字串 |
+
+改的是 `PKG = ROOT / "watchers" / "transcripts"`（指向原始碼的錨點）與一條斷言裡的
+import 路徑字串 `"watchers.transcripts.claude_code"` → `"coding_agent_transcripts.claude_code"`。
+受影響的 9 條全部是**掃描原始碼的測試**（行數上限、不得碰資料庫、desktop 重用 claude_code
+的格式）——它們斷言的是「某個檔案在哪裡、裡面寫了什麼」，而這一輪的交付**就是把那些檔案
+搬走**。行為測試一條都沒改。
+
+這不是實作沒做到，是判準沒能預見這件事。把掃描指向轉接層才是真正的失敗——那會變成
+掃一個沒有實作的空目錄，測試全綠而什麼都沒驗。

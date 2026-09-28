@@ -16,8 +16,8 @@ import json
 from pathlib import Path
 from typing import Iterator, List
 
-from core.time_utils import get_local_now
-from watchers.transcripts.base import (
+from coding_agent_transcripts._clock import get_local_now
+from coding_agent_transcripts.base import (
     TranscriptTurn,
     TurnEvidence,
     build_turn_key,
