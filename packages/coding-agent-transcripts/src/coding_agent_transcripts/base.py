@@ -78,6 +78,11 @@ class TranscriptSource:
     label: str
     discover: Callable[..., Iterable[Path]]
     parse: Callable[..., Iterator[TranscriptTurn]]
+    # 「這個平台**通常**把逐字稿放在哪」。**與 `discover()` 是兩件事**：
+    # `discover()` 照設定走（Antigravity 沒設定就回空清單，不猜），這個欄位只是給
+    # 「偵測並詢問使用者要不要納入」那條路徑當**候選**。
+    # 猜一個位置去採集，跟提議一個位置請使用者確認，差別就是同意權在誰手上。
+    default_logs_dir: Optional[Callable[[], Path]] = None
 
 
 # ---------------------------------------------------------------------------

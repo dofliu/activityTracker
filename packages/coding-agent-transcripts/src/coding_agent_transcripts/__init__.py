@@ -50,10 +50,14 @@ from coding_agent_transcripts.config import (
 from coding_agent_transcripts.drift import DRIFT_WINDOW_DAYS, empty_drift, evaluate_drift
 
 SOURCES = (
-    TranscriptSource("claude_code", "Claude Code", claude_code.discover, claude_code.parse),
-    TranscriptSource("claude_desktop", "Claude Desktop", claude_desktop.discover, claude_desktop.parse),
-    TranscriptSource("codex", "Codex", codex.discover, codex.parse),
-    TranscriptSource("antigravity", "Antigravity", antigravity.discover, antigravity.parse),
+    TranscriptSource("claude_code", "Claude Code", claude_code.discover, claude_code.parse,
+                     claude_code.default_logs_dir),
+    TranscriptSource("claude_desktop", "Claude Desktop", claude_desktop.discover, claude_desktop.parse,
+                     claude_desktop.default_logs_dir),
+    TranscriptSource("codex", "Codex", codex.discover, codex.parse,
+                     codex.default_logs_dir),
+    TranscriptSource("antigravity", "Antigravity", antigravity.discover, antigravity.parse,
+                     antigravity.default_logs_dir),
 )
 
 SOURCE_KEYS = tuple(source.key for source in SOURCES)
