@@ -1,0 +1,4 @@
+{"type": "session_meta", "payload": {"id": "session-0002", "cwd": "/workspace/sample-project"}}
+{"type": "response_item", "timestamp": "2026-01-02T03:00:00Z", "payload": {"role": "user", "content": "示範提問：這個函式為什麼回 None"}}
+{"type": "response_item", "timestamp": "2026-01-02T03:00:40Z", "payload": {"role": "assistant", "phase": "commentary", "content": "示範中途訊息：正在看那個分支。"}}
+{"type": "response_item", "timestamp": "2026-01-02T03:01:00Z", "payload": {"role": "assistant", "phase": "final_answer", "content": "示範回應：早退的那個分支沒有 return。"}}

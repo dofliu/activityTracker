@@ -13,8 +13,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Iterator, List
 
-from core.time_utils import get_local_now
-from watchers.transcripts.base import (
+from coding_agent_transcripts._clock import get_local_now
+from coding_agent_transcripts.config import EMPTY_CONFIG
+from coding_agent_transcripts.base import (
     TranscriptTurn,
     TurnEvidence,
     build_turn_key,
@@ -205,8 +206,9 @@ def parse_claude_history(history_file: Path, *, platform: str = PLATFORM) -> Ite
 # ---------------------------------------------------------------------------
 
 
-def discover(cfg, *, full_history: bool = False, now=None) -> List[Path]:
+def discover(cfg=None, *, full_history: bool = False, now=None) -> List[Path]:
     """優先 `projects/**/*.jsonl`；**只在完全沒有 projects 日誌時**才回退 `history.jsonl`。"""
+    cfg = cfg or EMPTY_CONFIG
     claude_dir = cfg.get_path(
         "watchers.agent_log_watcher.claude_code_logs_path",
         Path.home() / ".claude",
