@@ -154,6 +154,34 @@ def test_the_mcp_extra_is_optional_and_not_a_core_dependency():
     assert "omnicontext[mcp]" in extras["dev"], "dev 要裝得到，否則 server.py 沒有人在本機測過"
 
 
+def test_read_only_uri_uses_the_three_slash_form():
+    """Windows 回歸：`f"file:{path.as_posix()}"` 在 D: 磁碟上會變成 `file:D:/…`，
+
+    `D:` 被當成 URI authority，SQLite 直接回 `unable to open database file`
+    （以同樣形狀在本機重現過）。`as_uri()` 給的 `file:///D:/…` 才是對的，
+    而且那也是 repo 既有的寫法（core/data_lifecycle.py:57 等三處）。
+    """
+    import pathlib
+
+    uri = readers.read_only_uri(Path("/tmp/x.db"))
+    assert uri.startswith("file:///"), uri
+    assert uri.endswith("?mode=ro")
+    # 直接證明壞掉的那個形狀長什麼樣（不是推論）
+    windows = pathlib.PureWindowsPath(r"D:\a\activityTracker\omni_context.db")
+    assert f"file:{windows.as_posix()}".startswith("file:D:/"), "這就是不能用 as_posix() 的理由"
+    # 掃**呼叫點**，不是子字串——上面那段 docstring 本身就寫著 `as_posix()` 三個字，
+    # 子字串掃描會被自己的說明文字絆倒（這正是 ADR-032 D1 說「掃描必須是 AST 級」的同一個坑）。
+    tree = ast.parse(Path(readers.__file__).read_text(encoding="utf-8"))
+    calls = [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "as_posix"
+    ]
+    assert calls == [], f"readers 不得再用 as_posix() 拼 SQLite URI（第 {calls} 行）"
+
+
 # ---- D1 唯讀 ------------------------------------------------------------------
 
 

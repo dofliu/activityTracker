@@ -76,13 +76,27 @@ def database_path() -> Path:
     return resolve_runtime_path(get_config().get("database.db_path", "omni_context.db"))
 
 
+def read_only_uri(path: Path) -> str:
+    """唯讀 URI。**一定要用 ``Path.as_uri()``，不可以自己拼 ``f"file:{path.as_posix()}"``。**
+
+    在 Linux 上兩者看起來都對（`file:/tmp/x.db`），但 Windows 的 `as_posix()` 會產生
+    `file:D:/a/x.db`——沒有 authority 分隔的兩斜線，`D:` 因此被當成 URI authority，
+    SQLite 直接回 ``unable to open database file``（本機以同形狀重現過）。
+    `as_uri()` 給的是 `file:///D:/a/x.db`，才是正確的三斜線形式。
+
+    這也是 repo 既有的寫法（`core/data_lifecycle.py:57`、`core/migrations.py:895`、
+    `rag/storage.py:164/185`），沿用它就不必再踩一次同一個坑。
+    """
+    return f"{path.as_uri()}?mode=ro"
+
+
 def read_only_engine(db_path: Path | None = None):
     """唯讀 engine。**不建目錄、不跑 migration、不 create_all。**"""
     path = Path(db_path) if db_path is not None else database_path()
     if not path.is_file():
         raise ReaderUnavailable("database_missing")
     engine = create_engine(
-        f"sqlite:///file:{path.as_posix()}?mode=ro&uri=true",
+        f"sqlite:///{read_only_uri(path)}&uri=true",
         connect_args={"check_same_thread": False, "timeout": 30},
         poolclass=None,
     )
@@ -136,7 +150,7 @@ def database_contract(db_path: Path | None = None) -> Dict[str, Tuple[int, str]]
     import sqlite3
 
     path = Path(db_path) if db_path is not None else database_path()
-    with sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True) as connection:
+    with sqlite3.connect(read_only_uri(path), uri=True) as connection:
         connection.execute("PRAGMA query_only=ON")
         tables = [
             row[0]
@@ -186,7 +200,7 @@ def resolve_source_ref(ref: str, db_path: Path | None = None) -> Optional[Dict[s
     path = Path(db_path) if db_path is not None else database_path()
     if not path.is_file():
         return None
-    with sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True) as connection:
+    with sqlite3.connect(read_only_uri(path), uri=True) as connection:
         connection.execute("PRAGMA query_only=ON")
         connection.row_factory = sqlite3.Row
         exists = connection.execute(
