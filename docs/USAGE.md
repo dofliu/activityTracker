@@ -24,14 +24,15 @@
 7. [知識庫、檢索與工作歷史](#7-知識庫檢索與工作歷史) — semantic index、DeskRAG、檢索 worker、空間回收
 8. [通知、推播與手機](#8-通知推播與手機) — 桌面通知、Telegram、LINE
 9. [摘要、快照與未結事項](#9-摘要快照與未結事項)
+10. [把脈絡接到 Claude Code／Codex（MCP）](#10-把脈絡接到-claude-codecodexmcp) — 唯讀、預設關閉
 
 **維運與疑難排解**
 
-10. [驗收中心：還有哪些實機收據沒拿到](#10-驗收中心還有哪些實機收據沒拿到adr-016)
-11. [Schema migration、備份與資料生命週期](#11-schema-migration備份與資料生命週期)
-12. [平台能力](#12-平台能力)
-13. [常見問題](#13-常見問題)
-14. [驗證與回報問題](#14-驗證與回報問題)
+11. [驗收中心：還有哪些實機收據沒拿到](#11-驗收中心還有哪些實機收據沒拿到adr-016)
+12. [Schema migration、備份與資料生命週期](#12-schema-migration備份與資料生命週期)
+13. [平台能力](#13-平台能力)
+14. [常見問題](#14-常見問題)
+15. [驗證與回報問題](#15-驗證與回報問題)
 
 ---
 
@@ -917,7 +918,97 @@ python main.py open-loop 12 open --note "需要重新處理"
 python main.py open-loop-reconcile
 ```
 
-## 10. 驗收中心：還有哪些實機收據沒拿到（ADR-016）
+## 10. 把脈絡接到 Claude Code／Codex（MCP）
+
+到目前為止，這個專案累積的脈絡只有三個出口：另開瀏覽器看儀表板、CLI、剪貼簿。
+而你實際在用的是 Claude Code／Codex——**MCP Context Server 就是第四個出口**：
+讓那些 agent 自己讀得到「我上次在 X 做到哪」，不必你去複製貼上。
+
+邊界寫在 [ADR-032](ADR-032-readonly-mcp-context-server.md)，一句話：**唯讀、預設關閉**。
+沒有任何 write tool，連線在引擎層就是 `?mode=ro`——不是「我們答應不寫」，是寫不進去。
+
+### 10.1 隱私邊界（開之前先讀這段）
+
+> MCP client 是**你自己啟動的本機 agent**。你透過它取得的 transcript 節錄、handoff 與檢索結果，
+> **會進入該 agent 的 context**；若該 agent 使用雲端供應商，這些內容會送往該供應商。
+> 這與儀表板上選 Gemini／Claude／OpenAI 產生摘要是同一個邊界，但**觸發者是 agent 不是你**，
+> 所以預設關閉。設 `mcp.metadata_only: true` 可只回 metadata 不回任何內容節錄。
+
+還有一件 ADR 裡也寫了、這裡再說一次的事：**這六條安全契約管的是我們的程序，沒有一條在管
+輸出被誰消費**。回傳會進入一個有寫入與執行能力的 agent，而 commit message、被索引到的檔案
+內容、你貼進 AI 視窗的任何東西都是攻擊者影響得到的自由文字。預設關閉與 `metadata_only`
+是**緩解不是解法**。
+
+### 10.2 開啟
+
+```bash
+pip install "omnicontext[mcp]"     # 選用依賴；核心安裝不變
+```
+
+設定檔加兩行（或在「06 系統設定」把它打開）：
+
+```yaml
+mcp:
+  enabled: true
+  metadata_only: false    # true = 只回 metadata，不回任何內容節錄
+```
+
+先自我檢查一次——**這一步不需要 `[mcp]` extra**，因為它只跑唯讀查詢：
+
+```bash
+python main.py mcp --selftest
+```
+
+它會把兩個 tool 各跑一次，並附上唯讀證明：前後比對每一張表的 `(列數, 全表內容雜湊)`，
+確認每一筆 `source_ref` 都回查得到，並掃描輸出裡有沒有絕對路徑或金鑰樣式。
+`status: passed` 才算通過。
+
+### 10.3 掛到 Claude Code
+
+在 MCP 設定裡加一個 stdio server（指令是 `omni mcp`，沒有網路埠、沒有認證形狀——
+stdio 是子程序管線，不是網路介面，所以完全不動 loopback 邊界）：
+
+```json
+{
+  "mcpServers": {
+    "omnicontext": {
+      "command": "omni",
+      "args": ["mcp"],
+      "env": { "OMNICONTEXT_HOME": "/path/to/your/OmniContext" }
+    }
+  }
+}
+```
+
+`OMNICONTEXT_HOME` 與 `OMNICONTEXT_CONFIG` 是這個程序**唯一會讀的兩個環境變數**；
+它不讀任何 API key，也不會把你環境裡的金鑰轉發給任何人。
+
+### 10.4 第一版有哪兩個 tool
+
+| Tool | 回什麼 |
+| :--- | :--- |
+| `omni_project_state` | canonical 專案清單：狀態、閒置天數、未結事項計數、repo 名稱。**不回本機路徑**；`state_recorded_at` 告訴你這份快照是什麼時候記下的 |
+| `omni_handoff` | 某個專案的接續脈絡：未結事項、最近 commit／檔案／AI 對話，外加一份 markdown |
+
+每一筆都帶 `source_ref`（`<table>:<id>`）指回 SQLite row。三件要先知道的事：
+
+- **回的是快照，不是此刻重算的**。MCP 唯讀，不准觸發專案狀態重整——主服務沒在跑的時候
+  它就會舊，所以 `state_recorded_at` 一定要看。
+- **`omni_handoff` 不回未結事項的標題**。那些標題是從 AI 對話抽出來的，可能含你的原始提問。
+- **`source_ref` 目前展不開**。它可引用、可去重、可交叉比對，但還沒有一個 tool 能把指標
+  解回那一列（`omni_resolve_ref` 排在下一階段）。
+
+其餘四個 tool（`omni_search_history`／`omni_open_loops`／`omni_work_sessions`／
+`omni_recent_digest`）在下一階段。
+
+### 10.5 它會留下什麼
+
+每次 tool call 寫一筆收據到 `reports/mcp/mcp-receipts-<日期>-<pid>.jsonl`：
+tool 名、成功與否、結果筆數、耗時、錯誤代碼。**不記你問了什麼，也不記參數值**。
+收據寫檔案而不是寫資料庫，是為了讓「唯讀」能用最強的形式成立——這個程序從頭到尾
+沒有一條可寫的資料庫連線，而不是「唯讀，但它自己的收據表除外」。
+
+## 11. 驗收中心：還有哪些實機收據沒拿到（ADR-016）
 
 [docs/TODO.md](TODO.md) A 段列著 22 條「只能在你自己機器上取得的收據」。要一項項翻很累，也很容易憑印象以為做過了，所以有**驗收中心**：它直接去本機找收據，告訴你每一項現在是什麼狀態。
 
@@ -948,7 +1039,7 @@ python main.py verify --output receipt.json  # 另存一份收據
 **人眼確認的項目**可以按「🖊 我親眼確認過」留下署名（存在 `reports/acceptance/confirmations.json`）。這是**另一種證據**，與機器找到的收據分開記帳，而且**永遠不會覆蓋機器判定**——對 A1 署名不會讓它變綠，ledger 查不到就是查不到。
 
 **gate**：報告最後依 [ROADMAP.md](../ROADMAP.md) §12.3 列出四個發佈收斂條件現在缺什麼。驗收中心**不會**改 `release_ready`，也不會寫 STATUS.yaml；只查部分項目時不給 gate（用一部分項目算出來的 gate 是誤導）。
-## 11. Schema migration、備份與資料生命週期
+## 12. Schema migration、備份與資料生命週期
 
 唯讀查看目前 schema 狀態：
 
@@ -990,7 +1081,7 @@ python main.py restore-drill `
 
 Windows isolated wheel fresh/upgrade/assets smoke 與 formal package+DB rollback rehearsal 已通過。Rollback 必須同時回復相容 wheel 與 pre-migration online backup，且在服務停止後處理 `.db-wal/.db-shm`；只覆蓋 `.db` 可能讓新 WAL 重新套回。Windows／Ubuntu／macOS × Python 3.10／3.12 CI matrix 已於 run `32757498004` 通過；自動 retention pruning 仍屬 release gate。
 
-## 12. 平台能力
+## 13. 平台能力
 
 | 功能 | Windows | macOS / Linux |
 |---|---|---|
@@ -1000,7 +1091,7 @@ Windows isolated wheel fresh/upgrade/assets smoke 與 formal package+DB rollback
 | Desktop notification | WinRT Toast／MessageBox fallback | 明確降級，待平台實作 |
 | Autostart installer | Windows Task Scheduler | 尚未提供 |
 
-## 13. 常見問題
+## 14. 常見問題
 
 ### 主控台一串 `POST /api/v1/events/ai 403 Forbidden` 是什麼？
 
@@ -1076,7 +1167,7 @@ Get-NetTCPConnection -LocalPort 8765 -State Listen
 
 先確認占用程序是否為既有 OmniContext instance；不要直接終止未確認的程序。OmniContext 具 single-instance lock，重複啟動應先關閉原實例。
 
-## 14. 驗證與回報問題
+## 15. 驗證與回報問題
 
 開發者驗證：
 
