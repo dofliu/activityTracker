@@ -27,6 +27,12 @@ dependencies = [
   "python-dateutil>=2.8.2",
   "tzdata>=2024.1; sys_platform == 'win32'",
   "apscheduler>=3.10.4",
+  # 四個 transcript parser 已抽成獨立套件（ADR-033）。**上限鎖大版本**：格式漂移的風險
+  # 屬於套件，所以要拿得到 patch；但四種格式都是別家私有格式，套件有權在大版本裡改介面，
+  # 那時候本 repo 要有一次明確的升級動作，不是被動吃下。
+  # 原始碼在 packages/coding-agent-transcripts/；尚未發佈到 PyPI，所以 CI 與開發環境
+  # 都先裝本地路徑（見 .github/workflows/platform-matrix.yml）。**發佈時它要先上**。
+  "coding-agent-transcripts>=0.1,<1.0",
   "pywin32>=306; sys_platform == 'win32'",
 ]
 
@@ -44,6 +50,12 @@ rag = [
   "python-pptx>=0.6.23",
   "openpyxl>=3.1.2",
 ]
+# 唯讀 MCP Context Server（ADR-032）。官方 SDK 只在 mcpserver/server.py 被 import；
+# 沒裝時 `omni mcp` 拒絕啟動並說出修法，`omni mcp --selftest` 仍跑得完（它不需要 SDK）。
+# 量過的代價：核心閉包 48 個套件 → 加 mcp 後 59 個，差 11 個／磁碟 8.8 MB（du -sh）。
+# 核心安裝一個位元組都不變——這正是它必須是 extra、不得進 dependencies 的理由。
+# 安裝：pip install "omnicontext[mcp]"
+mcp = ["mcp>=2.2.0"]
 # 圖片 OCR（rag/parsers/image_parser.py）。未安裝時圖片只留檔名 stub，不影響其他解析器。
 ocr = ["rapidocr-onnxruntime>=1.3.0"]
 # 只跑測試（不含 rag）：CI 用它證明核心在沒有知識庫依賴時也全綠。
@@ -55,6 +67,7 @@ test = [
 # 開發：核心 + 知識庫 + 測試工具。
 dev = [
   "omnicontext[rag]",
+  "omnicontext[mcp]",
   "omnicontext[test]",
 ]
 
@@ -71,7 +84,7 @@ version = {attr = "core.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["core*", "exporters*", "integrations*", "notifiers*", "rag*", "scripts*", "synthesizer*", "watchers*", "web*"]
+include = ["core*", "exporters*", "integrations*", "mcpserver*", "notifiers*", "rag*", "scripts*", "synthesizer*", "watchers*", "web*"]
 
 [tool.setuptools.package-data]
 web = ["*.html", "*.css", "*.js", "vendor/*.js", "js/*.js", "js/core/*.js", "js/tabs/*.js", "i18n/*.json"]

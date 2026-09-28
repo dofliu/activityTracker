@@ -316,6 +316,19 @@ integrations:
     token: ''
     token_env: GITHUB_TOKEN
 
+# ADR-032 唯讀 MCP Context Server（預設關閉）：以獨立、唯讀的 stdio MCP server 把
+# canonical context 暴露給 Claude Code／Codex 這類 agent，不必開瀏覽器或貼剪貼簿。
+# 六個 tool 全部唯讀、沒有任何 write tool；連線在引擎層就是 ?mode=ro，不是靠自律。
+# 需要選用依賴：pip install "omnicontext[mcp]"（核心安裝不變）。
+# 注意（隱私邊界）：
+#   MCP client 是你自己啟動的本機 agent。你透過它取得的 transcript 節錄、handoff 與檢索結果，
+#   會進入該 agent 的 context；若該 agent 使用雲端供應商，這些內容會送往該供應商。
+#   這與儀表板上選 Gemini／Claude／OpenAI 產生摘要是同一個邊界，但觸發者是 agent 不是你，
+#   所以預設關閉。設 mcp.metadata_only: true 可只回 metadata 不回任何內容節錄。
+mcp:
+  enabled: false
+  metadata_only: false
+
 rag:
   enabled: true
   chroma_dir: data/chroma

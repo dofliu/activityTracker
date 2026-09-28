@@ -1,0 +1,4 @@
+{"type": "user", "timestamp": "2026-01-02T03:04:05Z", "sessionId": "session-0001", "cwd": "/workspace/sample-project", "message": {"role": "user", "content": "示範提問：把排序改成穩定排序"}}
+{"type": "assistant", "timestamp": "2026-01-02T03:04:30Z", "sessionId": "session-0001", "message": {"role": "assistant", "content": [{"type": "text", "text": "示範回應：已改成穩定排序，並補了一個測試。"}]}}
+{"type": "user", "timestamp": "2026-01-02T03:05:00Z", "sessionId": "session-0001", "cwd": "/workspace/sample-project", "message": {"role": "user", "content": "<system-reminder>這行是 CLI 內部訊息，應該被濾掉</system-reminder>"}}
+{"type": "user", "timestamp": "2026-01-02T03:06:00Z", "sessionId": "session-0001", "cwd": "/workspace/sample-project", "message": {"role": "user", "content": "示範提問二：順便補一個 README"}}

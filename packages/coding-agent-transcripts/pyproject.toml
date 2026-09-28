@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coding-agent-transcripts"
+version = "0.1.0"
+description = "Read Claude Code, Claude Desktop, Codex and Antigravity transcripts into one turn model."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{name = "Juihung Liu"}]
+keywords = ["claude-code", "codex", "antigravity", "transcript", "parser"]
+# **零第三方相依是這個套件的賣點之一**，不是還沒加。ADR-033 量過：四個 parser 只用標準
+# 函式庫。任何一筆新相依都要先問「解析格式為什麼需要它」。
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+
+[project.urls]
+Homepage = "https://github.com/dofliu/activityTracker"
+Source = "https://github.com/dofliu/activityTracker/tree/main/packages/coding-agent-transcripts"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

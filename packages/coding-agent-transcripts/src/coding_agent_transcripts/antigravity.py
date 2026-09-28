@@ -16,8 +16,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterator, List
 
-from core.time_utils import get_local_now
-from watchers.transcripts.base import (
+from coding_agent_transcripts._clock import get_local_now
+from coding_agent_transcripts.config import EMPTY_CONFIG
+from coding_agent_transcripts.base import (
     TranscriptTurn,
     build_turn_key,
     classify_response_status,
@@ -28,12 +29,30 @@ from watchers.transcripts.base import (
 PLATFORM = "antigravity"
 
 
-def discover(cfg, *, full_history: bool = False, now=get_local_now) -> List[Path]:
-    path_str = cfg.get("watchers.agent_log_watcher.antigravity_logs_path")
-    if not path_str:
+def default_logs_dir() -> Path:
+    """Antigravity 沒有官方固定位置；這是本專案設定範本一直以來用的那個。
+
+    `discover()` **不會**自己用它（沒設定就回空清單，不猜），它只給「偵測並詢問」
+    那條路徑當候選——猜一個位置去採集，跟提議一個位置請使用者確認，是兩件事。
+    """
+    return Path.home() / ".gemini" / "antigravity" / "brain"
+
+
+LOGS_PATH_KEY = "watchers.agent_log_watcher.antigravity_logs_path"
+
+
+def discover(cfg=None, *, full_history: bool = False, now=get_local_now) -> List[Path]:
+    """Antigravity 沒有預設位置，**一定要設定**；沒設就回空清單（不是猜一個）。
+
+    原本這裡是 `cfg.get(...)` ＋ `cfg.expand_path(...)`，用掉三個 Config 方法。
+    改成 `get` ＋ `get_path` 兩個，讓 ADR-033 決策三那個「兩個方法的 protocol」是真的
+    ——`get_path` 內部就是 `expand_path(get(...))`，所以行為一樣，只是少借一個方法。
+    """
+    cfg = cfg or EMPTY_CONFIG
+    if not cfg.get(LOGS_PATH_KEY):
         return []
 
-    base_path = cfg.expand_path(path_str)
+    base_path = cfg.get_path(LOGS_PATH_KEY)
     if not base_path.exists():
         return []
     return list(base_path.glob("**/transcript.jsonl"))

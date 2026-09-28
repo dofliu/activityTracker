@@ -71,6 +71,33 @@ def test_init_uses_writable_application_home(tmp_path, monkeypatch):
     assert (app_home / "logs" / "checkpoints").is_dir()
 
 
+def test_every_top_level_package_on_disk_is_whitelisted_for_the_wheel():
+    """頂層 package 漏加 `packages.find.include` 時，build 不報錯、wheel 無聲少檔案。
+
+    ADR-032 決策一實測過這件事：加一個沒收錄的頂層套件，`python -m build` 成功、零警告，
+    但 wheel 裡零檔案、`top_level.txt` 也沒有它，而使用者跑 `omni mcp` 會拿到
+    `ModuleNotFoundError`。所以不靠人記得，靠這裡對帳。
+
+    順帶補掉一個既有的洞：在這條測試之前，把 `rag*` 或 `synthesizer*` 從 include 拿掉，
+    全 repo 沒有任何東西會紅。
+    """
+    project_root = Path(__file__).resolve().parent.parent
+    metadata = tomllib.loads((project_root / "pyproject.toml").read_text(encoding="utf-8"))
+    include = metadata["tool"]["setuptools"]["packages"]["find"]["include"]
+    prefixes = {p[:-1] if p.endswith("*") else p for p in include}
+
+    # 刻意不出貨的頂層 package 寫在這裡，每一項都要附理由；目前是空集合。
+    not_shipped: set[str] = set()
+
+    on_disk = {
+        d.name
+        for d in project_root.iterdir()
+        if d.is_dir() and (d / "__init__.py").is_file() and not d.name.startswith(".")
+    }
+    missing = sorted(on_disk - prefixes - not_shipped)
+    assert not missing, f"頂層 package 沒進 packages.find.include，wheel 會無聲少檔案：{missing}"
+
+
 def test_pyproject_declares_wheel_runtime_assets():
     project_root = Path(__file__).resolve().parent.parent
     metadata = tomllib.loads((project_root / "pyproject.toml").read_text(encoding="utf-8"))

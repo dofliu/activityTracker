@@ -362,10 +362,80 @@ def cmd_migration_status(db_path: Optional[str] = None):
         print(f"error: {status['error']}")
 
 
+def _detect_and_ask(config_data: dict) -> int:
+    """偵測本機既有的 AI 逐字稿來源，**逐一詢問**要不要納入（TODO E6）。
+
+    三條規矩，每一條都有契約測試守著：
+
+    1. **偵測不等於啟用。** 這裡只會寫入「路徑」那四個鍵，不碰
+       `watchers.agent_log_watcher.<平台>` 的開關，更不碰任何危險能力開關。
+       偵測到 `~/.claude` 不代表使用者想讓我們讀它。
+    2. **一定要明確回答才寫。** 預設是「不納入」——直接按 Enter、輸入看不懂的東西、
+       或任何不是 `y`／`yes` 的回答，都算不納入。
+    3. **沒有 `--yes`。** 非互動環境（stdin 不是 TTY）一律只印出偵測結果然後結束，
+       一個字都不寫。一個「自動全部同意」的旗標會讓上面兩條變成裝飾品，所以它不存在——
+       不是「預設關閉」，是沒有這個東西。
+
+    回傳寫進設定的筆數。
+    """
+    import sys as _sys
+
+    from coding_agent_transcripts import DictConfig
+
+    from core.source_detection import describe, detect_sources
+
+    candidates = detect_sources(DictConfig(config_data))
+    if not candidates:
+        print("偵測：這台機器上沒有找到 Claude Code／Claude Desktop／Codex／Antigravity 的逐字稿目錄。")
+        print("（找不到不代表你沒在用——可能只是裝在別的地方。路徑可以自己寫進設定檔。）")
+        return 0
+
+    print(f"偵測：找到 {len(candidates)} 個來源。")
+    for candidate in candidates:
+        print(f"  - {describe(candidate)}")
+    print()
+
+    pending = [c for c in candidates if not c.already_configured]
+    if not pending:
+        print("這些路徑都已經在設定檔裡了，沒有要問的。")
+        return 0
+
+    if not _sys.stdin.isatty():
+        # 非互動環境一律不寫。**這不是保守，是這個指令唯一誠實的行為**：
+        # 沒有人在那頭回答，任何「寫進去」都等於替使用者決定。
+        print("stdin 不是互動終端機，所以**沒有寫入任何設定**。")
+        print("要納入請在終端機裡再跑一次 `python main.py init --detect` 並逐一回答。")
+        return 0
+
+    print("要把哪些納入採集範圍？（直接按 Enter＝不納入）")
+    written = 0
+    for candidate in pending:
+        answer = input(f"  納入 {candidate.label}（{candidate.path}）？ [y/N] ").strip().lower()
+        if answer not in {"y", "yes"}:
+            print(f"    → 不納入 {candidate.label}")
+            continue
+        node = config_data
+        *parents, leaf = candidate.config_key.split(".")
+        for part in parents:
+            node = node.setdefault(part, {})
+        node[leaf] = str(candidate.path)
+        written += 1
+        print(f"    → 已寫入 {candidate.config_key}")
+
+    print()
+    if written:
+        print(f"寫入 {written} 個路徑。**採集器的開關沒有動**——要真的開始採集，")
+        print("請自己把 watchers.agent_log_watcher 底下對應的平台設成 true（或在儀表板上開）。")
+    else:
+        print("一個都沒納入，設定檔的來源路徑維持原樣。")
+    return written
+
+
 def cmd_init(
     watch_directories: List[str],
     show_token: bool = False,
     rotate_token: bool = False,
+    detect: bool = False,
 ):
     """建立可攜式本機設定，且只在 token 空白時產生 browser ingest capability。"""
     root = runtime_data_root()
@@ -406,6 +476,9 @@ def cmd_init(
             if path not in normalized:
                 normalized.append(path)
         watcher["watch_directories"] = normalized
+
+    if detect:
+        _detect_and_ask(config_data)
 
     config_path.write_text(
         yaml.safe_dump(config_data, allow_unicode=True, sort_keys=False),
@@ -905,6 +978,41 @@ def cmd_verify(
     print("=" * 62 + "\n")
 
 
+def cmd_mcp(selftest: bool = False) -> int:
+    """`omni mcp`——唯讀 MCP Context Server（ADR-032）。
+
+    兩道閘門，順序有意義：`--selftest` **不需要**官方 SDK（它只跑 readers 與投影），
+    所以在沒裝 `[mcp]` 的核心安裝裡也證得出唯讀；真的要起 server 才需要 extra。
+    """
+    import json as _json
+
+    from mcpserver import availability, tools
+
+    if selftest:
+        from mcpserver import receipts
+
+        report = tools.selftest(enforce_gate=False)
+        # 落一份檔案收據：驗收中心（A23／A25／A26）只讀本機便宜證據，不會替你跑 tool。
+        # 沒有這一步，那三項就只能永遠掛 needs_human。
+        written = receipts.write_selftest_receipt(report)
+        print(_json.dumps(report, ensure_ascii=False, indent=2, default=str))
+        if written is not None:
+            print(f"[MCP] 收據：{written.name}（{written.parent}）", file=sys.stderr)
+        return 0 if report.get("status") == "passed" else 1
+
+    if not availability.mcp_enabled():
+        print(f"[MCP] {tools.ERRORS['mcp_disabled']}", file=sys.stderr)
+        return 2
+    missing = availability.missing_sdk_packages()
+    if missing:
+        print(f"[MCP] {tools.ERRORS['mcp_extra_not_installed']}", file=sys.stderr)
+        return 3
+
+    from mcpserver.server import run_stdio
+
+    return run_stdio()
+
+
 def main():
     parser = argparse.ArgumentParser(description="OmniContext - 個人全景上下文與進行中專案智慧中樞")
     subparsers = parser.add_subparsers(dest="command", help="子指令")
@@ -922,6 +1030,11 @@ def main():
         action="append",
         default=[],
         help="要監控的目錄，可重複指定；未指定時保留範本設定",
+    )
+    init_parser.add_argument(
+        "--detect",
+        action="store_true",
+        help="偵測本機既有的 AI 逐字稿目錄並逐一詢問要不要納入（不會自動開啟任何採集器）",
     )
     init_parser.add_argument("--show-token", action="store_true", help="顯示既有 browser ingest token")
     init_parser.add_argument("--rotate-token", action="store_true", help="旋轉 browser ingest token")
@@ -1046,6 +1159,15 @@ def main():
     wal_parser = subparsers.add_parser("wal-checkpoint", help="手動執行 SQLite WAL Checkpoint")
     wal_parser.add_argument("--mode", default="TRUNCATE", choices=["PASSIVE", "FULL", "RESTART", "TRUNCATE"])
 
+    mcp_parser = subparsers.add_parser(
+        "mcp", help="啟動唯讀 MCP Context Server（stdio；預設關閉，見 ADR-032）"
+    )
+    mcp_parser.add_argument(
+        "--selftest",
+        action="store_true",
+        help="不啟動 server，改跑一輪自我檢查（兩個 tool 各回一次＋唯讀證明），輸出 JSON",
+    )
+
     verify_parser = subparsers.add_parser(
         "verify", help="驗收中心：檢查 docs/TODO.md A 段每一項的本機收據（唯讀）"
     )
@@ -1073,6 +1195,7 @@ def main():
             getattr(args, "watch", []),
             getattr(args, "show_token", False),
             getattr(args, "rotate_token", False),
+            getattr(args, "detect", False),
         )
     elif args.command == "demo":
         cmd_demo(getattr(args, "home", None))
@@ -1161,6 +1284,8 @@ def main():
         cmd_heal()
     elif args.command == "wal-checkpoint":
         cmd_wal_checkpoint(getattr(args, "mode", "TRUNCATE"))
+    elif args.command == "mcp":
+        sys.exit(cmd_mcp(getattr(args, "selftest", False)))
     elif args.command == "verify":
         cmd_verify(
             getattr(args, "item", None),

@@ -13,6 +13,11 @@ from pathlib import Path
 
 WHEEL_REQUIRED_SUFFIXES = (
     "core/capture_coverage.py",
+    # ADR-032：這份清單是白名單、不會自動涵蓋新模組（實測放一個沒收錄的頂層套件
+    # 進 wheel 仍回 status: passed）。漏加不會紅，只會讓「wheel 含 mcpserver/」那條收據變空。
+    "mcpserver/readers.py",
+    "mcpserver/server.py",
+    "mcpserver/tools.py",
     "core/context_memory.py",
     "core/desktop_sources.py",
     "core/runtime_paths.py",
@@ -43,6 +48,9 @@ SDIST_REQUIRED_SUFFIXES = (
     "/MANIFEST.in",
     "/config.example.yaml",
     "/core/capture_coverage.py",
+    "/mcpserver/readers.py",
+    "/mcpserver/server.py",
+    "/mcpserver/tools.py",
     "/core/context_memory.py",
     "/core/desktop_sources.py",
     "/core/runtime_paths.py",

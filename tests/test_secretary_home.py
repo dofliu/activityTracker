@@ -231,7 +231,11 @@ def test_home_never_writes_and_never_calls_an_llm(db):
 
 
 def test_home_endpoint_is_read_only(monkeypatch):
-    monkeypatch.setattr("core.secretary.present.build_home", lambda: {"focus": {"proposal": None, "total": 0, "remaining": 0}, "sections": {}, "claim_boundary": "x"})
+    # 補在 `core.api.secretary` 而不是 `core.secretary.present`：路由在 import 時就把
+    # `build_home` 取值綁死（core/api/secretary.py:24 `from ... import build_home`），
+    # 補來源模組補不到它。補錯地方的後果不是紅字，是這個測試改去讀**開發機真正的資料庫**——
+    # 資料庫空的時候照樣綠，有一筆焦點提案就紅，而紅的原因跟這個測試想驗的事無關。
+    monkeypatch.setattr("core.api.secretary.build_home", lambda: {"focus": {"proposal": None, "total": 0, "remaining": 0}, "sections": {}, "claim_boundary": "x"})
     client = TestClient(app)
     res = client.get("/api/v1/secretary/home", headers={"Origin": _LOCAL_ORIGIN})
     assert res.status_code == 200 and res.json()["focus"]["total"] == 0

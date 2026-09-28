@@ -32,7 +32,10 @@ from watchers.transcripts import antigravity, claude_code, claude_desktop, codex
 from watchers.transcripts.drift import DRIFT_WINDOW_DAYS, empty_drift, evaluate_drift
 
 ROOT = Path(__file__).resolve().parents[1]
-PKG = ROOT / "watchers" / "transcripts"
+# E5（ADR-033）之後，parser 的**原始碼**搬到套件裡；`watchers/transcripts/` 只剩轉接層。
+# 這一行是這支測試在 E5 唯一改的東西——下面那些掃描要掃的是真的原始碼，掃轉接層等於空轉。
+# （行為測試一個字都沒改；改的只有「去哪裡找檔案」。）
+PKG = ROOT / "packages" / "coding-agent-transcripts" / "src" / "coding_agent_transcripts"
 NOW = datetime(2026, 9, 17, 9, 0)
 
 PARSER_MODULES = ("claude_code", "claude_desktop", "codex", "antigravity")
@@ -125,7 +128,7 @@ def test_claude_desktop_reuses_the_claude_code_format_on_purpose():
         for node in ast.walk(tree)
         if isinstance(node, ast.ImportFrom) and node.module
     }
-    assert "watchers.transcripts.claude_code" in imported
+    assert "coding_agent_transcripts.claude_code" in imported
 
 
 # ---- 2. parser 行為（不碰資料庫）-------------------------------------------

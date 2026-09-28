@@ -16,8 +16,8 @@ import json
 from pathlib import Path
 from typing import Iterator, List
 
-from core.time_utils import get_local_now
-from watchers.transcripts.base import (
+from coding_agent_transcripts._clock import get_local_now
+from coding_agent_transcripts.base import (
     TranscriptTurn,
     TurnEvidence,
     build_turn_key,
@@ -35,6 +35,11 @@ HISTORY_FILENAME = "history.jsonl"
 
 def codex_home() -> Path:
     return Path.home() / ".codex"
+
+
+def default_logs_dir() -> Path:
+    """與另外三個平台同名的 API；內容就是 `codex_home()`。"""
+    return codex_home()
 
 
 # ---------------------------------------------------------------------------
