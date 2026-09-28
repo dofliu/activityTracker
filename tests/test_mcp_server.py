@@ -24,7 +24,11 @@ import re
 import subprocess
 import sys
 import textwrap
-import tomllib
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10 使用相容套件（沿用 tests/test_packaging_runtime.py 的寫法）。
+    import tomli as tomllib
 from datetime import datetime, timedelta
 from pathlib import Path
 
