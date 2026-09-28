@@ -158,16 +158,22 @@ def test_the_mcp_extra_is_optional_and_not_a_core_dependency():
     assert "omnicontext[mcp]" in extras["dev"], "dev 要裝得到，否則 server.py 沒有人在本機測過"
 
 
-def test_read_only_uri_uses_the_three_slash_form():
+def test_read_only_uri_uses_the_three_slash_form(tmp_path):
     """Windows 回歸：`f"file:{path.as_posix()}"` 在 D: 磁碟上會變成 `file:D:/…`，
 
     `D:` 被當成 URI authority，SQLite 直接回 `unable to open database file`
     （以同樣形狀在本機重現過）。`as_uri()` 給的 `file:///D:/…` 才是對的，
     而且那也是 repo 既有的寫法（core/data_lifecycle.py:57 等三處）。
+
+    **這個測試自己踩過一次同一類坑**：原本寫死 `Path("/tmp/x.db")`，在 Windows 上那是
+    `WindowsPath('/tmp/x.db')`——沒有磁碟代號，`is_absolute()` 是 False，`as_uri()` 直接丟
+    `ValueError`。一個「防 Windows 路徑錯誤」的測試本身不能跨平台，CI 的
+    `windows-latest / Python 3.10` 幫我抓到了。改用 `tmp_path`：pytest 在每個平台
+    給的都是絕對路徑。
     """
     import pathlib
 
-    uri = readers.read_only_uri(Path("/tmp/x.db"))
+    uri = readers.read_only_uri(tmp_path / "x.db")
     assert uri.startswith("file:///"), uri
     assert uri.endswith("?mode=ro")
     # 直接證明壞掉的那個形狀長什麼樣（不是推論）
@@ -184,6 +190,25 @@ def test_read_only_uri_uses_the_three_slash_form():
         and node.func.attr == "as_posix"
     ]
     assert calls == [], f"readers 不得再用 as_posix() 拼 SQLite URI（第 {calls} 行）"
+
+
+def test_read_only_uri_accepts_a_relative_path_without_leaking_valueerror(tmp_path, monkeypatch):
+    """`as_uri()` 對非絕對路徑會丟 ValueError——那不在 tools.ERRORS 封閉字串表裡。
+
+    正式路徑一定絕對（`resolve_runtime_path()` 永遠 `.resolve()`），但
+    `read_only_engine(db_path=…)` 允許呼叫端自己傳；傳相對路徑時 `path.is_file()`
+    會過、下一行才炸。先證明沒有 `.resolve()` 的那個形狀真的會炸，再證明現在不會。
+    """
+    import pathlib
+
+    with pytest.raises(ValueError, match="relative path"):
+        pathlib.Path("omni_context.db").as_uri()  # 舊寫法的形狀
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "omni_context.db").write_bytes(b"")
+    uri = readers.read_only_uri(Path("omni_context.db"))
+    assert uri.startswith("file:///") and uri.endswith("?mode=ro"), uri
+    assert uri.endswith("omni_context.db?mode=ro"), uri
 
 
 # ---- D1 唯讀 ------------------------------------------------------------------

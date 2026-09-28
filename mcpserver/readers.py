@@ -86,8 +86,15 @@ def read_only_uri(path: Path) -> str:
 
     這也是 repo 既有的寫法（`core/data_lifecycle.py:57`、`core/migrations.py:895`、
     `rag/storage.py:164/185`），沿用它就不必再踩一次同一個坑。
+
+    **先 ``resolve()`` 再 ``as_uri()``**：`as_uri()` 對非絕對路徑會丟
+    ``ValueError: relative path can't be expressed as a file URI``——那是一個不在
+    `tools.ERRORS` 封閉字串表裡的例外，會整個漏到呼叫端（ADR-032 D4 不准這樣）。
+    正式路徑一定是絕對的（`resolve_runtime_path()` 永遠回 `.resolve()` 過的），
+    但 `read_only_engine(db_path=…)` 允許呼叫端自己傳，傳相對路徑時
+    `path.is_file()` 會過、下一行才炸。`core/data_lifecycle.py:62` 也是先 `.resolve()`。
     """
-    return f"{path.as_uri()}?mode=ro"
+    return f"{Path(path).resolve().as_uri()}?mode=ro"
 
 
 def read_only_engine(db_path: Path | None = None):
