@@ -35,7 +35,7 @@
 
 | 文件 | 說明 |
 | :--- | :--- |
-| [../ROADMAP.md](../ROADMAP.md) | P0–P8 開發規劃與**成果紀錄**（已完成的事寫在 §11.2，依日期排序的單一清單）；§13 為 2026-09-16 起的架構整頓三階段（已全部完成）；§14 為 2026-09-22 起的推廣路線（E1 → E6） |
+| [../ROADMAP.md](../ROADMAP.md) | P0–P8 開發規劃與**成果紀錄**（已完成的事寫在 §11.2，依日期排序的單一清單）；§13 為 2026-09-16 起的架構整頓三階段（已全部完成）；§14 為 2026-09-22 起的推廣路線（E1 → E6，**已全部完成**） |
 | [TODO.md](TODO.md) | **待辦清單**：等待中的使用者側收據（A）、已知問題與技術債（B）、功能候選（C，暫停）、架構整頓（D，已全部完成）、推廣路線（E）；每項都有完成判準 |
 | [../STATUS.yaml](../STATUS.yaml) | 機器可讀的現況快照：feature 清單、evidence receipts、quality gates、**真正還擋著的** known_blockers 與 capability_boundaries（已完成的歷史在 ROADMAP §11.2，不在這裡重複） |
 | [PRODUCT_POSITIONING.md](PRODUCT_POSITIONING.md) | 產品定位：跨 AI、應用與 Repository 的個人工作脈絡層，以及能力／證據邊界 |

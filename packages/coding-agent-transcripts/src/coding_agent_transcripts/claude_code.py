@@ -29,6 +29,12 @@ PLATFORM = "claude_code"
 HISTORY_FILENAME = "history.jsonl"
 
 
+def default_logs_dir() -> Path:
+    """`~/.claude`。**寫成函式不是模組常數**：常數會在 import 當下把 HOME 釘死，
+    而測試與示範家目錄都會換 HOME。"""
+    return Path.home() / ".claude"
+
+
 # ---------------------------------------------------------------------------
 # Claude 專用的取文規則
 # ---------------------------------------------------------------------------

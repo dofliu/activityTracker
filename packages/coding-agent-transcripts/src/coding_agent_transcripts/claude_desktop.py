@@ -24,6 +24,11 @@ from coding_agent_transcripts.base import TranscriptTurn
 from coding_agent_transcripts.claude_code import parse_claude_jsonl
 
 PLATFORM = "claude_desktop"
+
+
+def default_logs_dir() -> Path:
+    """依平台自動偵測（Windows／macOS／Linux 的路徑各不相同）。"""
+    return default_claude_desktop_logs_dir()
 DEFAULT_LOOKBACK_DAYS = 7
 
 

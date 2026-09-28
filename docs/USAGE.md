@@ -85,6 +85,36 @@ Wheel 安裝可改用 `omnicontext init --watch "D:\Projects"`。
 - 指令會建立本機 `config.yaml`、必要資料目錄與 Browser Extension ingest token。
 - `config.yaml` 與 `omni_context.db` 包含本機路徑或私人資料，不應提交至 Git。
 
+#### `--detect`：看看這台機器上有哪些 AI 逐字稿，**然後問你**
+
+```powershell
+python main.py init --detect
+```
+
+它會找 Claude Code、Claude Desktop、Codex、Antigravity 四個平台的預設位置，列出**真的存在**
+的那些（連裡面有幾份逐字稿一起講），然後**一個一個問**要不要把路徑寫進設定：
+
+```
+偵測：找到 2 個來源。
+  - Claude Code：/home/you/.claude（44 份逐字稿）
+  - Codex：/home/you/.codex（3 份逐字稿）
+
+要把哪些納入採集範圍？（直接按 Enter＝不納入）
+  納入 Claude Code（/home/you/.claude）？ [y/N]
+```
+
+三件事先講清楚：
+
+- **偵測不等於啟用。** 答應之後寫進去的只有**路徑**那一個鍵。採集器的開關
+  （`watchers.agent_log_watcher.<平台>`）一個都不會動，危險能力開關更不會。
+  要真的開始採集，得你自己把對應平台設成 `true`。
+- **預設是不納入。** 直接按 Enter、或任何不是 `y`／`yes` 的回答，都算不納入。
+- **沒有 `--yes`。** 不是「預設關閉」，是**沒有這個旗標**。非互動環境（stdin 不是終端機）
+  一律只印出偵測結果然後結束，一個字都不寫——沒有人在那頭回答的時候，
+  任何「寫進去」都等於替你決定。
+
+找不到不代表你沒在用，可能只是裝在別的地方；路徑隨時可以自己寫進 `config.yaml`。
+
 如需讓 Project State 與 Context Handoff 在新電腦上可靠回推專案資料夾，請在 `config.yaml` 明確填入自己的 roots；未設定時才會沿用 file/Git watcher 的設定：
 
 ```yaml

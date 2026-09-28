@@ -29,6 +29,15 @@ from coding_agent_transcripts.base import (
 PLATFORM = "antigravity"
 
 
+def default_logs_dir() -> Path:
+    """Antigravity 沒有官方固定位置；這是本專案設定範本一直以來用的那個。
+
+    `discover()` **不會**自己用它（沒設定就回空清單，不猜），它只給「偵測並詢問」
+    那條路徑當候選——猜一個位置去採集，跟提議一個位置請使用者確認，是兩件事。
+    """
+    return Path.home() / ".gemini" / "antigravity" / "brain"
+
+
 LOGS_PATH_KEY = "watchers.agent_log_watcher.antigravity_logs_path"
 
 
