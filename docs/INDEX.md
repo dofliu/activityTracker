@@ -78,7 +78,7 @@
 | [ADR-026](ADR-026-frontend-modules.md) | 前端拆成 ES module：一個分頁一個檔 | 沒有打包步驟（本機工具，少一層是一層）、字典是資料且兩份 key 集合由測試把關、`fetch` 只准出現在 `core/api.js`、點擊動作走 `data-action` 委派而不是字串裡的 handler、`state.js` 是過渡形狀（改成注入是 D11） |
 | [ADR-031](ADR-031-omni-demo-dataset.md) | `omni demo` 示範資料集的邊界（TODO E1 已於 2026-09-23 全部完成） | 只能寫進另開的 `OMNICONTEXT_HOME`、對既有家目錄 fail-closed、每筆資料標示 `demo_mode` 且一路傳到 API、驗收中心與問候卡不得把示範數字當實機收據、匿名化資料一律從頭編造 |
 
-| [ADR-032](ADR-032-readonly-mcp-context-server.md) | 唯讀 MCP Context Server 的邊界（TODO E2；**E3 已落地** `mcpserver/` 骨架＋`omni_project_state`／`omni_handoff`，其餘四個 tool 在 E4） | 模組叫頂層 `mcpserver/` 不叫 `mcp/`（會遮掉官方 SDK，附實測收據）、官方 MCP SDK 以 `[mcp]` optional extra 進場（核心安裝 176 MB 一個位元組不動，量到的代價是 11 個套件／8.8 MB）、MCP 程序自己開唯讀連線不碰 `get_db()`（`get_db()` 本身會跑 migration 與寫備份）、不轉送 core 既有產物一律 allowlist 投影（既有 handoff 帶絕對路徑與 AI 原文）、receipt 寫檔案不寫資料庫（這樣 D1 才不必開例外）、唯讀證明從「列數不變」加嚴成「內容雜湊不變」 |
+| [ADR-032](ADR-032-readonly-mcp-context-server.md) | 唯讀 MCP Context Server 的邊界（TODO E2；**E3／E4 已全部落地**：`mcpserver/` 骨架＋七個 tool，含三態 `omni_resolve_ref` 與 `source_ref_token`） | 模組叫頂層 `mcpserver/` 不叫 `mcp/`（會遮掉官方 SDK，附實測收據）、官方 MCP SDK 以 `[mcp]` optional extra 進場（核心安裝 176 MB 一個位元組不動，量到的代價是 11 個套件／8.8 MB）、MCP 程序自己開唯讀連線不碰 `get_db()`（`get_db()` 本身會跑 migration 與寫備份）、不轉送 core 既有產物一律 allowlist 投影（既有 handoff 帶絕對路徑與 AI 原文）、receipt 寫檔案不寫資料庫（這樣 D1 才不必開例外）、唯讀證明從「列數不變」加嚴成「內容雜湊不變」 |
 ## 功能規格與驗證
 
 | 文件 | 說明 |

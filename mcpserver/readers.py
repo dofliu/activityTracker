@@ -36,6 +36,7 @@ from core.models import (
     GitHubRepoState,
     OpenLoop,
     ProjectState,
+    SecretaryNote,
 )
 
 # `source_ref` 的 table 白名單（ADR-032「共通規定」）。形狀 "<table>:<id>"，沿用
@@ -248,6 +249,38 @@ def scrub_secret_shapes(text: str) -> str:
     return text
 
 
+# **內容鍵的唯一定義**（`tools.CONTENT_KEYS` 是它的別名）。內容＝使用者寫的字：
+# `mcp.metadata_only: true` 時這些鍵一個都不出現，而就算 false，裡面的金鑰樣式也一律刮掉。
+# 定義住在 `readers` 是因為 `tools` import `readers`，反過來會成環。
+CONTENT_KEYS: Tuple[str, ...] = (
+    "prompt_excerpt", "response_excerpt", "markdown", "excerpt",
+    "title", "body", "headline", "narrative",
+)
+
+
+def scrub_content(node: Any) -> Any:
+    """把所有內容鍵的值刮過一次金鑰樣式。
+
+    **為什麼需要這一支**：`omni_work_sessions` 接的是 `core` 的函式，它的
+    `headline`／`narrative`／`items[].title` 是用 `_compact_text()` 直接切 prompt 前 140 字
+    （[core/context_memory.py:108]），**沒有經過 `_excerpt()`**——別的 reader 都有。
+    E4 的實機 E2E（真的用官方 SDK client 驅動一輪）就在那裡撈到一個
+    `sk-…` 字樣，單元測試抓不到，因為 D4 的掃描面刻意排除內容鍵。
+
+    路徑一樣刻意保留：它常常正是脈絡本身。這裡拿掉的只有「對呼叫端零價值、
+    外洩代價卻是實的」那一種。
+    """
+    if isinstance(node, dict):
+        return {
+            key: (scrub_secret_shapes(value) if key in CONTENT_KEYS and isinstance(value, str)
+                  else scrub_content(value))
+            for key, value in node.items()
+        }
+    if isinstance(node, list):
+        return [scrub_content(item) for item in node]
+    return node
+
+
 def _excerpt(text: Any, limit: int) -> Optional[str]:
     cleaned = " ".join(str(text or "").split())
     if not cleaned:
@@ -325,6 +358,7 @@ def project_state(
             projects.append(
                 {
                     "source_ref": source_ref("project_states", row.id),
+                    "source_ref_token": ref_token("project_states", row),
                     "project_key": row.project_key,
                     "display_name": row.display_name,
                     "category": row.category,
@@ -421,6 +455,7 @@ def handoff(
             "open_loops": [
                 {
                     "source_ref": source_ref("open_loops", loop.id),
+                    "source_ref_token": ref_token("open_loops", loop),
                     "project_key": loop.project_key,
                     "status": loop.status,
                     "source_type": loop.source_type,
@@ -434,6 +469,7 @@ def handoff(
             "recent_commits": [
                 {
                     "source_ref": source_ref("git_activity_events", commit.id),
+                    "source_ref_token": ref_token("git_activity_events", commit),
                     "hash": (commit.commit_hash or "")[:8],
                     "message": _excerpt(commit.message, 120),
                     "branch": commit.branch,
@@ -445,6 +481,7 @@ def handoff(
             "recent_files": [
                 {
                     "source_ref": source_ref("file_activity_events", item.id),
+                    "source_ref_token": ref_token("file_activity_events", item),
                     "name": item.file_name or _basename(item.file_path),
                     "changed_at": _iso(item.timestamp),
                 }
@@ -456,6 +493,7 @@ def handoff(
         for turn in ai_turns:
             entry: Dict[str, Any] = {
                 "source_ref": source_ref("ai_prompt_events", turn.id),
+                "source_ref_token": ref_token("ai_prompt_events", turn),
                 "platform": turn.platform,
                 "time": _iso(turn.timestamp),
                 # turn_key 是 sha256(platform|resolved source_path|source_position)，
@@ -533,3 +571,511 @@ def render_markdown(payload: Dict[str, Any]) -> str:
         "相似度與時間鄰近都不構成因果。"
     )
     return "\n".join(lines)
+
+
+# ---- 唯讀 Database 介面（給 core 的兩支唯讀查詢函式用） --------------------------
+
+
+class ReadOnlyDatabase:
+    """`core` 那兩支**唯讀**查詢函式要的 `database` 介面，只有 `session_scope()`。
+
+    **為什麼這次選重用而不是再抄一份查詢**（與 E3 的 `project_state`／`handoff` 相反）：
+
+    E3 不重用 `get_active_projects_list()`／`build_daily_digest()`，理由是**那些函式會寫**
+    （ADR-032 決策三）。這裡要接的兩支不會：`build_recent_work_sessions()` 與
+    `semantic_search()` 查證過沒有 `session.add`／`commit`／`record_observation`。
+    而且 session 分群有一個 E3 沒有的性質——`_stable_session_id()` 是
+    `sha256(project|首筆時間|首筆 source_ref)`。抄第二份就等於保證「同一批資料、
+    儀表板與 MCP 給出不同的 session id」，那比欄位漂移更糟：呼叫端 agent 根本沒辦法
+    拿 MCP 的結果去對照人在畫面上看到的東西。
+
+    **D1 沒有被繞過。** D1 禁的是 `core.database.get_db()`／`Database()`／
+    `session_scope()` 那一套，因為它們會跑 migration、寫備份、下 WAL PRAGMA，而且
+    `session_scope()` 結束一定 commit。這個類別三件都不做：engine 是
+    `mode=ro` ＋ `PRAGMA query_only=ON`，離開時只 `close()`。真正的保證在引擎層——
+    就算 `core` 哪天在那兩支裡加了寫入，拿到的也是 `OperationalError`，
+    不是靜悄悄寫進去。契約測試兩邊都守：內容雜湊不變，且驅動時不得出現 commit。
+    """
+
+    def __init__(self, db_path: Path | None = None):
+        self._db_path = db_path
+
+    @contextmanager
+    def session_scope(self) -> Iterator[Any]:
+        with read_only_session(self._db_path) as session:
+            yield session
+
+
+# ---- source_ref 自證指標（三態 resolver 的前提） --------------------------------
+
+# 每張表的「出生身分」欄位。**只能挑插入之後不會被改寫的欄位**：拿會變的欄位
+# （`open_loops.last_seen_at`、`project_states.updated_at`）當身分，合法更新會被誤判成
+# 「指標被重用」。契約測試鎖兩件事：七張白名單表一張都不能少，且每個欄位名在真 schema
+# 裡存在——schema 改了這裡沒跟上，測試就紅，不會靜悄悄退化成永遠 verified=false。
+IDENTITY_COLUMNS: Dict[str, Tuple[str, ...]] = {
+    "ai_prompt_events": ("timestamp", "turn_key"),
+    "git_activity_events": ("timestamp", "commit_hash"),
+    "file_activity_events": ("timestamp", "file_path", "action"),
+    "open_loops": ("created_at", "fingerprint"),
+    "project_states": ("project_key",),
+    "secretary_notes": ("created_at", "kind", "source_ref"),
+    "activity_micro_summaries": ("period_start", "period_end"),
+}
+
+REF_TOKEN_CHARS = 12
+_REF_TOKEN_RE = re.compile(r"^[0-9a-f]{%d}$" % REF_TOKEN_CHARS)
+
+
+def ref_token(table: str, row: Any) -> Optional[str]:
+    """`source_ref` 的自證附件：出生身分欄位的短雜湊。
+
+    **為什麼需要它**：全庫的主鍵都是 rowid 別名（沒有 `AUTOINCREMENT`），刪掉最大的那列
+    之後新插入會**重用同一個數字**。所以裸 `<table>:<id>` 在「查得到」時分不出
+    「還是原來那一列」與「那個位置已經換人了」。三態 resolver 必須靠呼叫端手上留著
+    發出當下的身分，這就是那個東西。
+
+    它是**單向雜湊**，不還原得出內容——所以 `file_path` 可以進雜湊而不會進輸出。
+    """
+    columns = IDENTITY_COLUMNS.get(table)
+    if not columns:
+        return None
+    digest = hashlib.sha256()
+    digest.update(table.encode("utf-8"))
+    for column in columns:
+        digest.update(b"\x1f")
+        value = row[column] if isinstance(row, dict) else getattr(row, column, None)
+        digest.update(_token_value(value).encode("utf-8", "replace"))
+    return digest.hexdigest()[:REF_TOKEN_CHARS]
+
+
+def _token_value(value: Any) -> str:
+    """把一個欄位值正規化成雜湊輸入。
+
+    **這一步不是潔癖，是正確性。** 同一列會從兩條路進來：ORM 物件（`created_at` 是
+    `datetime`）與 `sqlite3.Row`（同一欄是字串 ``'2026-09-28 10:00:00.123456'``）。
+    直接 `repr()` 兩邊會得到不同的 token，於是 `omni_resolve_ref` 會把**沒動過的列**
+    判成 `stale_reused`——一個只在「發指標的 tool 與解指標的 tool 走不同路」時才出現的
+    假警報。所以時間一律先轉成 ISO 字面，兩條路才收斂。
+    """
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if value is None:
+        return ""
+    text = str(value)
+    try:
+        return datetime.fromisoformat(text).isoformat()
+    except ValueError:
+        return text
+
+
+def resolve_ref(
+    ref: str,
+    token: Optional[str] = None,
+    db_path: Path | None = None,
+) -> Dict[str, Any]:
+    """三態解析：``ok`` / ``stale_gone`` / ``stale_reused``。
+
+    - 沒有那一列 → ``stale_gone``（指標指向的東西不在了）。
+    - 有那一列、呼叫端沒給 token → ``ok`` 但 ``verified: false``：**分不出重用**，
+      這一點必須讓呼叫端看得到，不能用 `ok` 蓋過去。
+    - 有那一列、token 對得上 → ``ok`` ＋ ``verified: true``。
+    - 有那一列、token 對不上 → ``stale_reused``：那個 id 現在是別的東西了。
+
+    回的是**投影過**的一列，不是原始 row（`file_path` 這種欄位永遠不出去）。
+    """
+    match = _SOURCE_REF_RE.match(str(ref or ""))
+    if not match:
+        return {"status": "invalid_ref", "source_ref": None, "verified": False, "row": None}
+    table, row_id = match.group(1), int(match.group(2))
+    row = resolve_source_ref(f"{table}:{row_id}", db_path)
+    if row is None:
+        return {"status": "stale_gone", "source_ref": f"{table}:{row_id}", "verified": False, "row": None}
+    actual = ref_token(table, row)
+    given = str(token or "").strip().lower()
+    if given:
+        if not _REF_TOKEN_RE.match(given):
+            return {"status": "invalid_ref", "source_ref": f"{table}:{row_id}", "verified": False, "row": None}
+        if given != actual:
+            # 列還在，但不是當初那一列。**不要回內容**——呼叫端要的是另一個東西。
+            return {
+                "status": "stale_reused",
+                "source_ref": f"{table}:{row_id}",
+                "verified": False,
+                "row": None,
+            }
+    return {
+        "status": "ok",
+        "source_ref": f"{table}:{row_id}",
+        "source_ref_token": actual,
+        "verified": bool(given),
+        "row": row,
+    }
+
+
+# 展開一列時的欄位白名單（第三道同型閘門）。**分兩層**：`metadata` 永遠回，
+# `content` 只在 `mcp.metadata_only` 為 false 時回。`file_path`／`prompt_text` 這些
+# 一個都不在名單上——展開指標不是繞過投影的後門。
+EXPAND_FIELDS: Dict[str, Dict[str, Tuple[str, ...]]] = {
+    "ai_prompt_events": {
+        "metadata": ("platform", "timestamp", "project_tag", "response_status", "turn_key"),
+        "content": ("prompt_text", "response_text"),
+    },
+    "git_activity_events": {
+        "metadata": ("timestamp", "repo_name", "branch", "files_changed_count", "insertions", "deletions"),
+        "content": ("message",),
+    },
+    "file_activity_events": {
+        "metadata": ("timestamp", "file_name", "file_type", "action", "size_bytes", "project_name"),
+        "content": ("diff_summary",),
+    },
+    "open_loops": {
+        "metadata": ("project_key", "status", "source_type", "confidence", "fingerprint",
+                     "created_at", "last_seen_at", "resolved_at"),
+        "content": ("title", "resolution_note"),
+    },
+    "project_states": {
+        "metadata": ("project_key", "display_name", "category", "status", "last_activity_at", "updated_at"),
+        "content": ("last_action_summary",),
+    },
+    "secretary_notes": {
+        "metadata": ("kind", "project_key", "source", "pinned", "created_at"),
+        "content": ("title", "body"),
+    },
+    "activity_micro_summaries": {
+        "metadata": ("period_start", "period_end", "provider", "model", "event_count", "created_at"),
+        "content": ("summary_text",),
+    },
+}
+
+_EXPAND_EXCERPT_CHARS = 600
+
+
+def expand_row(table: str, row: Dict[str, Any], *, include_content: bool) -> Dict[str, Any]:
+    """把一列投影成可以送出去的形狀。時間欄位轉字串，內容欄位刮金鑰、限長。"""
+    spec = EXPAND_FIELDS.get(table) or {}
+    out: Dict[str, Any] = {}
+    for key in spec.get("metadata", ()):  # noqa: B007
+        if key not in row:
+            continue
+        value = row[key]
+        out[key] = value if not isinstance(value, datetime) else _iso(value)
+    if include_content:
+        for key in spec.get("content", ()):
+            if key in row:
+                out[key] = _excerpt(row[key], _EXPAND_EXCERPT_CHARS)
+    return out
+
+
+# ---- omni_open_loops ---------------------------------------------------------
+
+# `core/project_engine.OPEN_LOOP_STATUSES` 的同一組字面。不 import 那個模組不是潔癖：
+# `get_open_loops_list()` 無條件呼叫 `get_db()`（[core/project_engine.py:518]），
+# 那正是 D1 禁的那一套。兩邊一致由 parity 測試守。
+OPEN_LOOP_STATUSES = ("open", "stale", "resolved", "superseded")
+
+
+def open_loops(
+    *,
+    project: Optional[str] = None,
+    status: str = "open",
+    limit: int = 50,
+    db_path: Path | None = None,
+) -> Dict[str, Any]:
+    """未結事項。**不回 `title` 也不回 `resolution_note`**（ADR-032 決策四）。
+
+    預設只回 ``open``——`core/context_memory._open_loops_by_project()` 用的是
+    ``{open, stale}``，同一批資料兩套集合會讓呼叫端 agent 困惑，所以 MCP 只認一套，
+    要 ``stale`` 必須明講。
+    """
+    limit = max(1, min(int(limit or 50), 200))
+    with read_only_session(db_path) as session:
+        query = session.query(OpenLoop).filter(OpenLoop.status == status)
+        if project:
+            query = query.filter(func.lower(OpenLoop.project_key) == project.lower())
+        rows = query.order_by(desc(OpenLoop.created_at)).limit(limit).all()
+        loops = [
+            {
+                "source_ref": source_ref("open_loops", row.id),
+                "source_ref_token": ref_token("open_loops", row),
+                "project_key": row.project_key,
+                "status": row.status,
+                "source_type": row.source_type,
+                "confidence": row.confidence,
+                "fingerprint": row.fingerprint,
+                "created_at": _iso(row.created_at),
+                "last_seen_at": _iso(row.last_seen_at),
+            }
+            for row in rows
+        ]
+    return {"loops": loops, "status_filter": status, "project": project}
+
+
+# ---- omni_work_sessions ------------------------------------------------------
+
+
+def work_sessions(
+    *,
+    project: Optional[str] = None,
+    hours: int = 72,
+    limit: int = 8,
+    db_path: Path | None = None,
+    now: datetime | None = None,
+) -> Dict[str, Any]:
+    """工作階段。**接 `core.context_memory.build_recent_work_sessions()`**，不另抄一份。
+
+    投影時處理掉兩件既有輸出裡不該出海的東西：
+
+    - **拿掉附掛的 open loops**（[core/context_memory.py:244]）。那份會帶標題，同時違反
+      「未結事項只有一個出口」與「不回標題」。要未結事項就呼叫 `omni_open_loops`。
+    - **`items[].title` 是原文**：`ai_turn` 的標題是 `[PLATFORM] <prompt 前 140 字>`
+      （[core/context_memory.py:108]），`file_activity` 的是 `ACTION: <檔名>`。所以它跟
+      `headline`／`narrative` 一樣算**內容**，受 `mcp.metadata_only` 管，不是 metadata。
+
+    `excluded` 一起送出去——「我沒看哪裡」跟「我看到什麼」一樣是脈絡。
+    """
+    from core.context_memory import build_recent_work_sessions
+    from core.time_utils import get_local_now
+
+    now = now or get_local_now()
+    return scrub_content(build_recent_work_sessions(
+        database=ReadOnlyDatabase(db_path),
+        now=now,
+        hours=hours,
+        project=project,
+        limit=limit,
+    ))
+
+
+# ---- omni_search_history -----------------------------------------------------
+
+
+class OllamaUnreachable(ReaderUnavailable):
+    """Ollama 打不到。**訊息永遠不帶 `str(exc)`**——`core/semantic_index.py:77-80`
+    會把回應 body 的前 500 字塞進 `RuntimeError`，那是已查證的洩漏面（ADR-032 D4）。"""
+
+    def __init__(self) -> None:
+        super().__init__("ollama_unreachable")
+
+
+def search_history(
+    *,
+    query: str,
+    project: Optional[str] = None,
+    since: Optional[str] = None,
+    limit: int = 6,
+    include_content: bool = True,
+    db_path: Path | None = None,
+) -> Dict[str, Any]:
+    """本機語意檢索。**retrieval-only，不做 LLM 合成**（ADR-032 決策：合成是呼叫端的事）。
+
+    這條路徑**不需要 `[rag]` extra**：向量來自 Ollama `/api/embed`，候選在
+    `semantic_documents` 的 float32 BLOB，排序是純 Python cosine——全程沒有
+    chromadb／fastembed／rank_bm25／jieba。
+
+    `since` 的語意誠實標示：`semantic_search()` 沒有時間參數，排序是在**全部候選**上做的，
+    所以這裡的 `since` 是**排序後過濾**。回傳同時帶 `since_applied: "post_rank"` 與
+    `truncated_by_since`，讓呼叫端知道自己拿到的不是「該時段內最相關的 n 筆」。
+    """
+    # **只為了認得例外型別**，不是為了發請求：打不到 Ollama 時要能把它轉成封閉字串表的
+    # `ollama_unreachable`，認不得就只能 `except Exception`，那會連真正的 bug 一起吞掉。
+    # 「mcpserver 不得自己發出請求」由契約測試掃**呼叫**而不是掃 import（D5 第二層）。
+    import requests as _requests
+
+    from core.semantic_index import semantic_search
+
+    limit = max(1, min(int(limit or 6), 20))
+    try:
+        raw = semantic_search(
+            query,
+            database=ReadOnlyDatabase(db_path),
+            project=project,
+            top_k=limit,
+        )
+    except ValueError:
+        raise ReaderUnavailable("invalid_argument") from None
+    except _requests.exceptions.RequestException:
+        raise OllamaUnreachable() from None
+    except RuntimeError:
+        # `OllamaEmbeddingProvider.embed` 對非 2xx 回應丟 RuntimeError，訊息含回應 body。
+        raise OllamaUnreachable() from None
+
+    cutoff = _parse_since(since)
+    truncated = 0
+    sources: List[Dict[str, Any]] = []
+    for item in raw.get("sources", []):
+        ref = str(item.get("source_ref") or "")
+        if not _SOURCE_REF_RE.match(ref):
+            # `semantic_documents.source_ref` 欄位寬 1500，不保證是 row 指標；
+            # 白名單外的形狀（例如 RAG 報告索引的 `report_file:<相對路徑>`）一律丟掉。
+            continue
+        updated = str(item.get("source_updated_at") or "")
+        if cutoff and updated and updated < cutoff:
+            truncated += 1
+            continue
+        entry: Dict[str, Any] = {
+            "citation": item.get("citation"),
+            "source_ref": ref,
+            "source_type": item.get("source_type"),
+            "project_key": item.get("project_key"),
+            "trust_status": item.get("trust_status"),
+            "score": item.get("score"),
+            "source_updated_at": item.get("source_updated_at"),
+        }
+        if include_content:
+            entry["title"] = _excerpt(item.get("title"), 120)
+            entry["excerpt"] = _excerpt(item.get("excerpt"), 600)
+        sources.append(entry)
+    return {
+        "sources": sources,
+        "embedding_model": raw.get("embedding_model"),
+        "indexed_candidates": raw.get("indexed_candidates", 0),
+        "since_applied": "post_rank" if since else None,
+        "truncated_by_since": truncated,
+        # 逐字沿用 core/semantic_index.py:502 的既有立場，不另寫一句。
+        "retrieval_claim_boundary": raw.get("claim_boundary"),
+    }
+
+
+def _parse_since(since: Optional[str]) -> Optional[str]:
+    """`since` 只收 ISO 日期；回一個可直接做字串比較的 `YYYY-MM-DD`。"""
+    raw = str(since or "").strip()
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw[:10]).date().isoformat()
+    except ValueError:
+        raise ReaderUnavailable("invalid_argument") from None
+
+
+# ---- omni_recent_digest ------------------------------------------------------
+
+# `record_observation()` 寫進 `secretary_notes.source_ref` 的**邏輯去重鍵**，
+# 不是 row 指標（ADR-032「共通規定」特別點名這個混淆）。這裡只拿它當查詢條件，
+# 送出去的 `source_ref` 一律是 `secretary_notes:<id>`。
+DAILY_DIGEST_PREFIX = "daily_digest:"
+WEEKLY_REVIEW_PREFIX = "weekly_review:"
+
+
+def recent_digest(
+    *,
+    date: Optional[str] = None,
+    weeks_back: Optional[int] = None,
+    limit: int = 20,
+    include_content: bool = True,
+    db_path: Path | None = None,
+    now: datetime | None = None,
+) -> Dict[str, Any]:
+    """已寫下的工作誌／週回顧。**不即時產生**。
+
+    `build_daily_digest()` 的內層 `_write()` 會呼叫 `record_observation(...)`
+    （[core/activity_digest.py:249-258]）——那是 `secretary_notes` 的 INSERT。
+    所以「沒有就順手產一份」在這裡是寫入，不是便利。沒有觀察就說沒有。
+    """
+    from core.time_utils import get_local_now
+
+    now = now or get_local_now()
+    limit = max(1, min(int(limit or 20), 100))
+
+    if weeks_back is not None:
+        label, period = _week_label(now, int(weeks_back))
+        pattern = f"{WEEKLY_REVIEW_PREFIX}{label}"
+        scope: Dict[str, Any] = {"period": label, "period_from": period[0], "period_to": period[1]}
+        exact = True
+    else:
+        day = _parse_since(date) or now.date().isoformat()
+        pattern = f"{DAILY_DIGEST_PREFIX}{day}"
+        scope = {"date": day}
+        exact = False
+
+    with read_only_session(db_path) as session:
+        query = session.query(SecretaryNote).filter(SecretaryNote.kind == "observation")
+        if exact:
+            query = query.filter(SecretaryNote.source_ref == pattern)
+        else:
+            # `daily_digest:<日期>` 與 `daily_digest:<日期>:<專案>` 兩種都要，
+            # 但 `daily_digest:2026-09-1` 不可以撈到 `2026-09-19`——所以是
+            # 「等於」或「以 `<pattern>:` 開頭」，不是裸 LIKE。
+            query = query.filter(
+                (SecretaryNote.source_ref == pattern)
+                | (SecretaryNote.source_ref.like(f"{pattern}:%"))
+            )
+        rows = query.order_by(desc(SecretaryNote.created_at)).limit(limit).all()
+        notes: List[Dict[str, Any]] = []
+        for row in rows:
+            entry: Dict[str, Any] = {
+                "source_ref": source_ref("secretary_notes", row.id),
+                "source_ref_token": ref_token("secretary_notes", row),
+                "project_key": row.project_key,
+                "created_at": _iso(row.created_at),
+            }
+            if include_content:
+                entry["title"] = _excerpt(row.title, 160)
+                entry["body"] = _excerpt(row.body, 2000)
+            notes.append(entry)
+    return {"notes": notes, **scope}
+
+
+def _week_label(now: datetime, weeks_back: int) -> Tuple[str, Tuple[str, str]]:
+    """ISO 週標籤，逐字對上 `core/weekly_review.review_period()` 寫進去的那個。
+
+    **`weeks_back=0` 不會被悄悄改成 1。** `review_period()` 自己 `max(1, …)`
+    （[core/weekly_review.py:76]），因為週回顧只寫**已結束**的週；把 0 送進去會拿到
+    上一週的資料卻標著 0，那是說謊。所以 0 在這裡自己算「進行中的這一週」，
+    照實去找（幾乎一定找不到），由 `no_observation` ＋ `next_step` 說明原因。
+    """
+    from datetime import timedelta
+
+    if weeks_back <= 0:
+        start = now.date() - timedelta(days=now.date().weekday())
+    else:
+        from core.weekly_review import review_period
+
+        start, _end, _label = review_period(now, weeks_back)
+    end = start + timedelta(days=6)
+    iso_year, iso_week, _ = start.isocalendar()
+    return f"{iso_year}-W{iso_week:02d}", (start.isoformat(), end.isoformat())
+
+
+def ref_tokens_for(refs: Iterable[str], db_path: Path | None = None) -> Dict[str, str]:
+    """一批 `source_ref` 的自證附件，**每張表一次查詢**。
+
+    `work_sessions()` 與 `search_history()` 的結果來自 `core` 的函式，手上沒有 ORM 物件，
+    所以不能像其他 reader 那樣就地算 token。沒有 token 的指標在
+    `omni_resolve_ref` 只能回 `verified: false`——那等於這兩個 tool 的指標比別人弱一級。
+    與其把那個不對稱留給呼叫端，不如多做最多七次 `SELECT`（每張白名單表一次）。
+    """
+    import sqlite3
+
+    wanted: Dict[str, List[int]] = {}
+    for ref in refs:
+        match = _SOURCE_REF_RE.match(str(ref or ""))
+        if match:
+            wanted.setdefault(match.group(1), []).append(int(match.group(2)))
+    if not wanted:
+        return {}
+    path = Path(db_path) if db_path is not None else database_path()
+    if not path.is_file():
+        return {}
+    out: Dict[str, str] = {}
+    with sqlite3.connect(read_only_uri(path), uri=True) as connection:
+        connection.execute("PRAGMA query_only=ON")
+        connection.row_factory = sqlite3.Row
+        known = {
+            row[0]
+            for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+        for table, ids in wanted.items():
+            if table not in known:
+                continue
+            columns = IDENTITY_COLUMNS.get(table)
+            if not columns:
+                continue
+            quoted = table.replace('"', '""')
+            selected = ", ".join('"%s"' % column.replace('"', '""') for column in ("id",) + columns)
+            placeholders = ",".join("?" * len(ids))
+            rows = connection.execute(
+                f'SELECT {selected} FROM "{quoted}" WHERE id IN ({placeholders})', ids
+            ).fetchall()
+            for row in rows:
+                out[f"{table}:{row['id']}"] = ref_token(table, dict(row))
+    return out

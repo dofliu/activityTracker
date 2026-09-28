@@ -959,9 +959,15 @@ mcp:
 python main.py mcp --selftest
 ```
 
-它會把兩個 tool 各跑一次，並附上唯讀證明：前後比對每一張表的 `(列數, 全表內容雜湊)`，
-確認每一筆 `source_ref` 都回查得到，並掃描輸出裡有沒有絕對路徑或金鑰樣式。
-`status: passed` 才算通過。
+它會把七個 tool 各跑一次，並附上唯讀證明：前後比對每一張表的 `(列數, 全表內容雜湊)`，
+確認每一筆 `source_ref` 都回查得到（而且拿 `source_ref_token` 驗過是同一列），
+並掃描輸出裡有沒有絕對路徑或金鑰樣式。`status: passed` 才算通過。
+
+沒開本機 Ollama 的話，`omni_search_history` 會被記成 `tools_skipped` 而不是通過——
+**「沒裝」不等於「沒問題」**，所以它在收據裡是一個看得見的欄位。
+
+同一次也會把結果落成 `reports/mcp/mcp-selftest-<時間>-<pid>.json`，
+驗收中心的 A23／A25／A26 讀的就是那份檔案。
 
 ### 10.3 掛到 Claude Code
 
@@ -983,28 +989,49 @@ stdio 是子程序管線，不是網路介面，所以完全不動 loopback 邊�
 `OMNICONTEXT_HOME` 與 `OMNICONTEXT_CONFIG` 是這個程序**唯一會讀的兩個環境變數**；
 它不讀任何 API key，也不會把你環境裡的金鑰轉發給任何人。
 
-### 10.4 第一版有哪兩個 tool
+### 10.4 七個 tool
 
 | Tool | 回什麼 |
 | :--- | :--- |
 | `omni_project_state` | canonical 專案清單：狀態、閒置天數、未結事項計數、repo 名稱。**不回本機路徑**；`state_recorded_at` 告訴你這份快照是什麼時候記下的 |
 | `omni_handoff` | 某個專案的接續脈絡：未結事項、最近 commit／檔案／AI 對話，外加一份 markdown |
+| `omni_search_history` | 本機語意檢索（需要 Ollama）。**retrieval-only：只回證據與指標，不回合成過的答案**——合成是呼叫端 agent 的事 |
+| `omni_open_loops` | 未結事項清單。預設只回 `open`，要 `stale` 必須明講。**不回標題** |
+| `omni_work_sessions` | 最近的工作階段（以專案＋停頓間隔分群）。session id 與儀表板上看到的是同一個 |
+| `omni_recent_digest` | 已經寫下的工作誌（`date`）或週回顧（`weeks_back`）。**不會即時產生** |
+| `omni_resolve_ref` | 把 `source_ref` 展開成一列。**三態**：`ok`／`stale_gone`／`stale_reused` |
 
-每一筆都帶 `source_ref`（`<table>:<id>`）指回 SQLite row。三件要先知道的事：
+每一筆都帶 `source_ref`（`<table>:<id>`）指回 SQLite row，外加一個 `source_ref_token`。
+幾件要先知道的事：
 
 - **回的是快照，不是此刻重算的**。MCP 唯讀，不准觸發專案狀態重整——主服務沒在跑的時候
   它就會舊，所以 `state_recorded_at` 一定要看。
-- **`omni_handoff` 不回未結事項的標題**。那些標題是從 AI 對話抽出來的，可能含你的原始提問。
-- **`source_ref` 目前展不開**。它可引用、可去重、可交叉比對，但還沒有一個 tool 能把指標
-  解回那一列（`omni_resolve_ref` 排在下一階段）。
+- **未結事項不回標題**。那些標題是從 AI 對話抽出來的，可能含你的原始提問。要標題就拿
+  那一筆的 `source_ref` ＋ `source_ref_token` 去問 `omni_resolve_ref`——等於「預設不給，
+  指名才展開」。
+- **`source_ref_token` 不是裝飾品**。本專案的主鍵都是 rowid 別名（沒有 `AUTOINCREMENT`），
+  刪掉最大的那列之後新插入會**重用同一個數字**。所以裸指標分不出「還是原來那一列」與
+  「那個位置換人了」；不帶 token 時 `omni_resolve_ref` 只會回 `verified: false`，
+  帶了才分得出 `stale_reused`。
+- **查不到不會冒充沒發生**。Ollama 打不到時 `omni_search_history` 回
+  `status: "unavailable"` ＋ `reason: "ollama_unreachable"`，**不會**改用雲端供應商，
+  也**不會**回一個空陣列裝作「查過了，沒有」。同理 `omni_recent_digest` 對沒有觀察的
+  日期回 `observed: false`——那代表採集器沒看到東西，不代表你那天沒工作。
+- **空手而回一定附 `next_step`**。每個 tool 在查無結果或指標過期時都會說出下一步該做什麼，
+  不會只丟一個空陣列讓呼叫端自己猜。
+- **兩個 tool 的「今天」不是同一個今天**。`omni_work_sessions` 用閉區間
+  `since <= ts <= until`，日摘要那條路用的是半開區間 `[00:00, 隔日 00:00)`；
+  回傳裡的 `window.bounds` 會說出自己用哪一把尺。
 
-其餘四個 tool（`omni_search_history`／`omni_open_loops`／`omni_work_sessions`／
-`omni_recent_digest`）在下一階段。
+`mcp.metadata_only: true` 時，**所有使用者寫的字**都不會出現——不只是對話節錄，
+還包括工作誌的標題與內文、work session 的敘述、檢索結果的標題與節錄。
 
 ### 10.5 它會留下什麼
 
 每次 tool call 寫一筆收據到 `reports/mcp/mcp-receipts-<日期>-<pid>.jsonl`：
 tool 名、成功與否、結果筆數、耗時、錯誤代碼。**不記你問了什麼，也不記參數值**。
+Ollama 打不到那種情況收據記的是 `ok: false` ＋ 代碼，不是「成功但沒有結果」——
+收據不能比回傳值鬆。
 收據寫檔案而不是寫資料庫，是為了讓「唯讀」能用最強的形式成立——這個程序從頭到尾
 沒有一條可寫的資料庫連線，而不是「唯讀，但它自己的收據表除外」。
 

@@ -89,3 +89,64 @@ def read_receipts(path: Path) -> list[Dict[str, Any]]:
         if line:
             out.append(json.loads(line))
     return out
+
+
+# selftest 的收據檔名。**與 tool call 收據刻意分開**（不同副檔名、不同前綴）：
+# 一個是 append-only 的逐筆流水，一個是一次完整檢查的快照，混在同一個檔案裡
+# 會讓「最近一次唯讀證明」變成要自己拼湊的東西。驗收中心讀的是這一個。
+SELFTEST_PREFIX = "mcp-selftest-"
+SELFTEST_GLOB = f"{SELFTEST_PREFIX}*.json"
+
+
+def write_selftest_receipt(report: Dict[str, Any], now: datetime | None = None) -> Optional[Path]:
+    """把一次 selftest 的結果落成檔案。
+
+    **為什麼要落檔**：A23／A25／A26 是驗收中心的項目，驗收中心只讀本機便宜證據、
+    不會替使用者跑 tool（那會變成「驗收自己製造收據」）。selftest 只印到 stdout 的話，
+    那三項就永遠只能是 `needs_human`——本來說好機器可查的三項會退化成人工。
+
+    寫不進去不讓 selftest 失敗，理由與 `write_receipt()` 相同。
+    """
+    from core.time_utils import get_local_now
+
+    moment = now or get_local_now()
+    path = receipts_dir() / f"{SELFTEST_PREFIX}{moment.strftime('%Y%m%d-%H%M%S')}-{os.getpid()}.json"
+    record = {"ts": moment.isoformat(timespec="seconds"), **report}
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        return None
+    return path
+
+
+def latest_selftest_receipt(directory: Path | None = None) -> Optional[Dict[str, Any]]:
+    """最近一次 selftest 的收據；沒有就是 None（**不是**空字典——「沒跑過」要看得出來）。"""
+    folder = directory or receipts_dir()
+    if not folder.is_dir():
+        return None
+    files = sorted(folder.glob(SELFTEST_GLOB), key=lambda p: p.stat().st_mtime, reverse=True)
+    for candidate in files:
+        try:
+            data = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict):
+            data["receipt_name"] = candidate.name
+            return data
+    return None
+
+
+# selftest 應該答得出來的 tool 名單。**住在這裡而不是 `tools.py`**：驗收中心
+# （`core/acceptance/readings.py`）要拿它比對收據，而 `tools.py` 會 import `readers`，
+# 那會把 SQLAlchemy 與 `core.models` 拉進驗收的 import 路徑上——驗收讀的是一份 JSON 檔，
+# 不該為此多載一整套 ORM。契約測試鎖住它與 `tools.TOOL_NAMES` 逐字相同。
+EXPECTED_TOOLS = (
+    "omni_project_state",
+    "omni_handoff",
+    "omni_search_history",
+    "omni_open_loops",
+    "omni_work_sessions",
+    "omni_recent_digest",
+    "omni_resolve_ref",
+)

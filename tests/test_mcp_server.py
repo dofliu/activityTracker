@@ -34,6 +34,7 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 
 import mcpserver
@@ -44,6 +45,7 @@ from core.models import (
     GitActivityEvent,
     OpenLoop,
     ProjectState,
+    SecretaryNote,
 )
 from mcpserver import availability, readers, receipts, tools
 
@@ -95,6 +97,21 @@ def seeded_db(tmp_path) -> Path:
                 project_tag="aurora-notes", cwd="/home/victim/code/aurora",
                 source_path="/home/victim/.claude/projects/x.jsonl", source_position=7,
                 turn_key="a" * 64, response_status="final_candidate",
+            ),
+            # E4：omni_recent_digest 讀的是 record_observation() 寫下的觀察。
+            # `source_ref` 這一欄是**邏輯去重鍵**不是 row 指標——這正是 ADR-032
+            # 特別點名的那個同名不同義，種子要長成真的那樣才測得到。
+            SecretaryNote(
+                kind="observation", title="2026-09-27 工作誌",
+                body=f"今天在 aurora-notes 上動了三個檔案。{HOSTILE_PROMPT}",
+                source="daily_digest", source_ref="daily_digest:2026-09-27",
+                created_at=NOW - timedelta(days=1),
+            ),
+            SecretaryNote(
+                kind="observation", title="2026-W39 回顧（09-21～09-27）",
+                body="這一週的重心是 aurora-notes。",
+                source="weekly_review", source_ref="weekly_review:2026-W39",
+                created_at=NOW - timedelta(days=1),
             ),
         ]
     )
@@ -461,12 +478,32 @@ def test_open_loops_carry_a_pointer_but_never_a_title(seeded_db):
 
 
 def test_metadata_only_removes_every_excerpt(monkeypatch, seeded_db):
+    """E4 把這條線從「節錄」擴大到**所有使用者寫的字**。
+
+    E3 只拿掉三個節錄欄位，於是 `metadata_only: true` 一邊宣稱「只回 metadata
+    不回任何內容節錄」（三處逐字的隱私邊界原文），一邊照樣送出
+    `secretary_notes.title/body`、work session 的 `headline`／`narrative`／`items[].title`
+    （後者含 prompt 前 140 字）。那條線畫錯了，E4 改成「內容＝使用者寫的字」。
+    """
     monkeypatch.setattr(availability, "metadata_only", lambda *a, **k: True)
     handoff = tools.omni_handoff({"project": "aurora-notes"}, db_path=seeded_db, now=NOW)
     assert handoff["excerpts_enabled"] is False
     turn = handoff["recent_ai_turns"][0]
     assert "prompt_excerpt" not in turn and "response_excerpt" not in turn
-    assert "好的，我不會那樣做" not in handoff["markdown"]
+    # markdown 是整份重排過的內容，metadata_only 時整個鍵都不該在（不是留空字串——
+    # 留空字串會讓呼叫端以為「這個專案沒有脈絡」）。
+    assert "markdown" not in handoff
+
+    digest = tools.omni_recent_digest({"date": "2026-09-27"}, db_path=seeded_db, now=NOW)
+    assert digest["observed"] is True and digest["notes"], "種子沒生效，這條會變成空轉"
+    for note in digest["notes"]:
+        assert "title" not in note and "body" not in note, note
+        assert note["source_ref"].startswith("secretary_notes:")
+
+    sessions = tools.omni_work_sessions({"hours": 24 * 30}, db_path=seeded_db, now=NOW)
+    assert sessions["sessions"], "種子沒生效，這條會變成空轉"
+    blob = json.dumps(sessions, ensure_ascii=False, default=str)
+    assert HOSTILE_PROMPT not in blob and "headline" not in blob and "narrative" not in blob
 
 
 def test_every_result_carries_a_resolvable_source_ref(seeded_db):
@@ -609,3 +646,648 @@ def test_the_privacy_boundary_is_verbatim_in_all_three_places():
         for sentence in PRIVACY_SENTENCES:
             needle = re.sub(r"\s+", "", sentence)
             assert needle in blob, f"{target.name} 少了隱私邊界的這一句：{sentence}"
+
+
+# ============================================================================
+# E4：其餘五個 tool（TODO E4）
+# ============================================================================
+
+
+def _all_tools(db, now=NOW):
+    """七個 tool 各跑一次，回 {name: payload}。Ollama 打不到的那個照樣有 payload。"""
+    project = "aurora-notes"
+    return {
+        "omni_project_state": tools.omni_project_state({}, db_path=db, now=now),
+        "omni_handoff": tools.omni_handoff({"project": project}, db_path=db, now=now),
+        "omni_open_loops": tools.omni_open_loops({}, db_path=db, now=now),
+        "omni_work_sessions": tools.omni_work_sessions({"hours": 24 * 30}, db_path=db, now=now),
+        "omni_recent_digest": tools.omni_recent_digest({"date": "2026-09-27"}, db_path=db, now=now),
+        "omni_search_history": tools.omni_search_history({"query": "aurora"}, db_path=db, now=now),
+        "omni_resolve_ref": tools.omni_resolve_ref({"source_ref": "open_loops:1"}, db_path=db, now=now),
+    }
+
+
+def test_seven_tools_are_registered_and_dispatch_is_aligned():
+    assert len(tools.TOOLS) == 7
+    assert set(tools.DISPATCH) == set(tools.TOOL_NAMES)
+    # 驗收中心拿的是 receipts.EXPECTED_TOOLS（那裡不能 import tools——會把 ORM 拉上
+    # 驗收的 import 路徑）。兩份名單分開住，就必須有人對帳。
+    assert set(receipts.EXPECTED_TOOLS) == set(tools.TOOL_NAMES)
+    assert set(tools.RESULT_COUNT_KEYS) == set(tools.TOOL_NAMES)
+    for tool in tools.TOOLS:
+        assert tool["inputSchema"]["additionalProperties"] is False, tool["name"]
+
+
+def test_every_tool_envelope_has_the_same_four_common_keys(seeded_db):
+    """共通規定：最外層一律帶 schema_version／generated_at／claim_boundary／next_step。"""
+    for name, payload in _all_tools(seeded_db).items():
+        assert payload["schema_version"] == tools.SCHEMA_VERSION, name
+        assert payload["generated_at"].startswith("2026-09-28"), name
+        assert payload["claim_boundary"] == tools.CLAIM_BOUNDARY, name
+        assert "next_step" in payload, f"{name} 少了 next_step"
+        assert payload["tool"] == name
+
+
+def test_every_empty_or_stale_path_carries_a_next_step(seeded_db):
+    """空手而回時必須說出下一步——空陣列加沉默等於讓呼叫端自己瞎猜（TODO E4）。"""
+    empties = {
+        "project_state": tools.omni_project_state({"project": "沒有這個專案"}, db_path=seeded_db, now=NOW),
+        "handoff": tools.omni_handoff({"project": "沒有這個專案"}, db_path=seeded_db, now=NOW),
+        "open_loops": tools.omni_open_loops({"status": "resolved"}, db_path=seeded_db, now=NOW),
+        "work_sessions": tools.omni_work_sessions({"hours": 1}, db_path=seeded_db, now=NOW),
+        "digest": tools.omni_recent_digest({"date": "1999-01-01"}, db_path=seeded_db, now=NOW),
+        "search": tools.omni_search_history({"query": "aurora"}, db_path=seeded_db, now=NOW),
+        "gone": tools.omni_resolve_ref({"source_ref": "open_loops:99999"}, db_path=seeded_db, now=NOW),
+    }
+    for name, payload in empties.items():
+        assert payload["result"] in {"empty", "stale", "unavailable"}, (name, payload["result"])
+        assert payload["next_step"], f"{name} 空手而回卻沒有 next_step"
+        assert len(payload["next_step"]) > 10, name
+
+
+# ---- omni_search_history -----------------------------------------------------
+
+
+def test_search_history_says_unavailable_instead_of_faking_an_empty_result(monkeypatch, seeded_db, tmp_path):
+    """Ollama 打不到時**不得**回空陣列冒充「沒有結果」，也不得 fallback 到雲端。"""
+    import requests
+
+    def _boom(*args, **kwargs):
+        raise requests.exceptions.ConnectionError("Connection refused to 127.0.0.1:11434")
+
+    monkeypatch.setattr(requests, "post", _boom)
+    monkeypatch.setattr(receipts, "receipts_dir", lambda: tmp_path / "mcp")
+
+    payload = tools.call_tool(
+        "omni_search_history", {"query": "aurora"},
+        db_path=seeded_db, now=NOW, enforce_gate=False,
+    )
+    assert payload["status"] == "unavailable"
+    assert payload["reason"] == "ollama_unreachable"
+    # **None 不是 []**：空清單會被呼叫端讀成「查過了，沒有」。
+    assert payload["sources"] is None
+    assert "ollama" in payload["next_step"].lower()
+
+    # 收據也不能比回傳值鬆：ok=false ＋ 代碼，否則對帳時它看起來像一次成功的空查詢。
+    lines = receipts.read_receipts(receipts.receipt_path(NOW))
+    assert lines and lines[-1]["ok"] is False
+    assert lines[-1]["error_code"] == "ollama_unreachable"
+
+
+def test_search_history_never_reaches_for_a_cloud_provider(monkeypatch, seeded_db):
+    """ADR-023：本機檢索打不到就打不到，不准偷偷換一個雲端供應商。"""
+    import core.llm_client as llm
+
+    def _forbidden(*args, **kwargs):  # pragma: no cover - 命中就是壞了
+        raise AssertionError("omni_search_history 不得呼叫任何 LLM provider")
+
+    monkeypatch.setattr(llm.LLMClient, "__init__", _forbidden)
+    import requests
+
+    monkeypatch.setattr(requests, "post", lambda *a, **k: (_ for _ in ()).throw(
+        requests.exceptions.ConnectionError("down")))
+    payload = tools.omni_search_history({"query": "aurora"}, db_path=seeded_db, now=NOW)
+    assert payload["status"] == "unavailable"
+
+
+def test_search_history_is_retrieval_only(monkeypatch, seeded_db):
+    """retrieval-only：回證據與指標，**不回合成出來的答案**。"""
+    fake = {
+        "embedding_model": "bge-m3:latest",
+        "indexed_candidates": 3,
+        "claim_boundary": "Similarity ranks local evidence; it does not validate source truth or coverage.",
+        "sources": [
+            {"citation": "S1", "source_ref": "ai_prompt_events:1", "source_type": "ai_turn",
+             "project_key": "aurora-notes", "trust_status": "final_candidate", "score": 0.91,
+             "source_updated_at": "2026-09-28T09:00:00", "title": "claude_code AI turn",
+             "excerpt": "Prompt:\n" + HOSTILE_PROMPT},
+            # 白名單外的形狀（RAG 報告索引）必須被丟掉，不能當成 row 指標送出去。
+            {"citation": "S2", "source_ref": "report_file:reports/x.md", "source_type": "report",
+             "project_key": None, "trust_status": "observed", "score": 0.7,
+             "source_updated_at": None, "title": "x", "excerpt": "..."},
+        ],
+    }
+    monkeypatch.setattr("core.semantic_index.semantic_search", lambda *a, **k: fake)
+    payload = tools.omni_search_history({"query": "aurora"}, db_path=seeded_db, now=NOW)
+    assert payload["status"] == "retrieved"
+    assert "answer" not in payload and "answer_model" not in payload
+    assert [s["source_ref"] for s in payload["sources"]] == ["ai_prompt_events:1"]
+    assert payload["sources"][0]["source_ref_token"], "指標沒帶自證附件"
+    # claim boundary 逐字沿用 core/semantic_index.py 的既有字串，不另寫一句。
+    assert payload["retrieval_claim_boundary"] == fake["claim_boundary"]
+    # 金鑰被刮掉，路徑刻意保留（節錄是使用者 opt-in 的自己的內容）。
+    assert "sk-abcdefghijklmnop" not in payload["sources"][0]["excerpt"]
+    assert "/home/victim" in payload["sources"][0]["excerpt"]
+
+
+def test_search_history_marks_since_as_a_post_rank_filter(monkeypatch, seeded_db):
+    fake = {
+        "embedding_model": "m", "indexed_candidates": 2, "claim_boundary": "b",
+        "sources": [
+            {"citation": "S1", "source_ref": "ai_prompt_events:1", "source_type": "ai_turn",
+             "project_key": None, "trust_status": "t", "score": 0.9,
+             "source_updated_at": "2020-01-01T00:00:00", "title": "老的", "excerpt": "x"},
+        ],
+    }
+    monkeypatch.setattr("core.semantic_index.semantic_search", lambda *a, **k: fake)
+    payload = tools.omni_search_history(
+        {"query": "aurora", "since": "2026-01-01"}, db_path=seeded_db, now=NOW
+    )
+    assert payload["since_applied"] == "post_rank"
+    assert payload["truncated_by_since"] == 1
+    assert "排序" in payload["next_step"], "砍掉結果卻沒說 since 是排序後過濾"
+
+
+# ---- omni_open_loops ---------------------------------------------------------
+
+
+def test_open_loops_is_the_single_exit_and_defaults_to_open_only(seeded_db):
+    payload = tools.omni_open_loops({}, db_path=seeded_db, now=NOW)
+    assert payload["status_filter"] == "open"
+    assert payload["titles_withheld"] is True
+    assert payload["loops"] and all("title" not in loop for loop in payload["loops"])
+    assert all("resolution_note" not in loop for loop in payload["loops"])
+    # 預設集合是 {open}，不是 core/context_memory 的 {open, stale}。
+    stale = tools.omni_open_loops({"status": "stale"}, db_path=seeded_db, now=NOW)
+    assert stale["loops"] == [] and stale["next_step"]
+
+
+def test_open_loops_turns_an_invalid_status_into_a_tool_error(seeded_db):
+    """`get_open_loops_list()` 對白名單外的 status 會 raise ValueError；
+    traceback 不得穿過 stdio（ADR-032）。"""
+    with pytest.raises(tools.ToolError) as excinfo:
+        tools.omni_open_loops({"status": "不存在"}, db_path=seeded_db, now=NOW)
+    assert excinfo.value.code == "invalid_argument"
+    assert str(excinfo.value) == tools.ERRORS["invalid_argument"]
+    assert "不存在" not in str(excinfo.value), "錯誤訊息把參數值回音出去了"
+
+
+# ---- omni_work_sessions ------------------------------------------------------
+
+
+def test_work_sessions_drops_the_attached_open_loops(seeded_db):
+    """既有實作會在每個 session 掛最多 3 筆**帶標題**的 open loop。那同時違反
+    「未結事項只有一個出口」與「不回標題」，所以投影必須把它拿掉。"""
+    raw = readers.work_sessions(hours=24 * 30, db_path=seeded_db, now=NOW)
+    attached = raw["sessions"][0]["open_loops"]
+    # **比對的是值，不是 JSON 子字串**：HOSTILE_TITLE 裡有反斜線，
+    # `json.dumps` 會把它變成 `\\`，子字串比對於是永遠不成立——一條看起來很硬、
+    # 實際上兩邊都會過的空轉測試。
+    assert attached and attached[0]["title"] == HOSTILE_TITLE, "上游沒掛 open loops，這條會變成空轉"
+
+    payload = tools.omni_work_sessions({"hours": 24 * 30}, db_path=seeded_db, now=NOW)
+    assert all("open_loops" not in node for node in _iter_maps(payload))
+    assert HOSTILE_TITLE not in set(_strings(payload))
+
+
+def test_work_sessions_reports_what_it_did_not_look_at(seeded_db):
+    payload = tools.omni_work_sessions({"hours": 24 * 30}, db_path=seeded_db, now=NOW)
+    assert payload["coverage"]["excluded"] == ["window_focus_without_canonical_project"]
+    # 時間窗語意：collect_work_observations() 是閉區間，day_bounds() 是半開區間。
+    # 兩個 tool 的「今天」不是同一個今天，回傳要說出來。
+    assert payload["window"]["bounds"] == "closed"
+    assert payload["window"]["hours"] == 24 * 30
+    assert "時間推論" in payload["session_claim_boundary"] or "temporal" in payload["session_claim_boundary"].lower()
+
+
+# ---- omni_recent_digest ------------------------------------------------------
+
+
+def test_recent_digest_never_generates_anything(seeded_db):
+    """沒有觀察就回 no_observation。**不得**呼叫 build_daily_digest()——那是 INSERT。"""
+    before = readers.database_contract(seeded_db)
+    payload = tools.omni_recent_digest({"date": "1999-01-01"}, db_path=seeded_db, now=NOW)
+    after = readers.database_contract(seeded_db)
+    assert before == after, "查一個沒有觀察的日期竟然寫了東西"
+    assert payload["status"] == "no_observation"
+    # 結構化旗標是刻意的：中文句子會被呼叫端讀成「使用者那天沒工作」。
+    assert payload["observed"] is False
+    assert payload["generated_on_demand"] is False
+    assert payload["date"] == "1999-01-01"
+    assert "不代表" in payload["next_step"]
+
+
+def test_recent_digest_finds_the_day_note_and_returns_a_row_pointer(seeded_db):
+    payload = tools.omni_recent_digest({"date": "2026-09-27"}, db_path=seeded_db, now=NOW)
+    assert payload["status"] == "found" and payload["observed"] is True
+    note = payload["notes"][0]
+    # 送出去的是 row 指標，**不是**那一列自己的 source_ref 欄位（daily_digest:...）。
+    assert note["source_ref"].startswith("secretary_notes:")
+    assert "daily_digest" not in json.dumps(payload, ensure_ascii=False)
+    assert note["title"].startswith("2026-09-27")
+
+
+def test_recent_digest_day_prefix_does_not_bleed_into_a_longer_date(seeded_db):
+    """`daily_digest:2026-09-2` 不可以撈到 `2026-09-27`——所以不是裸 LIKE。"""
+    payload = tools.omni_recent_digest({"date": "2026-09-02"}, db_path=seeded_db, now=NOW)
+    assert payload["observed"] is False, payload["notes"]
+
+
+def test_recent_digest_weeks_back_zero_is_not_silently_turned_into_one(seeded_db):
+    """`review_period()` 自己 max(1, …)，把 0 送進去會拿到上一週的資料卻標著 0。"""
+    week_one = tools.omni_recent_digest({"weeks_back": 1}, db_path=seeded_db, now=NOW)
+    week_zero = tools.omni_recent_digest({"weeks_back": 0}, db_path=seeded_db, now=NOW)
+    assert week_one["period"] != week_zero["period"], "weeks_back=0 被悄悄當成 1"
+    assert week_one["period"] == "2026-W39" and week_one["observed"] is True
+    assert week_zero["observed"] is False
+    assert "已結束" in week_zero["next_step"]
+
+
+def test_recent_digest_rejects_both_parameters_at_once(seeded_db):
+    with pytest.raises(tools.ToolError) as excinfo:
+        tools.omni_recent_digest({"date": "2026-09-27", "weeks_back": 1}, db_path=seeded_db, now=NOW)
+    assert excinfo.value.code == "invalid_argument"
+
+
+# ---- omni_resolve_ref（三態） -------------------------------------------------
+
+
+def test_resolve_ref_has_three_states_not_two(seeded_db):
+    """裸 `<table>:<id>` 分不出「被刪」與「被重用」——全庫主鍵都是 rowid 別名。"""
+    loops = tools.omni_open_loops({}, db_path=seeded_db, now=NOW)["loops"]
+    ref, token = loops[0]["source_ref"], loops[0]["source_ref_token"]
+
+    # ① 有 token：ok ＋ verified
+    ok = tools.omni_resolve_ref({"source_ref": ref, "source_ref_token": token},
+                                db_path=seeded_db, now=NOW)
+    assert ok["status"] == "ok" and ok["verified"] is True
+    assert ok["row"]["title"] == HOSTILE_TITLE, "展開之後才拿得到標題（omni_open_loops 不給）"
+    assert ok["next_step"] is None
+
+    # ② 沒 token：ok 但 verified=false，而且要講清楚為什麼
+    bare = tools.omni_resolve_ref({"source_ref": ref}, db_path=seeded_db, now=NOW)
+    assert bare["status"] == "ok" and bare["verified"] is False
+    assert "重用" in bare["next_step"]
+
+    # ③ 不存在：stale_gone
+    gone = tools.omni_resolve_ref({"source_ref": "open_loops:99999"}, db_path=seeded_db, now=NOW)
+    assert gone["status"] == "stale_gone" and gone["row"] is None and gone["next_step"]
+
+
+def test_resolve_ref_detects_a_reused_row_id(seeded_db):
+    """真的把最大的那一列刪掉再插一筆——SQLite 會把同一個 id 發回來。"""
+    engine = create_engine(f"sqlite:///{seeded_db.as_posix()}")
+    session = sessionmaker(bind=engine)()
+    row = session.query(OpenLoop).order_by(OpenLoop.id.desc()).first()
+    reused_id = row.id
+    before = tools.omni_open_loops({}, db_path=seeded_db, now=NOW)["loops"][0]
+    assert before["source_ref"] == f"open_loops:{reused_id}"
+    old_token = before["source_ref_token"]
+
+    session.delete(row)
+    session.commit()
+    session.add(OpenLoop(
+        project_key="另一個專案", title="完全不同的事", source_type="manual", status="open",
+        confidence=1.0, fingerprint="fp-2", created_at=NOW, last_seen_at=NOW,
+    ))
+    session.commit()
+    new_id = session.query(OpenLoop).order_by(OpenLoop.id.desc()).first().id
+    session.close()
+    engine.dispose()
+    assert new_id == reused_id, "SQLite 沒有重用 id，這個測試就沒有在測它要測的東西"
+
+    stale = tools.omni_resolve_ref(
+        {"source_ref": f"open_loops:{reused_id}", "source_ref_token": old_token},
+        db_path=seeded_db, now=NOW,
+    )
+    assert stale["status"] == "stale_reused"
+    # 那個位置已經換人了，內容刻意不回——回了就是把別人的東西當成你要的那筆。
+    assert stale["row"] is None and stale["verified"] is False
+    assert "完全不同的事" not in json.dumps(stale, ensure_ascii=False)
+
+
+def test_resolve_ref_projects_instead_of_dumping_the_raw_row(seeded_db):
+    """展開指標不是繞過白名單投影的後門：`file_path` 這種欄位永遠不出去。"""
+    handoff = tools.omni_handoff({"project": "aurora-notes"}, db_path=seeded_db, now=NOW)
+    ref = handoff["recent_files"][0]["source_ref"]
+    token = handoff["recent_files"][0]["source_ref_token"]
+    out = tools.omni_resolve_ref({"source_ref": ref, "source_ref_token": token},
+                                 db_path=seeded_db, now=NOW)
+    assert out["status"] == "ok" and out["row"]["file_name"] == "x.py"
+    assert "file_path" not in out["row"]
+    assert "/home/victim" not in json.dumps(out, ensure_ascii=False)
+
+
+def test_resolve_ref_respects_metadata_only(monkeypatch, seeded_db):
+    monkeypatch.setattr(availability, "metadata_only", lambda *a, **k: True)
+    loops = tools.omni_open_loops({}, db_path=seeded_db, now=NOW)["loops"]
+    out = tools.omni_resolve_ref(
+        {"source_ref": loops[0]["source_ref"], "source_ref_token": loops[0]["source_ref_token"]},
+        db_path=seeded_db, now=NOW,
+    )
+    assert out["status"] == "ok" and out["content_included"] is False
+    assert "title" not in out["row"] and "resolution_note" not in out["row"]
+    assert "metadata_only" in out["next_step"]
+
+
+# ---- source_ref 自證附件 ------------------------------------------------------
+
+
+def test_identity_columns_cover_every_whitelisted_table_and_really_exist():
+    """schema 改了這裡沒跟上，要大聲紅——不要靜悄悄退化成「永遠 verified=false」。"""
+    from core.models import Base
+
+    assert set(readers.IDENTITY_COLUMNS) == set(readers.SOURCE_REF_TABLES)
+    assert set(readers.EXPAND_FIELDS) == set(readers.SOURCE_REF_TABLES)
+    actual = {table.name: {c.name for c in table.columns} for table in Base.metadata.sorted_tables}
+    for table, columns in readers.IDENTITY_COLUMNS.items():
+        assert columns, f"{table} 沒有身分欄位"
+        missing = [c for c in columns if c not in actual.get(table, set())]
+        assert not missing, f"{table} 的身分欄位在真 schema 裡不存在：{missing}"
+    for table, spec in readers.EXPAND_FIELDS.items():
+        for key in tuple(spec["metadata"]) + tuple(spec["content"]):
+            assert key in actual.get(table, set()), f"{table}.{key} 不存在"
+
+
+def test_ref_token_is_the_same_from_the_orm_path_and_the_sqlite_path(seeded_db):
+    """同一列會從兩條路進來：ORM（`created_at` 是 datetime）與 sqlite3.Row（同一欄是字串）。
+
+    直接 `repr()` 兩邊會得到不同 token，於是 `omni_resolve_ref` 會把**沒動過的列**
+    判成 `stale_reused`——一個只在「發指標的 tool 與解指標的 tool 走不同路」時才出現的
+    假警報。實作用 `_token_value()` 讓兩條路收斂，這支鎖住它。
+    """
+    orm_tokens = {
+        loop["source_ref"]: loop["source_ref_token"]
+        for loop in tools.omni_open_loops({}, db_path=seeded_db, now=NOW)["loops"]
+    }
+    assert orm_tokens
+    batch = readers.ref_tokens_for(list(orm_tokens), seeded_db)
+    assert batch == orm_tokens
+    # 而且解出來也要一致（第三條路：resolve_source_ref 的 dict）。
+    for ref, token in orm_tokens.items():
+        assert readers.resolve_ref(ref, token, seeded_db)["status"] == "ok"
+
+
+def test_every_emitted_source_ref_comes_with_a_token(seeded_db):
+    """沒有 token 的指標在 omni_resolve_ref 只能回 verified=false——那是弱一級的指標。"""
+    for name, payload in _all_tools(seeded_db).items():
+        for node in _iter_maps(payload):
+            if "source_ref" in node and node.get("source_ref"):
+                assert node.get("source_ref_token"), f"{name} 的 {node['source_ref']} 沒帶 token"
+
+
+def _strings(node):
+    """把巢狀結構裡所有字串攤平。比 `json.dumps` 子字串比對可靠——後者會因為
+    跳脫字元（反斜線、引號）讓「不該出現的東西」永遠比不中。"""
+    if isinstance(node, str):
+        yield node
+    elif isinstance(node, dict):
+        for key, value in node.items():
+            yield key
+            yield from _strings(value)
+    elif isinstance(node, (list, tuple)):
+        for item in node:
+            yield from _strings(item)
+
+
+def _iter_maps(node):
+    if isinstance(node, dict):
+        yield node
+        for value in node.values():
+            yield from _iter_maps(value)
+    elif isinstance(node, (list, tuple)):
+        for item in node:
+            yield from _iter_maps(item)
+
+
+# ---- 唯讀（ReadOnlyDatabase） --------------------------------------------------
+
+
+def test_read_only_database_adapter_refuses_writes_and_never_commits(seeded_db):
+    """重用 core 的唯讀查詢函式不等於把 D1 讓掉：保證在引擎層，不在自律。"""
+    from sqlalchemy import text
+
+    adapter = readers.ReadOnlyDatabase(seeded_db)
+    with adapter.session_scope() as session:
+        assert session.query(OpenLoop).count() >= 1
+        with pytest.raises(OperationalError):
+            session.execute(text("INSERT INTO open_loops (project_key, title, status) VALUES ('x','y','open')"))
+            session.flush()
+    # 而且 session_scope 離開時不 commit（core.database 的那支一定 commit，
+    # 那正是這裡不能用它的理由）。
+    source = Path(readers.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    klass = next(n for n in ast.walk(tree)
+                 if isinstance(n, ast.ClassDef) and n.name == "ReadOnlyDatabase")
+    calls = [n.func.attr for n in ast.walk(klass)
+             if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)]
+    assert "commit" not in calls, "唯讀 adapter 不得 commit"
+
+
+def test_driving_core_query_functions_leaves_the_database_byte_identical(seeded_db):
+    """接上去的那兩支（work sessions／semantic search）真的沒寫東西。"""
+    before = readers.database_contract(seeded_db)
+    readers.work_sessions(hours=24 * 30, db_path=seeded_db, now=NOW)
+    tools.omni_search_history({"query": "aurora"}, db_path=seeded_db, now=NOW)
+    assert readers.database_contract(seeded_db) == before
+
+
+# ---- parity（同一份資料，core 與 mcpserver 要一致） ------------------------------
+
+
+def test_open_loops_parity_with_the_core_query(seeded_db, monkeypatch):
+    """欄位名不會漂移（共用 ORM 宣告），但查詢邏輯是第二份——由這支守。"""
+    import core.project_engine as pe
+
+    monkeypatch.setattr(pe, "get_db", lambda: readers.ReadOnlyDatabase(seeded_db))
+    core_rows = pe.get_open_loops_list()
+    mine = tools.omni_open_loops({"limit": 200}, db_path=seeded_db, now=NOW)["loops"]
+    assert [row["id"] for row in core_rows] == [int(x["source_ref"].split(":")[1]) for x in mine]
+    for core_row, row in zip(core_rows, mine):
+        assert core_row["project_key"] == row["project_key"]
+        assert core_row["status"] == row["status"]
+        assert core_row["source_type"] == row["source_type"]
+        assert core_row["confidence"] == row["confidence"]
+        # 刻意不同的那些：標題與處理註記不出海。
+        assert "title" not in row and "resolution_note" not in row
+
+
+def test_work_sessions_parity_keeps_the_same_session_ids(seeded_db):
+    """session id 是 sha256(專案|首筆時間|首筆 source_ref)。抄第二份查詢就等於保證
+    「同一批資料、儀表板與 MCP 給出不同的 session id」——那比欄位漂移更糟。"""
+    raw = readers.work_sessions(hours=24 * 30, db_path=seeded_db, now=NOW)
+    mine = tools.omni_work_sessions({"hours": 24 * 30}, db_path=seeded_db, now=NOW)
+    assert [s["session_id"] for s in raw["sessions"]] == [s["session_id"] for s in mine["sessions"]]
+    assert [s["started_at"] for s in raw["sessions"]] == [s["started_at"] for s in mine["sessions"]]
+    assert raw["observations_considered"] == mine["observations_considered"]
+
+
+# ---- D4：七個 tool 的輸出 -------------------------------------------------------
+
+
+def test_no_tool_leaks_an_absolute_path_or_a_secret_on_the_metadata_surface(seeded_db):
+    payloads = _all_tools(seeded_db)
+    rendered = json.dumps(tools._without_excerpts(payloads), ensure_ascii=False, default=str)
+    assert tools.scan_output(rendered) == [], rendered[:400]
+    # **非空轉證明**：種子的絕對路徑確實出現在**內容面**（節錄刻意保留路徑），
+    # 所以上面那句「metadata 面乾淨」是真的在區分兩個面，不是因為整份資料都沒東西。
+    # 注意不要拿整句 HOSTILE_PROMPT 來比——它裡面的 `sk-…` 現在到處都被刮掉了，
+    # 整句因此哪裡都不會原樣出現（E4 才加的 scrub_content）。
+    assert any("/home/victim/.ssh/id_rsa" in text for text in _strings(payloads))
+
+
+# ---- selftest ＋ 驗收收據 -------------------------------------------------------
+
+
+def test_selftest_covers_seven_tools_and_stays_read_only(seeded_db, monkeypatch, tmp_path):
+    monkeypatch.setattr(receipts, "receipts_dir", lambda: tmp_path / "mcp")
+    before = readers.database_contract(seeded_db)
+    report = tools.selftest(db_path=seeded_db, enforce_gate=False)
+    assert readers.database_contract(seeded_db) == before
+    checks = report["checks"]
+    covered = set(checks["tools_answered"]) | set(checks["tools_skipped"]) | set(checks["tools_failed"])
+    assert covered == set(tools.TOOL_NAMES), covered
+    assert checks["source_refs_unresolved"] == []
+    assert checks["refs_resolved"]["checked"] >= 1
+    assert checks["refs_resolved"]["stale"] == []
+    # 沒有 Ollama 的環境裡，檢索是 skipped 而不是 passed——「沒裝」不等於「通過」。
+    assert "omni_search_history" in checks["tools_skipped"] or \
+           "omni_search_history" in checks["tools_answered"]
+
+
+def test_selftest_writes_a_receipt_the_acceptance_centre_can_read(seeded_db, monkeypatch, tmp_path):
+    folder = tmp_path / "mcp"
+    monkeypatch.setattr(receipts, "receipts_dir", lambda: folder)
+    report = tools.selftest(db_path=seeded_db, enforce_gate=False)
+    path = receipts.write_selftest_receipt(report, now=NOW)
+    assert path is not None and path.parent == folder
+    latest = receipts.latest_selftest_receipt(folder)
+    assert latest is not None and latest["checks"]["tables_checked"] >= 5
+    assert latest["receipt_name"] == path.name
+
+
+def test_receipts_never_contain_the_query_text(seeded_db, monkeypatch, tmp_path):
+    """D6：收據只有六個鍵，**不含 query 原文也不含參數值**。"""
+    folder = tmp_path / "mcp"
+    monkeypatch.setattr(receipts, "receipts_dir", lambda: folder)
+    marker = "MARKER-7f3a-DO-NOT-LOG"
+    tools.call_tool("omni_search_history", {"query": marker, "project": "aurora-notes"},
+                    db_path=seeded_db, now=NOW, enforce_gate=False)
+    tools.call_tool("omni_open_loops", {"project": "aurora-notes"},
+                    db_path=seeded_db, now=NOW, enforce_gate=False)
+    blob = "\n".join(p.read_text(encoding="utf-8") for p in folder.glob("*.jsonl"))
+    assert marker not in blob
+    assert "aurora-notes" not in blob, "收據把參數值寫進去了"
+    for record in receipts.read_receipts(receipts.receipt_path(NOW)):
+        assert set(record) <= set(receipts.RECEIPT_FIELDS), record
+
+
+def test_acceptance_centre_carries_a23_to_a26(seeded_db, monkeypatch, tmp_path):
+    from core.acceptance import items as items_module
+    from core.acceptance import readings_mcp
+
+    ids = [item["id"] for item in items_module.ITEMS]
+    assert ids[-4:] == ["A23", "A24", "A25", "A26"]
+    by_id = {item["id"]: item for item in items_module.ITEMS}
+    # A24 是人工項；其餘三項機器可查。
+    statuses = {rule[1] for rule in by_id["A24"]["probe"].rules}
+    assert "needs_human" in statuses
+    for machine in ("A23", "A25", "A26"):
+        assert "passed" in {rule[1] for rule in by_id[machine]["probe"].rules}, machine
+    # 驗收讀的目錄，就是收據寫進去的那個目錄——不是另一份手抄的 glob。
+    folder = tmp_path / "reports" / "mcp"
+    monkeypatch.setattr(receipts, "receipts_dir", lambda: folder)
+    tools.call_tool("omni_open_loops", {}, db_path=seeded_db, now=NOW, enforce_gate=False)
+    receipts.write_selftest_receipt(tools.selftest(db_path=seeded_db, enforce_gate=False), now=NOW)
+
+    class _Cfg:
+        def get(self, key, default=None):
+            return str(tmp_path / "reports") if key == "exporters.reports_dir" else default
+
+    ctx = type("C", (), {"cfg": _Cfg(), "now": NOW, "session": None, "database": None,
+                         "today": NOW.date(), "runtime": False})()
+    assert readings_mcp.a23_mcp_selftest(ctx).evidence["receipt_available"] is True
+    assert readings_mcp.a25_mcp_read_only(ctx).evidence["contract_unchanged"] is True
+    assert readings_mcp.a26_mcp_receipts(ctx).facts["offenders"] == 0
+
+
+def test_no_tool_leaks_a_secret_shape_on_the_content_surface(seeded_db):
+    """D4 的掃描面刻意排除內容鍵，所以內容面需要自己這一條。
+
+    **這條是實機 E2E 撈出來的**：`omni_work_sessions` 的 `headline`／`narrative`／
+    `items[].title` 來自 `core/context_memory._compact_text()`，直接切 prompt 前 140 字，
+    **沒經過 `_excerpt()`**——別的 reader 都有。單元測試抓不到（掃描面排除了那些鍵），
+    真的用官方 SDK client 驅動一輪才看到 `sk-…` 原封不動出現在裡面。
+
+    路徑不在這條的管轄內（它常常正是脈絡本身）；這裡只擋「對呼叫端零價值、
+    外洩代價卻是實的」那一種。
+    """
+    payloads = _all_tools(seeded_db)
+    secret_only = tuple(
+        pattern for pattern in tools.FORBIDDEN_OUTPUT
+        if any(token in pattern.pattern for token in ("sk-", "ghp_", "AIza"))
+    )
+    assert secret_only, "抓不到金鑰樣式，這條會變成空轉"
+    for text in _strings(payloads):
+        for pattern in secret_only:
+            assert not pattern.search(text), f"內容面漏出金鑰樣式：{text[:120]}"
+
+    # 非空轉證明：種子裡真的有一個金鑰樣式，而且它在**原始** core 輸出裡看得到。
+    assert "sk-abcdefghijklmnop" in HOSTILE_PROMPT
+    from core.context_memory import build_recent_work_sessions
+
+    unscrubbed = build_recent_work_sessions(
+        database=readers.ReadOnlyDatabase(seeded_db), now=NOW, hours=24 * 30,
+    )
+    assert any("sk-abcdefghijklmnop" in text for text in _strings(unscrubbed)), \
+        "上游已經不帶金鑰了，這條測試失去意義"
+
+
+def test_content_keys_have_exactly_one_definition():
+    """兩份名單會漂移，而漂移的症狀是某個內容欄位靜悄悄變成 metadata。"""
+    assert tools.CONTENT_KEYS is readers.CONTENT_KEYS
+    assert tools.EXCERPT_KEYS is readers.CONTENT_KEYS
+    # 每個名字都要真的出現在某個投影白名單或 core 的輸出裡，否則是死名單。
+    whitelisted = set(tools.AI_TURN_FIELDS) | set(tools.HANDOFF_FIELDS) | \
+        set(tools.SEARCH_SOURCE_FIELDS) | set(tools.SESSION_FIELDS) | \
+        set(tools.SESSION_ITEM_FIELDS) | set(tools.DIGEST_NOTE_FIELDS)
+    unused = [key for key in readers.CONTENT_KEYS if key not in whitelisted]
+    assert unused == [], f"內容鍵沒有任何 tool 會回：{unused}"
+
+
+def test_mcpserver_never_spawns_a_process_and_never_makes_a_request():
+    """D5 第二層。**E3 沒有實作這一條**——ADR-032 寫了「`subprocess`、`requests`／`httpx`
+    只能掃 `mcpserver/*.py` 的直接 import」，但 E3 只落地了執行器那三個模組的閉包斷言，
+    這一半只出現在某支測試的 docstring 對照說明裡。E4 補上，順便把它寫得比原文精確。
+
+    **原文那條規則到 E4 會與自己打架**：`omni_search_history` 的向量來自本機 Ollama
+    的 `/api/embed`（ADR 自己寫的），而 `readers` 必須認得 `requests` 的例外型別，
+    才有辦法把「打不到」轉成封閉字串表裡的 `ollama_unreachable`——不認得就只能
+    `except Exception`，那會連真正的 bug 一起吞掉。
+
+    所以規則收斂成**行為**而不是 import：`subprocess` 一律不准（連 import 都不行），
+    `requests`／`httpx` 可以 import，但 `mcpserver/` 裡不准出現任何「發出請求」的呼叫。
+    這比「不准 import」更硬——真正要擋的是打開一條連線，不是引用一個型別。
+    """
+    verbs = {"get", "post", "put", "patch", "delete", "head", "options", "request",
+             "Session", "session", "urlopen", "run", "Popen", "call", "check_output",
+             "check_call", "getoutput", "system", "spawn", "spawnv", "execv", "fork"}
+    banned_modules = {"subprocess", "multiprocessing", "socket", "urllib.request", "http.client"}
+    http_modules = {"requests", "httpx", "aiohttp", "urllib3"}
+
+    import_offenders, call_offenders = [], []
+    for path in _package_files():
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        aliases: dict[str, str] = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name in banned_modules:
+                        import_offenders.append(f"{path.name}:{node.lineno} {alias.name}")
+                    if alias.name in http_modules:
+                        aliases[alias.asname or alias.name.split(".")[0]] = alias.name
+            elif isinstance(node, ast.ImportFrom) and (node.module or "") in banned_modules:
+                import_offenders.append(f"{path.name}:{node.lineno} {node.module}")
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+                continue
+            owner = getattr(node.func.value, "id", None)
+            if owner in aliases and node.func.attr in verbs:
+                call_offenders.append(f"{path.name}:{node.lineno} {owner}.{node.func.attr}()")
+
+    assert import_offenders == [], f"MCP surface 不得開子程序或開 socket：{import_offenders}"
+    assert call_offenders == [], f"MCP surface 不得自己發出請求：{call_offenders}"
+    # 非空轉證明：掃描真的看得到 http 模組的 import（readers 為了認例外型別而 import 它）。
+    assert any(
+        "requests" in Path(path).read_text(encoding="utf-8") for path in _package_files()
+    ), "掃描面沒有任何 http 模組，這條會變成空轉"

@@ -916,8 +916,15 @@ def cmd_mcp(selftest: bool = False) -> int:
     from mcpserver import availability, tools
 
     if selftest:
+        from mcpserver import receipts
+
         report = tools.selftest(enforce_gate=False)
+        # 落一份檔案收據：驗收中心（A23／A25／A26）只讀本機便宜證據，不會替你跑 tool。
+        # 沒有這一步，那三項就只能永遠掛 needs_human。
+        written = receipts.write_selftest_receipt(report)
         print(_json.dumps(report, ensure_ascii=False, indent=2, default=str))
+        if written is not None:
+            print(f"[MCP] 收據：{written.name}（{written.parent}）", file=sys.stderr)
         return 0 if report.get("status") == "passed" else 1
 
     if not availability.mcp_enabled():

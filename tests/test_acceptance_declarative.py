@@ -55,8 +55,9 @@ def test_rules_only_use_the_status_vocabulary():
             assert isinstance(detail, str) or callable(detail), f"{spec['id']} 的敘述型別不對"
 
 
-def test_table_covers_a1_to_a22_in_order():
-    assert [spec["id"] for spec in items_module.ITEMS] == [f"A{n}" for n in range(1, 23)]
+def test_table_covers_a1_to_a26_in_order():
+    # E4 把 A23–A26（MCP Context Server）加進來，所以上界從 23 變成 27。
+    assert [spec["id"] for spec in items_module.ITEMS] == [f"A{n}" for n in range(1, 27)]
     for spec in items_module.ITEMS:
         for key in ("title", "priority", "blocks_release", "how", "criterion", "probe"):
             assert key in spec, f"{spec['id']} 少了 {key}"
@@ -66,17 +67,23 @@ def test_table_covers_a1_to_a22_in_order():
 
 
 def test_every_reading_is_used_exactly_once():
-    """readings.py 裡不該留下沒人用的 reading，也不該有兩項共用同一個（那會共用 evidence）。"""
-    from core.acceptance import readings
+    """reading 模組裡不該留下沒人用的 reading，也不該有兩項共用同一個（那會共用 evidence）。
+
+    E4 之後 reading 有兩個模組（`readings` 與 `readings_mcp`），所以掃描範圍是兩個——
+    **不是**在 `readings` 裡 re-export 一份來騙過這支測試。拆檔的理由見
+    `readings_mcp.py` 的 docstring：600 行的 god-object 守門本來就是為了在這種時候擋人。
+    """
+    from core.acceptance import readings, readings_mcp
 
     used = [spec["probe"].read for spec in items_module.ITEMS]
     assert len(set(used)) == len(used), "有兩項共用同一個 reading"
     defined = {
-        getattr(readings, name)
-        for name in dir(readings)
-        if name.startswith("a") and callable(getattr(readings, name)) and name[1:2].isdigit()
+        getattr(module, name)
+        for module in (readings, readings_mcp)
+        for name in dir(module)
+        if name.startswith("a") and callable(getattr(module, name)) and name[1:2].isdigit()
     }
-    assert defined == set(used), "readings.py 有沒被表格引用的 reading（或反過來）"
+    assert defined == set(used), "reading 模組有沒被表格引用的 reading（或反過來）"
 
 
 def test_ladder_returns_exactly_the_three_contract_keys():
@@ -133,7 +140,8 @@ def test_dependency_direction_is_downward_only():
     """items → readings → rules。反過來 import 會把「規格」和「怎麼查」黏成一團。"""
     assert _imports(PACKAGE / "rules.py") == set()
     assert _imports(PACKAGE / "readings.py") <= {"rules"}
-    assert _imports(PACKAGE / "items.py") <= {"readings", "rules"}
+    assert _imports(PACKAGE / "readings_mcp.py") <= {"rules"}
+    assert _imports(PACKAGE / "items.py") <= {"readings", "readings_mcp", "rules"}
     assert _imports(PACKAGE / "report.py") <= {"items", "rules"}
 
 
