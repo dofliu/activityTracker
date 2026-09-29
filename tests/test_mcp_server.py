@@ -1291,3 +1291,32 @@ def test_mcpserver_never_spawns_a_process_and_never_makes_a_request():
     assert any(
         "requests" in Path(path).read_text(encoding="utf-8") for path in _package_files()
     ), "掃描面沒有任何 http 模組，這條會變成空轉"
+
+
+def test_the_receipt_follows_the_clock_the_call_used_not_the_wall_clock(monkeypatch, seeded_db, tmp_path):
+    """收據的檔名日期要跟著 `call_tool(now=...)` 走。
+
+    2026-09-29 抓到：`call_tool` 把 `now` 傳給 handler（tools.py:723），卻**沒有**傳給
+    四個 `write_receipt`，所以收據一律蓋牆上時鐘。這在正式路徑上永遠看不出來
+    （`now` 是 `None`，兩邊都是真時鐘），但
+    `test_search_history_says_unavailable_instead_of_faking_an_empty_result`
+    讀的是 `receipt_path(NOW)`——於是那條測試**只有在牆上時鐘剛好是 NOW 那一天才會綠**。
+    它在 9/28 的 CI 上全綠，9/29 就紅了；換句話說它一直是顆定時炸彈，
+    而「今天綠」被誤讀成「這段邏輯對」。
+
+    所以這裡守的不是那一條測試，是那條因果：**注入的時鐘要一路走到收據**。
+    """
+    monkeypatch.setattr(receipts, "receipts_dir", lambda: tmp_path / "mcp")
+    far_past = datetime(2020, 1, 2, 3, 4, 5)
+
+    tools.call_tool(
+        "omni_project_state", {}, db_path=seeded_db, now=far_past, enforce_gate=False,
+    )
+
+    assert receipts.read_receipts(receipts.receipt_path(far_past)), (
+        "收據沒有落在注入時鐘的那一天——now 又在半路被丟掉了"
+    )
+    # 而且不能同時也寫一份到今天：那代表有路徑還在用牆上時鐘。
+    stamps = sorted(p.name for p in (tmp_path / "mcp").glob("mcp-receipts-*.jsonl"))
+    assert len(stamps) == 1, f"收據落在不只一個日期：{stamps}"
+    assert "20200102" in stamps[0], stamps[0]

@@ -220,3 +220,108 @@ def test_example_config_is_settings_only_and_carries_no_personal_paths():
     text = "\n".join(lines)
     for personal in ("BladeDamage", "CASE-", "D:/Project_CodingSimulation"):
         assert personal not in text, personal
+
+
+# ---- 7. 範本設的鍵，程式必須真的讀得到（TODO B8） --------------------------
+#
+# 2026-09-28（E6）量到一個從未被任何測試擋下的缺陷：`window_watcher:`／
+# `agent_log_watcher:`／`browser:` 三塊的縮排落在 `repository_sync:` 底下，而全 repo
+# 讀的都是 `watchers.*`。於是**從範本建立的設定檔裡，這三塊的每一個鍵都讀不到**：
+# 布林與數值的程式預設剛好與範本一致，所以看不出來；真正有差的是
+# `antigravity_logs_path`（程式沒有預設 → `discover()` 回空清單 → **Antigravity 從範本
+# 安裝的機器上永遠採集不到**）。
+#
+# 「範本看起來設了」與「程式讀得到」是兩件事，而**只有後者算數**。所以這裡守的不是
+# 縮排長相，是那個因果：範本提到的鍵，一定要能從程式讀它的那條 dotted path 讀出來。
+
+
+def _dotted_keys_the_code_reads() -> set[str]:
+    """AST 掃產品原始碼裡以 ``watchers.`` 開頭的字串常數。
+
+    用 AST 不用子字串掃描：`config.example.yaml` 與本檔案自己都寫著這些鍵名，
+    子字串掃描會掃到說明文字然後自爆（ADR-032 D1、TODO E6 各記過一次同一個坑）。
+    """
+    import ast
+
+    skip = {"tests", "build", "dist", ".venv", "venv", "node_modules", ".git"}
+    keys: set[str] = set()
+    for path in ROOT.rglob("*.py"):
+        if skip & set(path.relative_to(ROOT).parts):
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError):  # pragma: no cover - 產品碼不該有
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                value = node.value
+                if value.startswith("watchers.") and value.count(".") >= 2:
+                    keys.add(value)
+    return keys
+
+
+def _leaf_is_written_in_the_template(leaf: str) -> bool:
+    """範本裡有沒有這個鍵（注解掉的不算——那是刻意留白，不是設定）。"""
+    import re
+
+    pattern = re.compile(rf"^\s*{re.escape(leaf)}\s*:")
+    return any(
+        pattern.match(line)
+        for line in EXAMPLE.read_text(encoding="utf-8").splitlines()
+        if not line.strip().startswith("#")
+    )
+
+
+def test_every_watcher_key_the_template_writes_is_readable_where_the_code_reads_it():
+    from core.config import Config
+
+    cfg = Config.__new__(Config)   # 不走單例：這裡要的是「這份檔案讀起來如何」
+    cfg.load(EXAMPLE)
+
+    checked, unreadable = [], []
+    for key in sorted(_dotted_keys_the_code_reads()):
+        if not _leaf_is_written_in_the_template(key.rsplit(".", 1)[-1]):
+            continue           # 範本沒設＝交給程式預設，不是缺陷
+        checked.append(key)
+        if cfg.get(key) is None:
+            unreadable.append(key)
+
+    # 這條測試自己不能是空轉：至少要真的驗到三塊各一個鍵。
+    assert len(checked) >= 8, checked
+    for block in ("window_watcher", "agent_log_watcher", "browser"):
+        assert any(f".{block}." in key for key in checked), (block, checked)
+
+    assert unreadable == [], (
+        "範本寫了這些鍵，但程式從它讀的那條 path 讀不到——"
+        f"通常是某一塊的縮排掛錯父節點：{unreadable}"
+    )
+
+
+def test_watcher_blocks_live_under_watchers_and_nowhere_else():
+    """任何 ``*_watcher``／``browser`` 區塊都只能掛在 ``watchers:`` 底下。
+
+    上一條守因果，這一條守位置——因果那條只看範本**有寫**的鍵，
+    所以一塊被搬到錯的地方、同時鍵也被注解掉時它會沉默；這條不會。
+    """
+    data = _example_config()
+
+    def looks_like_a_watcher_block(name: str) -> bool:
+        return name.endswith("_watcher") or name == "browser"
+
+    assert [k for k in data["watchers"] if looks_like_a_watcher_block(k)] == [
+        "file_watcher",
+        "git_watcher",
+        "calendar_watcher",
+        "window_watcher",
+        "agent_log_watcher",
+        "browser",
+    ]
+
+    misplaced = {
+        f"{top}.{name}"
+        for top, section in data.items()
+        if top != "watchers" and isinstance(section, dict)
+        for name in section
+        if looks_like_a_watcher_block(name)
+    }
+    assert misplaced == set(), f"這些採集器區塊掛在 watchers: 以外的地方：{sorted(misplaced)}"

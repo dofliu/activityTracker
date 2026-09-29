@@ -67,6 +67,13 @@ def fake_home(tmp_path, monkeypatch):
     codex.mkdir(parents=True)
     (codex / "rollout.jsonl").write_text('{"type": "session_meta"}\n', encoding="utf-8")
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    # `Path.home()` 不夠：設定檔裡寫的是 `~/.claude`，而 `expanduser()` 走的是
+    # HOME／USERPROFILE 環境變數，不是 `Path.home`。2026-09-29 修 B8 時這個洞才現形——
+    # 在那之前範本的 `claude_code_logs_path` 根本讀不到，所以永遠走 `default_logs_dir()`
+    # 的 `Path.home()` 分支，漏掉的那一半沒有機會出事。補上之後這條測試才真的只看假家目錄，
+    # 而不是讀到跑測試那台機器上真正的 `~/.claude`。
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
     return home
 
 
@@ -165,18 +172,20 @@ def test_accepting_a_source_writes_the_path_and_nothing_else(fake_home, monkeypa
     monkeypatch.setattr(main_module.sys.stdin, "isatty", lambda: True)
     monkeypatch.setattr("builtins.input", lambda _prompt: "y")
     written = main_module._detect_and_ask(config_data)
-    assert written == 2, "假家目錄裡有兩個來源"
+
+    # 假家目錄裡有兩個來源，但範本**本來就寫著** `claude_code_logs_path: ~/.claude`，
+    # 所以只有 Codex 是待問的。2026-09-29 修 B8 之前這裡是 2——那時候 `watchers:` 底下
+    # 讀不到那個鍵，於是一個明明已經設好的平台每次都被重問一次。**這一條的數字從 2 變 1，
+    # 量的正是那個缺陷的修復**：`already_configured` 現在真的認得出範本設過的東西。
+    assert written == 1, "只有 Codex 是待問的（Claude Code 範本已設）"
 
     node = config_data["watchers"]["agent_log_watcher"]
-    assert node["claude_code_logs_path"] == str(fake_home / ".claude")
+    assert node["claude_code_logs_path"] == "~/.claude", "已經設好的鍵被覆寫了"
     assert node["codex_logs_path"] == str(fake_home / ".codex")
 
-    # 除了那兩個路徑鍵，設定檔逐鍵相同。
+    # 除了那個新寫入的路徑鍵，設定檔逐鍵相同。
     after = copy.deepcopy(config_data)
-    after["watchers"]["agent_log_watcher"].pop("claude_code_logs_path")
     after["watchers"]["agent_log_watcher"].pop("codex_logs_path")
-    if not after["watchers"]["agent_log_watcher"]:
-        after["watchers"].pop("agent_log_watcher")
     assert json.dumps(after, sort_keys=True, default=str) == json.dumps(
         before, sort_keys=True, default=str
     ), "偵測動到了路徑以外的東西"
