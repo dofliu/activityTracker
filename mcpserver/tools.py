@@ -711,12 +711,14 @@ def call_tool(
         receipts.write_receipt(
             tool=str(name), ok=False, result_count=0,
             elapsed_ms=int((time.perf_counter() - started) * 1000), error_code="unknown_tool",
+            now=now,
         )
         raise ToolError("unknown_tool")
     if enforce_gate and not availability.mcp_enabled():
         receipts.write_receipt(
             tool=name, ok=False, result_count=0,
             elapsed_ms=int((time.perf_counter() - started) * 1000), error_code="mcp_disabled",
+            now=now,
         )
         raise ToolError("mcp_disabled")
     try:
@@ -725,6 +727,7 @@ def call_tool(
         receipts.write_receipt(
             tool=name, ok=False, result_count=0,
             elapsed_ms=int((time.perf_counter() - started) * 1000), error_code=exc.code,
+            now=now,
         )
         raise
     # **`unavailable` 不是 ok。** 第一版這裡一律寫 ok=true，於是
@@ -738,6 +741,7 @@ def call_tool(
         result_count=_result_count(payload),
         elapsed_ms=int((time.perf_counter() - started) * 1000),
         error_code=str(payload.get("reason")) if unavailable else None,
+        now=now,
     )
     return payload
 
