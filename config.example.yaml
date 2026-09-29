@@ -48,17 +48,6 @@ watchers:
     scan_interval_seconds: 900
     horizon_days: 30        # 重複行程展開到未來幾天（另含過去 7 天供回顧）
     store_titles: true      # false → 只留時間，連標題與地點都不存
-repository_sync:
-  # 與 git_watcher 共用明示設定的 repository roots。沒有排程自動 fetch/pull/commit/push；
-  # 單一動作由 Dashboard 個別確認，批次 pull/push 需先列清單並確認（執行前仍重檢）。
-  batch:
-    allow_push: false       # 批次 push 會發佈 commit，預設關閉；單一 repo 的 Push 不受影響
-    max_repositories: 50
-  command_timeout_seconds: 30
-  status_timeout_seconds: 5
-  status_parallelism: 8
-  max_repositories: 80
-  dashboard_recent_limit: 10
   window_watcher:
     enabled: true
     heartbeat_minutes: 5
@@ -82,6 +71,17 @@ repository_sync:
     chatgpt: true
     claude_web: true
     heartbeat_stale_minutes: 5
+repository_sync:
+  # 與 git_watcher 共用明示設定的 repository roots。沒有排程自動 fetch/pull/commit/push；
+  # 單一動作由 Dashboard 個別確認，批次 pull/push 需先列清單並確認（執行前仍重檢）。
+  batch:
+    allow_push: false       # 批次 push 會發佈 commit，預設關閉；單一 repo 的 Push 不受影響
+    max_repositories: 50
+  command_timeout_seconds: 30
+  status_timeout_seconds: 5
+  status_parallelism: 8
+  max_repositories: 80
+  dashboard_recent_limit: 10
 usage_tracking:
   enabled: true
   # P2.6 coverage ledger：記錄視窗採集器實際被觀測運作的時間段；當日覆蓋率達
