@@ -402,6 +402,92 @@ export function initRepositorySyncSection() {
   if (batchPush) batchPush.addEventListener("click", () => runRepoBatch("push"));
   const scan = $("btn-onboarding-scan");
   if (scan) scan.addEventListener("click", loadOnboardingReport);
+  const cloud = $("btn-gh-overview-load");
+  if (cloud) cloud.addEventListener("click", loadGitHubCloudOverview);
+}
+
+// ------------------------------------------------ F2 GitHub 雲端總覽（只讀已同步資料）
+
+// 兩個跨 repo 端點加上秘書提案已算好的 repo_issue_backlog；三者都只讀本機資料庫。
+// issue 積壓不在前端重算（GitHub 的 open_issues_count 含 PR，扣除規則只寫在 core/secretary/signals.py）。
+export async function loadGitHubCloudOverview() {
+  const zh = state.ui.currentLang === "zh-TW";
+  const summary = $("gh-overview-summary");
+  if (!summary) return;
+  summary.textContent = zh ? "讀取上次同步的資料…" : "Reading the last synced data…";
+  const [repos, prs, proposals] = await Promise.allSettled([
+    getJSON("/api/v1/github/repos"),
+    getJSON("/api/v1/github/prs?state=open"),
+    getJSON("/api/v1/secretary/proposals?limit=1"),
+  ]);
+  if (repos.status !== "fulfilled") {
+    state.repos.cloudOverview = null;
+    summary.textContent = `❌ ${String(repos.reason?.message || repos.reason)}`;
+    $("gh-overview-grid").innerHTML = "";
+    $("gh-overview-prs").innerHTML = "";
+    return;
+  }
+  state.repos.cloudOverview = {
+    repos: repos.value || [],
+    prs: prs.status === "fulfilled" ? (prs.value || []) : null,
+    backlog: proposals.status === "fulfilled" ? (proposals.value?.inputs?.repo_issue_backlog || {}) : null,
+  };
+  renderGitHubCloudOverview();
+}
+
+export function renderGitHubCloudOverview() {
+  const zh = state.ui.currentLang === "zh-TW";
+  const data = state.repos.cloudOverview;
+  const summary = $("gh-overview-summary");
+  const grid = $("gh-overview-grid");
+  const prBox = $("gh-overview-prs");
+  if (!data || !summary || !grid || !prBox) return;
+  const repos = data.repos;
+  if (!repos.length) {
+    summary.textContent = zh
+      ? "還沒有任何同步過的 GitHub repo。到「06 系統設定 → GitHub 雲端整合」連線並按立即同步。"
+      : "No synced GitHub repositories yet. Connect and sync under 06 Settings → GitHub integration.";
+    grid.innerHTML = "";
+    prBox.innerHTML = "";
+    return;
+  }
+  const privateCount = repos.filter(r => r.is_private).length;
+  const openPrTotal = repos.reduce((sum, r) => sum + (Number(r.open_prs_count) || 0), 0);
+  const backlog = data.backlog;
+  const backlogTotal = backlog ? Object.values(backlog).reduce((sum, n) => sum + (Number(n) || 0), 0) : null;
+  const backlogText = backlog === null
+    ? (zh ? "issue 積壓讀不到（秘書提案端點失敗）" : "issue backlog unavailable (proposals endpoint failed)")
+    : (zh ? `issue 積壓 ${backlogTotal}（${Object.keys(backlog).length} 個 repo）` : `issue backlog ${backlogTotal} (${Object.keys(backlog).length} repos)`);
+  summary.textContent = zh
+    ? `${repos.length} 個 repo（公開 ${repos.length - privateCount}／私有 ${privateCount}）· open PR ${openPrTotal} · ${backlogText} · 依最近推送排序，資料為上次同步時的狀態`
+    : `${repos.length} repos (${repos.length - privateCount} public / ${privateCount} private) · open PRs ${openPrTotal} · ${backlogText} · most recently pushed first, as of the last sync`;
+
+  grid.innerHTML = repos.map(r => {
+    const issues = backlog === null ? "?" : (backlog[r.name] || 0);
+    return `<div class="gh-overview-card">
+      <div><a href="${esc(r.html_url || "#")}" target="_blank" rel="noopener">${esc(r.full_name || r.name)}</a> ${r.is_private ? "🔒" : ""}</div>
+      ${r.description ? `<p>${esc(r.description)}</p>` : ""}
+      <div class="mono-mini muted">⎇ ${esc(r.default_branch || "—")} · ★ ${Number(r.stars) || 0} · PR ${Number(r.open_prs_count) || 0} · ${zh ? "issue" : "issues"} ${esc(String(issues))}</div>
+      <div class="mono-mini muted">${zh ? "最近推送" : "pushed"} ${esc(r.pushed_at || "—")}</div>
+    </div>`;
+  }).join("");
+
+  if (data.prs === null) {
+    prBox.innerHTML = `<div class="muted small">${zh ? "PR 清單讀不到。" : "PR list unavailable."}</div>`;
+    return;
+  }
+  const head = zh
+    ? `Open PR（依更新時間，最多 40 筆）· ${data.prs.length}`
+    : `Open PRs (by last update, up to 40) · ${data.prs.length}`;
+  prBox.innerHTML = `<div class="mono-mini muted mb-6">${head}</div>` + (data.prs.length ? data.prs.map(pr => `
+    <div class="gh-overview-pr">
+      <span class="mono-mini muted">${esc(pr.repo)}</span>
+      <a href="${esc(pr.html_url || "#")}" target="_blank" rel="noopener">#${Number(pr.number) || 0} ${esc(pr.title)}</a>
+      ${pr.is_draft ? `<span class="trust neutral">draft</span>` : ""}
+      ${pr.ci_status ? `<span class="mono-mini muted">CI ${esc(pr.ci_status)}</span>` : ""}
+      ${pr.review_state ? `<span class="mono-mini muted">review ${esc(pr.review_state)}</span>` : ""}
+      <span class="mono-mini muted">${esc(pr.updated_at || "")}</span>
+    </div>`).join("") : `<div class="muted small">${zh ? "（沒有 open PR）" : "(no open PRs)"}</div>`);
 }
 
 // ------------------------------------------------ P4.3 repo onboarding

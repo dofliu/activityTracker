@@ -32,6 +32,16 @@
             <div id="repo-overview-result" class="repo-sync-result mono-mini muted"></div>
             <div class="repo-sync-intro" style="margin-top: 14px;">
               <div>
+                <strong data-i18n="gh_overview_title">GitHub cloud overview</strong>
+                <p data-i18n="gh_overview_intro">Every repository and open PR saved by the last GitHub sync on one screen, most recently pushed first. Reads the local database only, no network; to refresh, use “Sync now” under 06 Settings → GitHub integration.</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="btn-gh-overview-load" data-i18n="btn_gh_overview_load">☁ Load cloud overview</button>
+            </div>
+            <div id="gh-overview-summary" class="repo-sync-summary mono-mini muted" aria-live="polite"></div>
+            <div id="gh-overview-grid" class="gh-overview-grid"></div>
+            <div id="gh-overview-prs" class="gh-overview-prs"></div>
+            <div class="repo-sync-intro" style="margin-top: 14px;">
+              <div>
                 <strong data-i18n="onboarding_title">Repo Onboarding / Reconciliation (P4.3)</strong>
                 <p data-i18n="onboarding_intro">Finds folders without git init, repos without a remote, and GitHub repos not cloned locally. Cloned-or-not is decided by remote URL only; same names are just hints, never auto-paired. Every action targets one repo with explicit confirmation.</p>
               </div>
