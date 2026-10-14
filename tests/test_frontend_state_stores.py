@@ -76,11 +76,12 @@ def used_paths() -> set[tuple[str, str, str]]:
     return seen
 
 
-def test_state_js_declares_eleven_stores_and_all_49_fields():
+def test_state_js_declares_eleven_stores_and_all_50_fields():
     found = stores()
     assert len(found) == 11, f"預期 11 個 store，讀到 {sorted(found)}"
     total = sum(len(v) for v in found.values())
-    assert total == 49, f"預期 49 個欄位，讀到 {total}——D10 收進來的就是這 49 個"
+    # D10 收進來的是 49 個；F2（GitHub 雲端總覽）在 repos store 加了 `cloudOverview`。
+    assert total == 50, f"預期 50 個欄位，讀到 {total}——D10 的 49 個加上 F2 的 repos.cloudOverview"
 
 
 def test_every_state_path_used_by_a_module_really_exists():
@@ -154,4 +155,4 @@ def test_create_app_state_really_makes_independent_copies():
                             capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stderr
     report = json.loads(result.stdout)
-    assert report == {"stores": 11, "fields": 49, "independent": True, "default_untouched": True}, report
+    assert report == {"stores": 11, "fields": 50, "independent": True, "default_untouched": True}, report

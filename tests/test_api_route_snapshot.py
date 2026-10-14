@@ -39,6 +39,7 @@ EXPECTED_ROUTES: tuple[tuple[str, str, str], ...] = (
     ("/api/v1/extension/status", "GET", "get_extension_monitor_status"),
     ("/api/v1/extension/verification", "POST", "start_extension_verification"),
     ("/api/v1/extension/verification/{verification_id}", "GET", "get_extension_verification"),
+    ("/api/v1/git/commits/{event_id}/provenance", "GET", "get_commit_provenance"),
     ("/api/v1/github/connect", "POST", "connect_github"),
     ("/api/v1/github/disconnect", "POST", "disconnect_github"),
     ("/api/v1/github/prs", "GET", "list_github_prs"),

@@ -8,6 +8,7 @@ usage／background-tasks／context sessions／recent events／checkpoint 快照�
 
 import logging
 from core.background_tasks import get_background_task_summary
+from core.commit_provenance import build_commit_provenance
 from core.config import get_config
 from core.context_memory import build_recent_work_sessions, find_related_work
 from core.coverage_ledger import get_daily_coverage
@@ -85,6 +86,23 @@ def get_related_context(payload: RelatedMemoryRequest):
             status_code=503,
             detail="local_semantic_index_unavailable",
         ) from exc
+
+
+@router.get("/api/v1/git/commits/{event_id}/provenance")
+def get_commit_provenance(
+    event_id: int,
+    window_minutes: Optional[int] = Query(None, ge=1, le=1440),
+    include_similarity: bool = Query(False),
+):
+    """ADR-034：commit 的三種來源證據分開回報；只有 trailer 能讓 ai_declared 成立。"""
+    result = build_commit_provenance(
+        event_id,
+        window_minutes=window_minutes,
+        include_similarity=include_similarity,
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="commit_not_found")
+    return result
 
 
 @router.post("/api/v1/usage/milestones/evaluate")

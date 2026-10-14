@@ -32,6 +32,16 @@
             <div id="repo-overview-result" class="repo-sync-result mono-mini muted"></div>
             <div class="repo-sync-intro" style="margin-top: 14px;">
               <div>
+                <strong data-i18n="gh_overview_title">GitHub 雲端總覽</strong>
+                <p data-i18n="gh_overview_intro">一屏看完上次 GitHub 同步存下來的全部 repo 與 open PR，依最近推送排序。只讀本機資料庫、不連網；要更新資料請到「06 系統設定 → GitHub 雲端整合」按立即同步。</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="btn-gh-overview-load" data-i18n="btn_gh_overview_load">☁ 載入雲端總覽</button>
+            </div>
+            <div id="gh-overview-summary" class="repo-sync-summary mono-mini muted" aria-live="polite"></div>
+            <div id="gh-overview-grid" class="gh-overview-grid"></div>
+            <div id="gh-overview-prs" class="gh-overview-prs"></div>
+            <div class="repo-sync-intro" style="margin-top: 14px;">
+              <div>
                 <strong data-i18n="onboarding_title">Repo Onboarding／對帳（P4.3）</strong>
                 <p data-i18n="onboarding_intro">找出尚未 git init 的資料夾、沒有 remote 的 repo、以及尚未 clone 的 GitHub repo。已 clone 與否只以 remote URL 比對；同名僅提示、不自動配對。每個動作都是單一目標、逐一確認。</p>
               </div>

@@ -1,0 +1,6 @@
+{
+  "body": "{\"status\":\"ok\",\"service\":\"OmniContext\",\"time\":\"2026-10-09T02:49:16.392704\",\"demo_mode\":false}",
+  "content_type": "application/json",
+  "status": 200,
+  "url": "/api/v1/health"
+}

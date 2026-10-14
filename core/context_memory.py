@@ -18,6 +18,17 @@ from core.semantic_index import semantic_search
 from core.time_utils import get_local_now
 
 
+# ADR-006 的兩條邊界；ADR-034 的 temporal_only／similarity_only 引用同一份，不另寫說法。
+SESSION_CLAIM_BOUNDARY = (
+    "Sessions are deterministic temporal groupings of observed local events. "
+    "They do not prove task continuity, productivity, active work duration, or result quality."
+)
+RELATED_CLAIM_BOUNDARY = (
+    "Similarity is a local retrieval signal only. It does not validate truth, "
+    "completeness, task identity, or whether prior work remains applicable."
+)
+
+
 @dataclass(frozen=True)
 class WorkObservation:
     """一筆已存在 SQLite 的可追溯活動；不推論實際工時或成果。"""
@@ -269,10 +280,7 @@ def build_recent_work_sessions(
             "included": ["ai_turn", "git_commit", "file_activity"],
             "excluded": ["window_focus_without_canonical_project"],
         },
-        "claim_boundary": (
-            "Sessions are deterministic temporal groupings of observed local events. "
-            "They do not prove task continuity, productivity, active work duration, or result quality."
-        ),
+        "claim_boundary": SESSION_CLAIM_BOUNDARY,
     }
 
 
@@ -320,8 +328,5 @@ def find_related_work(
             if matches else
             "目前索引中沒有超過門檻的相似紀錄；這不代表歷史中一定沒有相關工作。"
         ),
-        "claim_boundary": (
-            "Similarity is a local retrieval signal only. It does not validate truth, "
-            "completeness, task identity, or whether prior work remains applicable."
-        ),
+        "claim_boundary": RELATED_CLAIM_BOUNDARY,
     }

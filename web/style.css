@@ -889,6 +889,13 @@ details.trust-panel[open] summary { border-bottom: none; }
 
 /* Repo 全覽與批次（ADR-011 Addendum B） */
 .repo-overview-toolbar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-content: flex-start; }
+.gh-overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 8px; margin-top: 8px; }
+.gh-overview-card { min-width: 0; padding: 10px 12px; border: 1px solid var(--bd); background: var(--s1); }
+.gh-overview-card a { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
+.gh-overview-card p { margin: 4px 0; color: var(--mu); font-size: 12px; overflow-wrap: anywhere; }
+.gh-overview-prs { margin-top: 10px; }
+.gh-overview-pr { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--bd); font-size: 12.5px; }
+.gh-overview-pr a { color: var(--tx); overflow-wrap: anywhere; }
 .repo-overview-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 8px; }
 
 .repo-overview-filters .repo-overview-chip { padding: 3px 9px; border: 1px solid var(--bd); border-radius: 999px; background: var(--s2); color: var(--mu); font-family: "JetBrains Mono", monospace; font-size: 10px; cursor: pointer; }

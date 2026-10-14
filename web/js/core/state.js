@@ -92,6 +92,8 @@ export function createAppState() {
       overviewBatch: { fetch_all: true, pull_ff_only: true, push: false },
       overviewFilter: "all",
       onboardingReport: null,
+      // GitHub 雲端總覽（F2）：null＝尚未載入；{ repos, prs, backlog } 皆為上次同步存下的資料。
+      cloudOverview: null,
     },
     // 06 系統設定：設定檔本身與它衍生的清單、各通道狀態。
     settings: {
