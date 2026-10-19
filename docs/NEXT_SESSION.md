@@ -1,6 +1,6 @@
 # 下一個 Session 接手指南
 
-> 最後更新：2026-10-09（**TODO F1／F2 完成**：commit 來源歸因 [ADR-034](ADR-034-commit-provenance-evidence-levels.md)＋04 分頁的 GitHub 雲端總覽；紀錄見 [ROADMAP §11.2](../ROADMAP.md)。F 段剩 F3／F4；新發現 [TODO B9](TODO.md)：完整 `pytest` 會把 MCP 收據漏進 repo 的 `reports/mcp/`，讓驗收中心 A26 假綠燈）。
+> 最後更新：2026-10-19（**F3／B7／B9 完成**：`github_repo_states.language`（migration 019 → 現為 **19/19**）、示範家目錄不啟動採集器（ADR-031 Addendum A）、MCP 測試收據不再漏進 repo。待辦只剩 F4 候選與 A 段實機收據，下一輪方向請使用者決定。以下是 2026-10-09 的舊敘述：**TODO F1／F2 完成**：commit 來源歸因 [ADR-034](ADR-034-commit-provenance-evidence-levels.md)＋04 分頁的 GitHub 雲端總覽；紀錄見 [ROADMAP §11.2](../ROADMAP.md)。F 段剩 F3／F4；新發現 [TODO B9](TODO.md)：完整 `pytest` 會把 MCP 收據漏進 repo 的 `reports/mcp/`，讓驗收中心 A26 假綠燈）。
 > 2026-09-23 第二輪（**TODO E1 `omni demo` 全部完成**：核心＋`memory_pick`／`reports/handoffs/`／前端示範橫幅都已實作並有容器 E2E 收據；紀錄見 [ROADMAP §11.2](../ROADMAP.md)，已從 [TODO.md](TODO.md) 刪除）。**下一輪從 TODO E 段的 E2（ADR-032 唯讀 MCP Context Server）接手**。這一輪過程中另外發現一個既有缺陷並記進 [TODO B7](TODO.md)：示範家目錄上跑 `main.py run` 會啟動真正的採集器，把使用者真實活動寫進示範資料庫（見下方「踩過的坑」）——**沒有修**，需要先決定設計再動手。
 > 2026-09-22：收到外部競品檢視 [REVIEW-2026-09-22](REVIEW-2026-09-22-competitive-landscape-and-P9.md)：四處過期的差異化宣稱已改寫，TODO E 段重排為 E1→E6，唯讀 MCP server 插進 `agent-transcripts` 之前。ROADMAP §13 的 R0～R2 已於 2026-09-20 全部完成，最後一項是 D13——[ADR-030](ADR-030-frontend-state-stores.md)）。
 > 上一輪程式變更是 2026-09-23 的 **TODO E1 `omni demo` 核心實作**（`core/demo_dataset.py`，[ADR-031](ADR-031-omni-demo-dataset.md)）。
@@ -16,7 +16,7 @@
 | :--- | :--- |
 | 版本 | v1.3.0a5 已發佈為 GitHub pre-release（release workflow 自動 build → verify → release，SHA-256 receipt 交叉驗證）。`release_ready: false`，唯一**能力型**缺口是全天 coverage ledger 實測（TODO A1）。 |
 | 還缺什麼 | 別憑記憶：跑 `python main.py verify`（或看「06 系統設定 → 驗收中心」）就會列出 A1–A22 每一項現在有沒有收據，以及 ROADMAP §12.3 四個 gate 缺什麼。 |
-| Schema | migration **18/18**（append-only + checksum；**新表一律進 registry，不得靠 `create_all` 繞過**）。017 = `secretary_notes`、018 = `calendar_events`。 |
+| Schema | migration **19/19**（019 = `github_repo_states.language`）（append-only + checksum；**新表一律進 registry，不得靠 `create_all` 繞過**）。017 = `secretary_notes`、018 = `calendar_events`。 |
 | 測試 | **961 項**（959 passed + 2 conditional skip；2026-10-09 裝 `[dev]`（含 `[rag]`／`[mcp]`）的完整跑法，`--junitxml` 核對過 errors=0/failures=0）。**裝依賴要先裝子套件**：`pip install -e packages/coding-agent-transcripts -e ".[dev]"`——只裝 `.[dev]` 會因為 `coding-agent-transcripts` 不在 PyPI 而失敗（CI 也是這個順序）。以下是 2026-09-23 的舊敘述：847 項。**不裝 `[rag]` extra 的變體本輪沒有另外裝一份 venv 複測**——`tests/test_omni_demo.py` 沒有 import 任何 `rag.*`，理論上不受影響，但沒有實測收據，下一輪如果要確認就跑一次不裝 `[rag]` 的 `pytest`。容器缺 xdg-open 時 `test_open_command_is_argv_not_shell_string` 會條件 skip 並標註原因，不是失敗。 |
 | API 路由 | `core/server.py` **只做組裝**（134 行）；端點在 `core/api/*.py` 依領域分 9 個 router，請求結構在 `core/schemas.py`，AI ingest 規則在 `core/ingest.py`，execution token 閘門在 `core/api/deps.py`。**改動端點前先看 `tests/test_api_route_snapshot.py`**——134 條路由的（路徑、方法、handler 名稱）鎖在那裡（第 134 條是 F1 的 `GET /api/v1/git/commits/{event_id}/provenance`），新增端點要在清單多一行（D4，2026-09-16）。 |
 | 活動來源 | **只有一份**：`core/activity_sources.py`（`EVENT_SOURCES` 決定哪三張表算活動與專案欄位在哪、`normalize_project` 空白＝沒歸戶不猜、`day_bounds` 一律半開區間）。每週回顧／模式提案／每日工作誌／問候卡都吃它；**要增減活動來源就只改 `EVENT_SOURCES`**，有契約測試禁止使用端自己查三張事件表的專案欄位（D3，2026-09-16）。 |

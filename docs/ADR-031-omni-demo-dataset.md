@@ -117,3 +117,20 @@ E2E 使用，見 `docs/NEXT_SESSION.md` 遠端容器環境備忘）。`omni demo
 示範資料庫（不是「示範資料混進實機」，是「實機活動混進示範」）。這不算本 ADR D1–D6 的違反（D1
 只保護真實家目錄不被示範資料覆寫），但方向上是同一類問題的另一半，需要另外決定；已記在
 [docs/TODO.md](TODO.md) B7，留給下一輪或另一份 ADR Addendum 處理，不修改本 ADR 的 Decision。
+
+## Addendum A（2026-10-19，TODO B7）：示範家目錄不啟動任何採集器
+
+**問題**：D1 只保護「示範資料不混進實機」；反方向——`main.py run` 對示範家目錄照樣啟動
+`file_watcher`／`git_watcher`／`window_watcher`／`agent_log_watcher`／`calendar_watcher`，把使用者
+真實活動寫進打算公開展示的示範資料庫——當時沒有答案（2026-09-23 容器 E2E 實測到一筆真的
+`ai_prompt_events` 混進去）。
+
+**決定**：`WatcherManager.start_all()` 偵測到 `is_demo_home()` 時**一個服務都不啟動**（五個採集器
+與排程器），回傳 `status: "demo_readonly"` 與原因，`is_running` 維持 `False`。示範家目錄是**唯讀展示**：
+要更新內容就用 `omni demo --home` 重灌。選擇「不啟動」而非「啟動並警告」，是因為警告擋不住已經寫入的資料。
+排程器一併不啟動，因為它會依「現在時間」寫新的觀察／工誌，同樣會改變示範內容。
+
+**邊界**：判定仍只看旗標檔（`is_demo_home()`），不猜。不改變任何非示範家目錄的行為；
+`main.py run` 的網頁服務與 API 照常啟動，所以示範橫幅與唯讀畫面仍可用。
+**Claim boundary**：這只保證「示範家目錄上本程式不會自己採集」；使用者若手動從 Extension 或 API 寫入事件，
+不在此擋。

@@ -6,6 +6,7 @@ from datetime import datetime
 from core.time_utils import get_local_now
 from core.config import get_config
 from core.database import get_db
+from core.runtime_paths import is_demo_home
 from core.models import AIPromptEvent, DailySummary, FileActivityEvent, GitActivityEvent, IngestionCheckpoint, OpenLoop, ProjectState, WindowEvent
 from watchers.file_watcher import FileWatcherService
 from watchers.git_watcher import GitWatcherService
@@ -169,6 +170,14 @@ class WatcherManager:
         with self._lock:
             if self._is_running:
                 return {"status": "already_running", "message": "監控服務已在運行中"}
+
+            if is_demo_home():
+                # ADR-031 Addendum A：示範家目錄是唯讀展示，不採集真實活動。
+                logger.warning("示範家目錄：不啟動任何採集器與排程器（ADR-031 Addendum A）")
+                return {
+                    "status": "demo_readonly",
+                    "message": "這是 omni demo 的示範家目錄，不啟動採集器；要更新內容請重跑 omni demo",
+                }
 
             logger.info("Starting all watchers and scheduler...")
             self.file_watcher.start()
