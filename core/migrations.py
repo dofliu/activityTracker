@@ -650,6 +650,15 @@ def _migration_018_calendar_events(connection: Connection) -> None:
     ))
 
 
+def _migration_019_github_repo_language(connection: Connection) -> None:
+    """TODO F3：GitHub 回應本來就含 `language`，只是以前沒存。舊列留 NULL，不回填、不猜。"""
+    columns = {
+        row[1] for row in connection.execute(text("PRAGMA table_info(github_repo_states)")).fetchall()
+    }
+    if columns and "language" not in columns:
+        connection.execute(text("ALTER TABLE github_repo_states ADD COLUMN language VARCHAR(100)"))
+
+
 MIGRATIONS: tuple[MigrationDefinition, ...] = (
     MigrationDefinition(
         1,
@@ -776,6 +785,12 @@ MIGRATIONS: tuple[MigrationDefinition, ...] = (
         "unique_source_uid_start;privacy:no_description_no_attendees_no_url;"
         "contract:read_only_local_ics_replace_per_source_within_horizon",
         _migration_018_calendar_events,
+    ),
+    MigrationDefinition(
+        19,
+        "github_repo_language",
+        "github_repo_states:add_column:language;contract:null_means_unknown_no_backfill_no_guess",
+        _migration_019_github_repo_language,
     ),
 )
 

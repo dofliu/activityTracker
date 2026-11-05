@@ -353,6 +353,7 @@ class GitHubRepoState(Base):
     open_issues_count = Column(Integer, default=0)
     stars_count = Column(Integer, default=0)
     forks_count = Column(Integer, default=0)
+    language = Column(String(100), nullable=True)  # GitHub 回報的主要語言；None＝GitHub 沒給，不猜
     pushed_at = Column(DateTime, nullable=True, index=True)
     updated_at = Column(DateTime, default=get_local_now, onupdate=get_local_now)
     metadata_json = Column(Text, nullable=True)  # 儲存 CI 狀態、最新 PR 摘要等

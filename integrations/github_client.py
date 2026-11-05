@@ -316,6 +316,7 @@ class GitHubClient:
                 open_issues = r.get("open_issues_count", 0)
                 stars = r.get("stargazers_count", 0)
                 forks = r.get("forks_count", 0)
+                language = r.get("language") or None  # 沒有語言就留空，不猜
                 pushed_at = self.parse_iso_time(r.get("pushed_at"))
 
                 # 取得或新增 repo state
@@ -330,6 +331,7 @@ class GitHubClient:
                         default_branch=default_branch,
                         stars_count=stars,
                         forks_count=forks,
+                        language=language,
                         pushed_at=pushed_at,
                         updated_at=now
                     )
@@ -342,6 +344,7 @@ class GitHubClient:
                     repo_record.default_branch = default_branch
                     repo_record.stars_count = stars
                     repo_record.forks_count = forks
+                    repo_record.language = language
                     repo_record.pushed_at = pushed_at
                     repo_record.updated_at = now
 
