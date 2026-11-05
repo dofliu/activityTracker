@@ -229,6 +229,7 @@ def list_github_repos():
                 "open_prs_count": r.open_prs_count,
                 "open_issues_count": r.open_issues_count,
                 "stars": r.stars_count,
+                "language": r.language,
                 "pushed_at": r.pushed_at.strftime("%Y-%m-%d %H:%M") if r.pushed_at else None,
                 "prs_summary": json.loads(r.metadata_json) if r.metadata_json else []
             }

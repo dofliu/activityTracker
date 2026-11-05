@@ -292,3 +292,42 @@ def test_cli_demo_subcommand_dispatches_to_cmd_demo(monkeypatch):
     monkeypatch.setattr("sys.argv", ["main.py", "demo", "--home", "/tmp/example-demo"])
     main.main()
     assert calls == ["/tmp/example-demo"]
+
+
+def _fresh_manager(monkeypatch):
+    from core import manager as manager_module
+
+    monkeypatch.setattr(manager_module.WatcherManager, "_instance", None)
+    return manager_module.WatcherManager()
+
+
+def _spy_services(manager):
+    started = []
+    for name in ("file_watcher", "git_watcher", "window_watcher", "agent_log_watcher", "calendar_watcher"):
+        monkeypatch_target = getattr(manager, name)
+        monkeypatch_target.start = lambda n=name: started.append(n)
+    manager.scheduler.start = lambda: started.append("scheduler")
+    manager.record_coverage_heartbeat = lambda: {}
+    return started
+
+
+def test_start_all_on_demo_home_starts_nothing(tmp_path, monkeypatch):
+    """B7／ADR-031 Addendum A：示範家目錄不得啟動任何採集器或排程器。"""
+    monkeypatch.setenv("OMNICONTEXT_HOME", str(tmp_path))
+    demo_marker_path(tmp_path).write_text("{}", encoding="utf-8")
+    manager = _fresh_manager(monkeypatch)
+    started = _spy_services(manager)
+    result = manager.start_all()
+    assert result["status"] == "demo_readonly"
+    assert started == []
+    assert manager.is_running is False
+
+
+def test_start_all_on_a_normal_home_still_starts_every_service(tmp_path, monkeypatch):
+    monkeypatch.setenv("OMNICONTEXT_HOME", str(tmp_path))
+    manager = _fresh_manager(monkeypatch)
+    started = _spy_services(manager)
+    assert manager.start_all()["status"] == "started"
+    assert sorted(started) == sorted(
+        ["file_watcher", "git_watcher", "window_watcher", "agent_log_watcher", "calendar_watcher", "scheduler"]
+    )
